@@ -1,0 +1,311 @@
+import asyncio
+import json
+import csv
+import uuid
+import yaml
+from datetime import datetime
+from typing import Dict, List, Any
+from aiohttp import web, ClientSession
+import aiofiles
+import logging
+
+# Configure logging to write to file
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.FileHandler('server.log'),
+        logging.StreamHandler()  # Also log to console
+    ]
+)
+logger = logging.getLogger(__name__)
+
+@web.middleware
+async def error_middleware(request, handler):
+    """Global error handling middleware"""
+    try:
+        return await handler(request)
+    except web.HTTPException:
+        raise
+    except ValueError as e:
+        logger.error(f"Validation error: {e}")
+        return web.json_response({'error': str(e)}, status=400)
+    except KeyError as e:
+        logger.error(f"Missing field: {e}")
+        return web.json_response({'error': f'Missing required field: {e}'}, status=400)
+    except Exception as e:
+        logger.error(f"Unexpected error: {e}")
+        return web.json_response({'error': 'Internal server error'}, status=500)
+
+
+class TestingServer:
+    def __init__(self):
+        self.users: Dict[str, Dict[str, Any]] = {}  # username -> user data
+        self.questions: List[Dict[str, Any]] = []
+        self.user_responses: List[Dict[str, Any]] = []
+        self.questions_for_client: List[Dict[str, Any]] = []
+        self.user_progress: Dict[str, int] = {}  # user_id -> last_answered_question_id
+        
+    async def initialize_log_file(self):
+        """Initialize/recreate log file"""
+        try:
+            # Clear the log file by opening in write mode
+            with open('server.log', 'w') as f:
+                f.write('')
+            logger.info("=== Server Started - Log File Reset ===")
+        except Exception as e:
+            print(f"Error initializing log file: {e}")
+
+    async def initialize_csv(self):
+        """Initialize/recreate CSV file with headers"""
+        try:
+            async with aiofiles.open('user_responses.csv', 'w') as f:
+                await f.write('user_id,username,question_text,selected_answer_text,correct_answer_text,is_correct,time_taken_seconds\n')
+            logger.info("Initialized CSV file with headers")
+        except Exception as e:
+            logger.error(f"Error initializing CSV file: {e}")
+    
+    async def load_questions(self):
+        """Load questions from YAML file"""
+        try:
+            async with aiofiles.open('questions.yaml', 'r') as f:
+                content = await f.read()
+                data = yaml.safe_load(content)
+                self.questions = data['questions']
+                
+                # Add automatic IDs if not present
+                for i, question in enumerate(self.questions):
+                    if 'id' not in question:
+                        question['id'] = i + 1
+                        
+                logger.info(f"Loaded {len(self.questions)} questions")
+        except Exception as e:
+            logger.error(f"Error loading questions: {e}")
+            
+    async def generate_client_questions(self):
+        """Generate JSON file with questions without correct answers"""
+        self.questions_for_client = []
+        for q in self.questions:
+            client_question = {
+                'id': q['id'],
+                'question': q['question'],
+                'options': q['options']
+            }
+            self.questions_for_client.append(client_question)
+            
+        try:
+            async with aiofiles.open('static/questions_for_client.json', 'w') as f:
+                await f.write(json.dumps(self.questions_for_client, indent=2))
+                logger.info("Generated client questions JSON file in static folder")
+        except Exception as e:
+            logger.error(f"Error generating client questions: {e}")
+            
+    async def flush_responses_to_csv(self):
+        """Flush in-memory responses to CSV file"""
+        if not self.user_responses:
+            return
+            
+        try:
+            # Copy data to local variables before clearing to avoid race conditions
+            responses_to_flush = self.user_responses.copy()
+            self.user_responses.clear()
+            
+            # Properly escape CSV fields that might contain commas, quotes, and newlines
+            def escape_csv_field(field):
+                if isinstance(field, str):
+                    # Replace quotes with double quotes and wrap in quotes if contains special chars
+                    escaped = field.replace('"', '""')
+                    if ',' in escaped or '\n' in escaped or '\r' in escaped or '"' in field:
+                        return f'"{escaped}"'
+                    return escaped
+                return str(field)
+            
+            async with aiofiles.open('user_responses.csv', 'a') as f:
+                for response in responses_to_flush:
+                    user_id = escape_csv_field(response['user_id'])
+                    username = escape_csv_field(response['username'])
+                    question_text = escape_csv_field(response['question_text'])
+                    selected_answer_text = escape_csv_field(response['selected_answer_text'])
+                    correct_answer_text = escape_csv_field(response['correct_answer_text'])
+                    is_correct = response['is_correct']
+                    time_taken = response['time_taken_seconds']
+                    
+                    line = f"{user_id},{username},{question_text},{selected_answer_text},{correct_answer_text},{is_correct},{time_taken}\n"
+                    await f.write(line)
+                    
+            logger.info(f"Flushed {len(responses_to_flush)} responses to CSV")
+        except Exception as e:
+            logger.error(f"Error flushing responses to CSV: {e}")
+            
+    async def periodic_flush(self):
+        """Periodically flush responses to CSV"""
+        while True:
+            await asyncio.sleep(30)  # Flush every 30 seconds
+            await self.flush_responses_to_csv()
+            
+    async def register_user(self, request):
+        """Register a new user"""
+        data = await request.json()
+        username = data['username'].strip()
+        
+        if not username:
+            raise ValueError('Username cannot be empty')
+            
+        if username in self.users:
+            raise ValueError('Username already exists')
+        
+        # Generate unique user ID
+        user_id = str(uuid.uuid4())
+        
+        self.users[username] = {
+            'user_id': user_id,
+            'registered_at': datetime.now().isoformat()
+        }
+        
+        logger.info(f"Registered user: {username} with ID: {user_id}")
+        return web.json_response({
+            'username': username,
+            'user_id': user_id,
+            'message': 'User registered successfully'
+        })
+            
+    async def submit_answer(self, request):
+        """Submit test answer"""
+        data = await request.json()
+        user_id = data['user_id']
+        question_id = data['question_id']
+        selected_answer = data['selected_answer']
+        time_taken = data.get('time_taken', 0)  # Time in seconds
+        
+        # Find user by user_id
+        username = None
+        for uname, user_data in self.users.items():
+            if user_data['user_id'] == user_id:
+                username = uname
+                break
+        
+        if not username:
+            return web.json_response({'error': 'User not found'}, status=404)
+            
+        # Find the question
+        question = next((q for q in self.questions if q['id'] == question_id), None)
+        if not question:
+            return web.json_response({'error': 'Question not found'}, status=404)
+            
+        # Check if answer is correct
+        is_correct = selected_answer == question['correct_answer']
+        
+        # Store response in memory
+        response_data = {
+            'user_id': user_id,
+            'username': username,
+            'question_id': question_id,
+            'question_text': question['question'],
+            'selected_answer_text': question['options'][selected_answer],
+            'correct_answer_text': question['options'][question['correct_answer']],
+            'is_correct': is_correct,
+            'time_taken_seconds': time_taken,
+            'timestamp': datetime.now().isoformat()
+        }
+        
+        self.user_responses.append(response_data)
+        
+        # Update user progress
+        self.user_progress[user_id] = question_id
+        
+        logger.info(f"Answer submitted by {username} (ID: {user_id}) for question {question_id}: {'Correct' if is_correct else 'Incorrect'} (took {time_taken}s)")
+        logger.info(f"Updated progress for user {user_id}: last answered question = {question_id}")
+        
+        return web.json_response({
+            'is_correct': is_correct,
+            'message': 'Answer submitted successfully'
+        })
+            
+        
+    async def check_username(self, request):
+        """Check if username is available or already registered"""
+        data = await request.json()
+        username = data['username'].strip()
+        
+        if not username:
+            raise ValueError('Username cannot be empty')
+        
+        is_available = username not in self.users
+        
+        return web.json_response({
+            'username': username,
+            'available': is_available,
+            'message': 'Username available' if is_available else 'Username already taken'
+        })
+
+    async def verify_user_id(self, request):
+        """Verify if user_id exists and return user data"""
+        user_id = request.match_info['user_id']
+        
+        # Find user by user_id
+        for username, user_data in self.users.items():
+            if user_data['user_id'] == user_id:
+                # Get last answered question ID from progress tracking
+                last_answered_question_id = self.user_progress.get(user_id, 0)
+                
+                # Find the index of next question to answer
+                next_question_index = 0
+                if last_answered_question_id > 0:
+                    # Find the index of last answered question, then add 1
+                    for i, question in enumerate(self.questions):
+                        if question['id'] == last_answered_question_id:
+                            next_question_index = i + 1
+                            break
+                
+                # Ensure we don't go beyond available questions
+                if next_question_index >= len(self.questions):
+                    next_question_index = len(self.questions)
+                
+                logger.info(f"User {user_id} verification: last_answered={last_answered_question_id}, next_index={next_question_index}")
+                
+                return web.json_response({
+                    'valid': True,
+                    'user_id': user_id,
+                    'username': username,
+                    'next_question_index': next_question_index,
+                    'total_questions': len(self.questions),
+                    'last_answered_question_id': last_answered_question_id
+                })
+        
+        return web.json_response({
+            'valid': False,
+            'message': 'User ID not found'
+        })
+
+async def create_app():
+    """Create and configure the application"""
+    server = TestingServer()
+    
+    # Clean/recreate log file and CSV file on startup
+    await server.initialize_log_file()
+    await server.initialize_csv()
+    
+    # Load questions and generate client JSON
+    await server.load_questions()
+    await server.generate_client_questions()
+    
+    # Start periodic flush task
+    asyncio.create_task(server.periodic_flush())
+    
+    # Create app with middleware
+    app = web.Application(middlewares=[error_middleware])
+    
+    # Routes
+    app.router.add_post('/api/register', server.register_user)
+    app.router.add_post('/api/submit-answer', server.submit_answer)
+    app.router.add_post('/api/check-username', server.check_username)
+    app.router.add_get('/api/verify-user/{user_id}', server.verify_user_id)
+    
+    # Serve static files from static folder
+    app.router.add_static('/', path='static', name='static')
+    
+    return app
+
+if __name__ == '__main__':
+    app = create_app()
+    web.run_app(app, host='localhost', port=8080)
