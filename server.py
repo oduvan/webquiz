@@ -40,7 +40,7 @@ async def error_middleware(request, handler):
 
 class TestingServer:
     def __init__(self):
-        self.users: Dict[str, Dict[str, Any]] = {}  # username -> user data
+        self.users: Dict[str, Dict[str, Any]] = {}  # user_id -> user data
         self.questions: List[Dict[str, Any]] = []
         self.user_responses: List[Dict[str, Any]] = []
         self.questions_for_client: List[Dict[str, Any]] = []
@@ -151,14 +151,17 @@ class TestingServer:
         if not username:
             raise ValueError('Username cannot be empty')
             
-        if username in self.users:
-            raise ValueError('Username already exists')
+        # Check if username already exists
+        for existing_user in self.users.values():
+            if existing_user['username'] == username:
+                raise ValueError('Username already exists')
         
         # Generate unique user ID
         user_id = str(uuid.uuid4())
         
-        self.users[username] = {
+        self.users[user_id] = {
             'user_id': user_id,
+            'username': username,
             'registered_at': datetime.now().isoformat()
         }
         
@@ -178,14 +181,10 @@ class TestingServer:
         time_taken = data.get('time_taken', 0)  # Time in seconds
         
         # Find user by user_id
-        username = None
-        for uname, user_data in self.users.items():
-            if user_data['user_id'] == user_id:
-                username = uname
-                break
-        
-        if not username:
+        if user_id not in self.users:
             return web.json_response({'error': 'User not found'}, status=404)
+        
+        username = self.users[user_id]['username']
             
         # Find the question
         question = next((q for q in self.questions if q['id'] == question_id), None)
@@ -222,60 +221,46 @@ class TestingServer:
         })
             
         
-    async def check_username(self, request):
-        """Check if username is available or already registered"""
-        data = await request.json()
-        username = data['username'].strip()
-        
-        if not username:
-            raise ValueError('Username cannot be empty')
-        
-        is_available = username not in self.users
-        
-        return web.json_response({
-            'username': username,
-            'available': is_available,
-            'message': 'Username available' if is_available else 'Username already taken'
-        })
 
     async def verify_user_id(self, request):
         """Verify if user_id exists and return user data"""
         user_id = request.match_info['user_id']
         
         # Find user by user_id
-        for username, user_data in self.users.items():
-            if user_data['user_id'] == user_id:
-                # Get last answered question ID from progress tracking
-                last_answered_question_id = self.user_progress.get(user_id, 0)
+        if user_id in self.users:
+            user_data = self.users[user_id]
+            username = user_data['username']
+            # Get last answered question ID from progress tracking
+            last_answered_question_id = self.user_progress.get(user_id, 0)
+            
+            # Find the index of next question to answer
+            next_question_index = 0
+            if last_answered_question_id > 0:
+                # Find the index of last answered question, then add 1
+                for i, question in enumerate(self.questions):
+                    if question['id'] == last_answered_question_id:
+                        next_question_index = i + 1
+                        break
+            
+            # Ensure we don't go beyond available questions
+            if next_question_index >= len(self.questions):
+                next_question_index = len(self.questions)
+            
+            logger.info(f"User {user_id} verification: last_answered={last_answered_question_id}, next_index={next_question_index}")
                 
-                # Find the index of next question to answer
-                next_question_index = 0
-                if last_answered_question_id > 0:
-                    # Find the index of last answered question, then add 1
-                    for i, question in enumerate(self.questions):
-                        if question['id'] == last_answered_question_id:
-                            next_question_index = i + 1
-                            break
-                
-                # Ensure we don't go beyond available questions
-                if next_question_index >= len(self.questions):
-                    next_question_index = len(self.questions)
-                
-                logger.info(f"User {user_id} verification: last_answered={last_answered_question_id}, next_index={next_question_index}")
-                
-                return web.json_response({
-                    'valid': True,
-                    'user_id': user_id,
-                    'username': username,
-                    'next_question_index': next_question_index,
-                    'total_questions': len(self.questions),
-                    'last_answered_question_id': last_answered_question_id
-                })
-        
-        return web.json_response({
-            'valid': False,
-            'message': 'User ID not found'
-        })
+            return web.json_response({
+                'valid': True,
+                'user_id': user_id,
+                'username': username,
+                'next_question_index': next_question_index,
+                'total_questions': len(self.questions),
+                'last_answered_question_id': last_answered_question_id
+            })
+        else:
+            return web.json_response({
+                'valid': False,
+                'message': 'User ID not found'
+            })
 
 async def create_app():
     """Create and configure the application"""
@@ -298,7 +283,6 @@ async def create_app():
     # Routes
     app.router.add_post('/api/register', server.register_user)
     app.router.add_post('/api/submit-answer', server.submit_answer)
-    app.router.add_post('/api/check-username', server.check_username)
     app.router.add_get('/api/verify-user/{user_id}', server.verify_user_id)
     
     # Serve static files from static folder
