@@ -6,38 +6,46 @@ This file contains project context and memory for Claude Code sessions.
 Testing system built with Python and aiohttp that allows users to take multiple-choice tests with real-time answer submission and statistics tracking.
 
 **Key Features:**
-- User registration with unique usernames (no IDs)
-- Multiple-choice questions loaded from YAML
+- User registration with unique usernames and UUID-based user IDs
+- Multiple-choice questions loaded from YAML (auto-generated if missing)
 - Real-time answer validation via REST API
+- Server-side timing for accurate response measurement
 - In-memory storage with periodic CSV backup (30s intervals)
-- User statistics and performance tracking
-- Responsive web interface
+- User session persistence with cookie-based user ID storage
+- Responsive web interface with dark/light theme
+- Comprehensive test suite (integration + unit tests)
 
 ## Architecture
 - **Backend**: Python aiohttp server with middleware-based error handling
 - **Frontend**: Vanilla HTML/JS single-page application
 - **Data Storage**: 
-  - Questions: YAML file with correct answers
-  - User responses: In-memory � CSV file
-  - Users: In-memory dictionary (username as key)
+  - Questions: YAML file with correct answers (auto-created with defaults)
+  - User responses: In-memory → CSV file (proper CSV module usage)
+  - Users: In-memory dictionary (user_id as key, contains username)
+  - Session timing: Server-side tracking for accurate measurements
 - **API Design**: RESTful endpoints with JSON responses
+- **Testing**: Integration tests with real HTTP requests + unit tests for internal logic
 
 ## Key Files
 - `server.py` - Main aiohttp server with middleware and API endpoints
-- `questions.yaml` - Questions database with correct answers (no IDs needed)
-- `user_responses.csv` - User response storage (username,question_text,selected_answer_text,correct_answer_text,is_correct,time_taken_seconds)
+- `questions.yaml` - Questions database with correct answers (auto-created with sample questions)
+- `user_responses.csv` - User response storage (user_id,username,question_text,selected_answer_text,correct_answer_text,is_correct,time_taken_seconds)
 - `server.log` - Server activity log (resets on startup)
 - `static/` - Static files folder
   - `index.html` - Single-page web client with dark/light theme
   - `questions_for_client.json` - Auto-generated questions without correct answers
-- `requirements.txt` - Python dependencies (aiohttp, PyYAML, aiofiles)
+- `tests/` - Test suite
+  - `test_integration.py` - Integration tests with real HTTP requests (11 tests)
+  - `test_server.py` - Unit tests for internal functionality (3 tests)
+  - `conftest.py` - Test fixtures and configuration
+- `requirements.txt` - Python dependencies (aiohttp, PyYAML, aiofiles, pytest, pytest-asyncio)
 - `venv/` - Python virtual environment
+- `.gitignore` - Git ignore file (excludes generated files, logs, virtual env)
 
 ## API Endpoints
-- `POST /api/register` - Register unique username
-- `POST /api/submit-answer` - Submit answer (username, question_id, selected_answer)
-- `GET /api/questions` - Get questions without correct answers
-- `GET /api/user/{username}/stats` - Get user statistics
+- `POST /api/register` - Register unique username (returns user_id)
+- `POST /api/submit-answer` - Submit answer (user_id, question_id, selected_answer)
+- `GET /api/verify-user/{user_id}` - Verify user session and get progress
 
 ## Commands
 ```bash
@@ -61,23 +69,37 @@ pytest tests/ -v
 
 ## Technical Decisions
 - **Middleware over try-catch**: Used aiohttp middleware for cleaner error handling
-- **Username-based auth**: Users identified by unique usernames, not generated IDs
-- **Periodic CSV flush**: Every 30 seconds to prevent data loss
+- **UUID-based user IDs**: Users identified by UUID with username storage, stored by user_id as key
+- **Server-side timing**: Question timing tracked server-side for accuracy and security
+- **Auto-YAML creation**: Server creates default questions.yaml if missing
+- **Periodic CSV flush**: Every 30 seconds using proper CSV module for escaping
 - **Client-side question filtering**: Server generates separate JSON without correct answers
 - **In-memory storage**: Fast responses, CSV backup for persistence
+- **Session persistence**: Cookie-based user_id storage for seamless user experience
+- **Comprehensive testing**: Integration tests for API + unit tests for internal logic
 
 ## Data Flow
-1. Server loads questions.yaml � generates questions_for_client.json
-2. User registers � username stored in memory
-3. Client fetches questions � displays test interface
-4. User submits answers � validated against correct answers � stored in memory
-5. Periodic flush � responses written to CSV
-6. Stats calculated from in-memory responses
+1. Server loads questions.yaml (or creates default) → generates questions_for_client.json
+2. User registers → user_id generated, stored by user_id key, timing starts
+3. Client stores user_id in cookies for session persistence
+4. User submits answers → server calculates time taken → validated against correct answers → stored in memory
+5. Periodic flush → responses written to CSV using proper CSV module
+6. Server automatically tracks timing for each question transition
+
+## Test Strategy
+- **Integration Tests (11)**: Real HTTP requests testing full API functionality
+- **Unit Tests (3)**: Internal functionality not exposed via HTTP
+  - CSV writing with proper escaping
+  - Default YAML file creation
+  - User data structure validation
+- **No duplicate tests**: Removed 9 redundant unit tests covered by integration tests
 
 ## Notes
 - Username must be unique across all users
 - Questions use 0-indexed correct_answer field
-- Server validates all answers server-side
-- CSV headers: username,question_id,selected_answer,is_correct,timestamp
+- Server validates all answers server-side with automatic timing
+- CSV headers: user_id,username,question_text,selected_answer_text,correct_answer_text,is_correct,time_taken_seconds
 - Middleware handles JSON parsing errors and validation
 - HTTP exceptions used for proper status codes (404, 400, 500)
+- Generated files (logs, CSV, client JSON, YAML) are git-ignored
+- Server automatically creates missing questions.yaml with 3 sample questions
