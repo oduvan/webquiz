@@ -67,6 +67,38 @@ class TestingServer:
         except Exception as e:
             logger.error(f"Error initializing CSV file: {e}")
     
+    async def create_default_questions_yaml(self):
+        """Create default questions.yaml file"""
+        default_questions = {
+            'questions': [
+                {
+                    'id': 1,
+                    'question': 'What is 2 + 2?',
+                    'options': ['3', '4', '5', '6'],
+                    'correct_answer': 1
+                },
+                {
+                    'id': 2,
+                    'question': 'What is the capital of France?',
+                    'options': ['London', 'Berlin', 'Paris', 'Madrid'],
+                    'correct_answer': 2
+                },
+                {
+                    'id': 3,
+                    'question': 'Which programming language is this server written in?',
+                    'options': ['JavaScript', 'Python', 'Java', 'C++'],
+                    'correct_answer': 1
+                }
+            ]
+        }
+        
+        try:
+            async with aiofiles.open('questions.yaml', 'w') as f:
+                await f.write(yaml.dump(default_questions, default_flow_style=False))
+            logger.info("Created default questions.yaml file")
+        except Exception as e:
+            logger.error(f"Error creating default questions.yaml: {e}")
+
     async def load_questions(self):
         """Load questions from YAML file"""
         try:
@@ -81,6 +113,11 @@ class TestingServer:
                         question['id'] = i + 1
                         
                 logger.info(f"Loaded {len(self.questions)} questions")
+        except FileNotFoundError:
+            logger.info("questions.yaml not found, creating default file")
+            await self.create_default_questions_yaml()
+            # Retry loading after creating default file
+            await self.load_questions()
         except Exception as e:
             logger.error(f"Error loading questions: {e}")
             
