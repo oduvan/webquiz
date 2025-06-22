@@ -45,6 +45,7 @@ class TestingServer:
         self.user_responses: List[Dict[str, Any]] = []
         self.questions_for_client: List[Dict[str, Any]] = []
         self.user_progress: Dict[str, int] = {}  # user_id -> last_answered_question_id
+        self.question_start_times: Dict[str, datetime] = {}  # user_id -> question_start_time
         
     async def initialize_log_file(self):
         """Initialize/recreate log file"""
@@ -165,6 +166,9 @@ class TestingServer:
             'registered_at': datetime.now().isoformat()
         }
         
+        # Start timing for first question
+        self.question_start_times[user_id] = datetime.now()
+        
         logger.info(f"Registered user: {username} with ID: {user_id}")
         return web.json_response({
             'username': username,
@@ -178,7 +182,6 @@ class TestingServer:
         user_id = data['user_id']
         question_id = data['question_id']
         selected_answer = data['selected_answer']
-        time_taken = data.get('time_taken', 0)  # Time in seconds
         
         # Find user by user_id
         if user_id not in self.users:
@@ -191,6 +194,13 @@ class TestingServer:
         if not question:
             return web.json_response({'error': 'Question not found'}, status=404)
             
+        # Calculate time taken server-side
+        time_taken = 0
+        if user_id in self.question_start_times:
+            time_taken = (datetime.now() - self.question_start_times[user_id]).total_seconds()
+            # Clean up the start time
+            del self.question_start_times[user_id]
+        
         # Check if answer is correct
         is_correct = selected_answer == question['correct_answer']
         
@@ -212,11 +222,16 @@ class TestingServer:
         # Update user progress
         self.user_progress[user_id] = question_id
         
-        logger.info(f"Answer submitted by {username} (ID: {user_id}) for question {question_id}: {'Correct' if is_correct else 'Incorrect'} (took {time_taken}s)")
+        # Start timing for next question if not the last question
+        if question_id < len(self.questions):
+            self.question_start_times[user_id] = datetime.now()
+        
+        logger.info(f"Answer submitted by {username} (ID: {user_id}) for question {question_id}: {'Correct' if is_correct else 'Incorrect'} (took {time_taken:.2f}s)")
         logger.info(f"Updated progress for user {user_id}: last answered question = {question_id}")
         
         return web.json_response({
             'is_correct': is_correct,
+            'time_taken': time_taken,
             'message': 'Answer submitted successfully'
         })
             
@@ -245,6 +260,10 @@ class TestingServer:
             # Ensure we don't go beyond available questions
             if next_question_index >= len(self.questions):
                 next_question_index = len(self.questions)
+            
+            # Start timing for current question if user has questions left
+            if next_question_index < len(self.questions):
+                self.question_start_times[user_id] = datetime.now()
             
             logger.info(f"User {user_id} verification: last_answered={last_answered_question_id}, next_index={next_question_index}")
                 

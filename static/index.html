@@ -213,7 +213,6 @@
         let questions = [];
         let currentQuestionIndex = 0;
         let selectedAnswer = null;
-        let questionStartTime = null;
         let testResults = [];
         
         // Theme management
@@ -362,7 +361,6 @@
             
             const question = questions[currentQuestionIndex];
             selectedAnswer = null;
-            questionStartTime = Date.now();
             
             // Update progress
             const progress = ((currentQuestionIndex + 1) / questions.length) * 100;
@@ -409,7 +407,6 @@
                 return;
             }
             
-            const timeTaken = (Date.now() - questionStartTime) / 1000; // Convert to seconds
             const question = questions[currentQuestionIndex];
             
             try {
@@ -421,8 +418,7 @@
                     body: JSON.stringify({
                         user_id: currentUserId,
                         question_id: question.id,
-                        selected_answer: selectedAnswer,
-                        time_taken: timeTaken
+                        selected_answer: selectedAnswer
                     })
                 });
                 
@@ -432,7 +428,7 @@
                     question: question.question,
                     selectedAnswer: question.options[selectedAnswer],
                     isCorrect: data.is_correct,
-                    timeTaken: timeTaken
+                    timeTaken: data.time_taken || 0
                 });
                 
                 // Move to next question
