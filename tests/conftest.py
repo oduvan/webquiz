@@ -18,6 +18,10 @@ async def server():
 @pytest_asyncio.fixture
 async def app():
     """Create a test app instance"""
+    # Create test static directory
+    import os
+    os.makedirs('test-static', exist_ok=True)
+    
     # Mock file operations to avoid creating actual files during tests
     with patch('webquiz.server.TestingServer.initialize_log_file', new_callable=AsyncMock), \
          patch('webquiz.server.TestingServer.initialize_csv', new_callable=AsyncMock), \
@@ -25,7 +29,7 @@ async def app():
          patch('webquiz.server.TestingServer.generate_client_questions', new_callable=AsyncMock), \
          patch('asyncio.create_task'):  # Prevent background tasks during tests
         
-        app = await create_app('test-config.yaml')
+        app = await create_app('test-config.yaml', 'test-server.log', 'test-responses.csv', 'test-static')
         
         # Access the server instance and set up test questions
         # The server instance is created inside create_app()
@@ -53,7 +57,12 @@ async def app():
                 }
             ]
         
-        return app
+        yield app
+        
+        # Cleanup test static directory
+        import shutil
+        if os.path.exists('test-static'):
+            shutil.rmtree('test-static')
 
 
 @pytest_asyncio.fixture

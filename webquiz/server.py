@@ -10,15 +10,7 @@ import aiofiles
 import logging
 from io import StringIO
 
-# Configure logging to write to file
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    handlers=[
-        logging.FileHandler('server.log'),
-        logging.StreamHandler()  # Also log to console
-    ]
-)
+# Logger will be configured in create_app() with custom log file
 logger = logging.getLogger(__name__)
 
 @web.middleware
@@ -40,8 +32,11 @@ async def error_middleware(request, handler):
 
 
 class TestingServer:
-    def __init__(self, config_file: str = 'config.yaml'):
+    def __init__(self, config_file: str = 'config.yaml', log_file: str = 'server.log', csv_file: str = 'user_responses.csv', static_dir: str = 'static'):
         self.config_file = config_file
+        self.log_file = log_file
+        self.csv_file = csv_file
+        self.static_dir = static_dir
         self.users: Dict[str, Dict[str, Any]] = {}  # user_id -> user data
         self.questions: List[Dict[str, Any]] = []
         self.user_responses: List[Dict[str, Any]] = []
@@ -53,20 +48,20 @@ class TestingServer:
         """Initialize/recreate log file"""
         try:
             # Clear the log file by opening in write mode
-            with open('server.log', 'w') as f:
+            with open(self.log_file, 'w') as f:
                 f.write('')
-            logger.info("=== Server Started - Log File Reset ===")
+            logger.info(f"=== Server Started - Log File Reset: {self.log_file} ===")
         except Exception as e:
-            print(f"Error initializing log file: {e}")
+            print(f"Error initializing log file {self.log_file}: {e}")
 
     async def initialize_csv(self):
         """Initialize/recreate CSV file with headers"""
         try:
-            async with aiofiles.open('user_responses.csv', 'w') as f:
+            async with aiofiles.open(self.csv_file, 'w') as f:
                 await f.write('user_id,username,question_text,selected_answer_text,correct_answer_text,is_correct,time_taken_seconds\n')
-            logger.info("Initialized CSV file with headers")
+            logger.info(f"Initialized CSV file with headers: {self.csv_file}")
         except Exception as e:
-            logger.error(f"Error initializing CSV file: {e}")
+            logger.error(f"Error initializing CSV file {self.csv_file}: {e}")
     
     async def create_default_config_yaml(self):
         """Create default config.yaml file"""
@@ -134,11 +129,86 @@ class TestingServer:
             self.questions_for_client.append(client_question)
             
         try:
-            async with aiofiles.open('static/questions_for_client.json', 'w') as f:
+            # Ensure static directory exists
+            import os
+            os.makedirs(self.static_dir, exist_ok=True)
+            
+            client_questions_path = f"{self.static_dir}/questions_for_client.json"
+            async with aiofiles.open(client_questions_path, 'w') as f:
                 await f.write(json.dumps(self.questions_for_client, indent=2))
-                logger.info("Generated client questions JSON file in static folder")
+                logger.info(f"Generated client questions JSON file: {client_questions_path}")
         except Exception as e:
             logger.error(f"Error generating client questions: {e}")
+            
+    async def create_default_index_html(self):
+        """Create default index.html file if it doesn't exist"""
+        index_path = f"{self.static_dir}/index.html"
+        
+        # Check if index.html already exists
+        try:
+            async with aiofiles.open(index_path, 'r') as f:
+                # File exists, don't overwrite
+                logger.info(f"index.html already exists: {index_path}")
+                return
+        except FileNotFoundError:
+            pass  # File doesn't exist, create it
+        
+        # Copy template from package
+        try:
+            try:
+                # Try modern importlib.resources first (Python 3.9+)
+                import importlib.resources as pkg_resources
+                template_content = (pkg_resources.files('webquiz') / 'templates' / 'index.html').read_text()
+            except (ImportError, AttributeError):
+                # Fallback to pkg_resources for older Python versions
+                import pkg_resources
+                template_path = pkg_resources.resource_filename('webquiz', 'templates/index.html')
+                async with aiofiles.open(template_path, 'r') as template_file:
+                    template_content = await template_file.read()
+            
+            # Write to destination
+            async with aiofiles.open(index_path, 'w') as f:
+                await f.write(template_content)
+                
+            logger.info(f"Created default index.html file: {index_path}")
+            return
+        except Exception as e:
+            logger.error(f"Error copying template index.html: {e}")
+            # Continue to fallback
+            
+        # Fallback: create minimal HTML if template is not available
+        fallback_html = '''<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WebQuiz Testing System</title>
+    <style>
+        body { font-family: Arial, sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; }
+        .container { background: white; padding: 30px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+        button { background: #007bff; color: white; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer; }
+        input { padding: 10px; width: 300px; margin: 10px 0; border: 1px solid #ddd; border-radius: 3px; }
+        .hidden { display: none; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>WebQuiz Testing System</h1>
+        <div id="error">
+            <h2>Template Error</h2>
+            <p>Unable to load the full interface template. Please ensure the WebQuiz package is properly installed.</p>
+            <p>You can manually create an index.html file in the static directory with your custom interface.</p>
+        </div>
+    </div>
+</body>
+</html>'''
+        
+        try:
+            async with aiofiles.open(index_path, 'w') as f:
+                await f.write(fallback_html)
+            logger.warning(f"Created fallback index.html file: {index_path}")
+        except Exception as e:
+            logger.error(f"Error creating fallback index.html: {e}")
             
     async def flush_responses_to_csv(self):
         """Flush in-memory responses to CSV file"""
@@ -168,10 +238,10 @@ class TestingServer:
             total_responses = len(self.user_responses)
             self.user_responses.clear()
             
-            async with aiofiles.open('user_responses.csv', 'a') as f:
+            async with aiofiles.open(self.csv_file, 'a') as f:
                 await f.write(csv_content)
                     
-            logger.info(f"Flushed {total_responses} responses to CSV")
+            logger.info(f"Flushed {total_responses} responses to CSV: {self.csv_file}")
         except Exception as e:
             logger.error(f"Error flushing responses to CSV: {e}")
             
@@ -318,9 +388,20 @@ class TestingServer:
                 'message': 'User ID not found'
             })
 
-async def create_app(config_file: str = 'config.yaml'):
+async def create_app(config_file: str = 'config.yaml', log_file: str = 'server.log', csv_file: str = 'user_responses.csv', static_dir: str = 'static'):
     """Create and configure the application"""
-    server = TestingServer(config_file)
+    # Configure logging with custom log file
+    logging.basicConfig(
+        level=logging.INFO,
+        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+        handlers=[
+            logging.FileHandler(log_file),
+            logging.StreamHandler()  # Also log to console
+        ],
+        force=True  # Override any existing configuration
+    )
+    
+    server = TestingServer(config_file, log_file, csv_file, static_dir)
     
     # Clean/recreate log file and CSV file on startup
     await server.initialize_log_file()
@@ -329,6 +410,9 @@ async def create_app(config_file: str = 'config.yaml'):
     # Load questions and generate client JSON
     await server.load_questions()
     await server.generate_client_questions()
+    
+    # Create default index.html if it doesn't exist
+    await server.create_default_index_html()
     
     # Start periodic flush task
     asyncio.create_task(server.periodic_flush())
@@ -341,8 +425,8 @@ async def create_app(config_file: str = 'config.yaml'):
     app.router.add_post('/api/submit-answer', server.submit_answer)
     app.router.add_get('/api/verify-user/{user_id}', server.verify_user_id)
     
-    # Serve static files from static folder
-    app.router.add_static('/', path='static', name='static')
+    # Serve static files from configured static directory
+    app.router.add_static('/', path=static_dir, name='static')
     
     return app
 

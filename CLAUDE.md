@@ -8,11 +8,13 @@ WebQuiz - A modern web-based quiz and testing system built with Python and aioht
 **Key Features:**
 - User registration with unique usernames and UUID-based user IDs
 - Multiple-choice questions loaded from config YAML (auto-generated if missing)
+- Web interface with auto-generated index.html if not present
 - Real-time answer validation via REST API
 - Server-side timing for accurate response measurement
-- In-memory storage with periodic CSV backup (30s intervals)
+- In-memory storage with periodic CSV backup (30s intervals) to configurable file path
 - User session persistence with cookie-based user ID storage
 - Responsive web interface with dark/light theme
+- Configurable file paths for config, logs, CSV output, and static files
 - Comprehensive test suite (integration + unit tests)
 
 ## Architecture
@@ -31,10 +33,12 @@ WebQuiz - A modern web-based quiz and testing system built with Python and aioht
 - `webquiz/cli.py` - CLI interface with daemon support
 - `webquiz/__init__.py` - Package initialization
 - `config.yaml` - Configuration and questions database with correct answers (auto-created with sample questions)
+- `static/index.html` - Web interface (auto-generated if missing, never overwrites existing)
 - `user_responses.csv` - User response storage (user_id,username,question_text,selected_answer_text,correct_answer_text,is_correct,time_taken_seconds)
 - `server.log` - Server activity log (resets on startup)
 - `static/` - Static files folder
   - `index.html` - Single-page web client with dark/light theme
+  - `index.html` - Web interface (auto-created if missing)
   - `questions_for_client.json` - Auto-generated questions without correct answers
 - `tests/` - Test suite
   - `test_integration.py` - Integration tests with real HTTP requests (11 tests)
@@ -61,11 +65,15 @@ source venv/bin/activate
 pip install -r requirements.txt
 
 # Run server
-webquiz                      # Foreground mode
-webquiz --config custom.yaml # Use custom config file
-webquiz -d                   # Daemon mode
-webquiz --stop               # Stop daemon
-webquiz --status             # Check status
+webquiz                              # Foreground mode
+webquiz --config custom.yaml         # Use custom config file
+webquiz --log-file /var/log/quiz.log # Use custom log file
+webquiz --csv-file /data/responses.csv # Use custom CSV file
+webquiz --static /var/www/quiz       # Use custom static directory
+webquiz --config quiz.yaml --log-file quiz.log --csv-file quiz.csv --static web/
+webquiz -d                           # Daemon mode
+webquiz --stop                       # Stop daemon
+webquiz --status                     # Check status
 
 # Alternative (without Poetry installation)
 python -m webquiz.cli

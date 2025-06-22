@@ -6,12 +6,14 @@ A modern web-based quiz and testing system built with Python and aiohttp that al
 
 - **User Management**: Unique username registration with UUID-based session tracking
 - **Question System**: YAML-based config with automatic file generation
+- **Auto-Generated Files**: Creates default config.yaml and index.html if missing
 - **Real-time Validation**: Server-side answer checking and timing
 - **Session Persistence**: Cookie-based user sessions for seamless experience
 - **Performance Tracking**: Server-side timing for accurate response measurement
-- **Data Export**: Automatic CSV export of user responses with proper escaping
+- **Data Export**: Automatic CSV export of user responses with configurable file paths
 - **Responsive UI**: Clean web interface with dark/light theme support
 - **Comprehensive Testing**: Full test suite with integration and unit tests
+- **Flexible File Paths**: Configurable paths for config, log, CSV, and static files
 
 ## 🚀 Quick Start
 
@@ -65,7 +67,10 @@ A modern web-based quiz and testing system built with Python and aiohttp that al
    python -m webquiz.cli
    ```
 
-That's it! The server will automatically create sample questions if none exist.
+That's it! The server will automatically create:
+- **config.yaml** with sample questions if missing
+- **index.html** web interface if missing
+- **CSV files** for user response tracking
 
 ## 📁 Project Structure
 
@@ -89,11 +94,13 @@ webquiz/
 └── venv/                  # Virtual environment (excluded from git)
 
 # Generated at runtime (excluded from git):
-├── config.yaml            # Configuration and question database
+├── config.yaml            # Configuration and question database (auto-created)
 ├── user_responses.csv     # User response data  
 ├── server.log            # Server logs
 ├── webquiz.pid           # Daemon process ID
-└── static/questions_for_client.json  # Client-safe questions
+└── static/
+    ├── index.html             # Web interface (auto-created if missing)
+    └── questions_for_client.json  # Client-safe questions (auto-generated)
 ```
 
 ## 🔧 API Reference
@@ -167,8 +174,14 @@ The `webquiz` command provides several options:
 # Start server in foreground (default)
 webquiz
 
-# Start server with custom config file
+# Start server with custom files
 webquiz --config my-config.yaml
+webquiz --log-file /var/log/webquiz.log
+webquiz --csv-file /data/responses.csv
+webquiz --static /var/www/quiz
+
+# Combine multiple custom paths
+webquiz --config quiz.yaml --log-file quiz.log --csv-file quiz.csv --static web/
 
 # Start server as daemon (background)
 webquiz -d
@@ -262,7 +275,11 @@ user_id,username,question_text,selected_answer_text,correct_answer_text,is_corre
 1. **Edit config.yaml** (created automatically on first run)
 2. **Restart the server** to load new questions  
 3. **Questions must have unique IDs** and 0-indexed correct answers
-4. **Use custom config**: `webquiz --config my-questions.yaml`
+4. **Use custom file paths**: 
+   - Config: `webquiz --config my-questions.yaml`
+   - Logs: `webquiz --log-file /var/log/quiz.log`
+   - CSV: `webquiz --csv-file /data/responses.csv`
+   - Static files: `webquiz --static /var/www/quiz`
 
 ### Styling
 
@@ -310,7 +327,11 @@ pip install -r requirements.txt
 - Check that `config.yaml` has valid YAML syntax
 - Restart server after editing config file
 - Check server logs for errors
-- Use `--config` flag to specify custom config file
+- Use custom file paths:
+  - `--config` for custom config file
+  - `--log-file` for custom log location
+  - `--csv-file` for custom CSV output location
+  - `--static` for custom static files directory
 
 ## 📝 License
 

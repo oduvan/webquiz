@@ -105,9 +105,12 @@ def start_daemon():
             
             # Start the server
             try:
-                # Get config file from global variable set in main()
+                # Get file paths from global variables set in main()
                 config_file = getattr(start_daemon, '_config_file', 'config.yaml')
-                run_server(config_file)
+                log_file = getattr(start_daemon, '_log_file', 'server.log')
+                csv_file = getattr(start_daemon, '_csv_file', 'user_responses.csv')
+                static_dir = getattr(start_daemon, '_static_dir', 'static')
+                run_server(config_file, log_file, csv_file, static_dir)
             except Exception as e:
                 print(f"❌ Error starting server: {e}")
                 pid_file = get_pid_file_path()
@@ -153,15 +156,18 @@ def stop_daemon():
         return 1
 
 
-def run_server(config_file: str = 'config.yaml'):
+def run_server(config_file: str = 'config.yaml', log_file: str = 'server.log', csv_file: str = 'user_responses.csv', static_dir: str = 'static'):
     """Run the server in foreground mode."""
     print("🚀 Starting WebQuiz Testing System...")
-    print(f"📄 Using config file: {config_file}")
+    print(f"📄 Config file: {config_file}")
+    print(f"📝 Log file: {log_file}")
+    print(f"📊 CSV file: {csv_file}")
+    print(f"📁 Static directory: {static_dir}")
     print("🌐 Server will be available at: http://localhost:8080")
     print("⏹️  Press Ctrl+C to stop")
     
     async def start_server():
-        app = await create_app(config_file)
+        app = await create_app(config_file, log_file, csv_file, static_dir)
         runner = web.AppRunner(app)
         await runner.setup()
         
@@ -198,16 +204,21 @@ def main():
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  webquiz                    Start server in foreground
-  webquiz -d                 Start server as daemon
-  webquiz --config custom.yaml    Use custom config file
-  webquiz --stop             Stop daemon server
-  webquiz --status           Check daemon status
+  webquiz                              Start server in foreground
+  webquiz -d                           Start server as daemon
+  webquiz --config custom.yaml         Use custom config file
+  webquiz --log-file /var/log/quiz.log Use custom log file
+  webquiz --csv-file /data/responses.csv   Use custom CSV file
+  webquiz --static /var/www/quiz       Use custom static files directory
+  webquiz --config quiz.yaml --log-file quiz.log --csv-file quiz.csv --static web/
+  webquiz --stop                       Stop daemon server
+  webquiz --status                     Check daemon status
 
 The server will be available at http://localhost:8080
 Questions are loaded from config.yaml (auto-created if missing)
 User responses are saved to user_responses.csv
 Server logs are written to server.log
+Static files served from static/ directory
         """
     )
     
@@ -233,6 +244,24 @@ Server logs are written to server.log
         '--config',
         default='config.yaml',
         help='Path to config file (default: config.yaml)'
+    )
+    
+    parser.add_argument(
+        '--log-file',
+        default='server.log',
+        help='Path to log file (default: server.log)'
+    )
+    
+    parser.add_argument(
+        '--csv-file',
+        default='user_responses.csv',
+        help='Path to CSV file for user responses (default: user_responses.csv)'
+    )
+    
+    parser.add_argument(
+        '--static',
+        default='static',
+        help='Path to static files directory (default: static)'
     )
     
     parser.add_argument(
@@ -262,12 +291,15 @@ Server logs are written to server.log
     
     # Handle daemon start
     if args.daemon:
-        # Store config file for daemon process
+        # Store file paths for daemon process
         start_daemon._config_file = args.config
+        start_daemon._log_file = args.log_file
+        start_daemon._csv_file = args.csv_file
+        start_daemon._static_dir = args.static
         return start_daemon()
     
     # Default: run server in foreground
-    return run_server(args.config)
+    return run_server(args.config, args.log_file, args.csv_file, args.static)
 
 
 if __name__ == '__main__':
