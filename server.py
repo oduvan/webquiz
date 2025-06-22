@@ -5,7 +5,7 @@ import uuid
 import yaml
 from datetime import datetime
 from typing import Dict, List, Any
-from aiohttp import web, ClientSession
+from aiohttp import web
 import aiofiles
 import logging
 from io import StringIO

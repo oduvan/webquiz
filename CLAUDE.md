@@ -52,6 +52,11 @@ python server.py
 
 # Add questions
 # Edit questions.yaml, restart server to load changes
+
+# Run tests
+pytest tests/
+# Or with verbose output:
+pytest tests/ -v
 ```
 
 ## Technical Decisions
