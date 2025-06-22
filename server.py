@@ -8,6 +8,7 @@ from typing import Dict, List, Any
 from aiohttp import web, ClientSession
 import aiofiles
 import logging
+from io import StringIO
 
 # Configure logging to write to file
 logging.basicConfig(
@@ -107,34 +108,32 @@ class TestingServer:
             return
             
         try:
-            # Copy data to local variables before clearing to avoid race conditions
-            responses_to_flush = self.user_responses.copy()
+            # Use StringIO buffer to write CSV data
+            csv_buffer = StringIO()
+            csv_writer = csv.writer(csv_buffer)
+            
+            # Write all responses to buffer
+            for response in self.user_responses:
+                csv_writer.writerow([
+                    response['user_id'],
+                    response['username'],
+                    response['question_text'],
+                    response['selected_answer_text'],
+                    response['correct_answer_text'],
+                    response['is_correct'],
+                    response['time_taken_seconds']
+                ])
+            
+            # Write buffer content to file
+            csv_content = csv_buffer.getvalue()
+            csv_buffer.close()
+            total_responses = len(self.user_responses)
             self.user_responses.clear()
             
-            # Properly escape CSV fields that might contain commas, quotes, and newlines
-            def escape_csv_field(field):
-                if isinstance(field, str):
-                    # Replace quotes with double quotes and wrap in quotes if contains special chars
-                    escaped = field.replace('"', '""')
-                    if ',' in escaped or '\n' in escaped or '\r' in escaped or '"' in field:
-                        return f'"{escaped}"'
-                    return escaped
-                return str(field)
-            
             async with aiofiles.open('user_responses.csv', 'a') as f:
-                for response in responses_to_flush:
-                    user_id = escape_csv_field(response['user_id'])
-                    username = escape_csv_field(response['username'])
-                    question_text = escape_csv_field(response['question_text'])
-                    selected_answer_text = escape_csv_field(response['selected_answer_text'])
-                    correct_answer_text = escape_csv_field(response['correct_answer_text'])
-                    is_correct = response['is_correct']
-                    time_taken = response['time_taken_seconds']
+                await f.write(csv_content)
                     
-                    line = f"{user_id},{username},{question_text},{selected_answer_text},{correct_answer_text},{is_correct},{time_taken}\n"
-                    await f.write(line)
-                    
-            logger.info(f"Flushed {len(responses_to_flush)} responses to CSV")
+            logger.info(f"Flushed {total_responses} responses to CSV")
         except Exception as e:
             logger.error(f"Error flushing responses to CSV: {e}")
             
