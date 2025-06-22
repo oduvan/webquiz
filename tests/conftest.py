@@ -4,7 +4,7 @@ import tempfile
 import os
 from unittest.mock import AsyncMock, patch
 from aiohttp.test_utils import TestClient, TestServer
-from server import TestingServer, create_app
+from webquiz.server import TestingServer, create_app
 
 
 @pytest_asyncio.fixture
@@ -19,10 +19,10 @@ async def server():
 async def app():
     """Create a test app instance"""
     # Mock file operations to avoid creating actual files during tests
-    with patch('server.TestingServer.initialize_log_file', new_callable=AsyncMock), \
-         patch('server.TestingServer.initialize_csv', new_callable=AsyncMock), \
-         patch('server.TestingServer.load_questions', new_callable=AsyncMock), \
-         patch('server.TestingServer.generate_client_questions', new_callable=AsyncMock), \
+    with patch('webquiz.server.TestingServer.initialize_log_file', new_callable=AsyncMock), \
+         patch('webquiz.server.TestingServer.initialize_csv', new_callable=AsyncMock), \
+         patch('webquiz.server.TestingServer.load_questions', new_callable=AsyncMock), \
+         patch('webquiz.server.TestingServer.generate_client_questions', new_callable=AsyncMock), \
          patch('asyncio.create_task'):  # Prevent background tasks during tests
         
         app = await create_app()

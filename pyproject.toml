@@ -1,0 +1,56 @@
+[tool.poetry]
+name = "webquiz"
+version = "1.0.0"
+description = "A modern web-based quiz and testing system built with Python and aiohttp"
+authors = ["Oleksandr Liabakh <oduvan@gmail.com>"]
+license = "MIT"
+readme = "README.md"
+homepage = "https://github.com/oduvan/webquiz"
+repository = "https://github.com/oduvan/webquiz"
+documentation = "https://github.com/oduvan/webquiz"
+keywords = ["quiz", "testing", "aiohttp", "web", "assessment", "education"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Education",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Education :: Testing",
+    "Topic :: Internet :: WWW/HTTP :: HTTP Servers",
+    "Topic :: Software Development :: Testing",
+]
+packages = [{include = "webquiz"}]
+
+[tool.poetry.dependencies]
+python = "^3.9"
+aiohttp = "^3.12.13"
+PyYAML = "^6.0.2"
+aiofiles = "^24.1.0"
+
+[tool.poetry.group.dev.dependencies]
+pytest = "^8.3.3"
+pytest-asyncio = "^0.24.0"
+
+[tool.poetry.scripts]
+webquiz = "webquiz.cli:main"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.pytest.ini_options]
+minversion = "6.0"
+addopts = "-ra -q"
+testpaths = [
+    "tests",
+]
+asyncio_mode = "auto"
+
+[tool.poetry.urls]
+"Bug Tracker" = "https://github.com/oduvan/webquiz/issues"

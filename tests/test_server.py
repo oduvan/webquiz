@@ -3,7 +3,7 @@ import json
 import uuid
 from datetime import datetime
 from unittest.mock import patch, AsyncMock, MagicMock
-from server import TestingServer
+from webquiz.server import TestingServer
 
 
 class TestTestingServer:

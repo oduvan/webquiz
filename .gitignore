@@ -133,6 +133,7 @@ server.log
 user_responses.csv
 static/questions_for_client.json
 questions.yaml
+webquiz.pid
 
 # IDE files
 .vscode/

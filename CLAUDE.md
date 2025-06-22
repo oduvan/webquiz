@@ -3,7 +3,7 @@
 This file contains project context and memory for Claude Code sessions.
 
 ## Project Overview
-Testing system built with Python and aiohttp that allows users to take multiple-choice tests with real-time answer submission and statistics tracking.
+WebQuiz - A modern web-based quiz and testing system built with Python and aiohttp that allows users to take multiple-choice tests with real-time answer submission and statistics tracking.
 
 **Key Features:**
 - User registration with unique usernames and UUID-based user IDs
@@ -27,7 +27,9 @@ Testing system built with Python and aiohttp that allows users to take multiple-
 - **Testing**: Integration tests with real HTTP requests + unit tests for internal logic
 
 ## Key Files
-- `server.py` - Main aiohttp server with middleware and API endpoints
+- `webquiz/server.py` - Main aiohttp server with middleware and API endpoints
+- `webquiz/cli.py` - CLI interface with daemon support
+- `webquiz/__init__.py` - Package initialization
 - `questions.yaml` - Questions database with correct answers (auto-created with sample questions)
 - `user_responses.csv` - User response storage (user_id,username,question_text,selected_answer_text,correct_answer_text,is_correct,time_taken_seconds)
 - `server.log` - Server activity log (resets on startup)
@@ -38,7 +40,8 @@ Testing system built with Python and aiohttp that allows users to take multiple-
   - `test_integration.py` - Integration tests with real HTTP requests (11 tests)
   - `test_server.py` - Unit tests for internal functionality (3 tests)
   - `conftest.py` - Test fixtures and configuration
-- `requirements.txt` - Python dependencies (aiohttp, PyYAML, aiofiles, pytest, pytest-asyncio)
+- `pyproject.toml` - Poetry configuration and dependencies
+- `requirements.txt` - Legacy pip dependencies
 - `venv/` - Python virtual environment
 - `.gitignore` - Git ignore file (excludes generated files, logs, virtual env)
 
@@ -49,22 +52,30 @@ Testing system built with Python and aiohttp that allows users to take multiple-
 
 ## Commands
 ```bash
-# Setup
+# Setup with Poetry (recommended)
+poetry install
+
+# Setup with pip (alternative)
 python3 -m venv venv
 source venv/bin/activate
 pip install -r requirements.txt
 
 # Run server
-python server.py
-# Server runs on http://localhost:8080
+webquiz              # Foreground mode
+webquiz -d           # Daemon mode
+webquiz --stop       # Stop daemon
+webquiz --status     # Check status
+
+# Alternative (without Poetry installation)
+python -m webquiz.cli
 
 # Add questions
 # Edit questions.yaml, restart server to load changes
 
 # Run tests
-pytest tests/
-# Or with verbose output:
-pytest tests/ -v
+poetry run pytest   # With Poetry
+pytest tests/       # Direct
+pytest tests/ -v    # Verbose
 ```
 
 ## Technical Decisions

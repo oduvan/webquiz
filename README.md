@@ -1,6 +1,6 @@
-# AI Testing System
+# WebQuiz
 
-A modern web-based testing system built with Python and aiohttp that allows users to take multiple-choice tests with real-time answer validation and performance tracking.
+A modern web-based quiz and testing system built with Python and aiohttp that allows users to take multiple-choice tests with real-time answer validation and performance tracking.
 
 ## ✨ Features
 
@@ -17,36 +17,52 @@ A modern web-based testing system built with Python and aiohttp that allows user
 
 ### Prerequisites
 
-- Python 3.8+
+- Python 3.9+ (required by aiohttp)
+- Poetry (recommended) or pip
 - Git
 
-### Installation
+### Installation with Poetry (Recommended)
 
 1. **Clone the repository**
    ```bash
-   git clone <repository-url>
-   cd aiotests
+   git clone git@github.com:oduvan/webquiz.git
+   cd webquiz
    ```
 
-2. **Set up virtual environment**
+2. **Install with Poetry**
    ```bash
+   poetry install
+   ```
+
+3. **Run the server**
+   ```bash
+   webquiz           # Foreground mode
+   webquiz -d        # Daemon mode
+   ```
+
+4. **Open your browser**
+   ```
+   http://localhost:8080
+   ```
+
+### Alternative Installation with pip
+
+1. **Clone and set up virtual environment**
+   ```bash
+   git clone git@github.com:oduvan/webquiz.git
+   cd webquiz
    python3 -m venv venv
    source venv/bin/activate  # On Windows: venv\Scripts\activate
    ```
 
-3. **Install dependencies**
+2. **Install dependencies**
    ```bash
    pip install -r requirements.txt
    ```
 
-4. **Run the server**
+3. **Run the server**
    ```bash
-   python server.py
-   ```
-
-5. **Open your browser**
-   ```
-   http://localhost:8080
+   python -m webquiz.cli
    ```
 
 That's it! The server will automatically create sample questions if none exist.
@@ -54,24 +70,29 @@ That's it! The server will automatically create sample questions if none exist.
 ## 📁 Project Structure
 
 ```
-aiotests/
-├── server.py                 # Main application server
-├── requirements.txt          # Python dependencies
-├── .gitignore               # Git ignore rules
-├── CLAUDE.md                # Project documentation
-├── README.md                # This file
-├── static/                  # Frontend files
-│   └── index.html          # Single-page web application
-├── tests/                   # Test suite
-│   ├── conftest.py         # Test configuration
+webquiz/
+├── pyproject.toml           # Poetry configuration and dependencies
+├── requirements.txt         # Legacy pip dependencies  
+├── .gitignore              # Git ignore rules
+├── CLAUDE.md               # Project documentation
+├── README.md               # This file
+├── webquiz/                # Main package
+│   ├── __init__.py        # Package initialization
+│   ├── cli.py             # CLI entry point (webquiz command)
+│   └── server.py          # Main application server
+├── static/                 # Frontend files
+│   └── index.html         # Single-page web application
+├── tests/                  # Test suite
+│   ├── conftest.py        # Test configuration
 │   ├── test_integration.py # Integration tests (11 tests)
-│   └── test_server.py      # Unit tests (3 tests)
-└── venv/                   # Virtual environment (excluded from git)
+│   └── test_server.py     # Unit tests (3 tests)
+└── venv/                  # Virtual environment (excluded from git)
 
 # Generated at runtime (excluded from git):
-├── questions.yaml          # Question database
-├── user_responses.csv      # User response data
-├── server.log             # Server logs
+├── questions.yaml         # Question database
+├── user_responses.csv     # User response data  
+├── server.log            # Server logs
+├── webquiz.pid           # Daemon process ID
 └── static/questions_for_client.json  # Client-safe questions
 ```
 
@@ -138,12 +159,48 @@ Verify user session and get progress information.
 }
 ```
 
+## 🖥️ CLI Commands
+
+The `webquiz` command provides several options:
+
+```bash
+# Start server in foreground (default)
+webquiz
+
+# Start server as daemon (background)
+webquiz -d
+webquiz --daemon
+
+# Stop daemon server
+webquiz --stop
+
+# Check daemon status
+webquiz --status
+
+# Show help
+webquiz --help
+
+# Show version
+webquiz --version
+```
+
+### Daemon Mode Features
+
+- **Background execution**: Server runs independently in background
+- **PID file management**: Automatic process tracking via `webquiz.pid`
+- **Graceful shutdown**: Proper cleanup on stop
+- **Status monitoring**: Check if daemon is running
+- **Log preservation**: All output still goes to `server.log`
+
 ## 🧪 Testing
 
 Run the comprehensive test suite:
 
 ```bash
-# Run all tests
+# With Poetry
+poetry run pytest
+
+# Or directly
 pytest tests/
 
 # Run with verbose output
@@ -221,7 +278,7 @@ user_id,username,question_text,selected_answer_text,correct_answer_text,is_corre
 
 ### Architecture
 
-- **Backend**: Python 3.8+ with aiohttp async web framework
+- **Backend**: Python 3.9+ with aiohttp async web framework
 - **Frontend**: Vanilla HTML/CSS/JavaScript (no frameworks)
 - **Storage**: In-memory with periodic CSV backups (30-second intervals)
 - **Session Management**: Cookie-based with server-side validation
