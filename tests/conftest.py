@@ -25,7 +25,7 @@ async def app():
          patch('webquiz.server.TestingServer.generate_client_questions', new_callable=AsyncMock), \
          patch('asyncio.create_task'):  # Prevent background tasks during tests
         
-        app = await create_app()
+        app = await create_app('test-config.yaml')
         
         # Access the server instance and set up test questions
         # The server instance is created inside create_app()

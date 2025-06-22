@@ -105,7 +105,9 @@ def start_daemon():
             
             # Start the server
             try:
-                run_server()
+                # Get config file from global variable set in main()
+                config_file = getattr(start_daemon, '_config_file', 'config.yaml')
+                run_server(config_file)
             except Exception as e:
                 print(f"❌ Error starting server: {e}")
                 pid_file = get_pid_file_path()
@@ -151,14 +153,15 @@ def stop_daemon():
         return 1
 
 
-def run_server():
+def run_server(config_file: str = 'config.yaml'):
     """Run the server in foreground mode."""
     print("🚀 Starting WebQuiz Testing System...")
+    print(f"📄 Using config file: {config_file}")
     print("🌐 Server will be available at: http://localhost:8080")
     print("⏹️  Press Ctrl+C to stop")
     
     async def start_server():
-        app = await create_app()
+        app = await create_app(config_file)
         runner = web.AppRunner(app)
         await runner.setup()
         
@@ -195,13 +198,14 @@ def main():
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  webquiz              Start server in foreground
-  webquiz -d           Start server as daemon
-  webquiz --stop       Stop daemon server
-  webquiz --status     Check daemon status
+  webquiz                    Start server in foreground
+  webquiz -d                 Start server as daemon
+  webquiz --config custom.yaml    Use custom config file
+  webquiz --stop             Stop daemon server
+  webquiz --status           Check daemon status
 
 The server will be available at http://localhost:8080
-Questions are loaded from questions.yaml (auto-created if missing)
+Questions are loaded from config.yaml (auto-created if missing)
 User responses are saved to user_responses.csv
 Server logs are written to server.log
         """
@@ -223,6 +227,12 @@ Server logs are written to server.log
         '--status',
         action='store_true',
         help='Check daemon status'
+    )
+    
+    parser.add_argument(
+        '--config',
+        default='config.yaml',
+        help='Path to config file (default: config.yaml)'
     )
     
     parser.add_argument(
@@ -252,10 +262,12 @@ Server logs are written to server.log
     
     # Handle daemon start
     if args.daemon:
+        # Store config file for daemon process
+        start_daemon._config_file = args.config
         return start_daemon()
     
     # Default: run server in foreground
-    return run_server()
+    return run_server(args.config)
 
 
 if __name__ == '__main__':

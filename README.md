@@ -5,7 +5,7 @@ A modern web-based quiz and testing system built with Python and aiohttp that al
 ## ✨ Features
 
 - **User Management**: Unique username registration with UUID-based session tracking
-- **Question System**: YAML-based questions with automatic file generation
+- **Question System**: YAML-based config with automatic file generation
 - **Real-time Validation**: Server-side answer checking and timing
 - **Session Persistence**: Cookie-based user sessions for seamless experience
 - **Performance Tracking**: Server-side timing for accurate response measurement
@@ -89,7 +89,7 @@ webquiz/
 └── venv/                  # Virtual environment (excluded from git)
 
 # Generated at runtime (excluded from git):
-├── questions.yaml         # Question database
+├── config.yaml            # Configuration and question database
 ├── user_responses.csv     # User response data  
 ├── server.log            # Server logs
 ├── webquiz.pid           # Daemon process ID
@@ -167,6 +167,9 @@ The `webquiz` command provides several options:
 # Start server in foreground (default)
 webquiz
 
+# Start server with custom config file
+webquiz --config my-config.yaml
+
 # Start server as daemon (background)
 webquiz -d
 webquiz --daemon
@@ -218,9 +221,9 @@ pytest tests/test_server.py
 - **3 Unit Tests**: Internal functionality testing (CSV, YAML, data structures)
 - **Total**: 14 tests covering all critical functionality
 
-## 📋 Question Format
+## 📋 Configuration Format
 
-Questions are stored in `questions.yaml` (auto-generated if missing):
+Questions are stored in `config.yaml` (auto-generated if missing):
 
 ```yaml
 questions:
@@ -256,9 +259,10 @@ user_id,username,question_text,selected_answer_text,correct_answer_text,is_corre
 
 ### Adding Your Own Questions
 
-1. **Edit questions.yaml** (created automatically on first run)
-2. **Restart the server** to load new questions
+1. **Edit config.yaml** (created automatically on first run)
+2. **Restart the server** to load new questions  
 3. **Questions must have unique IDs** and 0-indexed correct answers
+4. **Use custom config**: `webquiz --config my-questions.yaml`
 
 ### Styling
 
@@ -303,9 +307,10 @@ pip install -r requirements.txt
 ```
 
 **Questions not loading:**
-- Check that `questions.yaml` has valid YAML syntax
-- Restart server after editing questions
+- Check that `config.yaml` has valid YAML syntax
+- Restart server after editing config file
 - Check server logs for errors
+- Use `--config` flag to specify custom config file
 
 ## 📝 License
 

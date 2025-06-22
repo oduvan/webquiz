@@ -40,7 +40,8 @@ async def error_middleware(request, handler):
 
 
 class TestingServer:
-    def __init__(self):
+    def __init__(self, config_file: str = 'config.yaml'):
+        self.config_file = config_file
         self.users: Dict[str, Dict[str, Any]] = {}  # user_id -> user data
         self.questions: List[Dict[str, Any]] = []
         self.user_responses: List[Dict[str, Any]] = []
@@ -67,8 +68,8 @@ class TestingServer:
         except Exception as e:
             logger.error(f"Error initializing CSV file: {e}")
     
-    async def create_default_questions_yaml(self):
-        """Create default questions.yaml file"""
+    async def create_default_config_yaml(self):
+        """Create default config.yaml file"""
         default_questions = {
             'questions': [
                 {
@@ -93,16 +94,16 @@ class TestingServer:
         }
         
         try:
-            async with aiofiles.open('questions.yaml', 'w') as f:
+            async with aiofiles.open(self.config_file, 'w') as f:
                 await f.write(yaml.dump(default_questions, default_flow_style=False))
-            logger.info("Created default questions.yaml file")
+            logger.info(f"Created default config file: {self.config_file}")
         except Exception as e:
-            logger.error(f"Error creating default questions.yaml: {e}")
+            logger.error(f"Error creating default config file {self.config_file}: {e}")
 
     async def load_questions(self):
-        """Load questions from YAML file"""
+        """Load questions from config file"""
         try:
-            async with aiofiles.open('questions.yaml', 'r') as f:
+            async with aiofiles.open(self.config_file, 'r') as f:
                 content = await f.read()
                 data = yaml.safe_load(content)
                 self.questions = data['questions']
@@ -112,14 +113,14 @@ class TestingServer:
                     if 'id' not in question:
                         question['id'] = i + 1
                         
-                logger.info(f"Loaded {len(self.questions)} questions")
+                logger.info(f"Loaded {len(self.questions)} questions from {self.config_file}")
         except FileNotFoundError:
-            logger.info("questions.yaml not found, creating default file")
-            await self.create_default_questions_yaml()
+            logger.info(f"{self.config_file} not found, creating default file")
+            await self.create_default_config_yaml()
             # Retry loading after creating default file
             await self.load_questions()
         except Exception as e:
-            logger.error(f"Error loading questions: {e}")
+            logger.error(f"Error loading questions from {self.config_file}: {e}")
             
     async def generate_client_questions(self):
         """Generate JSON file with questions without correct answers"""
@@ -317,9 +318,9 @@ class TestingServer:
                 'message': 'User ID not found'
             })
 
-async def create_app():
+async def create_app(config_file: str = 'config.yaml'):
     """Create and configure the application"""
-    server = TestingServer()
+    server = TestingServer(config_file)
     
     # Clean/recreate log file and CSV file on startup
     await server.initialize_log_file()

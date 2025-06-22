@@ -132,7 +132,7 @@ dmypy.json
 server.log
 user_responses.csv
 static/questions_for_client.json
-questions.yaml
+config.yaml
 webquiz.pid
 
 # IDE files

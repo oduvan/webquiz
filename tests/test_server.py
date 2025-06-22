@@ -58,13 +58,13 @@ class TestTestingServer:
             assert len(server.user_responses) == 0
     
     @pytest.mark.asyncio
-    async def test_default_questions_creation(self, server):
-        """Test default questions YAML file creation"""
+    async def test_default_config_creation(self, server):
+        """Test default config YAML file creation"""
         with patch('aiofiles.open') as mock_open:
             mock_file = AsyncMock()
             mock_open.return_value.__aenter__.return_value = mock_file
             
-            await server.create_default_questions_yaml()
+            await server.create_default_config_yaml()
             
             # Check that file was written
             mock_file.write.assert_called_once()

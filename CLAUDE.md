@@ -7,7 +7,7 @@ WebQuiz - A modern web-based quiz and testing system built with Python and aioht
 
 **Key Features:**
 - User registration with unique usernames and UUID-based user IDs
-- Multiple-choice questions loaded from YAML (auto-generated if missing)
+- Multiple-choice questions loaded from config YAML (auto-generated if missing)
 - Real-time answer validation via REST API
 - Server-side timing for accurate response measurement
 - In-memory storage with periodic CSV backup (30s intervals)
@@ -19,7 +19,7 @@ WebQuiz - A modern web-based quiz and testing system built with Python and aioht
 - **Backend**: Python aiohttp server with middleware-based error handling
 - **Frontend**: Vanilla HTML/JS single-page application
 - **Data Storage**: 
-  - Questions: YAML file with correct answers (auto-created with defaults)
+  - Questions: config.yaml file with correct answers (auto-created with defaults)
   - User responses: In-memory → CSV file (proper CSV module usage)
   - Users: In-memory dictionary (user_id as key, contains username)
   - Session timing: Server-side tracking for accurate measurements
@@ -30,7 +30,7 @@ WebQuiz - A modern web-based quiz and testing system built with Python and aioht
 - `webquiz/server.py` - Main aiohttp server with middleware and API endpoints
 - `webquiz/cli.py` - CLI interface with daemon support
 - `webquiz/__init__.py` - Package initialization
-- `questions.yaml` - Questions database with correct answers (auto-created with sample questions)
+- `config.yaml` - Configuration and questions database with correct answers (auto-created with sample questions)
 - `user_responses.csv` - User response storage (user_id,username,question_text,selected_answer_text,correct_answer_text,is_correct,time_taken_seconds)
 - `server.log` - Server activity log (resets on startup)
 - `static/` - Static files folder
@@ -61,16 +61,17 @@ source venv/bin/activate
 pip install -r requirements.txt
 
 # Run server
-webquiz              # Foreground mode
-webquiz -d           # Daemon mode
-webquiz --stop       # Stop daemon
-webquiz --status     # Check status
+webquiz                      # Foreground mode
+webquiz --config custom.yaml # Use custom config file
+webquiz -d                   # Daemon mode
+webquiz --stop               # Stop daemon
+webquiz --status             # Check status
 
 # Alternative (without Poetry installation)
 python -m webquiz.cli
 
 # Add questions
-# Edit questions.yaml, restart server to load changes
+# Edit config.yaml, restart server to load changes
 
 # Run tests
 poetry run pytest   # With Poetry
