@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Testing System</title>
+    <title>Система Тестування</title>
     <style>
         :root {
             --bg-color: #f5f5f5;
@@ -172,38 +172,38 @@
 </head>
 <body>
     <div class="container">
-        <button class="theme-toggle" onclick="toggleTheme()">🌙 Dark</button>
-        <h1>Testing System</h1>
+        <button class="theme-toggle" onclick="toggleTheme()">🌙 Темна</button>
+        <h1>Система Тестування</h1>
         
         <!-- Loading State -->
         <div id="loading" class="section">
-            <h2>Loading...</h2>
-            <p>Checking your credentials...</p>
+            <h2>Завантаження...</h2>
+            <p>Перевірка ваших даних...</p>
         </div>
         
         <!-- Registration Form -->
         <div id="registration" class="section hidden">
-            <h2>Register to Start Test</h2>
-            <input type="text" id="username" placeholder="Enter your username" style="padding: 10px; width: 300px;">
-            <button onclick="registerUser()">Register</button>
+            <h2>Зареєструйтеся для початку тесту</h2>
+            <input type="text" id="username" placeholder="Введіть ваше ім'я користувача" style="padding: 10px; width: 300px;">
+            <button onclick="registerUser()">Зареєструватися</button>
         </div>
         
         <!-- Test Section -->
         <div id="test-section" class="section hidden">
-            <h2>Test Questions</h2>
+            <h2>Тестові Питання</h2>
             <div id="progress-bar" class="progress">
                 <div id="progress-fill"></div>
-                <span id="progress-text">Question 1 of 5</span>
+                <span id="progress-text">Питання 1 з 5</span>
             </div>
             <div id="current-question-container"></div>
-            <button id="submit-answer-btn" onclick="submitCurrentAnswer()" disabled>Submit Answer</button>
+            <button id="submit-answer-btn" onclick="submitCurrentAnswer()" disabled>Відправити відповідь</button>
         </div>
         
         <!-- Results Section -->
         <div id="results" class="section hidden">
-            <h2>Test Results</h2>
+            <h2>Результати Тесту</h2>
             <div id="results-content"></div>
-            <button onclick="startNewTest()">Take Test Again</button>
+            <button onclick="startNewTest()">Пройти тест заново</button>
         </div>
     </div>
 
@@ -220,7 +220,7 @@
             const savedTheme = localStorage.getItem('theme') || 'light';
             if (savedTheme === 'dark') {
                 document.body.setAttribute('data-theme', 'dark');
-                document.querySelector('.theme-toggle').textContent = '☀️ Light';
+                document.querySelector('.theme-toggle').textContent = '☀️ Світла';
             }
         }
         
@@ -230,11 +230,11 @@
             
             if (currentTheme === 'dark') {
                 document.body.removeAttribute('data-theme');
-                toggleButton.textContent = '🌙 Dark';
+                toggleButton.textContent = '🌙 Темна';
                 localStorage.setItem('theme', 'light');
             } else {
                 document.body.setAttribute('data-theme', 'dark');
-                toggleButton.textContent = '☀️ Light';
+                toggleButton.textContent = '☀️ Світла';
                 localStorage.setItem('theme', 'dark');
             }
         }
@@ -306,7 +306,7 @@
         async function registerUser() {
             const username = document.getElementById('username').value.trim();
             if (!username) {
-                alert('Please enter a username');
+                alert('Будь ласка, введіть ім\'я користувача');
                 return;
             }
             
@@ -329,10 +329,10 @@
                     await loadQuestions();
                     startTest();
                 } else {
-                    alert(data.error || 'Registration failed');
+                    alert(data.error || 'Помилка реєстрації');
                 }
             } catch (error) {
-                alert('Error: ' + error.message);
+                alert('Помилка: ' + error.message);
             }
         }
         
@@ -341,7 +341,7 @@
                 const response = await fetch('/questions_for_client.json');
                 questions = await response.json();
             } catch (error) {
-                alert('Error loading questions: ' + error.message);
+                alert('Помилка завантаження питань: ' + error.message);
             }
         }
         
@@ -364,7 +364,7 @@
             // Update progress
             const progress = ((currentQuestionIndex + 1) / questions.length) * 100;
             document.getElementById('progress-fill').style.width = progress + '%';
-            document.getElementById('progress-text').textContent = `Question ${currentQuestionIndex + 1} of ${questions.length}`;
+            document.getElementById('progress-text').textContent = `Питання ${currentQuestionIndex + 1} з ${questions.length}`;
             
             // Show current question
             const container = document.getElementById('current-question-container');
@@ -402,7 +402,7 @@
         
         async function submitCurrentAnswer() {
             if (selectedAnswer === null) {
-                alert('Please select an answer');
+                alert('Будь ласка, оберіть відповідь');
                 return;
             }
             
@@ -435,7 +435,7 @@
                 showCurrentQuestion();
                 
             } catch (error) {
-                alert('Error submitting answer: ' + error.message);
+                alert('Помилка відправки відповіді: ' + error.message);
             }
         }
         
@@ -450,19 +450,19 @@
             const avgTime = totalTime / totalCount;
             
             container.innerHTML = `
-                <h3>Test Complete!</h3>
-                <p><strong>Score:</strong> ${correctCount}/${totalCount} (${percentage}%)</p>
-                <h4>Question Details:</h4>
+                <h3>Тест завершено!</h3>
+                <p><strong>Результат:</strong> ${correctCount}/${totalCount} (${percentage}%)</p>
+                <h4>Деталі питань:</h4>
             `;
             
             testResults.forEach((result, index) => {
                 const resultDiv = document.createElement('div');
                 resultDiv.style.marginBottom = '15px';
                 resultDiv.innerHTML = `
-                    <p><strong>Q${index + 1}:</strong> ${result.question}</p>
-                    <p><strong>Your Answer:</strong> ${result.selectedAnswer}</p>
+                    <p><strong>П${index + 1}:</strong> ${result.question}</p>
+                    <p><strong>Ваша відповідь:</strong> ${result.selectedAnswer}</p>
                     <p class="${result.isCorrect ? 'correct' : 'incorrect'}">
-                        ${result.isCorrect ? '✓ Correct' : '✗ Incorrect'}
+                        ${result.isCorrect ? '✓ Правильно' : '✗ Неправильно'}
                     </p>
                 `;
                 container.appendChild(resultDiv);

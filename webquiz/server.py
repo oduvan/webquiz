@@ -144,15 +144,6 @@ class TestingServer:
         """Create default index.html file if it doesn't exist"""
         index_path = f"{self.static_dir}/index.html"
         
-        # Check if index.html already exists
-        try:
-            async with aiofiles.open(index_path, 'r') as f:
-                # File exists, don't overwrite
-                logger.info(f"index.html already exists: {index_path}")
-                return
-        except FileNotFoundError:
-            pass  # File doesn't exist, create it
-        
         # Copy template from package
         try:
             try:
