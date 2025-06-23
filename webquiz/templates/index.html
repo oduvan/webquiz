@@ -168,6 +168,45 @@
             color: var(--text-color);
             font-style: italic;
         }
+        .results-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+            font-size: 14px;
+        }
+        .results-table th {
+            background-color: var(--question-bg);
+            border: 1px solid var(--border-color);
+            padding: 12px;
+            text-align: left;
+            font-weight: bold;
+            color: var(--text-color);
+        }
+        .results-table td {
+            border: 1px solid var(--border-color);
+            padding: 12px;
+            vertical-align: top;
+            color: var(--text-color);
+        }
+        .results-table tr:nth-child(even) {
+            background-color: var(--question-bg);
+        }
+        .results-table tr:hover {
+            background-color: var(--option-hover);
+        }
+        .answer-correct {
+            color: #28a745;
+            font-weight: bold;
+        }
+        .answer-incorrect {
+            color: #dc3545;
+            font-weight: bold;
+        }
+        .correct-answer-hint {
+            color: var(--text-color);
+            font-size: 12px;
+            margin-top: 4px;
+        }
     </style>
 </head>
 <body>
@@ -203,7 +242,6 @@
         <div id="results" class="section hidden">
             <h2>Результати Тесту</h2>
             <div id="results-content"></div>
-            <button onclick="startNewTest()">Пройти тест заново</button>
         </div>
     </div>
 
@@ -271,12 +309,19 @@
                     const data = await response.json();
                     
                     if (response.ok && data.valid) {
-                        // Valid user ID, set user data and resume
+                        // Valid user ID, set user data
                         currentUserId = data.user_id;
                         currentUsername = data.username;
                         currentQuestionIndex = data.next_question_index;
-                        await loadQuestions();
-                        hideLoadingShowTest();
+                        
+                        if (data.test_completed && data.final_results) {
+                            // Test is completed, show final results
+                            showCompletedTestResults(data.final_results);
+                        } else {
+                            // Test not completed, resume test
+                            await loadQuestions();
+                            await hideLoadingShowTest();
+                        }
                     } else {
                         // Invalid user ID, need registration
                         hideLoadingShowRegistration();
@@ -296,9 +341,9 @@
             document.getElementById('registration').classList.remove('hidden');
         }
         
-        function hideLoadingShowTest() {
+        async function hideLoadingShowTest() {
             document.getElementById('loading').classList.add('hidden');
-            startTest();
+            await startTest();
         }
         
         
@@ -327,7 +372,7 @@
                     currentQuestionIndex = 0; // New user starts from beginning
                     document.getElementById('registration').classList.add('hidden');
                     await loadQuestions();
-                    startTest();
+                    await startTest();
                 } else {
                     alert(data.error || 'Помилка реєстрації');
                 }
@@ -345,16 +390,17 @@
             }
         }
         
-        function startTest() {
+        async function startTest() {
             selectedAnswer = null;
             testResults = [];
             document.getElementById('test-section').classList.remove('hidden');
-            showCurrentQuestion();
+            await showCurrentQuestion();
         }
         
-        function showCurrentQuestion() {
+        async function showCurrentQuestion() {
             if (currentQuestionIndex >= questions.length) {
-                showFinalResults();
+                // Test completed - fetch final results from server to ensure consistency
+                await fetchAndShowFinalResults();
                 return;
             }
             
@@ -432,14 +478,36 @@
                 
                 // Move to next question
                 currentQuestionIndex++;
-                showCurrentQuestion();
+                await showCurrentQuestion();
                 
             } catch (error) {
                 alert('Помилка відправки відповіді: ' + error.message);
             }
         }
         
+        async function fetchAndShowFinalResults() {
+            try {
+                // Fetch final results from server to ensure consistency with page reload
+                const response = await fetch(`/api/verify-user/${currentUserId}`);
+                const data = await response.json();
+                
+                if (response.ok && data.valid && data.test_completed && data.final_results) {
+                    // Use the same function as page reload to ensure identical display
+                    showCompletedTestResults(data.final_results);
+                } else {
+                    // Fallback to client-side results if server fetch fails
+                    showFinalResults();
+                }
+            } catch (error) {
+                console.error('Error fetching final results from server:', error);
+                // Fallback to client-side results
+                showFinalResults();
+            }
+        }
+        
         function showFinalResults() {
+            document.getElementById('test-section').classList.add('hidden');
+            
             const container = document.getElementById('results-content');
             container.innerHTML = '';
             
@@ -449,35 +517,97 @@
             const totalTime = testResults.reduce((sum, r) => sum + r.timeTaken, 0);
             const avgTime = totalTime / totalCount;
             
-            container.innerHTML = `
+            // Build table with results using CSS classes
+            let tableContent = `
                 <h3>Тест завершено!</h3>
                 <p><strong>Результат:</strong> ${correctCount}/${totalCount} (${percentage}%)</p>
-                <h4>Деталі питань:</h4>
+                <table class="results-table">
+                    <thead>
+                        <tr>
+                            <th>Питання</th>
+                            <th>Ваша відповідь</th>
+                            <th style="text-align: center;">Правильно</th>
+                        </tr>
+                    </thead>
+                    <tbody>
             `;
             
             testResults.forEach((result, index) => {
-                const resultDiv = document.createElement('div');
-                resultDiv.style.marginBottom = '15px';
-                resultDiv.innerHTML = `
-                    <p><strong>П${index + 1}:</strong> ${result.question}</p>
-                    <p><strong>Ваша відповідь:</strong> ${result.selectedAnswer}</p>
-                    <p class="${result.isCorrect ? 'correct' : 'incorrect'}">
-                        ${result.isCorrect ? '✓ Правильно' : '✗ Неправильно'}
-                    </p>
+                // Note: testResults uses different property names than server data
+                const correctAnswer = questions[index] ? questions[index].options[questions[index].correct_answer] : 'N/A';
+                tableContent += `
+                    <tr>
+                        <td>${result.question}</td>
+                        <td>
+                            <span class="${result.isCorrect ? 'answer-correct' : 'answer-incorrect'}">
+                                ${result.selectedAnswer}
+                            </span>
+                            ${!result.isCorrect ? `<div class="correct-answer-hint">Правильна: ${correctAnswer}</div>` : ''}
+                        </td>
+                        <td style="text-align: center;">
+                            <span class="${result.isCorrect ? 'correct' : 'incorrect'}" style="font-size: 18px;">
+                                ${result.isCorrect ? '✓' : '✗'}
+                            </span>
+                        </td>
+                    </tr>
                 `;
-                container.appendChild(resultDiv);
             });
+            
+            tableContent += `
+                    </tbody>
+                </table>
+            `;
+            
+            container.innerHTML = tableContent;
             
             document.getElementById('test-section').classList.add('hidden');
             document.getElementById('results').classList.remove('hidden');
         }
         
-        function startNewTest() {
-            currentQuestionIndex = 0;
-            selectedAnswer = null;
-            testResults = [];
-            document.getElementById('results').classList.add('hidden');
-            startTest();
+        function showCompletedTestResults(finalResults) {
+            document.getElementById('loading').classList.add('hidden');
+            document.getElementById('test-section').classList.add('hidden');
+            
+            const container = document.getElementById('results-content');
+            container.innerHTML = '';
+            
+            const correctCount = finalResults.correct_count;
+            const totalCount = finalResults.total_count;
+            const percentage = finalResults.percentage;
+            
+            container.innerHTML = `
+                <h3>Тест завершено!</h3>
+                <p><strong>Результат:</strong> ${correctCount}/${totalCount} (${percentage}%)</p>
+                <table class="results-table">
+                    <thead>
+                        <tr>
+                            <th>Питання</th>
+                            <th>Ваша відповідь</th>
+                            <th style="text-align: center;">Правильно</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${finalResults.test_results.map((result, index) => `
+                            <tr>
+                                <td>${result.question}</td>
+                                <td>
+                                    <span class="${result.is_correct ? 'answer-correct' : 'answer-incorrect'}">
+                                        ${result.selected_answer}
+                                    </span>
+                                    ${!result.is_correct ? `<div class="correct-answer-hint">Правильна: ${result.correct_answer}</div>` : ''}
+                                </td>
+                                <td style="text-align: center;">
+                                    <span class="${result.is_correct ? 'correct' : 'incorrect'}" style="font-size: 18px;">
+                                        ${result.is_correct ? '✓' : '✗'}
+                                    </span>
+                                </td>
+                            </tr>
+                        `).join('')}
+                    </tbody>
+                </table>
+            `;
+            
+            document.getElementById('results').classList.remove('hidden');
         }
     </script>
 </body>

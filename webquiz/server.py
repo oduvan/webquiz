@@ -43,6 +43,8 @@ class TestingServer:
         self.questions_for_client: List[Dict[str, Any]] = []
         self.user_progress: Dict[str, int] = {}  # user_id -> last_answered_question_id
         self.question_start_times: Dict[str, datetime] = {}  # user_id -> question_start_time
+        self.user_stats: Dict[str, Dict[str, Any]] = {}  # user_id -> final stats for completed users
+        self.user_answers: Dict[str, List[Dict[str, Any]]] = {}  # user_id -> list of answers for stats calculation
         
     async def initialize_log_file(self):
         """Initialize/recreate log file"""
@@ -317,11 +319,29 @@ class TestingServer:
         
         self.user_responses.append(response_data)
         
+        # Track answer separately for stats calculation (independent of CSV flushing)
+        if user_id not in self.user_answers:
+            self.user_answers[user_id] = []
+        
+        answer_data = {
+            'question': question['question'],
+            'selected_answer': question['options'][selected_answer],
+            'correct_answer': question['options'][question['correct_answer']],
+            'is_correct': is_correct,
+            'time_taken': time_taken
+        }
+        self.user_answers[user_id].append(answer_data)
+        
         # Update user progress
         self.user_progress[user_id] = question_id
         
-        # Start timing for next question if not the last question
-        if question_id < len(self.questions):
+        # Check if this was the last question and calculate final stats
+        if question_id == len(self.questions):
+            # Test completed - calculate and store final stats
+            self.calculate_and_store_user_stats(user_id)
+            logger.info(f"Test completed for user {user_id} - final stats calculated")
+        else:
+            # Start timing for next question
             self.question_start_times[user_id] = datetime.now()
         
         logger.info(f"Answer submitted by {username} (ID: {user_id}) for question {question_id}: {'Correct' if is_correct else 'Incorrect'} (took {time_taken:.2f}s)")
@@ -335,6 +355,56 @@ class TestingServer:
             
         
 
+    def calculate_and_store_user_stats(self, user_id):
+        """Calculate and store final stats for a completed user using user_answers (not user_responses)"""
+        # Get answers from dedicated user_answers tracking (independent of CSV flushing)
+        if user_id not in self.user_answers or not self.user_answers[user_id]:
+            logger.warning(f"No answers found for user {user_id} during stats calculation")
+            return
+        
+        user_answer_list = self.user_answers[user_id]
+        
+        # Calculate stats from user_answers
+        correct_count = 0
+        total_time = 0
+        
+        for answer in user_answer_list:
+            if answer['is_correct']:
+                correct_count += 1
+            total_time += answer['time_taken']
+        
+        total_count = len(user_answer_list)
+        percentage = round((correct_count / total_count) * 100) if total_count > 0 else 0
+        
+        # Store final stats (copy the answer data to avoid reference issues)
+        self.user_stats[user_id] = {
+            'test_results': [answer.copy() for answer in user_answer_list],
+            'correct_count': correct_count,
+            'total_count': total_count,
+            'percentage': percentage,
+            'total_time': total_time,
+            'completed_at': datetime.now().isoformat()
+        }
+        
+        logger.info(f"Stored final stats for user {user_id}: {correct_count}/{total_count} ({percentage}%) using user_answers")
+    
+    def get_user_final_results(self, user_id):
+        """Get final results for a completed user from persistent user_stats"""
+        if user_id in self.user_stats:
+            # Return stored stats (without the completed_at timestamp for the frontend)
+            stats = self.user_stats[user_id].copy()
+            stats.pop('completed_at', None)  # Remove timestamp from response
+            return stats
+        
+        # Fallback - should not happen if calculate_and_store_user_stats was called
+        return {
+            'test_results': [],
+            'correct_count': 0,
+            'total_count': 0,
+            'percentage': 0,
+            'total_time': 0
+        }
+    
     async def verify_user_id(self, request):
         """Verify if user_id exists and return user data"""
         user_id = request.match_info['user_id']
@@ -359,20 +429,30 @@ class TestingServer:
             if next_question_index >= len(self.questions):
                 next_question_index = len(self.questions)
             
-            # Start timing for current question if user has questions left
-            if next_question_index < len(self.questions):
-                self.question_start_times[user_id] = datetime.now()
+            # Check if test is completed
+            test_completed = next_question_index >= len(self.questions)
             
-            logger.info(f"User {user_id} verification: last_answered={last_answered_question_id}, next_index={next_question_index}")
-                
-            return web.json_response({
+            response_data = {
                 'valid': True,
                 'user_id': user_id,
                 'username': username,
                 'next_question_index': next_question_index,
                 'total_questions': len(self.questions),
-                'last_answered_question_id': last_answered_question_id
-            })
+                'last_answered_question_id': last_answered_question_id,
+                'test_completed': test_completed
+            }
+            
+            if test_completed:
+                # Get final results for completed test
+                final_results = self.get_user_final_results(user_id)
+                response_data['final_results'] = final_results
+                logger.info(f"User {user_id} verification: test completed, returning final results")
+            else:
+                # Start timing for current question if user has questions left
+                self.question_start_times[user_id] = datetime.now()
+                logger.info(f"User {user_id} verification: last_answered={last_answered_question_id}, next_index={next_question_index}")
+                
+            return web.json_response(response_data)
         else:
             return web.json_response({
                 'valid': False,
