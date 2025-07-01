@@ -279,7 +279,7 @@
     <script>
         let currentUsername = null;
         let currentUserId = null;
-        let questions = [];
+        let questions = {{QUESTIONS_DATA}};
         let currentQuestionIndex = 0;
         let selectedAnswer = null;
         let testResults = [];
@@ -363,7 +363,6 @@
                             showCompletedTestResults(data.final_results);
                         } else {
                             // Test not completed, resume test
-                            await loadQuestions();
                             await hideLoadingShowTest();
                         }
                     } else {
@@ -419,7 +418,6 @@
                     showUsername(currentUsername);
                     
                     document.getElementById('registration').classList.add('hidden');
-                    await loadQuestions();
                     await startTest();
                 } else {
                     alert(data.error || 'Помилка реєстрації');
@@ -429,14 +427,6 @@
             }
         }
         
-        async function loadQuestions() {
-            try {
-                const response = await fetch('/questions_for_client.json');
-                questions = await response.json();
-            } catch (error) {
-                alert('Помилка завантаження питань: ' + error.message);
-            }
-        }
         
         async function startTest() {
             selectedAnswer = null;

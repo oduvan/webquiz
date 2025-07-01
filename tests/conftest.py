@@ -26,7 +26,7 @@ async def app():
     with patch('webquiz.server.TestingServer.initialize_log_file', new_callable=AsyncMock), \
          patch('webquiz.server.TestingServer.initialize_csv', new_callable=AsyncMock), \
          patch('webquiz.server.TestingServer.load_questions', new_callable=AsyncMock), \
-         patch('webquiz.server.TestingServer.generate_client_questions', new_callable=AsyncMock), \
+         patch('webquiz.server.TestingServer.create_default_index_html', new_callable=AsyncMock), \
          patch('asyncio.create_task'):  # Prevent background tasks during tests
         
         app = await create_app('test-config.yaml', 'test-server.log', 'test-responses.csv', 'test-static')

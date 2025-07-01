@@ -40,7 +40,6 @@ class TestingServer:
         self.users: Dict[str, Dict[str, Any]] = {}  # user_id -> user data
         self.questions: List[Dict[str, Any]] = []
         self.user_responses: List[Dict[str, Any]] = []
-        self.questions_for_client: List[Dict[str, Any]] = []
         self.user_progress: Dict[str, int] = {}  # user_id -> last_answered_question_id
         self.question_start_times: Dict[str, datetime] = {}  # user_id -> question_start_time
         self.user_stats: Dict[str, Dict[str, Any]] = {}  # user_id -> final stats for completed users
@@ -119,32 +118,23 @@ class TestingServer:
         except Exception as e:
             logger.error(f"Error loading questions from {self.config_file}: {e}")
             
-    async def generate_client_questions(self):
-        """Generate JSON file with questions without correct answers"""
-        self.questions_for_client = []
+            
+    async def create_default_index_html(self):
+        """Create default index.html file with embedded questions data"""
+        index_path = f"{self.static_dir}/index.html"
+        
+        # Prepare questions data for client (without correct answers)
+        questions_for_client = []
         for q in self.questions:
             client_question = {
                 'id': q['id'],
                 'question': q['question'],
                 'options': q['options']
             }
-            self.questions_for_client.append(client_question)
-            
-        try:
-            # Ensure static directory exists
-            import os
-            os.makedirs(self.static_dir, exist_ok=True)
-            
-            client_questions_path = f"{self.static_dir}/questions_for_client.json"
-            async with aiofiles.open(client_questions_path, 'w') as f:
-                await f.write(json.dumps(self.questions_for_client, indent=2))
-                logger.info(f"Generated client questions JSON file: {client_questions_path}")
-        except Exception as e:
-            logger.error(f"Error generating client questions: {e}")
-            
-    async def create_default_index_html(self):
-        """Create default index.html file if it doesn't exist"""
-        index_path = f"{self.static_dir}/index.html"
+            questions_for_client.append(client_question)
+        
+        # Convert questions to JSON string for embedding
+        questions_json = json.dumps(questions_for_client, indent=2)
         
         # Copy template from package
         try:
@@ -159,11 +149,14 @@ class TestingServer:
                 async with aiofiles.open(template_path, 'r') as template_file:
                     template_content = await template_file.read()
             
+            # Inject questions data into template
+            html_content = template_content.replace('{{QUESTIONS_DATA}}', questions_json)
+            
             # Write to destination
             async with aiofiles.open(index_path, 'w') as f:
-                await f.write(template_content)
+                await f.write(html_content)
                 
-            logger.info(f"Created default index.html file: {index_path}")
+            logger.info(f"Created index.html file with embedded questions data: {index_path}")
             return
         except Exception as e:
             logger.error(f"Error copying template index.html: {e}")
@@ -478,11 +471,8 @@ async def create_app(config_file: str = 'config.yaml', log_file: str = 'server.l
     await server.initialize_log_file()
     await server.initialize_csv()
     
-    # Load questions and generate client JSON
+    # Load questions and create HTML with embedded data
     await server.load_questions()
-    await server.generate_client_questions()
-    
-    # Create default index.html if it doesn't exist
     await server.create_default_index_html()
     
     # Start periodic flush task

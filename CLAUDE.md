@@ -19,7 +19,7 @@ WebQuiz - A modern web-based quiz and testing system built with Python and aioht
 
 ## Architecture
 - **Backend**: Python aiohttp server with middleware-based error handling
-- **Frontend**: Vanilla HTML/JS single-page application
+- **Frontend**: Vanilla HTML/JS single-page application with embedded questions data
 - **Data Storage**: 
   - Questions: config.yaml file with correct answers (auto-created with defaults)
   - User responses: In-memory → CSV file (proper CSV module usage)
@@ -90,13 +90,13 @@ pytest tests/ -v    # Verbose
 - **Server-side timing**: Question timing tracked server-side for accuracy and security
 - **Auto-YAML creation**: Server creates default questions.yaml if missing
 - **Periodic CSV flush**: Every 30 seconds using proper CSV module for escaping
-- **Client-side question filtering**: Server generates separate JSON without correct answers
+- **Embedded questions data**: Questions injected directly into HTML template (no separate JSON file)
 - **In-memory storage**: Fast responses, CSV backup for persistence
 - **Session persistence**: Cookie-based user_id storage for seamless user experience
 - **Comprehensive testing**: Integration tests for API + unit tests for internal logic
 
 ## Data Flow
-1. Server loads questions.yaml (or creates default) → generates questions_for_client.json
+1. Server loads questions.yaml (or creates default) → injects questions into HTML template (without correct answers)
 2. User registers → user_id generated, stored by user_id key, timing starts
 3. Client stores user_id in cookies for session persistence
 4. User submits answers → server calculates time taken → validated against correct answers → stored in memory
