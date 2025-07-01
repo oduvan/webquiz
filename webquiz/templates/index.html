@@ -207,10 +207,32 @@
             font-size: 12px;
             margin-top: 4px;
         }
+        .user-info {
+            position: absolute;
+            top: 15px;
+            left: 15px;
+            background: var(--option-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 20px;
+            padding: 8px 16px;
+            font-size: 14px;
+            color: var(--text-color);
+            transition: all 0.3s ease;
+            display: none;
+        }
+        .user-info.visible {
+            display: block;
+        }
+        .user-info:hover {
+            background: var(--option-hover);
+        }
     </style>
 </head>
 <body>
     <div class="container">
+        <div class="user-info" id="user-info">
+            👤 <span id="username-display"></span>
+        </div>
         <button class="theme-toggle" onclick="toggleTheme()">🌙 Темна</button>
         <h1>Система Тестування</h1>
         
@@ -277,6 +299,16 @@
             }
         }
         
+        // Username display management
+        function showUsername(username) {
+            document.getElementById('username-display').textContent = username;
+            document.getElementById('user-info').classList.add('visible');
+        }
+        
+        function hideUsername() {
+            document.getElementById('user-info').classList.remove('visible');
+        }
+        
         // Cookie management
         function setCookie(name, value, days = 30) {
             const expires = new Date();
@@ -313,6 +345,9 @@
                         currentUserId = data.user_id;
                         currentUsername = data.username;
                         currentQuestionIndex = data.next_question_index;
+                        
+                        // Show username on page
+                        showUsername(currentUsername);
                         
                         if (data.test_completed && data.final_results) {
                             // Test is completed, show final results
@@ -370,6 +405,10 @@
                     currentUserId = data.user_id;
                     setCookie('user_id', currentUserId);
                     currentQuestionIndex = 0; // New user starts from beginning
+                    
+                    // Show username on page
+                    showUsername(currentUsername);
+                    
                     document.getElementById('registration').classList.add('hidden');
                     await loadQuestions();
                     await startTest();
@@ -520,6 +559,7 @@
             // Build table with results using CSS classes
             let tableContent = `
                 <h3>Тест завершено!</h3>
+                <p><strong>Користувач:</strong> ${currentUsername}</p>
                 <p><strong>Результат:</strong> ${correctCount}/${totalCount} (${percentage}%)</p>
                 <table class="results-table">
                     <thead>
@@ -577,6 +617,7 @@
             
             container.innerHTML = `
                 <h3>Тест завершено!</h3>
+                <p><strong>Користувач:</strong> ${currentUsername}</p>
                 <p><strong>Результат:</strong> ${correctCount}/${totalCount} (${percentage}%)</p>
                 <table class="results-table">
                     <thead>

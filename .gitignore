@@ -150,3 +150,6 @@ webquiz.pid
 .Trashes
 ehthumbs.db
 Thumbs.db
+
+questions.yaml
+static/

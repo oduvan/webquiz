@@ -64,7 +64,7 @@ def start_daemon():
             time.sleep(1)
             if is_daemon_running():
                 print(f"✅ Daemon started successfully (PID: {pid})")
-                print(f"🌐 Server running at http://localhost:8080")
+                print(f"🌐 Server running at http://0.0.0.0:8080 (accessible on network)")
                 print(f"📄 Logs: server.log")
                 print(f"⏹️  Stop with: kill {pid}")
                 return 0
@@ -163,7 +163,7 @@ def run_server(config_file: str = 'config.yaml', log_file: str = 'server.log', c
     print(f"📝 Log file: {log_file}")
     print(f"📊 CSV file: {csv_file}")
     print(f"📁 Static directory: {static_dir}")
-    print("🌐 Server will be available at: http://localhost:8080")
+    print("🌐 Server will be available at: http://0.0.0.0:8080 (accessible on network)")
     print("⏹️  Press Ctrl+C to stop")
     
     async def start_server():
@@ -171,7 +171,7 @@ def run_server(config_file: str = 'config.yaml', log_file: str = 'server.log', c
         runner = web.AppRunner(app)
         await runner.setup()
         
-        site = web.TCPSite(runner, 'localhost', 8080)
+        site = web.TCPSite(runner, '0.0.0.0', 8080)
         await site.start()
         
         print("✅ Server started successfully")
@@ -214,7 +214,7 @@ Examples:
   webquiz --stop                       Stop daemon server
   webquiz --status                     Check daemon status
 
-The server will be available at http://localhost:8080
+The server will be available at http://0.0.0.0:8080 (accessible on network)
 Questions are loaded from config.yaml (auto-created if missing)
 User responses are saved to user_responses.csv
 Server logs are written to server.log
@@ -283,7 +283,7 @@ Static files served from static/ directory
             with open(pid_file, 'r') as f:
                 pid = f.read().strip()
             print(f"✅ Daemon is running (PID: {pid})")
-            print(f"🌐 Server: http://localhost:8080")
+            print(f"🌐 Server: http://0.0.0.0:8080 (accessible on network)")
             return 0
         else:
             print("❌ Daemon is not running")
