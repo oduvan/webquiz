@@ -56,18 +56,28 @@
             transition: background-color 0.3s ease, box-shadow 0.3s ease;
             position: relative;
         }
-        .theme-toggle {
+        .top-right-controls {
             position: absolute;
             top: 15px;
             right: 15px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .theme-toggle {
             background: var(--option-bg);
             border: 1px solid var(--border-color);
-            border-radius: 20px;
-            padding: 8px 16px;
+            border-radius: 50%;
+            padding: 8px;
             cursor: pointer;
-            font-size: 14px;
+            font-size: 16px;
             color: var(--text-color);
             transition: all 0.3s ease;
+            width: 36px;
+            height: 36px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
         }
         .theme-toggle:hover {
             background: var(--option-hover);
@@ -208,9 +218,6 @@
             margin-top: 4px;
         }
         .user-info {
-            position: absolute;
-            top: 15px;
-            left: 15px;
             background: var(--option-bg);
             border: 1px solid var(--border-color);
             border-radius: 20px;
@@ -230,10 +237,12 @@
 </head>
 <body>
     <div class="container">
-        <div class="user-info" id="user-info">
-            👤 <span id="username-display"></span>
+        <div class="top-right-controls">
+            <div class="user-info" id="user-info">
+                👤 <span id="username-display"></span>
+            </div>
+            <button class="theme-toggle" onclick="toggleTheme()" title="Перемкнути тему">🌙</button>
         </div>
-        <button class="theme-toggle" onclick="toggleTheme()">🌙 Темна</button>
         <h1>Система Тестування</h1>
         
         <!-- Loading State -->
@@ -280,7 +289,7 @@
             const savedTheme = localStorage.getItem('theme') || 'light';
             if (savedTheme === 'dark') {
                 document.body.setAttribute('data-theme', 'dark');
-                document.querySelector('.theme-toggle').textContent = '☀️ Світла';
+                document.querySelector('.theme-toggle').textContent = '☀️';
             }
         }
         
@@ -290,11 +299,11 @@
             
             if (currentTheme === 'dark') {
                 document.body.removeAttribute('data-theme');
-                toggleButton.textContent = '🌙 Темна';
+                toggleButton.textContent = '🌙';
                 localStorage.setItem('theme', 'light');
             } else {
                 document.body.setAttribute('data-theme', 'dark');
-                toggleButton.textContent = '☀️ Світла';
+                toggleButton.textContent = '☀️';
                 localStorage.setItem('theme', 'dark');
             }
         }
