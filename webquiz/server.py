@@ -5,14 +5,123 @@ import uuid
 import yaml
 import os
 from datetime import datetime
-from typing import Dict, List, Any
+from typing import Dict, List, Any, Optional
 from aiohttp import web
 import aiofiles
 import logging
 from io import StringIO
+from dataclasses import dataclass, asdict
 
 # Logger will be configured in create_app() with custom log file
 logger = logging.getLogger(__name__)
+
+@dataclass
+class ServerConfig:
+    """Server configuration data class"""
+    host: str = "0.0.0.0"
+    port: int = 8080
+
+@dataclass  
+class PathsConfig:
+    """Paths configuration data class"""
+    quizzes_dir: str = "quizzes"
+    logs_dir: str = "logs"
+    csv_dir: str = "data"
+    static_dir: str = "static"
+
+@dataclass
+class AdminConfig:
+    """Admin configuration data class"""
+    master_key: Optional[str] = None
+
+@dataclass
+class OptionsConfig:
+    """Options configuration data class"""
+    flush_interval: int = 30
+
+@dataclass
+class WebQuizConfig:
+    """Main configuration data class"""
+    server: ServerConfig = None
+    paths: PathsConfig = None
+    admin: AdminConfig = None
+    options: OptionsConfig = None
+    
+    def __post_init__(self):
+        if self.server is None:
+            self.server = ServerConfig()
+        if self.paths is None:
+            self.paths = PathsConfig()
+        if self.admin is None:
+            self.admin = AdminConfig()
+        if self.options is None:
+            self.options = OptionsConfig()
+
+def ensure_directory_exists(path: str) -> str:
+    """Create directory if it doesn't exist and return the path"""
+    os.makedirs(path, exist_ok=True)
+    return path
+
+def load_config_from_yaml(config_path: str) -> WebQuizConfig:
+    """Load configuration from YAML file"""
+    try:
+        with open(config_path, 'r') as f:
+            config_data = yaml.safe_load(f)
+        
+        if not config_data:
+            return WebQuizConfig()
+            
+        # Create config objects from YAML data
+        server_config = ServerConfig(**(config_data.get('server', {})))
+        paths_config = PathsConfig(**(config_data.get('paths', {})))
+        admin_config = AdminConfig(**(config_data.get('admin', {})))
+        options_config = OptionsConfig(**(config_data.get('options', {})))
+        
+        return WebQuizConfig(
+            server=server_config,
+            paths=paths_config,
+            admin=admin_config,
+            options=options_config
+        )
+    except FileNotFoundError:
+        logger.warning(f"Config file not found: {config_path}, using defaults")
+        return WebQuizConfig()
+    except Exception as e:
+        logger.error(f"Error loading config from {config_path}: {e}")
+        return WebQuizConfig()
+
+def load_config_with_overrides(config_path: Optional[str] = None, **cli_overrides) -> WebQuizConfig:
+    """Load configuration with CLI parameter overrides
+    
+    Priority: CLI parameters > config file > defaults
+    """
+    # Start with config file or defaults
+    if config_path and os.path.exists(config_path):
+        config = load_config_from_yaml(config_path)
+        logger.info(f"Loaded configuration from: {config_path}")
+    else:
+        config = WebQuizConfig()
+        logger.info("Using default configuration")
+    
+    # Apply CLI overrides
+    for key, value in cli_overrides.items():
+        if value is not None:  # Only override if CLI parameter was provided
+            if key in ['host', 'port']:
+                setattr(config.server, key, value)
+            elif key in ['quizzes_dir', 'logs_dir', 'csv_dir', 'static_dir']:
+                setattr(config.paths, key, value)
+            elif key in ['master_key']:
+                setattr(config.admin, key, value)
+            elif key in ['flush_interval']:
+                setattr(config.options, key, value)
+    
+    # Environment variable override for master key
+    env_master_key = os.environ.get('WEBQUIZ_MASTER_KEY')
+    if env_master_key and not cli_overrides.get('master_key'):
+        config.admin.master_key = env_master_key
+        logger.info("Master key loaded from environment variable")
+    
+    return config
 
 def generate_unique_filename(base_path: str) -> str:
     """Generate a unique filename with suffix (0001, 0002, etc.) if file exists"""
@@ -71,14 +180,16 @@ async def error_middleware(request, handler):
 
 
 class TestingServer:
-    def __init__(self, quizzes_dir: str = 'quizzes', log_file: str = 'server.log', csv_file: str = 'user_responses.csv', static_dir: str = 'static', master_key: str = None):
-        self.quizzes_dir = quizzes_dir
-        self.master_key = master_key
+    def __init__(self, config: WebQuizConfig):
+        self.config = config
+        self.quizzes_dir = config.paths.quizzes_dir
+        self.master_key = config.admin.master_key
         self.current_quiz_file = None  # Will be set when quiz is selected
-        self.log_file = generate_unique_filename(log_file)
-        self.base_csv_file = csv_file  # Store base name for generating quiz-prefixed names
+        self.logs_dir = config.paths.logs_dir
+        self.csv_dir = config.paths.csv_dir
+        self.static_dir = config.paths.static_dir
+        self.log_file = None  # Will be set during initialization
         self.csv_file = None  # Will be set when quiz is selected
-        self.static_dir = static_dir
         self.users: Dict[str, Dict[str, Any]] = {}  # user_id -> user data
         self.questions: List[Dict[str, Any]] = []
         self.user_responses: List[Dict[str, Any]] = []
@@ -87,11 +198,18 @@ class TestingServer:
         self.user_stats: Dict[str, Dict[str, Any]] = {}  # user_id -> final stats for completed users
         self.user_answers: Dict[str, List[Dict[str, Any]]] = {}  # user_id -> list of answers for stats calculation
         
-    def generate_csv_filename(self, quiz_name: str) -> str:
-        """Generate CSV filename with quiz name prefix"""
-        name, ext = os.path.splitext(self.base_csv_file)
+    def generate_log_path(self) -> str:
+        """Generate log file path in logs directory"""
+        ensure_directory_exists(self.logs_dir)
+        base_path = os.path.join(self.logs_dir, "server.log")
+        return generate_unique_filename(base_path)
+        
+    def generate_csv_path(self, quiz_name: str) -> str:
+        """Generate CSV file path with quiz name prefix in CSV directory"""
+        ensure_directory_exists(self.csv_dir)
         quiz_prefix = quiz_name.replace('.yaml', '').replace('.yml', '')
-        base_path = f"{quiz_prefix}_{name}{ext}"
+        base_filename = f"{quiz_prefix}_user_responses.csv"
+        base_path = os.path.join(self.csv_dir, base_filename)
         return generate_unique_filename(base_path)
         
     def reset_server_state(self):
@@ -129,7 +247,7 @@ class TestingServer:
         # Update current quiz and CSV filename
         self.current_quiz_file = quiz_path
         quiz_name = os.path.splitext(quiz_filename)[0]
-        self.csv_file = self.generate_csv_filename(quiz_name)
+        self.csv_file = self.generate_csv_path(quiz_name)
         
         # Load new questions
         await self.load_questions_from_file(quiz_path)
@@ -142,10 +260,115 @@ class TestingServer:
         
         logger.info(f"Switched to quiz: {quiz_filename}, CSV: {self.csv_file}")
         
+    async def create_admin_selection_page(self):
+        """Create a page informing admin to select a quiz first"""
+        ensure_directory_exists(self.static_dir)
+        index_path = f"{self.static_dir}/index.html"
+        
+        # Get list of available quizzes for display
+        available_quizzes = await self.list_available_quizzes()
+        quiz_list_html = ""
+        for quiz in available_quizzes:
+            quiz_list_html += f"<li>{quiz}</li>"
+        
+        admin_url = f"/admin" if self.master_key else "#"
+        admin_message = "Access admin panel" if self.master_key else "Admin panel disabled (no master key set)"
+        
+        selection_html = f'''<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WebQuiz - Admin Selection Required</title>
+    <style>
+        body {{
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+            color: #333;
+        }}
+        .container {{
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            text-align: center;
+        }}
+        .quiz-list {{
+            text-align: left;
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 5px;
+            margin: 20px 0;
+        }}
+        .admin-button {{
+            display: inline-block;
+            background: #007bff;
+            color: white;
+            padding: 12px 24px;
+            text-decoration: none;
+            border-radius: 5px;
+            margin: 10px;
+        }}
+        .admin-button:hover {{
+            background: #0056b3;
+        }}
+        .disabled {{
+            background: #6c757d;
+            cursor: not-allowed;
+        }}
+        .warning {{
+            background: #fff3cd;
+            border: 1px solid #ffeaa7;
+            color: #856404;
+            padding: 15px;
+            border-radius: 5px;
+            margin: 20px 0;
+        }}
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎯 WebQuiz System</h1>
+        
+        <div class="warning">
+            <h3>⚠️ Quiz Selection Required</h3>
+            <p>Multiple quiz files are available, but no default quiz is set. An administrator must select which quiz to use.</p>
+        </div>
+        
+        <h3>📋 Available Quiz Files:</h3>
+        <div class="quiz-list">
+            <ul>
+                {quiz_list_html}
+            </ul>
+        </div>
+        
+        <p>To set a default quiz, rename one of the files to <code>default.yaml</code> or use the admin panel to select a quiz.</p>
+        
+        <a href="{admin_url}" class="admin-button {'disabled' if not self.master_key else ''}">{admin_message}</a>
+        
+        <div style="margin-top: 30px; font-size: 0.9em; color: #666;">
+            <p>💡 <strong>Tip:</strong> Rename your preferred quiz file to <code>default.yaml</code> to make it load automatically.</p>
+        </div>
+    </div>
+</body>
+</html>'''
+        
+        try:
+            async with aiofiles.open(index_path, 'w') as f:
+                await f.write(selection_html)
+            logger.info(f"Created admin selection page: {index_path}")
+        except Exception as e:
+            logger.error(f"Error creating admin selection page: {e}")
+        
     
     async def initialize_log_file(self):
-        """Initialize new log file with unique suffix"""
+        """Initialize new log file with unique suffix in logs directory"""
         try:
+            # Generate log file path
+            self.log_file = self.generate_log_path()
             # Create the new log file
             with open(self.log_file, 'w') as f:
                 f.write('')
@@ -215,7 +438,7 @@ class TestingServer:
             raise
             
     async def load_questions(self):
-        """Load questions from first available quiz file or create default"""
+        """Load questions based on available quiz files"""
         try:
             # Check if quizzes directory exists
             if not os.path.exists(self.quizzes_dir):
@@ -230,11 +453,20 @@ class TestingServer:
                 default_path = os.path.join(self.quizzes_dir, 'default.yaml')
                 await self.create_default_config_yaml(default_path)
                 available_quizzes = ['default.yaml']
-            
-            # Load the first available quiz
-            first_quiz = available_quizzes[0]
-            quiz_path = os.path.join(self.quizzes_dir, first_quiz)
-            await self.switch_quiz(first_quiz)
+                await self.switch_quiz('default.yaml')
+            elif len(available_quizzes) == 1:
+                # Only one quiz file - use it as default
+                await self.switch_quiz(available_quizzes[0])
+                logger.info(f"Using single quiz file as default: {available_quizzes[0]}")
+            elif 'default.yaml' in available_quizzes or 'default.yml' in available_quizzes:
+                # Multiple files but default.yaml exists - use it
+                default_file = 'default.yaml' if 'default.yaml' in available_quizzes else 'default.yml'
+                await self.switch_quiz(default_file)
+                logger.info(f"Using explicit default file: {default_file}")
+            else:
+                # Multiple files but no default.yaml - don't load any quiz
+                logger.info(f"Multiple quiz files found but no default.yaml - admin must select quiz first")
+                await self.create_admin_selection_page()
             
         except Exception as e:
             logger.error(f"Error in load_questions: {e}")
@@ -630,23 +862,24 @@ class TestingServer:
             logger.error(f"Error serving admin page: {e}")
             return web.Response(text='<h1>Admin page not found</h1>', content_type='text/html', status=404)
 
-async def create_app(quizzes_dir: str = 'quizzes', log_file: str = 'server.log', csv_file: str = 'user_responses.csv', static_dir: str = 'static', master_key: str = None):
+async def create_app(config: WebQuizConfig):
     """Create and configure the application"""
-    # Configure logging with custom log file
+    
+    server = TestingServer(config)
+    
+    # Initialize log file first (this will set server.log_file)
+    await server.initialize_log_file()
+    
+    # Configure logging with the actual log file path
     logging.basicConfig(
         level=logging.INFO,
         format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
         handlers=[
-            logging.FileHandler(log_file),
+            logging.FileHandler(server.log_file),
             logging.StreamHandler()  # Also log to console
         ],
         force=True  # Override any existing configuration
     )
-    
-    server = TestingServer(quizzes_dir, log_file, csv_file, static_dir, master_key)
-    
-    # Clean/recreate log file on startup
-    await server.initialize_log_file()
     
     # Load questions and create HTML with embedded data (CSV will be initialized in switch_quiz)
     await server.load_questions()
@@ -669,7 +902,8 @@ async def create_app(quizzes_dir: str = 'quizzes', log_file: str = 'server.log',
     app.router.add_post('/api/admin/switch-quiz', server.admin_switch_quiz)
     
     # Serve static files from configured static directory
-    app.router.add_static('/', path=static_dir, name='static')
+    ensure_directory_exists(config.paths.static_dir)
+    app.router.add_static('/', path=config.paths.static_dir, name='static')
     
     return app
 

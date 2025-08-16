@@ -1,0 +1,24 @@
+# WebQuiz Server Configuration
+# Copy this file to server_config.yaml and customize as needed
+
+server:
+  host: "0.0.0.0"  # Listen on all interfaces (use "127.0.0.1" for localhost only)
+  port: 8080       # Server port
+
+paths:
+  quizzes_dir: "quizzes"  # Directory containing quiz YAML files
+  logs_dir: "logs"        # Directory for server log files (auto-created)
+  csv_dir: "data"         # Directory for CSV response files (auto-created)  
+  static_dir: "static"    # Directory for static web files (auto-created)
+
+admin:
+  master_key: null        # Set to enable admin interface (e.g., "your-secret-key")
+                          # Can also use WEBQUIZ_MASTER_KEY environment variable
+
+options:
+  flush_interval: 30      # Seconds between CSV response flushes
+
+# Usage examples:
+# webquiz --config server_config.yaml
+# webquiz --config server_config.yaml --master-key override-key
+# WEBQUIZ_MASTER_KEY=secret webquiz --config server_config.yaml

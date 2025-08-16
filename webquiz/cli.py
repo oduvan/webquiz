@@ -19,7 +19,7 @@ from pathlib import Path
 import asyncio
 from aiohttp import web
 
-from .server import create_app
+from .server import create_app, load_config_with_overrides
 
 
 def get_pid_file_path():
@@ -105,13 +105,12 @@ def start_daemon():
             
             # Start the server
             try:
-                # Get parameters from global variables set in main()
-                quizzes_dir = getattr(start_daemon, '_quizzes_dir', 'quizzes')
-                log_file = getattr(start_daemon, '_log_file', 'server.log')
-                csv_file = getattr(start_daemon, '_csv_file', 'user_responses.csv')
-                static_dir = getattr(start_daemon, '_static_dir', 'static')
-                master_key = getattr(start_daemon, '_master_key', None)
-                run_server(quizzes_dir, log_file, csv_file, static_dir, master_key)
+                # Get config from global variable set in main()
+                config = getattr(start_daemon, '_config', None)
+                if config is None:
+                    from .server import WebQuizConfig
+                    config = WebQuizConfig()
+                run_server(config)
             except Exception as e:
                 print(f"❌ Error starting server: {e}")
                 pid_file = get_pid_file_path()
@@ -157,25 +156,25 @@ def stop_daemon():
         return 1
 
 
-def run_server(quizzes_dir: str = 'quizzes', log_file: str = 'server.log', csv_file: str = 'user_responses.csv', static_dir: str = 'static', master_key: str = None):
+def run_server(config):
     """Run the server in foreground mode."""
     print("🚀 Starting WebQuiz Testing System...")
-    print(f"📁 Quizzes directory: {quizzes_dir}")
-    print(f"📝 Log file: {log_file}")
-    print(f"📊 CSV file: {csv_file}")
-    print(f"📂 Static directory: {static_dir}")
-    print(f"🔑 Master key: {'Set' if master_key else 'Not set (admin disabled)'}")
-    print("🌐 Server will be available at: http://0.0.0.0:8080 (accessible on network)")
-    if master_key:
-        print("🔧 Admin panel: http://0.0.0.0:8080/admin")
+    print(f"📁 Quizzes directory: {config.paths.quizzes_dir}")
+    print(f"📝 Logs directory: {config.paths.logs_dir}")
+    print(f"📊 CSV directory: {config.paths.csv_dir}")
+    print(f"📂 Static directory: {config.paths.static_dir}")
+    print(f"🔑 Master key: {'Set' if config.admin.master_key else 'Not set (admin disabled)'}")
+    print(f"🌐 Server will be available at: http://{config.server.host}:{config.server.port} (accessible on network)")
+    if config.admin.master_key:
+        print(f"🔧 Admin panel: http://{config.server.host}:{config.server.port}/admin")
     print("⏹️  Press Ctrl+C to stop")
     
     async def start_server():
-        app = await create_app(quizzes_dir, log_file, csv_file, static_dir, master_key)
+        app = await create_app(config)
         runner = web.AppRunner(app)
         await runner.setup()
         
-        site = web.TCPSite(runner, '0.0.0.0', 8080)
+        site = web.TCPSite(runner, config.server.host, config.server.port)
         await site.start()
         
         print("✅ Server started successfully")
@@ -208,23 +207,26 @@ def main():
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  webquiz                              Start server in foreground
+  webquiz                              Start server with defaults
   webquiz -d                           Start server as daemon
+  webquiz --config server.yaml        Use configuration file
   webquiz --quizzes-dir my_quizzes     Use custom quizzes directory
   webquiz --master-key secret123       Set admin master key
-  webquiz --log-file /var/log/quiz.log Use custom log file
-  webquiz --csv-file responses.csv     Use custom CSV file base name
+  webquiz --logs-dir /var/log          Use custom logs directory
+  webquiz --csv-dir /data              Use custom CSV directory
   webquiz --static /var/www/quiz       Use custom static files directory
   WEBQUIZ_MASTER_KEY=secret webquiz    Set master key via environment
+  webquiz --config prod.yaml --master-key override  Mix config file with CLI overrides
   webquiz --stop                       Stop daemon server
   webquiz --status                     Check daemon status
 
 The server will be available at http://0.0.0.0:8080 (accessible on network)
-Quiz files are loaded from quizzes/ directory (auto-created if missing)
+Quiz files loaded from quizzes/ directory (auto-created if missing)
 Admin panel available at http://0.0.0.0:8080/admin (if master key is set)
-User responses saved to {quiz_name}_user_responses.csv files
-Server logs written to server.log
+User responses saved to data/{quiz_name}_user_responses_{suffix}.csv
+Server logs written to logs/server_{suffix}.log
 Static files served from static/ directory
+CLI parameters always override config file values
         """
     )
     
@@ -247,8 +249,12 @@ Static files served from static/ directory
     )
     
     parser.add_argument(
+        '--config',
+        help='Path to YAML configuration file'
+    )
+    
+    parser.add_argument(
         '--quizzes-dir',
-        default='quizzes',
         help='Path to quizzes directory (default: quizzes)'
     )
     
@@ -258,20 +264,17 @@ Static files served from static/ directory
     )
     
     parser.add_argument(
-        '--log-file',
-        default='server.log',
-        help='Path to log file (default: server.log)'
+        '--logs-dir',
+        help='Directory for log files (default: logs/)'
     )
     
     parser.add_argument(
-        '--csv-file',
-        default='user_responses.csv',
-        help='Path to CSV file for user responses (default: user_responses.csv)'
+        '--csv-dir',
+        help='Directory for CSV response files (default: data/)'
     )
     
     parser.add_argument(
         '--static',
-        default='static',
         help='Path to static files directory (default: static)'
     )
     
@@ -283,8 +286,15 @@ Static files served from static/ directory
     
     args = parser.parse_args()
     
-    # Get master key from args or environment
-    master_key = args.master_key or os.environ.get('WEBQUIZ_MASTER_KEY')
+    # Load configuration with CLI overrides
+    config = load_config_with_overrides(
+        config_path=args.config,
+        quizzes_dir=args.quizzes_dir,
+        master_key=args.master_key,
+        logs_dir=args.logs_dir,
+        csv_dir=args.csv_dir,
+        static_dir=args.static
+    )
     
     # Handle daemon stop
     if args.stop:
@@ -305,16 +315,12 @@ Static files served from static/ directory
     
     # Handle daemon start
     if args.daemon:
-        # Store parameters for daemon process
-        start_daemon._quizzes_dir = args.quizzes_dir
-        start_daemon._log_file = args.log_file
-        start_daemon._csv_file = args.csv_file
-        start_daemon._static_dir = args.static
-        start_daemon._master_key = master_key
+        # Store config for daemon process
+        start_daemon._config = config
         return start_daemon()
     
     # Default: run server in foreground
-    return run_server(args.quizzes_dir, args.log_file, args.csv_file, args.static, master_key)
+    return run_server(config)
 
 
 if __name__ == '__main__':
