@@ -105,12 +105,13 @@ def start_daemon():
             
             # Start the server
             try:
-                # Get file paths from global variables set in main()
-                config_file = getattr(start_daemon, '_config_file', 'config.yaml')
+                # Get parameters from global variables set in main()
+                quizzes_dir = getattr(start_daemon, '_quizzes_dir', 'quizzes')
                 log_file = getattr(start_daemon, '_log_file', 'server.log')
                 csv_file = getattr(start_daemon, '_csv_file', 'user_responses.csv')
                 static_dir = getattr(start_daemon, '_static_dir', 'static')
-                run_server(config_file, log_file, csv_file, static_dir)
+                master_key = getattr(start_daemon, '_master_key', None)
+                run_server(quizzes_dir, log_file, csv_file, static_dir, master_key)
             except Exception as e:
                 print(f"❌ Error starting server: {e}")
                 pid_file = get_pid_file_path()
@@ -156,18 +157,21 @@ def stop_daemon():
         return 1
 
 
-def run_server(config_file: str = 'config.yaml', log_file: str = 'server.log', csv_file: str = 'user_responses.csv', static_dir: str = 'static'):
+def run_server(quizzes_dir: str = 'quizzes', log_file: str = 'server.log', csv_file: str = 'user_responses.csv', static_dir: str = 'static', master_key: str = None):
     """Run the server in foreground mode."""
     print("🚀 Starting WebQuiz Testing System...")
-    print(f"📄 Config file: {config_file}")
+    print(f"📁 Quizzes directory: {quizzes_dir}")
     print(f"📝 Log file: {log_file}")
     print(f"📊 CSV file: {csv_file}")
-    print(f"📁 Static directory: {static_dir}")
+    print(f"📂 Static directory: {static_dir}")
+    print(f"🔑 Master key: {'Set' if master_key else 'Not set (admin disabled)'}")
     print("🌐 Server will be available at: http://0.0.0.0:8080 (accessible on network)")
+    if master_key:
+        print("🔧 Admin panel: http://0.0.0.0:8080/admin")
     print("⏹️  Press Ctrl+C to stop")
     
     async def start_server():
-        app = await create_app(config_file, log_file, csv_file, static_dir)
+        app = await create_app(quizzes_dir, log_file, csv_file, static_dir, master_key)
         runner = web.AppRunner(app)
         await runner.setup()
         
@@ -206,18 +210,20 @@ def main():
 Examples:
   webquiz                              Start server in foreground
   webquiz -d                           Start server as daemon
-  webquiz --config custom.yaml         Use custom config file
+  webquiz --quizzes-dir my_quizzes     Use custom quizzes directory
+  webquiz --master-key secret123       Set admin master key
   webquiz --log-file /var/log/quiz.log Use custom log file
-  webquiz --csv-file /data/responses.csv   Use custom CSV file
+  webquiz --csv-file responses.csv     Use custom CSV file base name
   webquiz --static /var/www/quiz       Use custom static files directory
-  webquiz --config quiz.yaml --log-file quiz.log --csv-file quiz.csv --static web/
+  WEBQUIZ_MASTER_KEY=secret webquiz    Set master key via environment
   webquiz --stop                       Stop daemon server
   webquiz --status                     Check daemon status
 
 The server will be available at http://0.0.0.0:8080 (accessible on network)
-Questions are loaded from config.yaml (auto-created if missing)
-User responses are saved to user_responses.csv
-Server logs are written to server.log
+Quiz files are loaded from quizzes/ directory (auto-created if missing)
+Admin panel available at http://0.0.0.0:8080/admin (if master key is set)
+User responses saved to {quiz_name}_user_responses.csv files
+Server logs written to server.log
 Static files served from static/ directory
         """
     )
@@ -241,9 +247,14 @@ Static files served from static/ directory
     )
     
     parser.add_argument(
-        '--config',
-        default='config.yaml',
-        help='Path to config file (default: config.yaml)'
+        '--quizzes-dir',
+        default='quizzes',
+        help='Path to quizzes directory (default: quizzes)'
+    )
+    
+    parser.add_argument(
+        '--master-key',
+        help='Master key for admin access (can also use WEBQUIZ_MASTER_KEY env var)'
     )
     
     parser.add_argument(
@@ -272,6 +283,9 @@ Static files served from static/ directory
     
     args = parser.parse_args()
     
+    # Get master key from args or environment
+    master_key = args.master_key or os.environ.get('WEBQUIZ_MASTER_KEY')
+    
     # Handle daemon stop
     if args.stop:
         return stop_daemon()
@@ -291,15 +305,16 @@ Static files served from static/ directory
     
     # Handle daemon start
     if args.daemon:
-        # Store file paths for daemon process
-        start_daemon._config_file = args.config
+        # Store parameters for daemon process
+        start_daemon._quizzes_dir = args.quizzes_dir
         start_daemon._log_file = args.log_file
         start_daemon._csv_file = args.csv_file
         start_daemon._static_dir = args.static
+        start_daemon._master_key = master_key
         return start_daemon()
     
     # Default: run server in foreground
-    return run_server(args.config, args.log_file, args.csv_file, args.static)
+    return run_server(args.quizzes_dir, args.log_file, args.csv_file, args.static, master_key)
 
 
 if __name__ == '__main__':

@@ -1,0 +1,394 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WebQuiz Admin Panel</title>
+    <style>
+        :root {
+            --bg-color: #f5f5f5;
+            --container-bg: white;
+            --text-color: #333;
+            --border-color: #ddd;
+            --button-bg: #007bff;
+            --button-hover: #0056b3;
+            --success-bg: #d4edda;
+            --success-border: #c3e6cb;
+            --success-color: #155724;
+            --error-bg: #f8d7da;
+            --error-border: #f5c6cb;
+            --error-color: #721c24;
+            --warning-bg: #fff3cd;
+            --warning-border: #ffeaa7;
+            --warning-color: #856404;
+        }
+
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+        }
+
+        .container {
+            background: var(--container-bg);
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+
+        h1 {
+            text-align: center;
+            color: var(--text-color);
+            margin-bottom: 30px;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+
+        input[type="password"], select {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid var(--border-color);
+            border-radius: 5px;
+            font-size: 16px;
+            box-sizing: border-box;
+        }
+
+        button {
+            background: var(--button-bg);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            margin: 5px;
+        }
+
+        button:hover {
+            background: var(--button-hover);
+        }
+
+        button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+
+        .hidden {
+            display: none;
+        }
+
+        .message {
+            padding: 10px;
+            border-radius: 5px;
+            margin: 10px 0;
+        }
+
+        .success {
+            background: var(--success-bg);
+            border: 1px solid var(--success-border);
+            color: var(--success-color);
+        }
+
+        .error {
+            background: var(--error-bg);
+            border: 1px solid var(--error-border);
+            color: var(--error-color);
+        }
+
+        .warning {
+            background: var(--warning-bg);
+            border: 1px solid var(--warning-border);
+            color: var(--warning-color);
+        }
+
+        .current-quiz {
+            padding: 15px;
+            background: var(--warning-bg);
+            border: 1px solid var(--warning-border);
+            border-radius: 5px;
+            margin: 20px 0;
+        }
+
+        .quiz-list {
+            max-height: 300px;
+            overflow-y: auto;
+            border: 1px solid var(--border-color);
+            border-radius: 5px;
+            padding: 10px;
+            background: #fafafa;
+        }
+
+        .quiz-item {
+            padding: 8px;
+            margin: 2px 0;
+            background: white;
+            border-radius: 3px;
+            cursor: pointer;
+            border: 1px solid transparent;
+        }
+
+        .quiz-item:hover {
+            border-color: var(--button-bg);
+        }
+
+        .quiz-item.selected {
+            background: var(--button-bg);
+            color: white;
+        }
+
+        .quiz-item.current {
+            background: var(--warning-bg);
+            border-color: var(--warning-border);
+            font-weight: bold;
+        }
+
+        .actions {
+            text-align: center;
+            margin-top: 20px;
+        }
+
+        .back-link {
+            text-align: center;
+            margin-top: 20px;
+        }
+
+        .back-link a {
+            color: var(--button-bg);
+            text-decoration: none;
+        }
+
+        .back-link a:hover {
+            text-decoration: underline;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔧 WebQuiz Admin Panel</h1>
+        
+        <!-- Authentication Section -->
+        <div id="auth-section">
+            <div class="form-group">
+                <label for="master-key">Master Key:</label>
+                <input type="password" id="master-key" placeholder="Enter master key">
+            </div>
+            <div class="actions">
+                <button onclick="authenticate()">Authenticate</button>
+            </div>
+        </div>
+
+        <!-- Admin Panel (hidden until authenticated) -->
+        <div id="admin-panel" class="hidden">
+            <div class="current-quiz">
+                <strong>Current Quiz:</strong> <span id="current-quiz-name">Loading...</span>
+            </div>
+
+            <div class="form-group">
+                <label>Available Quiz Files:</label>
+                <div id="quiz-list" class="quiz-list">
+                    Loading quiz files...
+                </div>
+            </div>
+
+            <div class="actions">
+                <button id="switch-btn" onclick="switchQuiz()" disabled>Switch to Selected Quiz</button>
+                <button onclick="refreshQuizzes()">Refresh List</button>
+            </div>
+
+            <div class="back-link">
+                <a href="/">← Back to Quiz</a>
+            </div>
+        </div>
+
+        <!-- Messages -->
+        <div id="message-area"></div>
+    </div>
+
+    <script>
+        let currentMasterKey = '';
+        let selectedQuiz = '';
+        let currentQuiz = '';
+
+        async function authenticate() {
+            const masterKey = document.getElementById('master-key').value.trim();
+            if (!masterKey) {
+                showMessage('Please enter master key', 'error');
+                return;
+            }
+
+            try {
+                const response = await fetch('/api/admin/auth', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-Master-Key': masterKey
+                    },
+                    body: JSON.stringify({})
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    currentMasterKey = masterKey;
+                    document.getElementById('auth-section').style.display = 'none';
+                    document.getElementById('admin-panel').classList.remove('hidden');
+                    showMessage('Authentication successful!', 'success');
+                    await loadQuizzes();
+                } else {
+                    showMessage(data.error || 'Authentication failed', 'error');
+                }
+            } catch (error) {
+                showMessage('Connection error: ' + error.message, 'error');
+            }
+        }
+
+        async function loadQuizzes() {
+            try {
+                const response = await fetch('/api/admin/list-quizzes', {
+                    headers: {
+                        'X-Master-Key': currentMasterKey
+                    }
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    currentQuiz = data.current_quiz;
+                    document.getElementById('current-quiz-name').textContent = currentQuiz || 'None selected';
+                    displayQuizzes(data.quizzes);
+                } else {
+                    showMessage(data.error || 'Failed to load quizzes', 'error');
+                }
+            } catch (error) {
+                showMessage('Error loading quizzes: ' + error.message, 'error');
+            }
+        }
+
+        function displayQuizzes(quizzes) {
+            const quizList = document.getElementById('quiz-list');
+            
+            if (quizzes.length === 0) {
+                quizList.innerHTML = '<div style="text-align: center; color: #666;">No quiz files found</div>';
+                return;
+            }
+
+            let html = '';
+            quizzes.forEach(quiz => {
+                const isCurrent = quiz === currentQuiz;
+                const classes = isCurrent ? 'quiz-item current' : 'quiz-item';
+                html += `<div class="${classes}" onclick="selectQuiz('${quiz}')">${quiz}${isCurrent ? ' (current)' : ''}</div>`;
+            });
+
+            quizList.innerHTML = html;
+        }
+
+        function selectQuiz(quizName) {
+            selectedQuiz = quizName;
+            
+            // Update UI
+            document.querySelectorAll('.quiz-item').forEach(item => {
+                item.classList.remove('selected');
+            });
+            
+            event.target.classList.add('selected');
+            
+            // Enable switch button if different from current
+            const switchBtn = document.getElementById('switch-btn');
+            if (selectedQuiz !== currentQuiz) {
+                switchBtn.disabled = false;
+                switchBtn.textContent = `Switch to "${selectedQuiz}"`;
+            } else {
+                switchBtn.disabled = true;
+                switchBtn.textContent = 'Quiz already active';
+            }
+        }
+
+        async function switchQuiz() {
+            if (!selectedQuiz || selectedQuiz === currentQuiz) {
+                showMessage('Please select a different quiz', 'warning');
+                return;
+            }
+
+            const switchBtn = document.getElementById('switch-btn');
+            switchBtn.disabled = true;
+            switchBtn.textContent = 'Switching...';
+
+            try {
+                const response = await fetch('/api/admin/switch-quiz', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-Master-Key': currentMasterKey
+                    },
+                    body: JSON.stringify({
+                        quiz_filename: selectedQuiz
+                    })
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    showMessage(`Successfully switched to "${selectedQuiz}". CSV file: ${data.csv_file}`, 'success');
+                    currentQuiz = selectedQuiz;
+                    document.getElementById('current-quiz-name').textContent = currentQuiz;
+                    
+                    // Refresh the quiz list to update current indicators
+                    await loadQuizzes();
+                    
+                    // Reset selection
+                    selectedQuiz = '';
+                    switchBtn.textContent = 'Switch to Selected Quiz';
+                } else {
+                    showMessage(data.error || 'Failed to switch quiz', 'error');
+                    switchBtn.disabled = false;
+                    switchBtn.textContent = `Switch to "${selectedQuiz}"`;
+                }
+            } catch (error) {
+                showMessage('Error switching quiz: ' + error.message, 'error');
+                switchBtn.disabled = false;
+                switchBtn.textContent = `Switch to "${selectedQuiz}"`;
+            }
+        }
+
+        async function refreshQuizzes() {
+            await loadQuizzes();
+            showMessage('Quiz list refreshed', 'success');
+        }
+
+        function showMessage(text, type) {
+            const messageArea = document.getElementById('message-area');
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `message ${type}`;
+            messageDiv.textContent = text;
+            
+            messageArea.appendChild(messageDiv);
+            
+            // Auto-remove after 5 seconds
+            setTimeout(() => {
+                if (messageDiv.parentNode) {
+                    messageDiv.parentNode.removeChild(messageDiv);
+                }
+            }, 5000);
+        }
+
+        // Allow Enter key to authenticate
+        document.getElementById('master-key').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                authenticate();
+            }
+        });
+    </script>
+</body>
+</html>

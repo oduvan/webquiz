@@ -3,6 +3,7 @@ import json
 import csv
 import uuid
 import yaml
+import os
 from datetime import datetime
 from typing import Dict, List, Any
 from aiohttp import web
@@ -12,6 +13,44 @@ from io import StringIO
 
 # Logger will be configured in create_app() with custom log file
 logger = logging.getLogger(__name__)
+
+def generate_unique_filename(base_path: str) -> str:
+    """Generate a unique filename with suffix (0001, 0002, etc.) if file exists"""
+    if not os.path.exists(base_path):
+        return base_path
+    
+    # Split the path into name and extension
+    name, ext = os.path.splitext(base_path)
+    
+    # Find the next available suffix
+    suffix = 1
+    while True:
+        new_path = f"{name}_{suffix:04d}{ext}"
+        if not os.path.exists(new_path):
+            return new_path
+        suffix += 1
+
+def admin_auth_required(func):
+    """Decorator to require master key authentication for admin endpoints"""
+    async def wrapper(self, request):
+        # Check if master key is provided
+        if not self.master_key:
+            return web.json_response({'error': 'Admin functionality disabled - no master key set'}, status=403)
+        
+        # Get master key from request (header or body)
+        provided_key = request.headers.get('X-Master-Key')
+        if not provided_key:
+            try:
+                data = await request.json()
+                provided_key = data.get('master_key')
+            except:
+                pass
+        
+        if not provided_key or provided_key != self.master_key:
+            return web.json_response({'error': 'Invalid or missing master key'}, status=401)
+        
+        return await func(self, request)
+    return wrapper
 
 @web.middleware
 async def error_middleware(request, handler):
@@ -32,10 +71,13 @@ async def error_middleware(request, handler):
 
 
 class TestingServer:
-    def __init__(self, config_file: str = 'config.yaml', log_file: str = 'server.log', csv_file: str = 'user_responses.csv', static_dir: str = 'static'):
-        self.config_file = config_file
-        self.log_file = log_file
-        self.csv_file = csv_file
+    def __init__(self, quizzes_dir: str = 'quizzes', log_file: str = 'server.log', csv_file: str = 'user_responses.csv', static_dir: str = 'static', master_key: str = None):
+        self.quizzes_dir = quizzes_dir
+        self.master_key = master_key
+        self.current_quiz_file = None  # Will be set when quiz is selected
+        self.log_file = generate_unique_filename(log_file)
+        self.base_csv_file = csv_file  # Store base name for generating quiz-prefixed names
+        self.csv_file = None  # Will be set when quiz is selected
         self.static_dir = static_dir
         self.users: Dict[str, Dict[str, Any]] = {}  # user_id -> user data
         self.questions: List[Dict[str, Any]] = []
@@ -45,27 +87,85 @@ class TestingServer:
         self.user_stats: Dict[str, Dict[str, Any]] = {}  # user_id -> final stats for completed users
         self.user_answers: Dict[str, List[Dict[str, Any]]] = {}  # user_id -> list of answers for stats calculation
         
-    async def initialize_log_file(self):
-        """Initialize/recreate log file"""
+    def generate_csv_filename(self, quiz_name: str) -> str:
+        """Generate CSV filename with quiz name prefix"""
+        name, ext = os.path.splitext(self.base_csv_file)
+        quiz_prefix = quiz_name.replace('.yaml', '').replace('.yml', '')
+        base_path = f"{quiz_prefix}_{name}{ext}"
+        return generate_unique_filename(base_path)
+        
+    def reset_server_state(self):
+        """Reset all server state for new quiz"""
+        self.users.clear()
+        self.user_responses.clear()
+        self.user_progress.clear()
+        self.question_start_times.clear()
+        self.user_stats.clear()
+        self.user_answers.clear()
+        logger.info("Server state reset for new quiz")
+        
+    async def list_available_quizzes(self):
+        """List all available quiz files in quizzes directory"""
         try:
-            # Clear the log file by opening in write mode
+            quiz_files = []
+            if os.path.exists(self.quizzes_dir):
+                for filename in os.listdir(self.quizzes_dir):
+                    if filename.endswith(('.yaml', '.yml')):
+                        quiz_files.append(filename)
+            return sorted(quiz_files)
+        except Exception as e:
+            logger.error(f"Error listing quiz files: {e}")
+            return []
+            
+    async def switch_quiz(self, quiz_filename: str):
+        """Switch to a different quiz file and reset server state"""
+        quiz_path = os.path.join(self.quizzes_dir, quiz_filename)
+        if not os.path.exists(quiz_path):
+            raise ValueError(f"Quiz file not found: {quiz_filename}")
+            
+        # Reset server state
+        self.reset_server_state()
+        
+        # Update current quiz and CSV filename
+        self.current_quiz_file = quiz_path
+        quiz_name = os.path.splitext(quiz_filename)[0]
+        self.csv_file = self.generate_csv_filename(quiz_name)
+        
+        # Load new questions
+        await self.load_questions_from_file(quiz_path)
+        
+        # Initialize new CSV file
+        await self.initialize_csv()
+        
+        # Regenerate index.html with new questions
+        await self.create_default_index_html()
+        
+        logger.info(f"Switched to quiz: {quiz_filename}, CSV: {self.csv_file}")
+        
+    
+    async def initialize_log_file(self):
+        """Initialize new log file with unique suffix"""
+        try:
+            # Create the new log file
             with open(self.log_file, 'w') as f:
                 f.write('')
-            logger.info(f"=== Server Started - Log File Reset: {self.log_file} ===")
+            logger.info(f"=== Server Started - New Log File Created: {self.log_file} ===")
         except Exception as e:
             print(f"Error initializing log file {self.log_file}: {e}")
 
     async def initialize_csv(self):
-        """Initialize/recreate CSV file with headers"""
+        """Initialize new CSV file with unique suffix and headers"""
         try:
             async with aiofiles.open(self.csv_file, 'w') as f:
                 await f.write('user_id,username,question_text,selected_answer_text,correct_answer_text,is_correct,time_taken_seconds\n')
-            logger.info(f"Initialized CSV file with headers: {self.csv_file}")
+            logger.info(f"Initialized new CSV file with headers: {self.csv_file}")
         except Exception as e:
             logger.error(f"Error initializing CSV file {self.csv_file}: {e}")
     
-    async def create_default_config_yaml(self):
+    async def create_default_config_yaml(self, file_path: str = None):
         """Create default config.yaml file"""
+        if file_path is None:
+            file_path = self.config_file if hasattr(self, 'config_file') else 'config.yaml'
         default_questions = {
             'questions': [
                 {
@@ -90,16 +190,16 @@ class TestingServer:
         }
         
         try:
-            async with aiofiles.open(self.config_file, 'w') as f:
+            async with aiofiles.open(file_path, 'w') as f:
                 await f.write(yaml.dump(default_questions, default_flow_style=False))
-            logger.info(f"Created default config file: {self.config_file}")
+            logger.info(f"Created default config file: {file_path}")
         except Exception as e:
-            logger.error(f"Error creating default config file {self.config_file}: {e}")
+            logger.error(f"Error creating default config file {file_path}: {e}")
 
-    async def load_questions(self):
-        """Load questions from config file"""
+    async def load_questions_from_file(self, quiz_file_path: str):
+        """Load questions from specific quiz file"""
         try:
-            async with aiofiles.open(self.config_file, 'r') as f:
+            async with aiofiles.open(quiz_file_path, 'r') as f:
                 content = await f.read()
                 data = yaml.safe_load(content)
                 self.questions = data['questions']
@@ -109,14 +209,36 @@ class TestingServer:
                     if 'id' not in question:
                         question['id'] = i + 1
                         
-                logger.info(f"Loaded {len(self.questions)} questions from {self.config_file}")
-        except FileNotFoundError:
-            logger.info(f"{self.config_file} not found, creating default file")
-            await self.create_default_config_yaml()
-            # Retry loading after creating default file
-            await self.load_questions()
+                logger.info(f"Loaded {len(self.questions)} questions from {quiz_file_path}")
         except Exception as e:
-            logger.error(f"Error loading questions from {self.config_file}: {e}")
+            logger.error(f"Error loading questions from {quiz_file_path}: {e}")
+            raise
+            
+    async def load_questions(self):
+        """Load questions from first available quiz file or create default"""
+        try:
+            # Check if quizzes directory exists
+            if not os.path.exists(self.quizzes_dir):
+                os.makedirs(self.quizzes_dir)
+                logger.info(f"Created quizzes directory: {self.quizzes_dir}")
+            
+            # Get available quiz files
+            available_quizzes = await self.list_available_quizzes()
+            
+            if not available_quizzes:
+                # No quiz files found, create default
+                default_path = os.path.join(self.quizzes_dir, 'default.yaml')
+                await self.create_default_config_yaml(default_path)
+                available_quizzes = ['default.yaml']
+            
+            # Load the first available quiz
+            first_quiz = available_quizzes[0]
+            quiz_path = os.path.join(self.quizzes_dir, first_quiz)
+            await self.switch_quiz(first_quiz)
+            
+        except Exception as e:
+            logger.error(f"Error in load_questions: {e}")
+            raise
             
             
     async def create_default_index_html(self):
@@ -451,8 +573,64 @@ class TestingServer:
                 'valid': False,
                 'message': 'User ID not found'
             })
+    
+    # Admin API endpoints
+    @admin_auth_required
+    async def admin_list_quizzes(self, request):
+        """List available quiz files"""
+        quizzes = await self.list_available_quizzes()
+        return web.json_response({
+            'quizzes': quizzes,
+            'current_quiz': os.path.basename(self.current_quiz_file) if self.current_quiz_file else None
+        })
+    
+    @admin_auth_required  
+    async def admin_switch_quiz(self, request):
+        """Switch to a different quiz"""
+        try:
+            data = await request.json()
+            quiz_filename = data['quiz_filename']
+            
+            await self.switch_quiz(quiz_filename)
+            
+            return web.json_response({
+                'success': True,
+                'message': f'Switched to quiz: {quiz_filename}',
+                'current_quiz': quiz_filename,
+                'csv_file': os.path.basename(self.csv_file)
+            })
+        except Exception as e:
+            logger.error(f"Error switching quiz: {e}")
+            return web.json_response({'error': str(e)}, status=400)
+    
+    @admin_auth_required
+    async def admin_auth_test(self, request):
+        """Test admin authentication"""
+        return web.json_response({
+            'authenticated': True,
+            'message': 'Admin authentication successful'
+        })
+        
+    async def serve_admin_page(self, request):
+        """Serve the admin interface page"""
+        try:
+            try:
+                # Try modern importlib.resources first (Python 3.9+)
+                import importlib.resources as pkg_resources
+                template_content = (pkg_resources.files('webquiz') / 'templates' / 'admin.html').read_text()
+            except (ImportError, AttributeError):
+                # Fallback to pkg_resources for older Python versions
+                import pkg_resources
+                template_path = pkg_resources.resource_filename('webquiz', 'templates/admin.html')
+                async with aiofiles.open(template_path, 'r') as template_file:
+                    template_content = await template_file.read()
+            
+            return web.Response(text=template_content, content_type='text/html')
+        except Exception as e:
+            logger.error(f"Error serving admin page: {e}")
+            return web.Response(text='<h1>Admin page not found</h1>', content_type='text/html', status=404)
 
-async def create_app(config_file: str = 'config.yaml', log_file: str = 'server.log', csv_file: str = 'user_responses.csv', static_dir: str = 'static'):
+async def create_app(quizzes_dir: str = 'quizzes', log_file: str = 'server.log', csv_file: str = 'user_responses.csv', static_dir: str = 'static', master_key: str = None):
     """Create and configure the application"""
     # Configure logging with custom log file
     logging.basicConfig(
@@ -465,15 +643,13 @@ async def create_app(config_file: str = 'config.yaml', log_file: str = 'server.l
         force=True  # Override any existing configuration
     )
     
-    server = TestingServer(config_file, log_file, csv_file, static_dir)
+    server = TestingServer(quizzes_dir, log_file, csv_file, static_dir, master_key)
     
-    # Clean/recreate log file and CSV file on startup
+    # Clean/recreate log file on startup
     await server.initialize_log_file()
-    await server.initialize_csv()
     
-    # Load questions and create HTML with embedded data
+    # Load questions and create HTML with embedded data (CSV will be initialized in switch_quiz)
     await server.load_questions()
-    await server.create_default_index_html()
     
     # Start periodic flush task
     asyncio.create_task(server.periodic_flush())
@@ -485,6 +661,12 @@ async def create_app(config_file: str = 'config.yaml', log_file: str = 'server.l
     app.router.add_post('/api/register', server.register_user)
     app.router.add_post('/api/submit-answer', server.submit_answer)
     app.router.add_get('/api/verify-user/{user_id}', server.verify_user_id)
+    
+    # Admin routes
+    app.router.add_get('/admin', server.serve_admin_page)
+    app.router.add_post('/api/admin/auth', server.admin_auth_test)
+    app.router.add_get('/api/admin/list-quizzes', server.admin_list_quizzes)
+    app.router.add_post('/api/admin/switch-quiz', server.admin_switch_quiz)
     
     # Serve static files from configured static directory
     app.router.add_static('/', path=static_dir, name='static')
