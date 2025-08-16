@@ -17,7 +17,7 @@ WebQuiz - A modern web-based quiz and testing system built with Python and aioht
 - In-memory storage with periodic CSV backup (30s intervals) to configurable file path
 - User session persistence with cookie-based user ID storage
 - Responsive web interface with dark/light theme
-- **Live statistics monitoring**: Real-time WebSocket-powered dashboard showing user progress
+- **Live statistics monitoring**: Real-time WebSocket-powered dashboard showing user progress with timing information
 - Configurable file paths for quizzes, logs, CSV output, and static files
 - Comprehensive test suite (integration + unit tests)
 
@@ -30,7 +30,7 @@ WebQuiz - A modern web-based quiz and testing system built with Python and aioht
   - **Users**: In-memory dictionary (user_id as key, contains username) - resets on quiz switch
   - **Session timing**: Server-side tracking for accurate measurements
   - **Quiz state**: Dynamic loading and switching with complete state reset
-  - **Live stats**: Real-time user progress tracking with WebSocket broadcasting
+  - **Live stats**: Real-time user progress tracking with WebSocket broadcasting and timing information
 - **API Design**: RESTful endpoints with JSON responses + admin-protected endpoints
 - **Authentication**: Master key-based admin authentication with decorator protection
 - **Testing**: Integration tests with real HTTP requests + unit tests for internal logic

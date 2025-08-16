@@ -622,11 +622,16 @@ class TestingServer:
         
         self.websocket_clients = active_clients
     
-    def update_live_stats(self, user_id: str, question_id: int, state: str):
+    def update_live_stats(self, user_id: str, question_id: int, state: str, time_taken: float = None):
         """Update live stats for a user and question"""
         if user_id not in self.live_stats:
             self.live_stats[user_id] = {}
-        self.live_stats[user_id][question_id] = state
+        
+        # Store both state and time_taken
+        self.live_stats[user_id][question_id] = {
+            'state': state,
+            'time_taken': time_taken
+        }
             
     async def register_user(self, request):
         """Register a new user"""
@@ -664,6 +669,7 @@ class TestingServer:
                 'username': username,
                 'question_id': 1,
                 'state': 'think',
+                'time_taken': None,
                 'total_questions': len(self.questions)
             })
         
@@ -735,7 +741,7 @@ class TestingServer:
         
         # Update live stats: set current question state based on correctness
         state = "ok" if is_correct else "fail"
-        self.update_live_stats(user_id, question_id, state)
+        self.update_live_stats(user_id, question_id, state, time_taken)
         
         # Broadcast current question result
         await self.broadcast_to_websockets({
@@ -744,6 +750,7 @@ class TestingServer:
             'username': username,
             'question_id': question_id,
             'state': state,
+            'time_taken': time_taken,
             'total_questions': len(self.questions)
         })
         
@@ -765,6 +772,7 @@ class TestingServer:
                 'username': username,
                 'question_id': next_question_id,
                 'state': 'think',
+                'time_taken': None,
                 'total_questions': len(self.questions)
             })
         

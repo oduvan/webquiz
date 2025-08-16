@@ -113,11 +113,33 @@
         }
 
         .state-cell {
-            width: 60px;
-            height: 40px;
-            font-size: 20px;
+            width: 80px;
+            height: 50px;
+            font-size: 14px;
             font-weight: bold;
             position: relative;
+            padding: 4px;
+        }
+
+        .cell-content {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100%;
+        }
+
+        .state-icon {
+            font-size: 18px;
+            line-height: 1;
+        }
+
+        .time-display {
+            font-size: 10px;
+            font-weight: normal;
+            opacity: 0.8;
+            margin-top: 2px;
+            line-height: 1;
         }
 
         .state-think {
@@ -195,9 +217,17 @@
             }
             
             .state-cell {
-                width: 40px;
-                height: 30px;
-                font-size: 16px;
+                width: 60px;
+                height: 40px;
+                font-size: 12px;
+            }
+            
+            .state-icon {
+                font-size: 14px;
+            }
+            
+            .time-display {
+                font-size: 8px;
             }
         }
     </style>
@@ -353,7 +383,7 @@
 
             handleInitialState(data) {
                 this.users = data.users || {};
-                this.liveStats = data.live_stats || {};
+                this.liveStats = this.normalizeStatsData(data.live_stats || {});
                 this.questions = data.questions || [];
                 this.totalQuestions = data.total_questions || 0;
                 this.currentQuiz = data.current_quiz || 'No quiz selected';
@@ -362,12 +392,37 @@
                 this.buildTable();
             }
 
+            normalizeStatsData(liveStats) {
+                // Convert old format to new format if needed
+                const normalized = {};
+                for (const userId in liveStats) {
+                    normalized[userId] = {};
+                    for (const questionId in liveStats[userId]) {
+                        const value = liveStats[userId][questionId];
+                        if (typeof value === 'string') {
+                            // Old format: just the state
+                            normalized[userId][questionId] = {
+                                state: value,
+                                time_taken: null
+                            };
+                        } else {
+                            // New format: object with state and time_taken
+                            normalized[userId][questionId] = value;
+                        }
+                    }
+                }
+                return normalized;
+            }
+
             handleUserRegistered(data) {
                 this.users[data.user_id] = data.username;
                 if (!this.liveStats[data.user_id]) {
                     this.liveStats[data.user_id] = {};
                 }
-                this.liveStats[data.user_id][data.question_id] = data.state;
+                this.liveStats[data.user_id][data.question_id] = {
+                    state: data.state,
+                    time_taken: data.time_taken
+                };
                 
                 this.updateQuizInfo();
                 this.buildTable();
@@ -377,9 +432,12 @@
                 if (!this.liveStats[data.user_id]) {
                     this.liveStats[data.user_id] = {};
                 }
-                this.liveStats[data.user_id][data.question_id] = data.state;
+                this.liveStats[data.user_id][data.question_id] = {
+                    state: data.state,
+                    time_taken: data.time_taken
+                };
                 
-                this.updateCell(data.user_id, data.question_id, data.state);
+                this.updateCell(data.user_id, data.question_id, data.state, data.time_taken);
             }
 
             handleQuizSwitched(data) {
@@ -430,11 +488,21 @@
                     bodyHtml += `<td class="username-cell">${username}</td>`;
                     
                     for (let questionId = 1; questionId <= this.questions.length; questionId++) {
-                        const state = this.liveStats[userId] && this.liveStats[userId][questionId] 
+                        const cellData = this.liveStats[userId] && this.liveStats[userId][questionId] 
                             ? this.liveStats[userId][questionId] 
-                            : 'empty';
+                            : { state: 'empty', time_taken: null };
+                        
+                        const state = cellData.state || 'empty';
+                        const timeTaken = cellData.time_taken;
                         const stateIcon = this.getStateIcon(state);
-                        bodyHtml += `<td class="state-cell state-${state}" id="cell-${userId}-${questionId}">${stateIcon}</td>`;
+                        const timeDisplay = this.formatTime(timeTaken);
+                        
+                        bodyHtml += `<td class="state-cell state-${state}" id="cell-${userId}-${questionId}">
+                            <div class="cell-content">
+                                <div class="state-icon">${stateIcon}</div>
+                                ${timeDisplay ? `<div class="time-display">${timeDisplay}</div>` : ''}
+                            </div>
+                        </td>`;
                     }
                     
                     bodyHtml += '</tr>';
@@ -443,11 +511,33 @@
                 this.tableBodyElement.innerHTML = bodyHtml;
             }
 
-            updateCell(userId, questionId, state) {
+            updateCell(userId, questionId, state, timeTaken) {
                 const cellElement = document.getElementById(`cell-${userId}-${questionId}`);
                 if (cellElement) {
                     cellElement.className = `state-cell state-${state}`;
-                    cellElement.textContent = this.getStateIcon(state);
+                    const stateIcon = this.getStateIcon(state);
+                    const timeDisplay = this.formatTime(timeTaken);
+                    
+                    cellElement.innerHTML = `
+                        <div class="cell-content">
+                            <div class="state-icon">${stateIcon}</div>
+                            ${timeDisplay ? `<div class="time-display">${timeDisplay}</div>` : ''}
+                        </div>
+                    `;
+                }
+            }
+
+            formatTime(seconds) {
+                if (seconds === null || seconds === undefined) {
+                    return null;
+                }
+                
+                if (seconds < 60) {
+                    return `${Math.round(seconds)}s`;
+                } else {
+                    const minutes = Math.floor(seconds / 60);
+                    const remainingSeconds = Math.round(seconds % 60);
+                    return `${minutes}m ${remainingSeconds}s`;
                 }
             }
 
