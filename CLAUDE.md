@@ -17,18 +17,20 @@ WebQuiz - A modern web-based quiz and testing system built with Python and aioht
 - In-memory storage with periodic CSV backup (30s intervals) to configurable file path
 - User session persistence with cookie-based user ID storage
 - Responsive web interface with dark/light theme
+- **Live statistics monitoring**: Real-time WebSocket-powered dashboard showing user progress
 - Configurable file paths for quizzes, logs, CSV output, and static files
 - Comprehensive test suite (integration + unit tests)
 
 ## Architecture
-- **Backend**: Python aiohttp server with middleware-based error handling and admin authentication
-- **Frontend**: Vanilla HTML/JS single-page application with embedded questions data + admin interface
+- **Backend**: Python aiohttp server with middleware-based error handling, admin authentication, and WebSocket support
+- **Frontend**: Vanilla HTML/JS single-page application with embedded questions data + admin interface + live stats dashboard
 - **Data Storage**: 
   - **Questions**: Multiple YAML files in `quizzes/` directory with correct answers (auto-created with defaults)
   - **User responses**: In-memory → CSV files with quiz name prefixes (proper CSV module usage)
   - **Users**: In-memory dictionary (user_id as key, contains username) - resets on quiz switch
   - **Session timing**: Server-side tracking for accurate measurements
   - **Quiz state**: Dynamic loading and switching with complete state reset
+  - **Live stats**: Real-time user progress tracking with WebSocket broadcasting
 - **API Design**: RESTful endpoints with JSON responses + admin-protected endpoints
 - **Authentication**: Master key-based admin authentication with decorator protection
 - **Testing**: Integration tests with real HTTP requests + unit tests for internal logic
@@ -44,12 +46,14 @@ WebQuiz - A modern web-based quiz and testing system built with Python and aioht
   - _(additional quiz files as needed)_
 - `webquiz/templates/index.html` - Main quiz interface template
 - **`webquiz/templates/admin.html`** - Admin interface template for quiz management
+- **`webquiz/templates/live_stats.html`** - Live statistics dashboard template with WebSocket client
 - **`{quiz_name}_user_responses.csv`** - User response storage with quiz name prefix (e.g., `math_quiz_user_responses.csv`)
 - **`server_{suffix}.log`** - Server activity logs with unique suffixes (no overwrites)
 - `static/` - Static files folder (automatically generated, contains current quiz's index.html)
 - `tests/` - Test suite
   - `test_integration.py` - Integration tests with real HTTP requests (11 tests)
   - `test_server.py` - Unit tests for internal functionality (3 tests)
+  - `test_live_stats.py` - Live statistics and WebSocket functionality tests (12 tests)
   - `conftest.py` - Test fixtures and configuration
 - `pyproject.toml` - Poetry configuration and dependencies
 - `requirements.txt` - Legacy pip dependencies
@@ -68,6 +72,10 @@ WebQuiz - A modern web-based quiz and testing system built with Python and aioht
 - **`POST /api/admin/auth`** - Test admin authentication (master key required)
 - **`GET /api/admin/list-quizzes`** - List available quiz files and current active quiz
 - **`POST /api/admin/switch-quiz`** - Switch to different quiz file and reset server state
+
+### Live Stats Endpoints (public access)
+- **`GET /live-stats`** - Serve live statistics dashboard webpage
+- **`WebSocket /ws/live-stats`** - Real-time WebSocket connection for live progress updates
 
 ## Commands
 ```bash
@@ -107,6 +115,7 @@ pytest tests/ -v    # Verbose
 # - test_server.py: Internal server functionality (3 tests)  
 # - test_quiz_selection.py: Multi-quiz loading scenarios (7 tests)
 # - test_admin_functionality.py: Admin interface and auth (13 tests)
+# - test_live_stats.py: WebSocket and live statistics (12 tests)
 ```
 
 ## Technical Decisions
@@ -122,6 +131,7 @@ pytest tests/ -v    # Verbose
 - **Embedded questions data**: Questions injected directly into HTML template (no separate JSON file)
 - **In-memory storage**: Fast responses, CSV backup for persistence, resets on quiz switch
 - **Session persistence**: Cookie-based user_id storage for seamless user experience
+- **Real-time monitoring**: WebSocket-based live statistics with automatic client cleanup and broadcasting
 - **Comprehensive testing**: Integration tests for API + unit tests for internal logic
 
 ## Data Flow
@@ -149,7 +159,8 @@ pytest tests/ -v    # Verbose
   - User data structure validation
 - **Quiz Selection Tests (7)**: Test multi-quiz system functionality
 - **Admin Functionality Tests (13)**: Test admin interface and authentication
-- **Total: 34 tests** with GitHub Actions CI/CD pipeline
+- **Live Stats Tests (12)**: Test WebSocket connectivity and real-time broadcasting
+- **Total: 46 tests** with GitHub Actions CI/CD pipeline
 - **Testing Philosophy**: Create new automated tests for newly implemented functionality instead of manual testing
 - **No duplicate tests**: Removed redundant unit tests covered by integration tests
 

@@ -6,7 +6,7 @@ import yaml
 import os
 from datetime import datetime
 from typing import Dict, List, Any, Optional
-from aiohttp import web
+from aiohttp import web, WSMsgType
 import aiofiles
 import logging
 from io import StringIO
@@ -198,6 +198,10 @@ class TestingServer:
         self.user_stats: Dict[str, Dict[str, Any]] = {}  # user_id -> final stats for completed users
         self.user_answers: Dict[str, List[Dict[str, Any]]] = {}  # user_id -> list of answers for stats calculation
         
+        # Live stats WebSocket infrastructure
+        self.websocket_clients: List[web.WebSocketResponse] = []  # Connected WebSocket clients
+        self.live_stats: Dict[str, Dict[int, str]] = {}  # user_id -> {question_id: state}
+        
     def generate_log_path(self) -> str:
         """Generate log file path in logs directory"""
         ensure_directory_exists(self.logs_dir)
@@ -220,6 +224,7 @@ class TestingServer:
         self.question_start_times.clear()
         self.user_stats.clear()
         self.user_answers.clear()
+        self.live_stats.clear()
         logger.info("Server state reset for new quiz")
         
     async def list_available_quizzes(self):
@@ -257,6 +262,15 @@ class TestingServer:
         
         # Regenerate index.html with new questions
         await self.create_default_index_html()
+        
+        # Notify WebSocket clients about quiz switch
+        await self.broadcast_to_websockets({
+            'type': 'quiz_switched',
+            'current_quiz': quiz_filename,
+            'questions': self.questions,
+            'total_questions': len(self.questions),
+            'message': f'Quiz switched to: {quiz_filename}'
+        })
         
         logger.info(f"Switched to quiz: {quiz_filename}, CSV: {self.csv_file}")
         
@@ -590,6 +604,29 @@ class TestingServer:
         while True:
             await asyncio.sleep(30)  # Flush every 30 seconds
             await self.flush_responses_to_csv()
+    
+    async def broadcast_to_websockets(self, message: dict):
+        """Broadcast message to all connected WebSocket clients"""
+        if not self.websocket_clients:
+            return
+            
+        # Clean up closed connections
+        active_clients = []
+        for ws in self.websocket_clients:
+            if not ws.closed:
+                try:
+                    await ws.send_str(json.dumps(message))
+                    active_clients.append(ws)
+                except Exception as e:
+                    logger.warning(f"Failed to send message to WebSocket client: {e}")
+        
+        self.websocket_clients = active_clients
+    
+    def update_live_stats(self, user_id: str, question_id: int, state: str):
+        """Update live stats for a user and question"""
+        if user_id not in self.live_stats:
+            self.live_stats[user_id] = {}
+        self.live_stats[user_id][question_id] = state
             
     async def register_user(self, request):
         """Register a new user"""
@@ -615,6 +652,20 @@ class TestingServer:
         
         # Start timing for first question
         self.question_start_times[user_id] = datetime.now()
+        
+        # Initialize live stats: set first question to "think"
+        if len(self.questions) > 0:
+            self.update_live_stats(user_id, 1, "think")
+            
+            # Broadcast new user registration
+            await self.broadcast_to_websockets({
+                'type': 'user_registered',
+                'user_id': user_id,
+                'username': username,
+                'question_id': 1,
+                'state': 'think',
+                'total_questions': len(self.questions)
+            })
         
         logger.info(f"Registered user: {username} with ID: {user_id}")
         return web.json_response({
@@ -682,14 +733,40 @@ class TestingServer:
         # Update user progress
         self.user_progress[user_id] = question_id
         
+        # Update live stats: set current question state based on correctness
+        state = "ok" if is_correct else "fail"
+        self.update_live_stats(user_id, question_id, state)
+        
+        # Broadcast current question result
+        await self.broadcast_to_websockets({
+            'type': 'state_update',
+            'user_id': user_id,
+            'username': username,
+            'question_id': question_id,
+            'state': state,
+            'total_questions': len(self.questions)
+        })
+        
         # Check if this was the last question and calculate final stats
         if question_id == len(self.questions):
             # Test completed - calculate and store final stats
             self.calculate_and_store_user_stats(user_id)
             logger.info(f"Test completed for user {user_id} - final stats calculated")
         else:
-            # Start timing for next question
+            # Start timing for next question and update live stats
+            next_question_id = question_id + 1
             self.question_start_times[user_id] = datetime.now()
+            self.update_live_stats(user_id, next_question_id, "think")
+            
+            # Broadcast next question thinking state
+            await self.broadcast_to_websockets({
+                'type': 'state_update',
+                'user_id': user_id,
+                'username': username,
+                'question_id': next_question_id,
+                'state': 'think',
+                'total_questions': len(self.questions)
+            })
         
         logger.info(f"Answer submitted by {username} (ID: {user_id}) for question {question_id}: {'Correct' if is_correct else 'Incorrect'} (took {time_taken:.2f}s)")
         logger.info(f"Updated progress for user {user_id}: last answered question = {question_id}")
@@ -861,6 +938,68 @@ class TestingServer:
         except Exception as e:
             logger.error(f"Error serving admin page: {e}")
             return web.Response(text='<h1>Admin page not found</h1>', content_type='text/html', status=404)
+    
+    async def serve_live_stats_page(self, request):
+        """Serve the live stats page"""
+        try:
+            try:
+                # Try modern importlib.resources first (Python 3.9+)
+                import importlib.resources as pkg_resources
+                template_content = (pkg_resources.files('webquiz') / 'templates' / 'live_stats.html').read_text()
+            except (ImportError, AttributeError):
+                # Fallback to pkg_resources for older Python versions
+                import pkg_resources
+                template_path = pkg_resources.resource_filename('webquiz', 'templates/live_stats.html')
+                async with aiofiles.open(template_path, 'r') as template_file:
+                    template_content = await template_file.read()
+            
+            return web.Response(text=template_content, content_type='text/html')
+        except Exception as e:
+            logger.error(f"Error serving live stats page: {e}")
+            return web.Response(text='<h1>Live stats page not found</h1>', content_type='text/html', status=404)
+    
+    async def websocket_live_stats(self, request):
+        """WebSocket endpoint for live stats updates"""
+        ws = web.WebSocketResponse()
+        await ws.prepare(request)
+        
+        # Add to connected clients
+        self.websocket_clients.append(ws)
+        logger.info(f"New WebSocket client connected. Total clients: {len(self.websocket_clients)}")
+        
+        # Send initial state
+        try:
+            initial_data = {
+                'type': 'initial_state',
+                'live_stats': self.live_stats,
+                'users': {user_id: user_data['username'] for user_id, user_data in self.users.items()},
+                'questions': self.questions,
+                'total_questions': len(self.questions),
+                'current_quiz': os.path.basename(self.current_quiz_file) if self.current_quiz_file else None
+            }
+            await ws.send_str(json.dumps(initial_data))
+        except Exception as e:
+            logger.error(f"Error sending initial state to WebSocket client: {e}")
+        
+        # Listen for messages (mainly for connection keep-alive)
+        async for msg in ws:
+            if msg.type == WSMsgType.TEXT:
+                try:
+                    data = json.loads(msg.data)
+                    if data.get('type') == 'ping':
+                        await ws.send_str(json.dumps({'type': 'pong'}))
+                except Exception as e:
+                    logger.warning(f"Error processing WebSocket message: {e}")
+            elif msg.type == WSMsgType.ERROR:
+                logger.error(f'WebSocket error: {ws.exception()}')
+                break
+        
+        # Remove from connected clients when connection closes
+        if ws in self.websocket_clients:
+            self.websocket_clients.remove(ws)
+        logger.info(f"WebSocket client disconnected. Total clients: {len(self.websocket_clients)}")
+        
+        return ws
 
 async def create_app(config: WebQuizConfig):
     """Create and configure the application"""
@@ -900,6 +1039,10 @@ async def create_app(config: WebQuizConfig):
     app.router.add_post('/api/admin/auth', server.admin_auth_test)
     app.router.add_get('/api/admin/list-quizzes', server.admin_list_quizzes)
     app.router.add_post('/api/admin/switch-quiz', server.admin_switch_quiz)
+    
+    # Live stats routes (public access)
+    app.router.add_get('/live-stats', server.serve_live_stats_page)
+    app.router.add_get('/ws/live-stats', server.websocket_live_stats)
     
     # Serve static files from configured static directory
     ensure_directory_exists(config.paths.static_dir)

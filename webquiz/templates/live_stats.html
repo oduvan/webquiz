@@ -1,0 +1,480 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WebQuiz Live Stats</title>
+    <style>
+        :root {
+            --bg-color: #f5f5f5;
+            --container-bg: white;
+            --text-color: #333;
+            --border-color: #ddd;
+            --think-color: #fff3cd;
+            --ok-color: #d4edda;
+            --fail-color: #f8d7da;
+            --empty-color: #e9ecef;
+            --header-bg: #007bff;
+            --header-color: white;
+        }
+
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+        }
+
+        .header {
+            background: var(--header-bg);
+            color: var(--header-color);
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+
+        .header h1 {
+            margin: 0 0 10px 0;
+        }
+
+        .connection-status {
+            padding: 10px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+            text-align: center;
+            font-weight: bold;
+        }
+
+        .connected {
+            background: var(--ok-color);
+            color: #155724;
+        }
+
+        .disconnected {
+            background: var(--fail-color);
+            color: #721c24;
+        }
+
+        .connecting {
+            background: var(--think-color);
+            color: #856404;
+        }
+
+        .stats-container {
+            background: var(--container-bg);
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+
+        .stats-table {
+            width: 100%;
+            border-collapse: collapse;
+            min-width: 600px;
+        }
+
+        .stats-table th,
+        .stats-table td {
+            padding: 12px;
+            text-align: center;
+            border: 1px solid var(--border-color);
+        }
+
+        .stats-table th {
+            background: var(--header-bg);
+            color: var(--header-color);
+            font-weight: bold;
+            position: sticky;
+            top: 0;
+            z-index: 10;
+        }
+
+        .stats-table .username-header {
+            background: var(--header-bg);
+            color: var(--header-color);
+            font-weight: bold;
+            text-align: left;
+            width: 150px;
+            position: sticky;
+            left: 0;
+            z-index: 11;
+        }
+
+        .stats-table .username-cell {
+            background: var(--container-bg);
+            font-weight: bold;
+            text-align: left;
+            position: sticky;
+            left: 0;
+            z-index: 5;
+            border-right: 2px solid var(--border-color);
+        }
+
+        .state-cell {
+            width: 60px;
+            height: 40px;
+            font-size: 20px;
+            font-weight: bold;
+            position: relative;
+        }
+
+        .state-think {
+            background: var(--think-color);
+            color: #856404;
+        }
+
+        .state-ok {
+            background: var(--ok-color);
+            color: #155724;
+        }
+
+        .state-fail {
+            background: var(--fail-color);
+            color: #721c24;
+        }
+
+        .state-empty {
+            background: var(--empty-color);
+            color: #6c757d;
+        }
+
+        .no-data {
+            text-align: center;
+            padding: 40px;
+            color: #6c757d;
+            font-style: italic;
+        }
+
+        .table-wrapper {
+            overflow: auto;
+            max-height: 70vh;
+        }
+
+        .legend {
+            display: flex;
+            justify-content: center;
+            gap: 20px;
+            margin: 20px 0;
+            flex-wrap: wrap;
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 12px;
+            border-radius: 5px;
+            font-size: 14px;
+            font-weight: bold;
+        }
+
+        .quiz-info {
+            background: var(--container-bg);
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            text-align: center;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+
+        @media (max-width: 768px) {
+            body {
+                padding: 10px;
+            }
+            
+            .stats-table th,
+            .stats-table td {
+                padding: 8px 4px;
+            }
+            
+            .username-header,
+            .username-cell {
+                width: 100px;
+            }
+            
+            .state-cell {
+                width: 40px;
+                height: 30px;
+                font-size: 16px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div id="connectionStatus" class="connection-status" style="display: none;">
+    </div>
+
+    <div id="quizInfo" class="quiz-info" style="display: none;">
+        <strong>Current Quiz:</strong> <span id="currentQuiz">-</span> |
+        <strong>Total Questions:</strong> <span id="totalQuestions">0</span> |
+        <strong>Active Users:</strong> <span id="activeUsers">0</span>
+    </div>
+
+    <div class="legend">
+        <div class="legend-item state-think">🟡 Thinking</div>
+        <div class="legend-item state-ok">🟢 Correct</div>
+        <div class="legend-item state-fail">🔴 Incorrect</div>
+        <div class="legend-item state-empty">⚪ Not Started</div>
+    </div>
+
+    <div class="stats-container">
+        <div class="table-wrapper">
+            <table class="stats-table" id="statsTable">
+                <thead>
+                    <tr id="tableHeader">
+                        <th class="username-header">User</th>
+                    </tr>
+                </thead>
+                <tbody id="tableBody">
+                    <tr>
+                        <td colspan="100" class="no-data">
+                            Waiting for users to join the quiz...
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <script>
+        class LiveStatsClient {
+            constructor() {
+                this.ws = null;
+                this.users = {};
+                this.liveStats = {};
+                this.questions = [];
+                this.totalQuestions = 0;
+                this.currentQuiz = null;
+                this.reconnectAttempts = 0;
+                this.maxReconnectAttempts = 5;
+                this.reconnectDelay = 1000;
+                
+                this.statusElement = document.getElementById('connectionStatus');
+                this.quizInfoElement = document.getElementById('quizInfo');
+                this.currentQuizElement = document.getElementById('currentQuiz');
+                this.totalQuestionsElement = document.getElementById('totalQuestions');
+                this.activeUsersElement = document.getElementById('activeUsers');
+                this.tableHeaderElement = document.getElementById('tableHeader');
+                this.tableBodyElement = document.getElementById('tableBody');
+                
+                this.connect();
+            }
+
+            connect() {
+                const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+                const wsUrl = `${protocol}//${window.location.host}/ws/live-stats`;
+                
+                this.hideStatus();
+                
+                try {
+                    this.ws = new WebSocket(wsUrl);
+                    
+                    this.ws.onopen = () => {
+                        this.hideStatus();
+                        this.reconnectAttempts = 0;
+                        console.log('WebSocket connected');
+                    };
+                    
+                    this.ws.onmessage = (event) => {
+                        try {
+                            const data = JSON.parse(event.data);
+                            this.handleMessage(data);
+                        } catch (error) {
+                            console.error('Error parsing WebSocket message:', error);
+                        }
+                    };
+                    
+                    this.ws.onclose = () => {
+                        this.updateStatus('disconnected', '🔴 Disconnected from server');
+                        console.log('WebSocket disconnected');
+                        this.scheduleReconnect();
+                    };
+                    
+                    this.ws.onerror = (error) => {
+                        console.error('WebSocket error:', error);
+                        this.updateStatus('disconnected', '🔴 Connection error');
+                    };
+                    
+                } catch (error) {
+                    console.error('Error creating WebSocket:', error);
+                    this.updateStatus('disconnected', '🔴 Failed to connect');
+                    this.scheduleReconnect();
+                }
+            }
+
+            scheduleReconnect() {
+                if (this.reconnectAttempts < this.maxReconnectAttempts) {
+                    this.reconnectAttempts++;
+                    const delay = this.reconnectDelay * Math.pow(2, this.reconnectAttempts - 1);
+                    
+                    this.updateStatus('connecting', `🔄 Reconnecting in ${delay/1000}s... (${this.reconnectAttempts}/${this.maxReconnectAttempts})`);
+                    
+                    setTimeout(() => {
+                        this.connect();
+                    }, delay);
+                } else {
+                    this.updateStatus('disconnected', '🔴 Failed to reconnect. Refresh page to try again.');
+                }
+            }
+
+            updateStatus(status, message) {
+                this.statusElement.className = `connection-status ${status}`;
+                this.statusElement.textContent = message;
+                this.statusElement.style.display = 'block';
+            }
+
+            hideStatus() {
+                this.statusElement.style.display = 'none';
+            }
+
+            handleMessage(data) {
+                switch (data.type) {
+                    case 'initial_state':
+                        this.handleInitialState(data);
+                        break;
+                    case 'user_registered':
+                        this.handleUserRegistered(data);
+                        break;
+                    case 'state_update':
+                        this.handleStateUpdate(data);
+                        break;
+                    case 'quiz_switched':
+                        this.handleQuizSwitched(data);
+                        break;
+                    case 'pong':
+                        // Keep-alive response
+                        break;
+                    default:
+                        console.log('Unknown message type:', data.type);
+                }
+            }
+
+            handleInitialState(data) {
+                this.users = data.users || {};
+                this.liveStats = data.live_stats || {};
+                this.questions = data.questions || [];
+                this.totalQuestions = data.total_questions || 0;
+                this.currentQuiz = data.current_quiz || 'No quiz selected';
+                
+                this.updateQuizInfo();
+                this.buildTable();
+            }
+
+            handleUserRegistered(data) {
+                this.users[data.user_id] = data.username;
+                if (!this.liveStats[data.user_id]) {
+                    this.liveStats[data.user_id] = {};
+                }
+                this.liveStats[data.user_id][data.question_id] = data.state;
+                
+                this.updateQuizInfo();
+                this.buildTable();
+            }
+
+            handleStateUpdate(data) {
+                if (!this.liveStats[data.user_id]) {
+                    this.liveStats[data.user_id] = {};
+                }
+                this.liveStats[data.user_id][data.question_id] = data.state;
+                
+                this.updateCell(data.user_id, data.question_id, data.state);
+            }
+
+            handleQuizSwitched(data) {
+                this.users = {};
+                this.liveStats = {};
+                this.questions = data.questions || [];
+                this.totalQuestions = data.total_questions || 0;
+                this.currentQuiz = data.current_quiz || 'No quiz selected';
+                
+                this.updateQuizInfo();
+                this.buildTable();
+            }
+
+            updateQuizInfo() {
+                this.currentQuizElement.textContent = this.currentQuiz;
+                this.totalQuestionsElement.textContent = this.totalQuestions;
+                this.activeUsersElement.textContent = Object.keys(this.users).length;
+                this.quizInfoElement.style.display = 'block';
+            }
+
+            buildTable() {
+                // Build header
+                let headerHtml = '<th class="username-header">User</th>';
+                for (let i = 0; i < this.questions.length; i++) {
+                    const question = this.questions[i];
+                    const questionText = question.question || `Q${i + 1}`;
+                    headerHtml += `<th title="${questionText}">${questionText}</th>`;
+                }
+                this.tableHeaderElement.innerHTML = headerHtml;
+
+                // Build body
+                const userIds = Object.keys(this.users);
+                if (userIds.length === 0) {
+                    this.tableBodyElement.innerHTML = `
+                        <tr>
+                            <td colspan="${this.questions.length + 1}" class="no-data">
+                                Waiting for users to join the quiz...
+                            </td>
+                        </tr>
+                    `;
+                    return;
+                }
+
+                let bodyHtml = '';
+                userIds.forEach(userId => {
+                    const username = this.users[userId];
+                    bodyHtml += `<tr id="user-${userId}">`;
+                    bodyHtml += `<td class="username-cell">${username}</td>`;
+                    
+                    for (let questionId = 1; questionId <= this.questions.length; questionId++) {
+                        const state = this.liveStats[userId] && this.liveStats[userId][questionId] 
+                            ? this.liveStats[userId][questionId] 
+                            : 'empty';
+                        const stateIcon = this.getStateIcon(state);
+                        bodyHtml += `<td class="state-cell state-${state}" id="cell-${userId}-${questionId}">${stateIcon}</td>`;
+                    }
+                    
+                    bodyHtml += '</tr>';
+                });
+
+                this.tableBodyElement.innerHTML = bodyHtml;
+            }
+
+            updateCell(userId, questionId, state) {
+                const cellElement = document.getElementById(`cell-${userId}-${questionId}`);
+                if (cellElement) {
+                    cellElement.className = `state-cell state-${state}`;
+                    cellElement.textContent = this.getStateIcon(state);
+                }
+            }
+
+            getStateIcon(state) {
+                switch (state) {
+                    case 'think': return '🟡';
+                    case 'ok': return '🟢';
+                    case 'fail': return '🔴';
+                    default: return '⚪';
+                }
+            }
+
+            // Send periodic ping to keep connection alive
+            startKeepAlive() {
+                setInterval(() => {
+                    if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+                        this.ws.send(JSON.stringify({ type: 'ping' }));
+                    }
+                }, 30000); // Ping every 30 seconds
+            }
+        }
+
+        // Initialize the live stats client when page loads
+        document.addEventListener('DOMContentLoaded', () => {
+            const client = new LiveStatsClient();
+            client.startKeepAlive();
+        });
+    </script>
+</body>
+</html>
