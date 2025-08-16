@@ -4,13 +4,21 @@ import tempfile
 import os
 from unittest.mock import AsyncMock, patch
 from aiohttp.test_utils import TestClient, TestServer
-from webquiz.server import TestingServer, create_app
+from webquiz.server import TestingServer, create_app, WebQuizConfig
 
 
 @pytest_asyncio.fixture
 async def server():
     """Create a test server instance"""
-    test_server = TestingServer()
+    # Create test config
+    config = WebQuizConfig()
+    config.paths.quizzes_dir = "test-quizzes"
+    config.paths.logs_dir = "test-logs"
+    config.paths.csv_dir = "test-csv"
+    config.paths.static_dir = "test-static"
+    config.admin.master_key = "test-master-key"
+    
+    test_server = TestingServer(config)
     # Don't initialize log file or CSV file for tests
     return test_server
 
@@ -22,14 +30,28 @@ async def app():
     import os
     os.makedirs('test-static', exist_ok=True)
     
+    # Create test config
+    config = WebQuizConfig()
+    config.paths.quizzes_dir = "test-quizzes"
+    config.paths.logs_dir = "test-logs"
+    config.paths.csv_dir = "test-csv"
+    config.paths.static_dir = "test-static"
+    config.admin.master_key = "test-master-key"
+    
+    # Create a proper async mock for initialize_log_file that sets the log_file attribute
+    async def mock_initialize_log_file(self):
+        self.log_file = "test-server.log"
+    
     # Mock file operations to avoid creating actual files during tests
-    with patch('webquiz.server.TestingServer.initialize_log_file', new_callable=AsyncMock), \
+    with patch('webquiz.server.TestingServer.initialize_log_file', mock_initialize_log_file), \
          patch('webquiz.server.TestingServer.initialize_csv', new_callable=AsyncMock), \
          patch('webquiz.server.TestingServer.load_questions', new_callable=AsyncMock), \
          patch('webquiz.server.TestingServer.create_default_index_html', new_callable=AsyncMock), \
-         patch('asyncio.create_task'):  # Prevent background tasks during tests
+         patch('logging.basicConfig'), \
+         patch('asyncio.create_task'), \
+         patch('webquiz.server.TestingServer.periodic_flush', new_callable=AsyncMock):  # Prevent background tasks during tests
         
-        app = await create_app('test-config.yaml', 'test-server.log', 'test-responses.csv', 'test-static')
+        app = await create_app(config)
         
         # Access the server instance and set up test questions
         # The server instance is created inside create_app()
@@ -42,6 +64,8 @@ async def app():
                     break
         
         if test_server:
+            # Set dummy log file for tests
+            test_server.log_file = "test-server.log"
             test_server.questions = [
                 {
                     'id': 1,

@@ -101,6 +101,12 @@ python -m webquiz.cli
 poetry run pytest   # With Poetry
 pytest tests/       # Direct
 pytest tests/ -v    # Verbose
+
+# Test coverage by file:
+# - test_integration.py: API endpoints and user flows (11 tests)
+# - test_server.py: Internal server functionality (3 tests)  
+# - test_quiz_selection.py: Multi-quiz loading scenarios (7 tests)
+# - test_admin_functionality.py: Admin interface and auth (13 tests)
 ```
 
 ## Technical Decisions
@@ -141,7 +147,11 @@ pytest tests/ -v    # Verbose
   - CSV writing with proper escaping
   - Default YAML file creation
   - User data structure validation
-- **No duplicate tests**: Removed 9 redundant unit tests covered by integration tests
+- **Quiz Selection Tests (7)**: Test multi-quiz system functionality
+- **Admin Functionality Tests (13)**: Test admin interface and authentication
+- **Total: 34 tests** with GitHub Actions CI/CD pipeline
+- **Testing Philosophy**: Create new automated tests for newly implemented functionality instead of manual testing
+- **No duplicate tests**: Removed redundant unit tests covered by integration tests
 
 ## Notes
 - Username must be unique across all users (per quiz session)
