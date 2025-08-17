@@ -13,6 +13,7 @@ WebQuiz - A modern web-based quiz and testing system built with Python and aioht
 - **Smart file naming**: CSV files prefixed with quiz names, unique suffixes prevent overwrites
 - Web interface with auto-generated index.html if not present
 - Real-time answer validation via REST API
+- **Immediate answer feedback**: Visual confirmation (green/red) after each answer submission
 - Server-side timing for accurate response measurement
 - In-memory storage with periodic CSV backup (30s intervals) to configurable file path
 - User session persistence with cookie-based user ID storage

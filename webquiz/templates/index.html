@@ -110,6 +110,32 @@
             background: var(--option-selected);
             border-color: var(--option-selected-border);
         }
+
+        .option.feedback-correct {
+            background: #d4edda !important;
+            border-color: #28a745 !important;
+            border-width: 3px !important;
+            color: #155724 !important;
+        }
+
+        .option.feedback-incorrect {
+            background: #f8d7da !important;
+            border-color: #dc3545 !important;
+            border-width: 3px !important;
+            color: #721c24 !important;
+        }
+
+        [data-theme="dark"] .option.feedback-correct {
+            background: #2d5a2d !important;
+            border-color: #4caf50 !important;
+            color: #a5d6a7 !important;
+        }
+
+        [data-theme="dark"] .option.feedback-incorrect {
+            background: #5a2d2d !important;
+            border-color: #f44336 !important;
+            color: #ef9a9a !important;
+        }
         button {
             background: #007bff;
             color: white;
@@ -121,6 +147,19 @@
         }
         button:hover {
             background: #0056b3;
+        }
+        .button-container {
+            position: relative;
+            margin: 20px 0;
+            height: 50px;
+        }
+        #submit-answer-btn {
+            position: absolute;
+            left: 0;
+        }
+        #continue-btn {
+            position: absolute;
+            right: 0;
         }
         .hidden {
             display: none;
@@ -266,7 +305,10 @@
                 <span id="progress-text">Питання 1 з 5</span>
             </div>
             <div id="current-question-container"></div>
-            <button id="submit-answer-btn" onclick="submitCurrentAnswer()" disabled>Відправити відповідь</button>
+            <div class="button-container">
+                <button id="submit-answer-btn" onclick="submitCurrentAnswer()" disabled>Відправити відповідь</button>
+                <button id="continue-btn" onclick="continueToNextQuestion()" class="hidden">Продовжити</button>
+            </div>
         </div>
         
         <!-- Results Section -->
@@ -465,8 +507,13 @@
                 </div>
             `;
             
-            // Disable submit button until answer is selected
-            document.getElementById('submit-answer-btn').disabled = true;
+            // Reset button states
+            const submitBtn = document.getElementById('submit-answer-btn');
+            const continueBtn = document.getElementById('continue-btn');
+            
+            submitBtn.classList.remove('hidden');
+            submitBtn.disabled = true;
+            continueBtn.classList.add('hidden');
         }
         
         function selectCurrentAnswer(optionIndex) {
@@ -514,13 +561,33 @@
                     timeTaken: data.time_taken || 0
                 });
                 
-                // Move to next question
-                currentQuestionIndex++;
-                await showCurrentQuestion();
+                // Show feedback on selected answer
+                showAnswerFeedback(data.is_correct);
                 
             } catch (error) {
                 alert('Помилка відправки відповіді: ' + error.message);
             }
+        }
+
+        function showAnswerFeedback(isCorrect) {
+            // Apply feedback styling to selected answer
+            const selectedOption = document.querySelector('.option.selected');
+            if (selectedOption) {
+                selectedOption.classList.add(isCorrect ? 'feedback-correct' : 'feedback-incorrect');
+            }
+            
+            // Hide submit button and show continue button
+            const submitBtn = document.getElementById('submit-answer-btn');
+            const continueBtn = document.getElementById('continue-btn');
+            
+            submitBtn.classList.add('hidden');
+            continueBtn.classList.remove('hidden');
+        }
+
+        async function continueToNextQuestion() {
+            // Move to next question
+            currentQuestionIndex++;
+            await showCurrentQuestion();
         }
         
         async function fetchAndShowFinalResults() {
