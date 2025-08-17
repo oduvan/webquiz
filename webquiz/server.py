@@ -927,6 +927,279 @@ class TestingServer:
             'authenticated': True,
             'message': 'Admin authentication successful'
         })
+    
+    @admin_auth_required
+    async def admin_get_quiz(self, request):
+        """Get quiz content for editing"""
+        try:
+            filename = request.match_info['filename']
+            quiz_path = os.path.join(self.quizzes_dir, filename)
+            
+            if not os.path.exists(quiz_path):
+                return web.json_response({'error': 'Quiz file not found'}, status=404)
+            
+            with open(quiz_path, 'r', encoding='utf-8') as f:
+                quiz_content = f.read()
+            
+            # Also return parsed YAML for wizard mode
+            try:
+                import yaml
+                parsed_quiz = yaml.safe_load(quiz_content)
+                return web.json_response({
+                    'filename': filename,
+                    'content': quiz_content,
+                    'parsed': parsed_quiz
+                })
+            except yaml.YAMLError as e:
+                return web.json_response({
+                    'filename': filename,
+                    'content': quiz_content,
+                    'parsed': None,
+                    'yaml_error': str(e)
+                })
+        except Exception as e:
+            logger.error(f"Error getting quiz: {e}")
+            return web.json_response({'error': str(e)}, status=500)
+    
+    @admin_auth_required
+    async def admin_create_quiz(self, request):
+        """Create new quiz from wizard or text input"""
+        try:
+            data = await request.json()
+            filename = data.get('filename', '').strip()
+            mode = data.get('mode', 'wizard')  # 'wizard' or 'text'
+            
+            if not filename:
+                return web.json_response({'error': 'Filename is required'}, status=400)
+            
+            if not filename.endswith('.yaml'):
+                filename += '.yaml'
+            
+            quiz_path = os.path.join(self.quizzes_dir, filename)
+            
+            # Check if file already exists
+            if os.path.exists(quiz_path):
+                return web.json_response({'error': 'Quiz file already exists'}, status=409)
+            
+            # Validate and create quiz content
+            if mode == 'wizard':
+                quiz_data = data.get('quiz_data', {})
+                if not self._validate_quiz_data(quiz_data):
+                    return web.json_response({'error': 'Invalid quiz data structure'}, status=400)
+                
+                import yaml
+                quiz_content = yaml.dump(quiz_data, default_flow_style=False, allow_unicode=True)
+            else:  # text mode
+                quiz_content = data.get('content', '').strip()
+                if not quiz_content:
+                    return web.json_response({'error': 'Quiz content is required'}, status=400)
+                
+                # Validate YAML
+                try:
+                    import yaml
+                    parsed = yaml.safe_load(quiz_content)
+                    if not self._validate_quiz_data(parsed):
+                        return web.json_response({'error': 'Invalid quiz data structure'}, status=400)
+                except yaml.YAMLError as e:
+                    return web.json_response({'error': f'Invalid YAML: {str(e)}'}, status=400)
+            
+            # Write the quiz file
+            with open(quiz_path, 'w', encoding='utf-8') as f:
+                f.write(quiz_content)
+            
+            logger.info(f"Created new quiz: {filename}")
+            return web.json_response({
+                'success': True,
+                'message': f'Quiz "{filename}" created successfully',
+                'filename': filename
+            })
+        except Exception as e:
+            logger.error(f"Error creating quiz: {e}")
+            return web.json_response({'error': str(e)}, status=500)
+    
+    @admin_auth_required
+    async def admin_update_quiz(self, request):
+        """Update existing quiz"""
+        try:
+            filename = request.match_info['filename']
+            data = await request.json()
+            mode = data.get('mode', 'wizard')
+            
+            quiz_path = os.path.join(self.quizzes_dir, filename)
+            
+            if not os.path.exists(quiz_path):
+                return web.json_response({'error': 'Quiz file not found'}, status=404)
+            
+            # Create backup
+            backup_path = quiz_path + '.backup'
+            import shutil
+            shutil.copy2(quiz_path, backup_path)
+            
+            # Prepare new content
+            if mode == 'wizard':
+                quiz_data = data.get('quiz_data', {})
+                if not self._validate_quiz_data(quiz_data):
+                    return web.json_response({'error': 'Invalid quiz data structure'}, status=400)
+                
+                import yaml
+                quiz_content = yaml.dump(quiz_data, default_flow_style=False, allow_unicode=True)
+            else:  # text mode
+                quiz_content = data.get('content', '').strip()
+                if not quiz_content:
+                    return web.json_response({'error': 'Quiz content is required'}, status=400)
+                
+                # Validate YAML
+                try:
+                    import yaml
+                    parsed = yaml.safe_load(quiz_content)
+                    if not self._validate_quiz_data(parsed):
+                        return web.json_response({'error': 'Invalid quiz data structure'}, status=400)
+                except yaml.YAMLError as e:
+                    return web.json_response({'error': f'Invalid YAML: {str(e)}'}, status=400)
+            
+            # Write updated content
+            with open(quiz_path, 'w', encoding='utf-8') as f:
+                f.write(quiz_content)
+            
+            # If this is the current quiz, reload it
+            if self.current_quiz_file and os.path.basename(self.current_quiz_file) == filename:
+                await self.switch_quiz(filename)
+            
+            logger.info(f"Updated quiz: {filename}")
+            return web.json_response({
+                'success': True,
+                'message': f'Quiz "{filename}" updated successfully',
+                'backup_created': os.path.basename(backup_path)
+            })
+        except Exception as e:
+            logger.error(f"Error updating quiz: {e}")
+            return web.json_response({'error': str(e)}, status=500)
+    
+    @admin_auth_required
+    async def admin_delete_quiz(self, request):
+        """Delete quiz file"""
+        try:
+            filename = request.match_info['filename']
+            quiz_path = os.path.join(self.quizzes_dir, filename)
+            
+            if not os.path.exists(quiz_path):
+                return web.json_response({'error': 'Quiz file not found'}, status=404)
+            
+            # Don't allow deleting the current quiz
+            if self.current_quiz_file and os.path.basename(self.current_quiz_file) == filename:
+                return web.json_response({'error': 'Cannot delete the currently active quiz'}, status=400)
+            
+            # Create backup before deletion
+            backup_path = quiz_path + '.deleted_backup'
+            import shutil
+            shutil.copy2(quiz_path, backup_path)
+            
+            # Delete the file
+            os.remove(quiz_path)
+            
+            logger.info(f"Deleted quiz: {filename} (backup: {backup_path})")
+            return web.json_response({
+                'success': True,
+                'message': f'Quiz "{filename}" deleted successfully',
+                'backup_created': os.path.basename(backup_path)
+            })
+        except Exception as e:
+            logger.error(f"Error deleting quiz: {e}")
+            return web.json_response({'error': str(e)}, status=500)
+    
+    @admin_auth_required
+    async def admin_validate_quiz(self, request):
+        """Validate quiz YAML structure"""
+        try:
+            data = await request.json()
+            content = data.get('content', '').strip()
+            
+            if not content:
+                return web.json_response({'valid': False, 'errors': ['Content is empty']})
+            
+            try:
+                import yaml
+                parsed = yaml.safe_load(content)
+                
+                # Validate structure
+                errors = []
+                if not self._validate_quiz_data(parsed, errors):
+                    return web.json_response({'valid': False, 'errors': errors})
+                
+                return web.json_response({
+                    'valid': True,
+                    'parsed': parsed,
+                    'question_count': len(parsed.get('questions', []))
+                })
+            except yaml.YAMLError as e:
+                return web.json_response({'valid': False, 'errors': [f'YAML syntax error: {str(e)}']})
+        except Exception as e:
+            logger.error(f"Error validating quiz: {e}")
+            return web.json_response({'error': str(e)}, status=500)
+    
+    def _validate_quiz_data(self, data, errors=None):
+        """Validate quiz data structure"""
+        if errors is None:
+            errors = []
+        
+        if not isinstance(data, dict):
+            errors.append("Quiz data must be a dictionary")
+            return False
+        
+        if 'questions' not in data:
+            errors.append("Quiz must contain 'questions' field")
+            return False
+        
+        questions = data['questions']
+        if not isinstance(questions, list):
+            errors.append("'questions' must be a list")
+            return False
+        
+        if len(questions) == 0:
+            errors.append("Quiz must contain at least one question")
+            return False
+        
+        question_ids = set()
+        for i, question in enumerate(questions):
+            if not isinstance(question, dict):
+                errors.append(f"Question {i+1} must be a dictionary")
+                continue
+            
+            # Validate required fields
+            required_fields = ['id', 'question', 'options', 'correct_answer']
+            for field in required_fields:
+                if field not in question:
+                    errors.append(f"Question {i+1} missing required field: {field}")
+            
+            # Validate question ID
+            if 'id' in question:
+                qid = question['id']
+                if not isinstance(qid, int) or qid < 1:
+                    errors.append(f"Question {i+1} ID must be a positive integer")
+                elif qid in question_ids:
+                    errors.append(f"Duplicate question ID: {qid}")
+                else:
+                    question_ids.add(qid)
+            
+            # Validate options
+            if 'options' in question:
+                options = question['options']
+                if not isinstance(options, list):
+                    errors.append(f"Question {i+1} options must be a list")
+                elif len(options) < 2:
+                    errors.append(f"Question {i+1} must have at least 2 options")
+                elif not all(isinstance(opt, str) for opt in options):
+                    errors.append(f"Question {i+1} all options must be strings")
+            
+            # Validate correct_answer
+            if 'correct_answer' in question and 'options' in question:
+                correct_answer = question['correct_answer']
+                if not isinstance(correct_answer, int):
+                    errors.append(f"Question {i+1} correct_answer must be an integer")
+                elif correct_answer < 0 or correct_answer >= len(question['options']):
+                    errors.append(f"Question {i+1} correct_answer index out of range")
+        
+        return len(errors) == 0
         
     async def serve_admin_page(self, request):
         """Serve the admin interface page"""
@@ -1047,6 +1320,11 @@ async def create_app(config: WebQuizConfig):
     app.router.add_post('/api/admin/auth', server.admin_auth_test)
     app.router.add_get('/api/admin/list-quizzes', server.admin_list_quizzes)
     app.router.add_post('/api/admin/switch-quiz', server.admin_switch_quiz)
+    app.router.add_get('/api/admin/quiz/{filename}', server.admin_get_quiz)
+    app.router.add_post('/api/admin/create-quiz', server.admin_create_quiz)
+    app.router.add_put('/api/admin/quiz/{filename}', server.admin_update_quiz)
+    app.router.add_delete('/api/admin/quiz/{filename}', server.admin_delete_quiz)
+    app.router.add_post('/api/admin/validate-quiz', server.admin_validate_quiz)
     
     # Live stats routes (public access)
     app.router.add_get('/live-stats', server.serve_live_stats_page)
