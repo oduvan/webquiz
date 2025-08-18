@@ -125,6 +125,12 @@
             color: #721c24 !important;
         }
 
+        .option.disabled {
+            cursor: not-allowed !important;
+            opacity: 0.6 !important;
+            pointer-events: none !important;
+        }
+
         [data-theme="dark"] .option.feedback-correct {
             background: #2d5a2d !important;
             border-color: #4caf50 !important;
@@ -517,6 +523,11 @@
         }
         
         function selectCurrentAnswer(optionIndex) {
+            // Don't allow selection if already submitted
+            if (document.querySelector('.option.disabled')) {
+                return;
+            }
+            
             selectedAnswer = optionIndex;
             
             // Clear previous selections
@@ -575,6 +586,11 @@
             if (selectedOption) {
                 selectedOption.classList.add(isCorrect ? 'feedback-correct' : 'feedback-incorrect');
             }
+            
+            // Disable all options to prevent further selection
+            document.querySelectorAll('.option').forEach(option => {
+                option.classList.add('disabled');
+            });
             
             // Hide submit button and show continue button
             const submitBtn = document.getElementById('submit-answer-btn');
