@@ -96,9 +96,18 @@ def load_config_with_overrides(config_path: Optional[str] = None, **cli_override
     Priority: CLI parameters > config file > defaults
     """
     # Start with config file or defaults
-    if config_path and os.path.exists(config_path):
-        config = load_config_from_yaml(config_path)
-        logger.info(f"Loaded configuration from: {config_path}")
+    if config_path:
+        if os.path.exists(config_path):
+            config = load_config_from_yaml(config_path)
+            logger.info(f"Loaded configuration from: {config_path}")
+        else:
+            # Config file specified but doesn't exist - create from example
+            example_path = "server_config.yaml.example"
+            import shutil
+            shutil.copy2(example_path, config_path)
+            logger.info(f"Created config file '{config_path}' from example file '{example_path}'")
+            config = load_config_from_yaml(config_path)
+            logger.info(f"Loaded configuration from newly created: {config_path}")
     else:
         config = WebQuizConfig()
         logger.info("Using default configuration")
