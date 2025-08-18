@@ -12,7 +12,7 @@ paths:
   static_dir: "static"    # Directory for static web files (auto-created)
 
 admin:
-  master_key: null        # Set to enable admin interface (e.g., "your-secret-key")
+  master_key: a1        # Set to enable admin interface (e.g., "your-secret-key")
                           # Can also use WEBQUIZ_MASTER_KEY environment variable
 
 options:

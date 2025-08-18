@@ -489,6 +489,7 @@ class TestingServer:
             
     async def create_default_index_html(self):
         """Create default index.html file with embedded questions data"""
+        ensure_directory_exists(self.static_dir)
         index_path = f"{self.static_dir}/index.html"
         
         # Prepare questions data for client (without correct answers)
@@ -1331,7 +1332,6 @@ async def create_app(config: WebQuizConfig):
     app.router.add_get('/ws/live-stats', server.websocket_live_stats)
     
     # Serve static files from configured static directory
-    ensure_directory_exists(config.paths.static_dir)
     app.router.add_static('/', path=config.paths.static_dir, name='static')
     
     return app
