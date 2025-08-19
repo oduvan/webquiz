@@ -212,18 +212,31 @@ class TestingServer:
         self.live_stats: Dict[str, Dict[int, str]] = {}  # user_id -> {question_id: state}
         
     def generate_log_path(self) -> str:
-        """Generate log file path in logs directory"""
+        """Generate log file path in logs directory with simple numeric naming"""
         ensure_directory_exists(self.logs_dir)
-        base_path = os.path.join(self.logs_dir, "server.log")
-        return generate_unique_filename(base_path)
+        
+        # Find the next available number
+        suffix = 1
+        while True:
+            log_path = os.path.join(self.logs_dir, f"{suffix:04d}.log")
+            if not os.path.exists(log_path):
+                return log_path
+            suffix += 1
         
     def generate_csv_path(self, quiz_name: str) -> str:
-        """Generate CSV file path with quiz name prefix in CSV directory"""
+        """Generate CSV file path in CSV directory with quiz name and numeric naming"""
         ensure_directory_exists(self.csv_dir)
+        
+        # Clean quiz name (remove extension)
         quiz_prefix = quiz_name.replace('.yaml', '').replace('.yml', '')
-        base_filename = f"{quiz_prefix}_user_responses.csv"
-        base_path = os.path.join(self.csv_dir, base_filename)
-        return generate_unique_filename(base_path)
+        
+        # Find the next available number for this quiz
+        suffix = 1
+        while True:
+            csv_path = os.path.join(self.csv_dir, f"{quiz_prefix}_{suffix:04d}.csv")
+            if not os.path.exists(csv_path):
+                return csv_path
+            suffix += 1
         
     def reset_server_state(self):
         """Reset all server state for new quiz"""
@@ -260,8 +273,7 @@ class TestingServer:
         
         # Update current quiz and CSV filename
         self.current_quiz_file = quiz_path
-        quiz_name = os.path.splitext(quiz_filename)[0]
-        self.csv_file = self.generate_csv_path(quiz_name)
+        self.csv_file = self.generate_csv_path(quiz_filename)
         
         # Load new questions
         await self.load_questions_from_file(quiz_path)
@@ -415,19 +427,16 @@ class TestingServer:
         default_questions = {
             'questions': [
                 {
-                    'id': 1,
                     'question': 'What is 2 + 2?',
                     'options': ['3', '4', '5', '6'],
                     'correct_answer': 1
                 },
                 {
-                    'id': 2,
                     'question': 'What is the capital of France?',
                     'options': ['London', 'Berlin', 'Paris', 'Madrid'],
                     'correct_answer': 2
                 },
                 {
-                    'id': 3,
                     'question': 'Which programming language is this server written in?',
                     'options': ['JavaScript', 'Python', 'Java', 'C++'],
                     'correct_answer': 1
@@ -450,10 +459,9 @@ class TestingServer:
                 data = yaml.safe_load(content)
                 self.questions = data['questions']
                 
-                # Add automatic IDs if not present
+                # Add automatic IDs based on array index
                 for i, question in enumerate(self.questions):
-                    if 'id' not in question:
-                        question['id'] = i + 1
+                    question['id'] = i + 1
                         
                 logger.info(f"Loaded {len(self.questions)} questions from {quiz_file_path}")
         except Exception as e:
@@ -506,9 +514,14 @@ class TestingServer:
         for q in self.questions:
             client_question = {
                 'id': q['id'],
-                'question': q['question'],
                 'options': q['options']
             }
+            # Include question text if present
+            if 'question' in q and q['question']:
+                client_question['question'] = q['question']
+            # Include optional image attribute if present
+            if 'image' in q and q['image']:
+                client_question['image'] = q['image']
             questions_for_client.append(client_question)
         
         # Convert questions to JSON string for embedding
@@ -1169,27 +1182,22 @@ class TestingServer:
             errors.append("Quiz must contain at least one question")
             return False
         
-        question_ids = set()
         for i, question in enumerate(questions):
             if not isinstance(question, dict):
                 errors.append(f"Question {i+1} must be a dictionary")
                 continue
             
-            # Validate required fields
-            required_fields = ['id', 'question', 'options', 'correct_answer']
+            # Validate required fields (except 'question' which is optional if image provided)
+            required_fields = ['options', 'correct_answer']
             for field in required_fields:
                 if field not in question:
                     errors.append(f"Question {i+1} missing required field: {field}")
             
-            # Validate question ID
-            if 'id' in question:
-                qid = question['id']
-                if not isinstance(qid, int) or qid < 1:
-                    errors.append(f"Question {i+1} ID must be a positive integer")
-                elif qid in question_ids:
-                    errors.append(f"Duplicate question ID: {qid}")
-                else:
-                    question_ids.add(qid)
+            # Either question text OR image must be provided
+            has_question = 'question' in question and question['question']
+            has_image = 'image' in question and question['image']
+            if not has_question and not has_image:
+                errors.append(f"Question {i+1} must have either question text or image")
             
             # Validate options
             if 'options' in question:

@@ -787,10 +787,17 @@
                    
                 </div>
                 <div class="form-group">
+                    <label>Question Text (optional if image provided):</label>
                     <input type="text" class="question-text" placeholder="Enter question text" style="width: 100%;">
                 </div>
                 <div class="form-group">
+                    <label>Question Image (optional if text provided):</label>
+                    <input type="text" class="question-image" placeholder="e.g., /static/diagram.png" style="width: 100%;">
+                    <small style="color: #666;">Enter a path starting with / for images on the same domain. Either question text OR image must be provided.</small>
+                </div>
+                <div class="form-group">
                     <label>Answer Options:</label>
+                    <small style="color: #666; margin-bottom: 10px; display: block;">For image options, start with / (e.g., /static/option1.png)</small>
                     <div class="options-container">
                         <div class="option-item">
                             <input type="radio" name="correct-${questionCounter}" value="0" checked>
@@ -877,10 +884,17 @@
                     
                     questionDiv.innerHTML = `
                         <div class="form-group">
-                            <input type="text" class="question-text" value="${question.question}" placeholder="Enter question text" style="width: 100%;">
+                            <label>Question Text (optional if image provided):</label>
+                            <input type="text" class="question-text" value="${question.question || ''}" placeholder="Enter question text" style="width: 100%;">
+                        </div>
+                        <div class="form-group">
+                            <label>Question Image (optional if text provided):</label>
+                            <input type="text" class="question-image" value="${question.image || ''}" placeholder="e.g., /static/diagram.png" style="width: 100%;">
+                            <small style="color: #666;">Enter a path starting with / for images on the same domain. Either question text OR image must be provided.</small>
                         </div>
                         <div class="form-group">
                             <label>Answer Options:</label>
+                            <small style="color: #666; margin-bottom: 10px; display: block;">For image options, start with / (e.g., /static/option1.png)</small>
                             <div class="options-container">
                                 ${optionsHtml}
                             </div>
@@ -925,16 +939,30 @@
             
             questionDivs.forEach((div, index) => {
                 const questionText = div.querySelector('.question-text').value.trim();
+                const questionImage = div.querySelector('.question-image').value.trim();
                 const options = Array.from(div.querySelectorAll('.option-text')).map(input => input.value.trim());
                 const correctRadio = div.querySelector('input[type="radio"]:checked');
                 
-                if (questionText && options.every(opt => opt) && correctRadio) {
-                    questions.push({
-                        id: index + 1,
-                        question: questionText,
+                // Either question text OR image must be provided
+                const hasQuestionContent = questionText || questionImage;
+                
+                if (hasQuestionContent && options.every(opt => opt) && correctRadio) {
+                    const questionData = {
                         options: options,
                         correct_answer: parseInt(correctRadio.value)
-                    });
+                    };
+                    
+                    // Include question text if provided
+                    if (questionText) {
+                        questionData.question = questionText;
+                    }
+                    
+                    // Include image if provided
+                    if (questionImage) {
+                        questionData.image = questionImage;
+                    }
+                    
+                    questions.push(questionData);
                 }
             });
             

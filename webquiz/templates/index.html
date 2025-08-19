@@ -142,6 +142,33 @@
             border-color: #f44336 !important;
             color: #ef9a9a !important;
         }
+        .question-image {
+            max-width: 100%;
+            height: auto;
+            margin: 15px 0;
+            border-radius: 5px;
+            box-shadow: 0 2px 8px var(--shadow);
+            display: block;
+            cursor: pointer;
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+        }
+        .question-image:hover {
+            transform: scale(1.02);
+            box-shadow: 0 4px 12px var(--shadow);
+        }
+        .option-image {
+            max-width: 200px;
+            height: auto;
+            margin: 5px 0;
+            border-radius: 3px;
+            box-shadow: 0 1px 4px var(--shadow);
+            display: block;
+        }
+        .option-content {
+            display: flex;
+            flex-direction: column;
+            align-items: flex-start;
+        }
         button {
             background: #007bff;
             color: white;
@@ -502,13 +529,28 @@
             const container = document.getElementById('current-question-container');
             container.innerHTML = `
                 <div class="current-question">
-                    <h3>${question.question}</h3>
+                    ${question.question ? `<h3>${question.question}</h3>` : ''}
+                    ${question.image ? `<a href="${question.image}" target="_blank"><img src="${question.image}" alt="Question image" class="question-image"></a>` : ''}
                     <div class="options">
-                        ${question.options.map((option, optionIndex) => `
-                            <div class="option" onclick="selectCurrentAnswer(${optionIndex})" id="option_${optionIndex}">
-                                ${optionIndex + 1}. ${option}
-                            </div>
-                        `).join('')}
+                        ${question.options.map((option, optionIndex) => {
+                            const isImageOption = option.startsWith('/');
+                            if (isImageOption) {
+                                return `
+                                    <div class="option" onclick="selectCurrentAnswer(${optionIndex})" id="option_${optionIndex}">
+                                        <div class="option-content">
+                                            <span>${optionIndex + 1}.</span>
+                                            <img src="${option}" alt="Option ${optionIndex + 1}" class="option-image">
+                                        </div>
+                                    </div>
+                                `;
+                            } else {
+                                return `
+                                    <div class="option" onclick="selectCurrentAnswer(${optionIndex})" id="option_${optionIndex}">
+                                        ${optionIndex + 1}. ${option}
+                                    </div>
+                                `;
+                            }
+                        }).join('')}
                     </div>
                 </div>
             `;
