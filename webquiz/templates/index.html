@@ -682,8 +682,6 @@
             
             // Build table with results using CSS classes
             let tableContent = `
-                <h3>Тест завершено!</h3>
-                <p><strong>Користувач:</strong> ${currentUsername}</p>
                 <p><strong>Результат:</strong> ${correctCount}/${totalCount} (${percentage}%)</p>
                 <table class="results-table">
                     <thead>
@@ -740,8 +738,6 @@
             const percentage = finalResults.percentage;
             
             container.innerHTML = `
-                <h3>Тест завершено!</h3>
-                <p><strong>Користувач:</strong> ${currentUsername}</p>
                 <p><strong>Результат:</strong> ${correctCount}/${totalCount} (${percentage}%)</p>
                 <table class="results-table">
                     <thead>
