@@ -102,10 +102,18 @@ def load_config_with_overrides(config_path: Optional[str] = None, **cli_override
             logger.info(f"Loaded configuration from: {config_path}")
         else:
             # Config file specified but doesn't exist - create from example
-            example_path = "server_config.yaml.example"
-            import shutil
-            shutil.copy2(example_path, config_path)
-            logger.info(f"Created config file '{config_path}' from example file '{example_path}'")
+            try:
+                # Try modern importlib.resources first (Python 3.9+)
+                import importlib.resources as pkg_resources
+                example_content = (pkg_resources.files('webquiz') / 'server_config.yaml.example').read_text()
+            except (ImportError, AttributeError):
+                # Fallback to pkg_resources for older Python versions
+                import pkg_resources
+                example_content = pkg_resources.resource_string('webquiz', 'server_config.yaml.example').decode('utf-8')
+            
+            with open(config_path, 'w', encoding='utf-8') as f:
+                f.write(example_content)
+            logger.info(f"Created config file '{config_path}' from package example file")
             config = load_config_from_yaml(config_path)
             logger.info(f"Loaded configuration from newly created: {config_path}")
     else:

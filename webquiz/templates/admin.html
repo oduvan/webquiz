@@ -504,25 +504,27 @@
                 switchBtn.disabled = false;
                 switchBtn.textContent = 'Switch to Selected Quiz';
             } else {
-                switchBtn.disabled = true;
-                switchBtn.textContent = 'Quiz already active';
+                switchBtn.disabled = false;
+                switchBtn.textContent = 'Restart Current Quiz';
             }
             
-            // Enable edit, duplicate and delete buttons
+            // Enable edit and duplicate buttons (current quiz can be edited now)
             editBtn.disabled = false;
             duplicateBtn.disabled = false;
             deleteBtn.disabled = selectedQuiz === currentQuiz; // Can't delete current quiz
         }
 
         async function switchQuiz() {
-            if (!selectedQuiz || selectedQuiz === currentQuiz) {
-                showMessage('Please select a different quiz', 'warning');
+            if (!selectedQuiz) {
+                showMessage('Please select a quiz', 'warning');
                 return;
             }
 
+            const isRestart = selectedQuiz === currentQuiz;
+
             const switchBtn = document.getElementById('switch-btn');
             switchBtn.disabled = true;
-            switchBtn.textContent = 'Switching...';
+            switchBtn.textContent = isRestart ? 'Restarting...' : 'Switching...';
 
             try {
                 const response = await fetch('/api/admin/switch-quiz', {
@@ -539,7 +541,8 @@
                 const data = await response.json();
 
                 if (response.ok) {
-                    showMessage(`Successfully switched to "${selectedQuiz}". CSV file: ${data.csv_file}`, 'success');
+                    const action = isRestart ? 'restarted' : 'switched to';
+                    showMessage(`Successfully ${action} "${selectedQuiz}". CSV file: ${data.csv_file}`, 'success');
                     currentQuiz = selectedQuiz;
                     
                     // Refresh the quiz list to update current indicators
@@ -549,14 +552,14 @@
                     selectedQuiz = '';
                     switchBtn.textContent = 'Switch to Selected Quiz';
                 } else {
-                    showMessage(data.error || 'Failed to switch quiz', 'error');
+                    showMessage(data.error || `Failed to ${isRestart ? 'restart' : 'switch'} quiz`, 'error');
                     switchBtn.disabled = false;
-                    switchBtn.textContent = `Switch to "${selectedQuiz}"`;
+                    switchBtn.textContent = isRestart ? 'Restart Current Quiz' : 'Switch to Selected Quiz';
                 }
             } catch (error) {
-                showMessage('Error switching quiz: ' + error.message, 'error');
+                showMessage(`Error ${isRestart ? 'restarting' : 'switching'} quiz: ` + error.message, 'error');
                 switchBtn.disabled = false;
-                switchBtn.textContent = `Switch to "${selectedQuiz}"`;
+                switchBtn.textContent = isRestart ? 'Restart Current Quiz' : 'Switch to Selected Quiz';
             }
         }
 

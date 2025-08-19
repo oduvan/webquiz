@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "webquiz"
-version = "1.0.1"
+version = "1.0.2"
 description = "A modern web-based quiz and testing system built with Python and aiohttp"
 authors = ["Oleksandr Liabakh <oduvan@gmail.com>"]
 license = "MIT"
@@ -26,7 +26,10 @@ classifiers = [
     "Topic :: Software Development :: Testing",
 ]
 packages = [{include = "webquiz"}]
-include = ["webquiz/templates/*"]
+include = [
+    "webquiz/templates/*",
+    "server_config.yaml.example"
+]
 
 [tool.poetry.dependencies]
 python = "^3.9"
