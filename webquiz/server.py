@@ -1342,7 +1342,7 @@ async def create_app(config: WebQuizConfig):
     app.router.add_get('/api/verify-user/{user_id}', server.verify_user_id)
     
     # Admin routes
-    app.router.add_get('/admin', server.serve_admin_page)
+    app.router.add_get('/admin/', server.serve_admin_page)
     app.router.add_post('/api/admin/auth', server.admin_auth_test)
     app.router.add_get('/api/admin/list-quizzes', server.admin_list_quizzes)
     app.router.add_post('/api/admin/switch-quiz', server.admin_switch_quiz)
@@ -1353,7 +1353,7 @@ async def create_app(config: WebQuizConfig):
     app.router.add_post('/api/admin/validate-quiz', server.admin_validate_quiz)
     
     # Live stats routes (public access)
-    app.router.add_get('/live-stats', server.serve_live_stats_page)
+    app.router.add_get('/live-stats/', server.serve_live_stats_page)
     app.router.add_get('/ws/live-stats', server.websocket_live_stats)
     
     # Serve static files from configured static directory
