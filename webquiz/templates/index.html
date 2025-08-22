@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Система Тестування</title>
     <style>
         :root {
@@ -275,6 +275,50 @@
         }
         .results-table tr:hover {
             background-color: var(--option-hover);
+        }
+        
+        /* Mobile responsive table */
+        @media screen and (max-width: 768px) {
+            .results-table {
+                font-size: 12px;
+                overflow-x: auto;
+                display: block;
+                white-space: nowrap;
+            }
+            .results-table thead, 
+            .results-table tbody, 
+            .results-table th, 
+            .results-table td, 
+            .results-table tr {
+                display: block;
+            }
+            .results-table thead tr {
+                position: absolute;
+                top: -9999px;
+                left: -9999px;
+            }
+            .results-table tr {
+                border: 1px solid var(--border-color);
+                margin-bottom: 10px;
+                padding: 10px;
+                border-radius: 5px;
+                white-space: normal;
+            }
+            .results-table td {
+                border: none;
+                padding: 5px 0;
+                position: relative;
+                padding-left: 50%;
+            }
+            .results-table td:before {
+                content: attr(data-label) ": ";
+                position: absolute;
+                left: 6px;
+                width: 45%;
+                padding-right: 10px;
+                white-space: nowrap;
+                font-weight: bold;
+            }
         }
         .answer-correct {
             color: #28a745;
@@ -699,14 +743,14 @@
                 const correctAnswer = questions[index] ? questions[index].options[questions[index].correct_answer] : 'N/A';
                 tableContent += `
                     <tr>
-                        <td>${result.question}</td>
-                        <td>
+                        <td data-label="Питання">${result.question}</td>
+                        <td data-label="Ваша відповідь">
                             <span class="${result.isCorrect ? 'answer-correct' : 'answer-incorrect'}">
                                 ${result.selectedAnswer}
                             </span>
                             ${!result.isCorrect ? `<div class="correct-answer-hint">Правильна: ${correctAnswer}</div>` : ''}
                         </td>
-                        <td style="text-align: center;">
+                        <td data-label="Правильно" style="text-align: center;">
                             <span class="${result.isCorrect ? 'correct' : 'incorrect'}" style="font-size: 18px;">
                                 ${result.isCorrect ? '✓' : '✗'}
                             </span>
@@ -750,14 +794,14 @@
                     <tbody>
                         ${finalResults.test_results.map((result, index) => `
                             <tr>
-                                <td>${result.question}</td>
-                                <td>
+                                <td data-label="Питання">${result.question}</td>
+                                <td data-label="Ваша відповідь">
                                     <span class="${result.is_correct ? 'answer-correct' : 'answer-incorrect'}">
                                         ${result.selected_answer}
                                     </span>
                                     ${!result.is_correct ? `<div class="correct-answer-hint">Правильна: ${result.correct_answer}</div>` : ''}
                                 </td>
-                                <td style="text-align: center;">
+                                <td data-label="Правильно" style="text-align: center;">
                                     <span class="${result.is_correct ? 'correct' : 'incorrect'}" style="font-size: 18px;">
                                         ${result.is_correct ? '✓' : '✗'}
                                     </span>
