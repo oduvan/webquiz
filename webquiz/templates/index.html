@@ -389,7 +389,6 @@
         
         <!-- Results Section -->
         <div id="results" class="section hidden">
-            <h2>Результати Тесту</h2>
             <div id="results-content"></div>
         </div>
     </div>
@@ -581,7 +580,6 @@
                                 return `
                                     <div class="option" onclick="selectCurrentAnswer(${optionIndex})" id="option_${optionIndex}">
                                         <div class="option-content">
-                                            <span>${optionIndex + 1}.</span>
                                             <img src="${option}" alt="Option ${optionIndex + 1}" class="option-image">
                                         </div>
                                     </div>
@@ -589,7 +587,7 @@
                             } else {
                                 return `
                                     <div class="option" onclick="selectCurrentAnswer(${optionIndex})" id="option_${optionIndex}">
-                                        ${optionIndex + 1}. ${option}
+                                        ${option}
                                     </div>
                                 `;
                             }

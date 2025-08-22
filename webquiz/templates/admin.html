@@ -791,8 +791,13 @@
             questionDiv.dataset.questionId = questionCounter;
             
             questionDiv.innerHTML = `
-                <div class="question-header">
-                   
+                <div class="question-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; padding: 10px; background: var(--question-bg); border-radius: 5px;">
+                    <span style="font-weight: bold;">Question ${questionCounter}</span>
+                    <div>
+                        <button type="button" onclick="moveQuestion(${questionCounter}, 'up')" style="margin-right: 5px; padding: 5px 8px; font-size: 12px;">↑</button>
+                        <button type="button" onclick="moveQuestion(${questionCounter}, 'down')" style="margin-right: 5px; padding: 5px 8px; font-size: 12px;">↓</button>
+                        <button type="button" onclick="removeQuestion(${questionCounter})" class="btn-danger" style="padding: 5px 8px; font-size: 12px;">×</button>
+                    </div>
                 </div>
                 <div class="form-group">
                     <label>Question Text (optional if image provided):</label>
@@ -819,18 +824,125 @@
                         </div>
                     </div>
                     <button type="button" onclick="addOption(${questionCounter})">+ Add Option</button>
-                    <button type="button" onclick="removeQuestion(${questionCounter})" class="btn-danger">Remove</button>
                 </div>
             `;
             
             container.appendChild(questionDiv);
             questionCounter++;
+            updateQuestionNumbers();
         }
 
         function removeQuestion(questionId) {
             const questionDiv = document.querySelector(`[data-question-id="${questionId}"]`);
             if (questionDiv) {
                 questionDiv.remove();
+                updateQuestionNumbers();
+            }
+        }
+
+        function moveQuestion(questionId, direction) {
+            const questionDiv = document.querySelector(`[data-question-id="${questionId}"]`);
+            if (!questionDiv) return;
+
+            const container = document.getElementById('questions-container');
+            const allQuestions = Array.from(container.children);
+            const currentIndex = allQuestions.indexOf(questionDiv);
+
+            let moved = false;
+            if (direction === 'up' && currentIndex > 0) {
+                // Move up
+                container.insertBefore(questionDiv, allQuestions[currentIndex - 1]);
+                updateQuestionNumbers();
+                moved = true;
+            } else if (direction === 'down' && currentIndex < allQuestions.length - 1) {
+                // Move down
+                container.insertBefore(allQuestions[currentIndex + 1], questionDiv);
+                updateQuestionNumbers();
+                moved = true;
+            }
+
+            // Animate scroll to the moved question
+            if (moved) {
+                setTimeout(() => {
+                    questionDiv.scrollIntoView({
+                        behavior: 'smooth',
+                        block: 'center',
+                        inline: 'nearest'
+                    });
+                    
+                    // Add a brief highlight animation
+                    questionDiv.style.transition = 'background-color 0.3s ease';
+                    const originalBg = getComputedStyle(questionDiv).backgroundColor;
+                    questionDiv.style.backgroundColor = 'var(--option-selected)';
+                    
+                    setTimeout(() => {
+                        questionDiv.style.backgroundColor = originalBg;
+                        setTimeout(() => {
+                            questionDiv.style.transition = '';
+                        }, 300);
+                    }, 300);
+                }, 50);
+            }
+        }
+
+        function updateQuestionNumbers() {
+            const container = document.getElementById('questions-container');
+            const questions = container.children;
+            
+            // Store checked states before updating names
+            const checkedStates = [];
+            for (let i = 0; i < questions.length; i++) {
+                const questionDiv = questions[i];
+                const radioButtons = questionDiv.querySelectorAll('input[type="radio"]');
+                let checkedIndex = -1;
+                radioButtons.forEach((radio, index) => {
+                    if (radio.checked) {
+                        checkedIndex = index;
+                    }
+                });
+                checkedStates[i] = checkedIndex;
+            }
+            
+            // Update numbers and radio button names
+            for (let i = 0; i < questions.length; i++) {
+                const questionDiv = questions[i];
+                const questionNumber = i + 1;
+                
+                // Update the visual question number in header
+                const headerSpan = questionDiv.querySelector('.question-header span');
+                if (headerSpan) {
+                    headerSpan.textContent = `Question ${questionNumber}`;
+                }
+                
+                // Update radio button names to ensure correct grouping
+                const radioButtons = questionDiv.querySelectorAll('input[type="radio"]');
+                radioButtons.forEach((radio, index) => {
+                    radio.name = `correct-${questionNumber}`;
+                    // Restore checked state
+                    radio.checked = (index === checkedStates[i]);
+                });
+            }
+            
+            // Update button visibility
+            updateMoveButtonVisibility();
+        }
+
+        function updateMoveButtonVisibility() {
+            const container = document.getElementById('questions-container');
+            const questions = container.children;
+            
+            for (let i = 0; i < questions.length; i++) {
+                const questionDiv = questions[i];
+                const upButton = questionDiv.querySelector('button[onclick*="up"]');
+                const downButton = questionDiv.querySelector('button[onclick*="down"]');
+                
+                if (upButton) {
+                    upButton.style.display = i === 0 ? 'none' : 'inline-block';
+                }
+                
+                if (downButton) {
+                    downButton.style.display = i === questions.length - 1 ? 'none' : 'inline-block';
+                }
             }
         }
 
@@ -894,6 +1006,14 @@
                     });
                     
                     questionDiv.innerHTML = `
+                        <div class="question-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; padding: 10px; background: var(--question-bg); border-radius: 5px;">
+                            <span style="font-weight: bold;">Question ${questionCounter}</span>
+                            <div>
+                                <button type="button" onclick="moveQuestion(${questionCounter}, 'up')" style="margin-right: 5px; padding: 5px 8px; font-size: 12px;">↑</button>
+                                <button type="button" onclick="moveQuestion(${questionCounter}, 'down')" style="margin-right: 5px; padding: 5px 8px; font-size: 12px;">↓</button>
+                                <button type="button" onclick="removeQuestion(${questionCounter})" class="btn-danger" style="padding: 5px 8px; font-size: 12px;">×</button>
+                            </div>
+                        </div>
                         <div class="form-group">
                             <label>Question Text (optional if image provided):</label>
                             <input type="text" class="question-text" value="${question.question || ''}" placeholder="Enter question text" style="width: 100%;">
@@ -910,13 +1030,13 @@
                                 ${optionsHtml}
                             </div>
                             <button type="button" onclick="addOption(${questionCounter})">+ Add Option</button>
-                            <button type="button" onclick="removeQuestion(${questionCounter})" class="btn-danger">Remove</button>
                         </div>
                     `;
                     
                     container.appendChild(questionDiv);
                     questionCounter++;
                 });
+                updateQuestionNumbers();
             }
         }
 
@@ -957,10 +1077,11 @@
                 // Either question text OR image must be provided
                 const hasQuestionContent = questionText || questionImage;
                 
-                if (hasQuestionContent && options.every(opt => opt) && correctRadio) {
+                // Check if we have valid question content and options
+                if (hasQuestionContent && options.every(opt => opt) && options.length > 0) {
                     const questionData = {
                         options: options,
-                        correct_answer: parseInt(correctRadio.value)
+                        correct_answer: correctRadio ? parseInt(correctRadio.value) : 0  // Default to first option if none selected
                     };
                     
                     // Include question text if provided
