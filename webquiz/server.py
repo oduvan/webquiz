@@ -813,6 +813,7 @@ class TestingServer:
         
         return web.json_response({
             'is_correct': is_correct,
+            'correct_answer': question['correct_answer'],
             'time_taken': time_taken,
             'message': 'Answer submitted successfully'
         })

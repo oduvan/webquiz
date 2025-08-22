@@ -116,6 +116,22 @@
             border-color: #28a745 !important;
             border-width: 3px !important;
             color: #155724 !important;
+            position: relative;
+        }
+        
+        .option.feedback-correct::after {
+            content: '✓ Правильна відповідь';
+            position: absolute;
+            top: -25px;
+            right: 0;
+            background: #28a745;
+            color: white;
+            padding: 2px 8px;
+            border-radius: 3px;
+            font-size: 12px;
+            font-weight: bold;
+            white-space: nowrap;
+            z-index: 10;
         }
 
         .option.feedback-incorrect {
@@ -123,6 +139,22 @@
             border-color: #dc3545 !important;
             border-width: 3px !important;
             color: #721c24 !important;
+            position: relative;
+        }
+        
+        .option.feedback-incorrect::after {
+            content: '✗ Ваша відповідь';
+            position: absolute;
+            top: -25px;
+            right: 0;
+            background: #dc3545;
+            color: white;
+            padding: 2px 8px;
+            border-radius: 3px;
+            font-size: 12px;
+            font-weight: bold;
+            white-space: nowrap;
+            z-index: 10;
         }
 
         .option.disabled {
@@ -157,7 +189,7 @@
             box-shadow: 0 4px 12px var(--shadow);
         }
         .option-image {
-            max-width: 200px;
+            max-width: 300px;
             height: auto;
             margin: 5px 0;
             border-radius: 3px;
@@ -656,18 +688,26 @@
                 });
                 
                 // Show feedback on selected answer
-                showAnswerFeedback(data.is_correct);
+                showAnswerFeedback(data.is_correct, data.correct_answer);
                 
             } catch (error) {
                 alert('Помилка відправки відповіді: ' + error.message);
             }
         }
 
-        function showAnswerFeedback(isCorrect) {
+        function showAnswerFeedback(isCorrect, correctAnswer) {
             // Apply feedback styling to selected answer
             const selectedOption = document.querySelector('.option.selected');
             if (selectedOption) {
                 selectedOption.classList.add(isCorrect ? 'feedback-correct' : 'feedback-incorrect');
+            }
+            
+            // If answer is incorrect, also highlight the correct answer
+            if (!isCorrect) {
+                const correctOption = document.getElementById(`option_${correctAnswer}`);
+                if (correctOption) {
+                    correctOption.classList.add('feedback-correct');
+                }
             }
             
             // Disable all options to prevent further selection
