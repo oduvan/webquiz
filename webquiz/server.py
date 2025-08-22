@@ -286,9 +286,6 @@ class TestingServer:
         # Load new questions
         await self.load_questions_from_file(quiz_path)
         
-        # Initialize new CSV file
-        await self.initialize_csv()
-        
         # Regenerate index.html with new questions
         await self.create_default_index_html()
         
@@ -419,15 +416,6 @@ class TestingServer:
         except Exception as e:
             print(f"Error initializing log file {self.log_file}: {e}")
 
-    async def initialize_csv(self):
-        """Initialize new CSV file with unique suffix and headers"""
-        try:
-            async with aiofiles.open(self.csv_file, 'w') as f:
-                await f.write('user_id,username,question_text,selected_answer_text,correct_answer_text,is_correct,time_taken_seconds\n')
-            logger.info(f"Initialized new CSV file with headers: {self.csv_file}")
-        except Exception as e:
-            logger.error(f"Error initializing CSV file {self.csv_file}: {e}")
-    
     async def create_default_config_yaml(self, file_path: str = None):
         """Create default config.yaml file"""
         if file_path is None:
@@ -601,14 +589,20 @@ class TestingServer:
             return
             
         try:
+            # Check if CSV file exists, if not create it with headers
+            file_exists = os.path.exists(self.csv_file)
+            
             # Use StringIO buffer to write CSV data
             csv_buffer = StringIO()
             csv_writer = csv.writer(csv_buffer)
             
+            # Write headers if file doesn't exist
+            if not file_exists:
+                csv_writer.writerow(['username', 'question_text', 'selected_answer_text', 'correct_answer_text', 'is_correct', 'time_taken_seconds'])
+            
             # Write all responses to buffer
             for response in self.user_responses:
                 csv_writer.writerow([
-                    response['user_id'],
                     response['username'],
                     response['question_text'],
                     response['selected_answer_text'],
@@ -623,10 +617,12 @@ class TestingServer:
             total_responses = len(self.user_responses)
             self.user_responses.clear()
             
-            async with aiofiles.open(self.csv_file, 'a') as f:
+            mode = 'w' if not file_exists else 'a'
+            async with aiofiles.open(self.csv_file, mode) as f:
                 await f.write(csv_content)
                     
-            logger.info(f"Flushed {total_responses} responses to CSV: {self.csv_file}")
+            action = "Created" if not file_exists else "Updated"
+            logger.info(f"{action} CSV file with {total_responses} responses: {self.csv_file}")
         except Exception as e:
             logger.error(f"Error flushing responses to CSV: {e}")
             
