@@ -382,6 +382,11 @@
                 <!-- Wizard Mode -->
                 <div id="wizard-form" class="wizard-form active">
                     <div class="form-group">
+                        <label>Quiz Title (optional):</label>
+                        <input type="text" id="quiz-title" placeholder="e.g., Mathematics Quiz" style="width: 100%; margin-bottom: 20px;">
+                        <small style="color: #666;">If not provided, default title will be used</small>
+                    </div>
+                    <div class="form-group">
                         <div id="questions-container">
                             <!-- Questions will be added dynamically -->
                         </div>
@@ -867,6 +872,9 @@
             container.innerHTML = '';
             questionCounter = 1;
             
+            // Populate title field
+            document.getElementById('quiz-title').value = quizData.title || '';
+            
             if (quizData.questions) {
                 quizData.questions.forEach(question => {
                     const questionDiv = document.createElement('div');
@@ -969,7 +977,15 @@
                 }
             });
             
-            return { questions };
+            const quizData = { questions };
+            
+            // Include title if provided
+            const quizTitle = document.getElementById('quiz-title').value.trim();
+            if (quizTitle) {
+                quizData.title = quizTitle;
+            }
+            
+            return quizData;
         }
 
         async function validateQuizContent() {

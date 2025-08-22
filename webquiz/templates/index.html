@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Система Тестування</title>
+    <title>{{QUIZ_TITLE}}</title>
     <style>
         :root {
             --bg-color: #f5f5f5;
@@ -359,7 +359,7 @@
             </div>
             <button class="theme-toggle" onclick="toggleTheme()" title="Перемкнути тему">🌙</button>
         </div>
-        <h1>Система Тестування</h1>
+        <h1>{{QUIZ_TITLE}}</h1>
         
         <!-- Loading State -->
         <div id="loading" class="section">
@@ -376,7 +376,6 @@
         
         <!-- Test Section -->
         <div id="test-section" class="section hidden">
-            <h2>Тестові Питання</h2>
             <div id="progress-bar" class="progress">
                 <div id="progress-fill"></div>
                 <span id="progress-text">Питання 1 з 5</span>

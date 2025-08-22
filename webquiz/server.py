@@ -207,6 +207,7 @@ class TestingServer:
         self.static_dir = config.paths.static_dir
         self.log_file = None  # Will be set during initialization
         self.csv_file = None  # Will be set when quiz is selected
+        self.quiz_title = 'Система Тестування'  # Default title, updated when quiz is loaded
         self.users: Dict[str, Dict[str, Any]] = {}  # user_id -> user data
         self.questions: List[Dict[str, Any]] = []
         self.user_responses: List[Dict[str, Any]] = []
@@ -455,6 +456,9 @@ class TestingServer:
                 data = yaml.safe_load(content)
                 self.questions = data['questions']
                 
+                # Store quiz title or use default
+                self.quiz_title = data.get('title', 'Система Тестування')
+                
                 # Add automatic IDs based on array index
                 for i, question in enumerate(self.questions):
                     question['id'] = i + 1
@@ -536,8 +540,9 @@ class TestingServer:
                 async with aiofiles.open(template_path, 'r') as template_file:
                     template_content = await template_file.read()
             
-            # Inject questions data into template
+            # Inject questions data and title into template
             html_content = template_content.replace('{{QUESTIONS_DATA}}', questions_json)
+            html_content = html_content.replace('{{QUIZ_TITLE}}', self.quiz_title)
             
             # Write to destination
             async with aiofiles.open(index_path, 'w') as f:
