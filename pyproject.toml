@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "webquiz"
-version = "1.0.4"
+version = "1.0.5"
 description = "A modern web-based quiz and testing system built with Python and aiohttp"
 authors = ["Oleksandr Liabakh <oduvan@gmail.com>"]
 license = "MIT"
@@ -40,9 +40,11 @@ aiofiles = "^24.1.0"
 [tool.poetry.group.dev.dependencies]
 pytest = "^8.3.3"
 pytest-asyncio = "^0.24.0"
+pyinstaller = {version = "^6.15", python = ">=3.9,<3.15"}
 
 [tool.poetry.scripts]
 webquiz = "webquiz.cli:main"
+build_binary = "webquiz.build:main"
 
 [build-system]
 requires = ["poetry-core"]

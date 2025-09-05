@@ -20,6 +20,7 @@ WebQuiz - A modern web-based quiz and testing system built with Python and aioht
 - Responsive web interface with dark/light theme
 - **Live statistics monitoring**: Real-time WebSocket-powered dashboard showing user progress with timing information
 - Configurable file paths for quizzes, logs, CSV output, and static files
+- **Binary distribution with PyInstaller 6.15**: Creates standalone executable with automatic executable directory defaults
 - Comprehensive test suite (integration + unit tests)
 
 ## Architecture
@@ -38,7 +39,9 @@ WebQuiz - A modern web-based quiz and testing system built with Python and aioht
 
 ## Key Files
 - `webquiz/server.py` - Main aiohttp server with middleware, API endpoints, and admin functionality
-- `webquiz/cli.py` - CLI interface with daemon support and new admin parameters
+- `webquiz/cli.py` - CLI interface with daemon support and configurable default paths for binary execution
+- `webquiz/build.py` - PyInstaller binary build script
+- `webquiz/binary_entry.py` - Entry point for PyInstaller binary with executable directory defaults
 - `webquiz/__init__.py` - Package initialization
 - **`quizzes/` directory** - Contains multiple YAML quiz files:
   - `default.yaml` - Default questions (auto-created if missing)
@@ -51,12 +54,13 @@ WebQuiz - A modern web-based quiz and testing system built with Python and aioht
 - **`{quiz_name}_user_responses.csv`** - User response storage with quiz name prefix (e.g., `math_quiz_user_responses.csv`)
 - **`server_{suffix}.log`** - Server activity logs with unique suffixes (no overwrites)
 - `static/` - Static files folder (automatically generated, contains current quiz's index.html)
+- **`dist/webquiz`** - Standalone PyInstaller binary executable
 - `tests/` - Test suite
   - `test_integration.py` - Integration tests with real HTTP requests (11 tests)
   - `test_server.py` - Unit tests for internal functionality (3 tests)
   - `test_live_stats.py` - Live statistics and WebSocket functionality tests (12 tests)
   - `conftest.py` - Test fixtures and configuration
-- `pyproject.toml` - Poetry configuration and dependencies
+- `pyproject.toml` - Poetry configuration and dependencies (includes PyInstaller 6.15)
 - `requirements.txt` - Legacy pip dependencies
 - `venv/` - Python virtual environment
 - `.gitignore` - Git ignore file (excludes generated files, logs, virtual env)
@@ -92,13 +96,16 @@ pip install -r requirements.txt
 webquiz                              # Foreground mode
 webquiz --master-key secret123       # Enable admin interface with master key
 webquiz --quizzes-dir my_quizzes     # Use custom quizzes directory
-webquiz --log-file /var/log/quiz.log # Use custom log file
-webquiz --csv-file responses.csv     # Use custom CSV base name (will be prefixed with quiz name)
+webquiz --logs-dir /var/log          # Use custom logs directory
+webquiz --csv-dir /data              # Use custom CSV directory
 webquiz --static /var/www/quiz       # Use custom static directory
 WEBQUIZ_MASTER_KEY=secret webquiz    # Set master key via environment variable
 webquiz -d                           # Daemon mode
 webquiz --stop                       # Stop daemon
 webquiz --status                     # Check status
+
+# Build binary
+poetry run build_binary              # Create standalone executable with PyInstaller
 
 # Alternative (without Poetry installation)
 python -m webquiz.cli
