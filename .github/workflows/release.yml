@@ -35,6 +35,14 @@ jobs:
         git config --local user.email "action@github.com"
         git config --local user.name "GitHub Action"
         
+    - name: Validate version format
+      run: |
+        if [[ ! "${{ github.event.inputs.version }}" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+          echo "❌ Invalid version format. Expected: X.Y.Z (e.g., 1.0.6)"
+          exit 1
+        fi
+        echo "✅ Version format is valid: ${{ github.event.inputs.version }}"
+        
     - name: Update version in pyproject.toml and __init__.py
       run: |
         poetry version ${{ github.event.inputs.version }}
