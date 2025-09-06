@@ -1,18 +1,16 @@
 #!/usr/bin/env python3
 """
 Entry point for PyInstaller binary.
-Sets default paths to executable directory before calling main CLI.
+Sets executable directory for relative path resolution.
 """
 
 import sys
+import os
 from pathlib import Path
 import webquiz.cli
 
+# Set executable directory for relative path resolution
 exe_dir = Path(sys.executable).parent
+os.environ['WEBQUIZ_BINARY_DIR'] = str(exe_dir)
 
-webquiz.cli.main(
-    default_quizzes_dir=str(exe_dir / "quizzes"),
-    default_logs_dir=str(exe_dir / "logs"),
-    default_csv_dir=str(exe_dir / "data"),
-    default_static_dir=str(exe_dir / "static")
-)
+webquiz.cli.main()

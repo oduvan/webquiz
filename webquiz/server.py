@@ -17,6 +17,20 @@ from dataclasses import dataclass, asdict
 # Logger will be configured in create_app() with custom log file
 logger = logging.getLogger(__name__)
 
+def resolve_path_relative_to_binary(path_str: str) -> str:
+    """Resolve relative paths relative to binary directory when running as binary."""
+    if not path_str or os.path.isabs(path_str):
+        return path_str
+    
+    binary_dir = os.environ.get('WEBQUIZ_BINARY_DIR')
+    if binary_dir:
+        # Running as binary - resolve relative to binary directory
+        resolved = Path(binary_dir) / path_str
+        return str(resolved)
+    else:
+        # Running normally - return as-is (relative to cwd)
+        return path_str
+
 @dataclass
 class ServerConfig:
     """Server configuration data class"""
@@ -26,10 +40,20 @@ class ServerConfig:
 @dataclass  
 class PathsConfig:
     """Paths configuration data class"""
-    quizzes_dir: str = "quizzes"
-    logs_dir: str = "logs"
-    csv_dir: str = "data"
-    static_dir: str = "static"
+    quizzes_dir: str = None
+    logs_dir: str = None
+    csv_dir: str = None
+    static_dir: str = None
+    
+    def __post_init__(self):
+        if self.quizzes_dir is None:
+            self.quizzes_dir = resolve_path_relative_to_binary("quizzes")
+        if self.logs_dir is None:
+            self.logs_dir = resolve_path_relative_to_binary("logs")
+        if self.csv_dir is None:
+            self.csv_dir = resolve_path_relative_to_binary("data")
+        if self.static_dir is None:
+            self.static_dir = resolve_path_relative_to_binary("static")
 
 @dataclass
 class AdminConfig:
@@ -92,11 +116,51 @@ def load_config_from_yaml(config_path: str) -> WebQuizConfig:
         logger.error(f"Error loading config from {config_path}: {e}")
         return WebQuizConfig()
 
+def get_default_config_path() -> Optional[str]:
+    """Get default config file path, creating one if it doesn't exist."""
+    # Determine where to look for/create config file
+    binary_dir = os.environ.get('WEBQUIZ_BINARY_DIR')
+    if binary_dir:
+        config_path = Path(binary_dir) / "webquiz.yaml"
+    else:
+        config_path = Path.cwd() / "webquiz.yaml"
+    
+    # If config file exists, return it
+    if config_path.exists():
+        return str(config_path)
+    
+    # Create default config file
+    try:
+        create_default_config_file(config_path)
+        return str(config_path)
+    except Exception as e:
+        logger.warning(f"Could not create default config file at {config_path}: {e}")
+        return None
+
+def create_default_config_file(config_path: Path):
+    """Create a default config file with example content."""
+    try:
+        # Try modern importlib.resources first (Python 3.9+)
+        import importlib.resources as pkg_resources
+        example_content = (pkg_resources.files('webquiz') / 'server_config.yaml.example').read_text()
+    except (ImportError, AttributeError):
+        # Fallback to pkg_resources for older Python versions
+        import pkg_resources
+        example_content = pkg_resources.resource_string('webquiz', 'server_config.yaml.example').decode('utf-8')
+    
+    with open(config_path, 'w', encoding='utf-8') as f:
+        f.write(example_content)
+    logger.info(f"Created default config file: {config_path}")
+
 def load_config_with_overrides(config_path: Optional[str] = None, **cli_overrides) -> WebQuizConfig:
     """Load configuration with CLI parameter overrides
     
     Priority: CLI parameters > config file > defaults
     """
+    # Use default config file if none provided
+    if not config_path:
+        config_path = get_default_config_path()
+    
     # Start with config file or defaults
     if config_path:
         if os.path.exists(config_path):
@@ -104,18 +168,7 @@ def load_config_with_overrides(config_path: Optional[str] = None, **cli_override
             logger.info(f"Loaded configuration from: {config_path}")
         else:
             # Config file specified but doesn't exist - create from example
-            try:
-                # Try modern importlib.resources first (Python 3.9+)
-                import importlib.resources as pkg_resources
-                example_content = (pkg_resources.files('webquiz') / 'server_config.yaml.example').read_text()
-            except (ImportError, AttributeError):
-                # Fallback to pkg_resources for older Python versions
-                import pkg_resources
-                example_content = pkg_resources.resource_string('webquiz', 'server_config.yaml.example').decode('utf-8')
-            
-            with open(config_path, 'w', encoding='utf-8') as f:
-                f.write(example_content)
-            logger.info(f"Created config file '{config_path}' from package example file")
+            create_default_config_file(Path(config_path))
             config = load_config_from_yaml(config_path)
             logger.info(f"Loaded configuration from newly created: {config_path}")
     else:

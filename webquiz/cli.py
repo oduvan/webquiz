@@ -199,7 +199,7 @@ def run_server(config):
     return 0
 
 
-def main(default_quizzes_dir='quizzes', default_logs_dir='logs', default_csv_dir='data', default_static_dir='static'):
+def main():
     """Main CLI entry point."""
     parser = argparse.ArgumentParser(
         prog='webquiz',
@@ -255,7 +255,6 @@ CLI parameters always override config file values
     
     parser.add_argument(
         '--quizzes-dir',
-        default=default_quizzes_dir,
         help='Path to quizzes directory (default: quizzes)'
     )
     
@@ -266,19 +265,16 @@ CLI parameters always override config file values
     
     parser.add_argument(
         '--logs-dir',
-        default=default_logs_dir,
         help='Directory for log files (default: logs/)'
     )
     
     parser.add_argument(
         '--csv-dir',
-        default=default_csv_dir,
         help='Directory for CSV response files (default: data/)'
     )
     
     parser.add_argument(
         '--static',
-        default=default_static_dir,
         help='Path to static files directory (default: static)'
     )
     

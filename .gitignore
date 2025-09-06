@@ -128,11 +128,15 @@ dmypy.json
 # Pyre type checker
 .pyre/
 
-# Project specific files
-server.log
-user_responses.csv
-static/questions_for_client.json
-config.yaml
+# WebQuiz project specific files
+*.log
+server_*.log
+*_user_responses*.csv
+static/
+data/
+logs/
+quizzes/
+webquiz.yaml
 webquiz.pid
 
 # IDE files
@@ -151,5 +155,3 @@ webquiz.pid
 ehthumbs.db
 Thumbs.db
 
-questions.yaml
-static/
