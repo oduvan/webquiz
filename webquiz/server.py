@@ -453,7 +453,7 @@ class TestingServer:
 </html>'''
         
         try:
-            async with aiofiles.open(index_path, 'w') as f:
+            async with aiofiles.open(index_path, 'w', encoding='utf-8') as f:
                 await f.write(selection_html)
             logger.info(f"Created admin selection page: {index_path}")
         except Exception as e:
@@ -497,8 +497,8 @@ class TestingServer:
         }
         
         try:
-            async with aiofiles.open(file_path, 'w') as f:
-                await f.write(yaml.dump(default_questions, default_flow_style=False))
+            async with aiofiles.open(file_path, 'w', encoding='utf-8') as f:
+                await f.write(yaml.dump(default_questions, default_flow_style=False, allow_unicode=True))
             logger.info(f"Created default config file: {file_path}")
         except Exception as e:
             logger.error(f"Error creating default config file {file_path}: {e}")
@@ -587,12 +587,12 @@ class TestingServer:
             try:
                 # Try modern importlib.resources first (Python 3.9+)
                 import importlib.resources as pkg_resources
-                template_content = (pkg_resources.files('webquiz') / 'templates' / 'index.html').read_text()
+                template_content = (pkg_resources.files('webquiz') / 'templates' / 'index.html').read_text(encoding='utf-8')
             except (ImportError, AttributeError):
                 # Fallback to pkg_resources for older Python versions
                 import pkg_resources
                 template_path = pkg_resources.resource_filename('webquiz', 'templates/index.html')
-                async with aiofiles.open(template_path, 'r') as template_file:
+                async with aiofiles.open(template_path, 'r', encoding='utf-8') as template_file:
                     template_content = await template_file.read()
             
             # Inject questions data and title into template
@@ -600,7 +600,7 @@ class TestingServer:
             html_content = html_content.replace('{{QUIZ_TITLE}}', self.quiz_title)
             
             # Write to destination
-            async with aiofiles.open(index_path, 'w') as f:
+            async with aiofiles.open(index_path, 'w', encoding='utf-8') as f:
                 await f.write(html_content)
                 
             logger.info(f"Created index.html file with embedded questions data: {index_path}")
@@ -637,7 +637,7 @@ class TestingServer:
 </html>'''
         
         try:
-            async with aiofiles.open(index_path, 'w') as f:
+            async with aiofiles.open(index_path, 'w', encoding='utf-8') as f:
                 await f.write(fallback_html)
             logger.warning(f"Created fallback index.html file: {index_path}")
         except Exception as e:
