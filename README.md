@@ -208,6 +208,32 @@ webquiz --version
 - **Status monitoring**: Check if daemon is running
 - **Log preservation**: All output still goes to `server.log`
 
+## 🚀 Release Management
+
+This project uses GitHub Actions for automated versioning and PyPI deployment.
+
+### Creating a New Release
+
+1. **Go to GitHub Actions** in the repository
+2. **Select "Release and Deploy to PyPI" workflow**
+3. **Click "Run workflow"**
+4. **Enter the new version** (e.g., `1.0.6`, `2.0.0`)
+5. **Click "Run workflow"**
+
+The action will automatically:
+- Update version in `pyproject.toml` and `webquiz/__init__.py`
+- Run tests to ensure everything works
+- Commit the version changes
+- Create a git tag with the version
+- Build the package using Poetry
+- Publish to PyPI
+
+### Prerequisites for PyPI Deployment
+
+Repository maintainers need to set up:
+- `PYPI_API_TOKEN` secret in GitHub repository settings
+- PyPI account with publish permissions for the `webquiz` package
+
 ## 🧪 Testing
 
 Run the comprehensive test suite:
