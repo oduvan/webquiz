@@ -1,0 +1,72 @@
+name: Release and Deploy to PyPI
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to release (e.g., 1.0.6, 2.0.0)'
+        required: true
+        type: string
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        token: ${{ secrets.GITHUB_TOKEN }}
+        
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+        
+    - name: Install Poetry
+      uses: snok/install-poetry@v1
+      with:
+        version: latest
+        virtualenvs-create: true
+        virtualenvs-in-project: true
+        
+    - name: Configure git
+      run: |
+        git config --local user.email "action@github.com"
+        git config --local user.name "GitHub Action"
+        
+    - name: Update version in pyproject.toml and __init__.py
+      run: |
+        poetry version ${{ github.event.inputs.version }}
+        sed -i 's/__version__ = "[^"]*"/__version__ = "${{ github.event.inputs.version }}"/' webquiz/__init__.py
+        
+    - name: Install dependencies
+      run: poetry install --no-interaction
+      
+    - name: Run tests
+      run: |
+        poetry run pytest tests/ --tb=short
+        
+    - name: Commit version change
+      run: |
+        git add pyproject.toml webquiz/__init__.py
+        git commit -m "Bump version to ${{ github.event.inputs.version }}"
+        
+    - name: Create and push tag
+      run: |
+        git tag "v${{ github.event.inputs.version }}"
+        git push origin "v${{ github.event.inputs.version }}"
+        
+    - name: Push version commit
+      run: |
+        git push origin HEAD:${{ github.ref_name }}
+        
+    - name: Build package
+      run: |
+        poetry build
+        
+    - name: Publish to PyPI
+      uses: pypa/gh-action-pypi-publish@release/v1
+      with:
+        password: ${{ secrets.PYPI_API_TOKEN }}
+        packages-dir: dist/
