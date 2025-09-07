@@ -210,7 +210,7 @@ webquiz --version
 
 ## 🚀 Release Management
 
-This project uses GitHub Actions for automated versioning and PyPI deployment.
+This project uses GitHub Actions for automated versioning, PyPI deployment, and GitHub Release creation.
 
 ### Creating a New Release
 
@@ -221,18 +221,29 @@ This project uses GitHub Actions for automated versioning and PyPI deployment.
 5. **Click "Run workflow"**
 
 The action will automatically:
-- Update version in `pyproject.toml` and `webquiz/__init__.py`
-- Run tests to ensure everything works
-- Commit the version changes
-- Create a git tag with the version
-- Build the package using Poetry
-- Publish to PyPI
+- ✅ Update version in `pyproject.toml` and `webquiz/__init__.py`
+- ✅ Run tests to ensure everything works
+- ✅ Commit the version changes
+- ✅ Create a git tag with the version
+- ✅ Build the package using Poetry
+- ✅ Publish to PyPI
+- 🆕 **Create a GitHub Release** with built artifacts
 
-### Prerequisites for PyPI Deployment
+### What's included in GitHub Releases
+
+Each release automatically includes:
+- 📦 **Python wheel package** (`.whl` file)
+- 📋 **Source distribution** (`.tar.gz` file)  
+- 📝 **Formatted release notes** with installation instructions
+- 🔗 **Links to commit history** for detailed changelog
+- 📋 **Installation commands** for the specific version
+
+### Prerequisites for Release Deployment
 
 Repository maintainers need to set up:
 - `PYPI_API_TOKEN` secret in GitHub repository settings
 - PyPI account with publish permissions for the `webquiz` package
+- `GITHUB_TOKEN` is automatically provided by GitHub Actions
 
 ## 🧪 Testing
 
