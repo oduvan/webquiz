@@ -77,3 +77,34 @@ jobs:
       with:
         password: ${{ secrets.PYPI_API_TOKEN }}
         packages-dir: dist/
+        
+    - name: Create GitHub Release
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      run: |
+        # Create release notes
+        cat > release_notes.md << 'EOF'
+        🚀 **WebQuiz v${{ github.event.inputs.version }}**
+
+        This release includes:
+        - 📦 Python wheel package (`webquiz-${{ github.event.inputs.version }}-py3-none-any.whl`)
+        - 📋 Source distribution (`webquiz-${{ github.event.inputs.version }}.tar.gz`)
+
+        ## Installation
+        ```bash
+        pip install webquiz==${{ github.event.inputs.version }}
+        ```
+
+        ## What's Changed
+        See the [commit history](https://github.com/oduvan/webquiz/commits/v${{ github.event.inputs.version }}) for detailed changes.
+
+        ---
+        *This release was automatically created by the release workflow.*
+        EOF
+        
+        # Create release with built artifacts
+        gh release create "v${{ github.event.inputs.version }}" \
+          --title "Release v${{ github.event.inputs.version }}" \
+          --notes-file release_notes.md \
+          --target ${{ github.ref_name }} \
+          dist/*
