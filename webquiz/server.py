@@ -14,8 +14,21 @@ import logging
 from io import StringIO
 from dataclasses import dataclass, asdict
 
+try:
+    from importlib.metadata import version
+except ImportError:
+    # Fallback for Python < 3.8
+    from importlib_metadata import version
+
 # Logger will be configured in create_app() with custom log file
 logger = logging.getLogger(__name__)
+
+def get_package_version() -> str:
+    """Get the webquiz package version"""
+    try:
+        return version('webquiz')
+    except Exception:
+        return 'unknown'
 
 def resolve_path_relative_to_binary(path_str: str) -> str:
     """Resolve relative paths relative to binary directory when running as binary."""
@@ -595,9 +608,10 @@ class TestingServer:
                 async with aiofiles.open(template_path, 'r', encoding='utf-8') as template_file:
                     template_content = await template_file.read()
             
-            # Inject questions data and title into template
+            # Inject questions data, title, and version into template
             html_content = template_content.replace('{{QUESTIONS_DATA}}', questions_json)
             html_content = html_content.replace('{{QUIZ_TITLE}}', self.quiz_title)
+            html_content = html_content.replace('{{WEBQUIZ_VERSION}}', get_package_version())
             
             # Write to destination
             async with aiofiles.open(index_path, 'w', encoding='utf-8') as f:
