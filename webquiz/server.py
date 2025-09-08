@@ -1293,6 +1293,11 @@ class TestingServer:
                     errors.append(f"Question {i+1} correct_answer index out of range")
         
         return len(errors) == 0
+    
+    async def serve_index_page(self, request):
+        """Serve the index.html page from static directory"""
+        index_path = f"{self.static_dir}/index.html"
+        return web.FileResponse(index_path, headers={'Content-Type': 'text/html'})
         
     async def serve_admin_page(self, request):
         """Serve the admin interface page"""
@@ -1423,6 +1428,17 @@ async def create_app(config: WebQuizConfig):
     app.router.add_get('/live-stats/', server.serve_live_stats_page)
     app.router.add_get('/ws/live-stats', server.websocket_live_stats)
     
+    # Serve index.html at root path
+    app.router.add_get('/', server.serve_index_page)
+    
+    # Ensure imgs directory exists before serving static files
+    ensure_directory_exists(os.path.join(config.paths.quizzes_dir, 'imgs'))
+    app.router.add_static(
+        '/imgs/', 
+        path=os.path.join(config.paths.quizzes_dir, 'imgs'),
+        show_index=True,
+        name='imgs',
+    )
     # Serve static files from configured static directory
     app.router.add_static('/', path=config.paths.static_dir, name='static')
     
