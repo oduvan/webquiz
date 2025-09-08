@@ -14,11 +14,7 @@ import logging
 from io import StringIO
 from dataclasses import dataclass, asdict
 
-try:
-    from importlib.metadata import version
-except ImportError:
-    # Fallback for Python < 3.8
-    from importlib_metadata import version
+from webquiz import __version__ as package_version
 
 # Logger will be configured in create_app() with custom log file
 logger = logging.getLogger(__name__)
@@ -26,7 +22,7 @@ logger = logging.getLogger(__name__)
 def get_package_version() -> str:
     """Get the webquiz package version"""
     try:
-        return version('webquiz')
+        return package_version
     except Exception:
         return 'unknown'
 
