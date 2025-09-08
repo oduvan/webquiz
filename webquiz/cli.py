@@ -15,6 +15,7 @@ import os
 import subprocess
 import signal
 import time
+import webbrowser
 from pathlib import Path
 import asyncio
 from aiohttp import web
@@ -178,6 +179,15 @@ def run_server(config):
         await site.start()
         
         print("✅ Server started successfully")
+        
+        # Open browser for admin interface if running as binary
+        if os.environ.get('WEBQUIZ_IS_BINARY') == '1':
+            admin_url = f"http://127.0.0.1:{config.server.port}/admin/"
+            print(f"🌐 Opening admin interface: {admin_url}")
+            try:
+                webbrowser.open(admin_url)
+            except Exception as e:
+                print(f"⚠️  Could not open browser: {e}")
         
         try:
             # Keep the server running

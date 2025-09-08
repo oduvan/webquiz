@@ -1200,6 +1200,16 @@
             }
         }
 
+        // Auto-authenticate for trusted IPs
+        if (typeof IS_TRUSTED_IP !== 'undefined' && IS_TRUSTED_IP) {
+            // Hide auth section and show admin panel immediately
+            document.getElementById('auth-section').style.display = 'none';
+            document.getElementById('admin-panel').style.display = 'block';
+            currentMasterKey = 'trusted-ip'; // Set a placeholder key for API calls
+            showMessage('Auto-authenticated from trusted IP', 'success');
+            loadQuizzes();
+        }
+
     </script>
 </body>
 </html>

@@ -68,6 +68,11 @@ class PathsConfig:
 class AdminConfig:
     """Admin configuration data class"""
     master_key: Optional[str] = None
+    trusted_ips: List[str] = None
+    
+    def __post_init__(self):
+        if self.trusted_ips is None:
+            self.trusted_ips = ['127.0.0.1']
 
 @dataclass
 class OptionsConfig:
@@ -220,12 +225,27 @@ def generate_unique_filename(base_path: str) -> str:
             return new_path
         suffix += 1
 
+def get_client_ip(request):
+    """Extract client IP address from request, handling proxies"""
+    client_ip = request.remote or '127.0.0.1'
+    if 'X-Forwarded-For' in request.headers:
+        # Handle proxy/load balancer forwarded IPs (take the first one)
+        client_ip = request.headers['X-Forwarded-For'].split(',')[0].strip()
+    elif 'X-Real-IP' in request.headers:
+        client_ip = request.headers['X-Real-IP']
+    return client_ip
+
 def admin_auth_required(func):
     """Decorator to require master key authentication for admin endpoints"""
     async def wrapper(self, request):
         # Check if master key is provided
         if not self.master_key:
             return web.json_response({'error': 'Admin functionality disabled - no master key set'}, status=403)
+        
+        # Get client IP and check if it's in trusted list (bypass authentication)
+        client_ip = get_client_ip(request)
+        if hasattr(self, 'admin_config') and client_ip in self.admin_config.trusted_ips:
+            return await func(self, request)
         
         # Get master key from request (header or body)
         provided_key = request.headers.get('X-Master-Key')
@@ -265,6 +285,7 @@ class TestingServer:
         self.config = config
         self.quizzes_dir = config.paths.quizzes_dir
         self.master_key = config.admin.master_key
+        self.admin_config = config.admin  # Store admin config for IP whitelist access
         self.current_quiz_file = None  # Will be set when quiz is selected
         self.logs_dir = config.paths.logs_dir
         self.csv_dir = config.paths.csv_dir
@@ -1312,6 +1333,17 @@ class TestingServer:
                 template_path = pkg_resources.resource_filename('webquiz', 'templates/admin.html')
                 async with aiofiles.open(template_path, 'r') as template_file:
                     template_content = await template_file.read()
+            
+            # Check if client IP is trusted and inject auto-auth flag
+            client_ip = get_client_ip(request)
+            is_trusted_ip = client_ip in self.admin_config.trusted_ips if hasattr(self, 'admin_config') else False
+            
+            # Inject trusted IP status into the template
+            auto_auth_script = f"const IS_TRUSTED_IP = {str(is_trusted_ip).lower()};"
+            template_content = template_content.replace(
+                '<script>',
+                f'<script>\n        {auto_auth_script}\n'
+            )
             
             return web.Response(text=template_content, content_type='text/html')
         except Exception as e:
