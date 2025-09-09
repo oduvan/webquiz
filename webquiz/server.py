@@ -5,6 +5,9 @@ import uuid
 import yaml
 import os
 import sys
+import socket
+import subprocess
+import platform
 from datetime import datetime
 from pathlib import Path
 from typing import Dict, List, Any, Optional
@@ -234,6 +237,91 @@ def get_client_ip(request):
     elif 'X-Real-IP' in request.headers:
         client_ip = request.headers['X-Real-IP']
     return client_ip
+
+def get_network_interfaces():
+    """Get all network interfaces and their IP addresses"""
+    interfaces = []
+    try:
+        # Get hostname
+        hostname = socket.gethostname()
+        
+        # Get all IP addresses associated with the hostname
+        ip_addresses = socket.getaddrinfo(hostname, None, socket.AF_INET)
+        for ip_info in ip_addresses:
+            ip = ip_info[4][0]
+            if ip != '127.0.0.1':  # Skip localhost
+                interfaces.append(ip)
+        
+        # Also try to get more interface info on Unix systems
+        if platform.system() != 'Windows':
+            try:
+                result = subprocess.run(['hostname', '-I'], capture_output=True, text=True, timeout=5)
+                if result.returncode == 0:
+                    ips = result.stdout.strip().split()
+                    for ip in ips:
+                        if ip not in interfaces and ip != '127.0.0.1':
+                            interfaces.append(ip)
+            except (subprocess.TimeoutExpired, subprocess.CalledProcessError, FileNotFoundError):
+                pass
+    except Exception:
+        pass
+    
+    return list(set(interfaces))  # Remove duplicates
+
+def get_wifi_name():
+    """Get the current WiFi network name"""
+    try:
+        system = platform.system()
+        
+        if system == 'Darwin':  # macOS
+            result = subprocess.run(
+                ['networksetup', '-getairportnetwork', 'en0'], 
+                capture_output=True, text=True, timeout=5
+            )
+            if result.returncode == 0:
+                output = result.stdout.strip()
+                if 'Current Wi-Fi Network:' in output:
+                    return output.split('Current Wi-Fi Network:')[1].strip()
+        
+        elif system == 'Linux':
+            # Try multiple methods for Linux
+            commands = [
+                ['iwgetid', '-r'],
+                ['nmcli', '-t', '-f', 'active,ssid', 'dev', 'wifi'],
+            ]
+            
+            for cmd in commands:
+                try:
+                    result = subprocess.run(cmd, capture_output=True, text=True, timeout=5)
+                    if result.returncode == 0:
+                        output = result.stdout.strip()
+                        if output:
+                            # For nmcli, filter active connections
+                            if 'nmcli' in cmd:
+                                lines = output.split('\n')
+                                for line in lines:
+                                    if line.startswith('yes:'):
+                                        return line.split(':', 1)[1]
+                            else:
+                                return output
+                except (subprocess.TimeoutExpired, subprocess.CalledProcessError, FileNotFoundError):
+                    continue
+        
+        elif system == 'Windows':
+            result = subprocess.run(
+                ['netsh', 'wlan', 'show', 'profiles'], 
+                capture_output=True, text=True, timeout=5
+            )
+            if result.returncode == 0:
+                lines = result.stdout.split('\n')
+                for line in lines:
+                    if 'All User Profile' in line and '*' in line:
+                        return line.split(':')[1].strip()
+    
+    except Exception:
+        pass
+    
+    return 'Unknown'
 
 def admin_auth_required(func):
     """Decorator to require master key authentication for admin endpoints"""
@@ -534,7 +622,7 @@ class TestingServer:
             logger.error(f"Error creating default config file {file_path}: {e}")
 
     async def load_questions_from_file(self, quiz_file_path: str):
-        """Load questions from specific quiz file"""
+        """Load questions from specific quiz file for quiz execution"""
         try:
             async with aiofiles.open(quiz_file_path, 'r') as f:
                 content = await f.read()
@@ -544,7 +632,7 @@ class TestingServer:
                 # Store quiz title or use default
                 self.quiz_title = data.get('title', 'Система Тестування')
                 
-                # Add automatic IDs based on array index
+                # Add automatic IDs based on array index (for quiz execution only)
                 for i, question in enumerate(self.questions):
                     question['id'] = i + 1
                         
@@ -1315,6 +1403,34 @@ class TestingServer:
         
         return len(errors) == 0
     
+    @admin_auth_required
+    async def admin_list_images(self, request):
+        """List all images in quizzes/imgs directory"""
+        try:
+            imgs_dir = os.path.join(self.quizzes_dir, 'imgs')
+            images = []
+            
+            if os.path.exists(imgs_dir) and os.path.isdir(imgs_dir):
+                # Get all image files (common image extensions)
+                image_extensions = {'.jpg', '.jpeg', '.png', '.gif', '.bmp', '.svg', '.webp'}
+                
+                for filename in os.listdir(imgs_dir):
+                    if os.path.isfile(os.path.join(imgs_dir, filename)):
+                        _, ext = os.path.splitext(filename.lower())
+                        if ext in image_extensions:
+                            images.append({
+                                'filename': filename,
+                                'path': f'/imgs/{filename}'  # Relative path for quiz usage
+                            })
+                
+                # Sort alphabetically
+                images.sort(key=lambda x: x['filename'].lower())
+            
+            return web.json_response({'images': images})
+        except Exception as e:
+            logger.error(f"Error listing images: {e}")
+            return web.json_response({'error': str(e)}, status=500)
+    
     async def serve_index_page(self, request):
         """Serve the index.html page from static directory"""
         index_path = f"{self.static_dir}/index.html"
@@ -1338,11 +1454,31 @@ class TestingServer:
             client_ip = get_client_ip(request)
             is_trusted_ip = client_ip in self.admin_config.trusted_ips if hasattr(self, 'admin_config') else False
             
-            # Inject trusted IP status into the template
-            auto_auth_script = f"const IS_TRUSTED_IP = {str(is_trusted_ip).lower()};"
+            # Get network information (external interfaces only)
+            interfaces = get_network_interfaces()  # This already excludes localhost
+            port = self.config.server.port
+            
+            # Generate URLs for external network interfaces only
+            urls = []
+            for ip in interfaces:
+                urls.append({
+                    'label': f'Network Access ({ip})',
+                    'quiz_url': f'http://{ip}:{port}/'
+                })
+            
+            # Prepare network info for JavaScript (only what's actually used)
+            network_info = {
+                'urls': urls
+            }
+            
+            # Inject both trusted IP status and network info into the template
+            server_data_script = f"""
+        const IS_TRUSTED_IP = {str(is_trusted_ip).lower()};
+        const NETWORK_INFO = {json.dumps(network_info)};"""
+            
             template_content = template_content.replace(
                 '<script>',
-                f'<script>\n        {auto_auth_script}\n'
+                f'<script>{server_data_script}\n'
             )
             
             return web.Response(text=template_content, content_type='text/html')
@@ -1455,6 +1591,7 @@ async def create_app(config: WebQuizConfig):
     app.router.add_put('/api/admin/quiz/{filename}', server.admin_update_quiz)
     app.router.add_delete('/api/admin/quiz/{filename}', server.admin_delete_quiz)
     app.router.add_post('/api/admin/validate-quiz', server.admin_validate_quiz)
+    app.router.add_get('/api/admin/list-images', server.admin_list_images)
     
     # Live stats routes (public access)
     app.router.add_get('/live-stats/', server.serve_live_stats_page)

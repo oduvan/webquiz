@@ -312,6 +312,104 @@
         .btn-danger:hover {
             background: #c82333;
         }
+
+        /* Network info styles */
+        .network-info {
+            background: var(--warning-bg);
+            border: 1px solid var(--warning-border);
+            border-radius: 5px;
+            padding: 20px;
+            margin: 20px 0;
+        }
+
+        .network-info h3 {
+            margin-top: 0;
+            color: var(--warning-color);
+        }
+
+        .info-section {
+            margin: 15px 0;
+        }
+
+        .url-list {
+            margin-top: 10px;
+        }
+
+        .url-item {
+            background: white;
+            border: 1px solid #ddd;
+            border-radius: 3px;
+            padding: 10px;
+            margin: 5px 0;
+            font-family: monospace;
+        }
+
+        .url-item .label {
+            font-weight: bold;
+            color: var(--button-bg);
+            margin-bottom: 5px;
+        }
+
+        .url-item .url {
+            color: #666;
+            font-size: 14px;
+        }
+
+        .url-item a {
+            color: var(--button-bg);
+            text-decoration: none;
+            margin-right: 15px;
+        }
+
+        .url-item a:hover {
+            text-decoration: underline;
+        }
+
+        /* Image picker styles */
+        .image-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+            gap: 15px;
+            padding: 20px;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+
+        .image-item {
+            border: 2px solid transparent;
+            border-radius: 8px;
+            padding: 10px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            background: var(--container-bg);
+        }
+
+        .image-item:hover {
+            border-color: var(--button-bg);
+            transform: scale(1.05);
+            box-shadow: 0 4px 12px var(--shadow);
+        }
+
+        .image-item img {
+            width: 100%;
+            height: 100px;
+            object-fit: cover;
+            border-radius: 4px;
+            margin-bottom: 8px;
+        }
+
+        .image-filename {
+            font-size: 12px;
+            color: var(--text-color);
+            word-break: break-word;
+            line-height: 1.2;
+        }
+
+        #image-picker-modal .modal-content {
+            max-width: 800px;
+            width: 90%;
+        }
     </style>
 </head>
 <body>
@@ -349,6 +447,16 @@
             <div class="quiz-actions">
                 <button onclick="createNewQuiz()">📝 Create New Quiz</button>
                 <button id="delete-btn" onclick="deleteSelectedQuiz()" disabled class="btn-danger">🗑️ Delete Quiz</button>
+            </div>
+
+            <!-- Network Access Information -->
+            <div class="network-info" id="network-info">
+                <div id="access-urls" class="info-section">
+                    <strong>Access URLs for other devices:</strong>
+                    <div id="url-list" class="url-list">
+                        Detecting network interfaces...
+                    </div>
+                </div>
             </div>
 
             <div class="back-link">
@@ -412,6 +520,22 @@
         </div>
     </div>
 
+    <!-- Image Picker Modal -->
+    <div id="image-picker-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>📷 Select Image</h2>
+                <span class="close" onclick="closeImagePicker()">&times;</span>
+            </div>
+            
+            <div id="image-picker-content">
+                <div id="image-grid" class="image-grid">
+                    Loading images...
+                </div>
+            </div>
+        </div>
+    </div>
+
     <script>
         let currentMasterKey = '';
         let selectedQuiz = '';
@@ -442,6 +566,7 @@
                     document.getElementById('admin-panel').classList.remove('hidden');
                     showMessage('Authentication successful!', 'success');
                     await loadQuizzes();
+                    displayNetworkInfo();
                 } else {
                     showMessage(data.error || 'Authentication failed', 'error');
                 }
@@ -805,8 +930,11 @@
                 </div>
                 <div class="form-group">
                     <label>Question Image (optional if text provided):</label>
-                    <input type="text" class="question-image" placeholder="e.g., /static/diagram.png" style="width: 100%;">
-                    <small style="color: #666;">Enter a path starting with / for images on the same domain. Either question text OR image must be provided.</small>
+                    <div style="display: flex; align-items: center; gap: 5px;">
+                        <input type="text" class="question-image" placeholder="e.g., /imgs/diagram.png" style="width: 100%;">
+                        <button type="button" onclick="openImagePicker('question-image', ${questionCounter})" style="padding: 5px 8px; font-size: 16px;" title="Select image">📷</button>
+                    </div>
+                    <small style="color: #666;">Enter a path starting with /imgs/ for images. Either question text OR image must be provided.</small>
                 </div>
                 <div class="form-group">
                     <label>Answer Options:</label>
@@ -815,11 +943,13 @@
                         <div class="option-item">
                             <input type="radio" name="correct-${questionCounter}" value="0" checked>
                             <input type="text" class="option-text" placeholder="Option 1">
+                            <button type="button" onclick="openImagePicker('option-text', ${questionCounter}, 0)" style="padding: 2px 5px; font-size: 12px;" title="Select image">📷</button>
                             <button type="button" onclick="removeOption(this)">×</button>
                         </div>
                         <div class="option-item">
                             <input type="radio" name="correct-${questionCounter}" value="1">
                             <input type="text" class="option-text" placeholder="Option 2">
+                            <button type="button" onclick="openImagePicker('option-text', ${questionCounter}, 1)" style="padding: 2px 5px; font-size: 12px;" title="Select image">📷</button>
                             <button type="button" onclick="removeOption(this)">×</button>
                         </div>
                     </div>
@@ -956,6 +1086,7 @@
             optionDiv.innerHTML = `
                 <input type="radio" name="correct-${questionId}" value="${optionIndex}">
                 <input type="text" class="option-text" placeholder="Option ${optionIndex + 1}">
+                <button type="button" onclick="openImagePicker('option-text', ${questionId}, ${optionIndex})" style="padding: 2px 5px; font-size: 12px;" title="Select image">📷</button>
                 <button type="button" onclick="removeOption(this)">×</button>
             `;
             
@@ -1000,6 +1131,7 @@
                             <div class="option-item">
                                 <input type="radio" name="correct-${questionCounter}" value="${index}" ${isCorrect ? 'checked' : ''}>
                                 <input type="text" class="option-text" value="${option}" placeholder="Option ${index + 1}">
+                                <button type="button" onclick="openImagePicker('option-text', ${questionCounter}, ${index})" style="padding: 2px 5px; font-size: 12px;" title="Select image">📷</button>
                                 <button type="button" onclick="removeOption(this)">×</button>
                             </div>
                         `;
@@ -1020,8 +1152,11 @@
                         </div>
                         <div class="form-group">
                             <label>Question Image (optional if text provided):</label>
-                            <input type="text" class="question-image" value="${question.image || ''}" placeholder="e.g., /static/diagram.png" style="width: 100%;">
-                            <small style="color: #666;">Enter a path starting with / for images on the same domain. Either question text OR image must be provided.</small>
+                            <div style="display: flex; align-items: center; gap: 5px;">
+                                <input type="text" class="question-image" value="${question.image || ''}" placeholder="e.g., /imgs/diagram.png" style="width: 100%;">
+                                <button type="button" onclick="openImagePicker('question-image', ${questionCounter})" style="padding: 5px 8px; font-size: 16px;" title="Select image">📷</button>
+                            </div>
+                            <small style="color: #666;">Enter a path starting with /imgs/ for images. Either question text OR image must be provided.</small>
                         </div>
                         <div class="form-group">
                             <label>Answer Options:</label>
@@ -1043,9 +1178,17 @@
         function syncWizardToText() {
             const quizData = getWizardData();
             if (quizData) {
-                const yamlContent = `questions:\n${quizData.questions.map(q => 
-                    `- id: ${q.id}\n  question: "${q.question}"\n  options:\n${q.options.map(opt => `  - "${opt}"`).join('\n')}\n  correct_answer: ${q.correct_answer}`
-                ).join('\n')}`;
+                const yamlContent = `questions:\n${quizData.questions.map(q => {
+                    let questionYaml = '-';
+                    if (q.question) {
+                        questionYaml += ` question: "${q.question}"`;
+                    }
+                    if (q.image) {
+                        questionYaml += `\n  image: "${q.image}"`;
+                    }
+                    questionYaml += `\n  options:\n${q.options.map(opt => `  - "${opt}"`).join('\n')}\n  correct_answer: ${q.correct_answer}`;
+                    return questionYaml;
+                }).join('\n')}`;
                 document.getElementById('quiz-content').value = yamlContent;
             }
         }
@@ -1200,6 +1343,133 @@
             }
         }
 
+        // Network information display using server-generated data
+        function displayNetworkInfo() {
+            if (typeof NETWORK_INFO === 'undefined') {
+                document.getElementById('wifi-name').textContent = 'Network information not available';
+                document.getElementById('url-list').innerHTML = '<div class="url-item">Network detection failed</div>';
+                return;
+            }
+            
+            // Generate URL list from server data
+            let urlHtml = '';
+            
+            if (NETWORK_INFO.urls && NETWORK_INFO.urls.length > 0) {
+                NETWORK_INFO.urls.forEach(url => {
+                    urlHtml += `
+                        <div class="url-item">
+                            <div class="label"><a href="${url.quiz_url}" target="_blank">${url.quiz_url}</a></div>
+                        </div>
+                    `;
+                });
+            } else {
+                urlHtml += `
+                    <div class="url-item">
+                        <div class="label">⚠️ No External Network Interfaces Found</div>
+                        <div class="url">
+                            Server is only accessible locally. Check network configuration or firewall settings.
+                        </div>
+                    </div>
+                `;
+            }
+            
+            document.getElementById('url-list').innerHTML = urlHtml;
+        }
+
+        // Image picker functionality
+        let currentImageTarget = null;
+
+        async function openImagePicker(fieldType, questionId, optionIndex = null) {
+            try {
+                // Store the target information
+                currentImageTarget = { fieldType, questionId, optionIndex };
+                
+                // Load images from server
+                const response = await fetch('/api/admin/list-images', {
+                    headers: {
+                        'X-Master-Key': currentMasterKey
+                    }
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                    displayImageGrid(data.images);
+                    document.getElementById('image-picker-modal').style.display = 'block';
+                } else {
+                    showMessage(data.error || 'Failed to load images', 'error');
+                }
+            } catch (error) {
+                showMessage('Error loading images: ' + error.message, 'error');
+            }
+        }
+
+        function displayImageGrid(images) {
+            const gridContainer = document.getElementById('image-grid');
+            
+            if (!images || images.length === 0) {
+                gridContainer.innerHTML = `
+                    <div style="text-align: center; padding: 40px; color: #666;">
+                        <p>No images found in quizzes/imgs directory</p>
+                        <small>Add image files to the quizzes/imgs directory to see them here</small>
+                    </div>
+                `;
+                return;
+            }
+            
+            let gridHtml = '';
+            images.forEach(image => {
+                gridHtml += `
+                    <div class="image-item" onclick="selectImage('${image.path}')" title="${image.filename}">
+                        <img src="${image.path}" alt="${image.filename}" loading="lazy">
+                        <div class="image-filename">${image.filename}</div>
+                    </div>
+                `;
+            });
+            
+            gridContainer.innerHTML = gridHtml;
+        }
+
+        function selectImage(imagePath) {
+            if (!currentImageTarget) {
+                showMessage('No target field selected', 'error');
+                return;
+            }
+            
+            // Find the target input field based on stored information
+            let targetInput = null;
+            
+            if (currentImageTarget.fieldType === 'question-image') {
+                // Find question image field by question ID
+                const questionDiv = document.querySelector(`[data-question-id="${currentImageTarget.questionId}"]`);
+                if (questionDiv) {
+                    targetInput = questionDiv.querySelector('.question-image');
+                }
+            } else if (currentImageTarget.fieldType === 'option-text') {
+                // Find option text field by question ID and option index
+                const questionDiv = document.querySelector(`[data-question-id="${currentImageTarget.questionId}"]`);
+                if (questionDiv) {
+                    const optionInputs = questionDiv.querySelectorAll('.option-text');
+                    if (optionInputs[currentImageTarget.optionIndex]) {
+                        targetInput = optionInputs[currentImageTarget.optionIndex];
+                    }
+                }
+            }
+            
+            if (targetInput) {
+                targetInput.value = imagePath;
+                closeImagePicker();
+                showMessage(`Image selected: ${imagePath}`, 'success');
+            } else {
+                showMessage('Target input field not found', 'error');
+            }
+        }
+
+        function closeImagePicker() {
+            document.getElementById('image-picker-modal').style.display = 'none';
+            currentImageTarget = null;
+        }
+
         // Auto-authenticate for trusted IPs
         if (typeof IS_TRUSTED_IP !== 'undefined' && IS_TRUSTED_IP) {
             // Hide auth section and show admin panel immediately
@@ -1208,6 +1478,7 @@
             currentMasterKey = 'trusted-ip'; // Set a placeholder key for API calls
             showMessage('Auto-authenticated from trusted IP', 'success');
             loadQuizzes();
+            displayNetworkInfo(); // Show network info for trusted IPs
         }
 
     </script>
