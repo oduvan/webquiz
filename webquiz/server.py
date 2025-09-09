@@ -159,7 +159,7 @@ def create_default_config_file(config_path: Path):
     try:
         # Try modern importlib.resources first (Python 3.9+)
         import importlib.resources as pkg_resources
-        example_content = (pkg_resources.files('webquiz') / 'server_config.yaml.example').read_text()
+        example_content = (pkg_resources.files('webquiz') / 'server_config.yaml.example').read_text(encoding='utf-8')
     except (ImportError, AttributeError):
         # Fallback to pkg_resources for older Python versions
         import pkg_resources
@@ -1443,12 +1443,12 @@ class TestingServer:
             try:
                 # Try modern importlib.resources first (Python 3.9+)
                 import importlib.resources as pkg_resources
-                template_content = (pkg_resources.files('webquiz') / 'templates' / 'admin.html').read_text()
+                template_content = (pkg_resources.files('webquiz') / 'templates' / 'admin.html').read_text(encoding='utf-8')
             except (ImportError, AttributeError):
                 # Fallback to pkg_resources for older Python versions
                 import pkg_resources
                 template_path = pkg_resources.resource_filename('webquiz', 'templates/admin.html')
-                async with aiofiles.open(template_path, 'r') as template_file:
+                async with aiofiles.open(template_path, 'r', encoding='utf-8') as template_file:
                     template_content = await template_file.read()
             
             # Check if client IP is trusted and inject auto-auth flag
@@ -1493,12 +1493,12 @@ class TestingServer:
             try:
                 # Try modern importlib.resources first (Python 3.9+)
                 import importlib.resources as pkg_resources
-                template_content = (pkg_resources.files('webquiz') / 'templates' / 'live_stats.html').read_text()
+                template_content = (pkg_resources.files('webquiz') / 'templates' / 'live_stats.html').read_text(encoding='utf-8')
             except (ImportError, AttributeError):
                 # Fallback to pkg_resources for older Python versions
                 import pkg_resources
                 template_path = pkg_resources.resource_filename('webquiz', 'templates/live_stats.html')
-                async with aiofiles.open(template_path, 'r') as template_file:
+                async with aiofiles.open(template_path, 'r', encoding='utf-8') as template_file:
                     template_content = await template_file.read()
             
             return web.Response(text=template_content, content_type='text/html')
