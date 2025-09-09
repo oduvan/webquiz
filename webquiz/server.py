@@ -595,21 +595,17 @@ class TestingServer:
         if file_path is None:
             file_path = self.config_file if hasattr(self, 'config_file') else 'config.yaml'
         default_questions = {
+            'title': 'Тестовий Quiz',
             'questions': [
                 {
-                    'question': 'What is 2 + 2?',
+                    'question': 'Скільки буде 2 + 2?',
                     'options': ['3', '4', '5', '6'],
                     'correct_answer': 1
                 },
                 {
-                    'question': 'What is the capital of France?',
-                    'options': ['London', 'Berlin', 'Paris', 'Madrid'],
+                    'question': 'Яка столиця України?',
+                    'options': ['Харків', 'Львів', 'Київ', 'Одеса'],
                     'correct_answer': 2
-                },
-                {
-                    'question': 'Which programming language is this server written in?',
-                    'options': ['JavaScript', 'Python', 'Java', 'C++'],
-                    'correct_answer': 1
                 }
             ]
         }

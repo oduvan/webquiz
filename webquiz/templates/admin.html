@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="uk">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>WebQuiz Admin Panel</title>
+    <title>Панель Адміністратора WebQuiz</title>
     <style>
         :root {
             --bg-color: #f5f5f5;
@@ -414,16 +414,16 @@
 </head>
 <body>
     <div class="container">
-        <h1>🔧 WebQuiz Admin Panel</h1>
+        <h1>🔧 Панель Адміністратора WebQuiz</h1>
         
         <!-- Authentication Section -->
         <div id="auth-section">
             <div class="form-group">
-                <label for="master-key">Master Key:</label>
-                <input type="password" id="master-key" placeholder="Enter master key">
+                <label for="master-key">Ключ:</label>
+                <input type="password" id="master-key" placeholder="Введіть ключ">
             </div>
             <div class="actions">
-                <button onclick="authenticate()">Authenticate</button>
+                <button onclick="authenticate()">Увійти</button>
             </div>
         </div>
 
@@ -431,36 +431,36 @@
         <div id="admin-panel" class="hidden">
 
             <div class="form-group">
-                <label>Available Quiz Files:</label>
+                <label>Доступні Файли Quiz:</label>
                 <div id="quiz-list" class="quiz-list">
-                    Loading quiz files...
+                    Завантаження файлів quiz...
                 </div>
             </div>
 
             <div class="actions">
-                <button id="switch-btn" onclick="switchQuiz()" disabled>Switch to Selected Quiz</button>
+                <button id="switch-btn" onclick="switchQuiz()" disabled>Переключитися на Вибраний Quiz</button>
                 <button onclick="refreshQuizzes()">🔄</button>
                 <button id="edit-btn" onclick="editSelectedQuiz()" disabled>✏️</button>
                 <button id="duplicate-btn" onclick="duplicateSelectedQuiz()" disabled>📋</button>
             </div>
 
             <div class="quiz-actions">
-                <button onclick="createNewQuiz()">📝 Create New Quiz</button>
-                <button id="delete-btn" onclick="deleteSelectedQuiz()" disabled class="btn-danger">🗑️ Delete Quiz</button>
+                <button onclick="createNewQuiz()">📝 Створити Новий Quiz</button>
+                <button id="delete-btn" onclick="deleteSelectedQuiz()" disabled class="btn-danger">🗑️ Видалити Quiz</button>
             </div>
 
             <!-- Network Access Information -->
             <div class="network-info" id="network-info">
                 <div id="access-urls" class="info-section">
-                    <strong>Access URLs for other devices:</strong>
+                    <strong>URL для доступу з інших пристроїв:</strong>
                     <div id="url-list" class="url-list">
-                        Detecting network interfaces...
+                        Визначення мережевих інтерфейсів...
                     </div>
                 </div>
             </div>
 
             <div class="back-link">
-                <a href="/">← Back to Quiz</a>
+                <a href="/">← Назад до Quiz</a>
             </div>
         </div>
 
@@ -472,50 +472,50 @@
     <div id="quiz-editor-modal" class="modal">
         <div class="modal-content">
             <div class="modal-header">
-                <h2 id="modal-title">Create New Quiz</h2>
+                <h2 id="modal-title">Створити Новий Quiz</h2>
                 <span class="close" onclick="closeQuizEditor()">&times;</span>
             </div>
 
             <div class="form-group">
-                <label for="quiz-filename">Quiz Filename:</label>
-                <input type="text" id="quiz-filename" placeholder="Enter filename (without .yaml extension)">
+                <label for="quiz-filename">Ім'я Файлу Quiz:</label>
+                <input type="text" id="quiz-filename" placeholder="Введіть ім'я файлу (без розширення .yaml)">
             </div>
 
             <div class="mode-toggle">
-                <button id="wizard-mode-btn" class="active" onclick="switchEditorMode('wizard')">🧙‍♂️ Wizard Mode</button>
-                <button id="text-mode-btn" onclick="switchEditorMode('text')">📝 Text Mode</button>
+                <button id="wizard-mode-btn" class="active" onclick="switchEditorMode('wizard')">🧙‍♂️ Режим Майстра</button>
+                <button id="text-mode-btn" onclick="switchEditorMode('text')">📝 Текстовий Режим</button>
             </div>
 
             <div class="editor-content">
                 <!-- Wizard Mode -->
                 <div id="wizard-form" class="wizard-form active">
                     <div class="form-group">
-                        <label>Quiz Title (optional):</label>
-                        <input type="text" id="quiz-title" placeholder="e.g., Mathematics Quiz" style="width: 100%; margin-bottom: 20px;">
-                        <small style="color: #666;">If not provided, default title will be used</small>
+                        <label>Назва Quiz (необов'язково):</label>
+                        <input type="text" id="quiz-title" placeholder="наприклад, Математичний Quiz" style="width: 100%; margin-bottom: 20px;">
+                        <small style="color: #666;">Якщо не вказано, буде використана стандартна назва</small>
                     </div>
                     <div class="form-group">
                         <div id="questions-container">
                             <!-- Questions will be added dynamically -->
                         </div>
-                        <button type="button" onclick="addQuestion()">➕ Add Question</button>
+                        <button type="button" onclick="addQuestion()">➕ Додати Питання</button>
                     </div>
                 </div>
 
                 <!-- Text Mode -->
                 <div id="text-form" class="text-editor">
                     <div class="form-group">
-                        <label for="quiz-content">YAML Content:</label>
-                        <textarea id="quiz-content" placeholder="Enter quiz YAML content here..."></textarea>
+                        <label for="quiz-content">YAML Контент:</label>
+                        <textarea id="quiz-content" placeholder="Введіть YAML контент quiz тут..."></textarea>
                     </div>
-                    <button type="button" onclick="validateQuizContent()">✅ Validate YAML</button>
+                    <button type="button" onclick="validateQuizContent()">✅ Перевірити YAML</button>
                     <div id="validation-results"></div>
                 </div>
             </div>
 
             <div class="actions">
-                <button onclick="saveQuiz()">💾 Save Quiz</button>
-                <button onclick="closeQuizEditor()">❌ Cancel</button>
+                <button onclick="saveQuiz()">💾 Зберегти Quiz</button>
+                <button onclick="closeQuizEditor()">❌ Скасувати</button>
             </div>
         </div>
     </div>
@@ -524,13 +524,13 @@
     <div id="image-picker-modal" class="modal">
         <div class="modal-content">
             <div class="modal-header">
-                <h2>📷 Select Image</h2>
+                <h2>📷 Вибрати Зображення</h2>
                 <span class="close" onclick="closeImagePicker()">&times;</span>
             </div>
             
             <div id="image-picker-content">
                 <div id="image-grid" class="image-grid">
-                    Loading images...
+                    Завантаження зображень...
                 </div>
             </div>
         </div>
@@ -544,7 +544,7 @@
         async function authenticate() {
             const masterKey = document.getElementById('master-key').value.trim();
             if (!masterKey) {
-                showMessage('Please enter master key', 'error');
+                showMessage('Будь ласка, введіть ключ', 'error');
                 return;
             }
 
@@ -564,14 +564,14 @@
                     currentMasterKey = masterKey;
                     document.getElementById('auth-section').style.display = 'none';
                     document.getElementById('admin-panel').classList.remove('hidden');
-                    showMessage('Authentication successful!', 'success');
+                    showMessage('Успішна автентифікація!', 'success');
                     await loadQuizzes();
                     displayNetworkInfo();
                 } else {
-                    showMessage(data.error || 'Authentication failed', 'error');
+                    showMessage(data.error || 'Автентифікація невдала', 'error');
                 }
             } catch (error) {
-                showMessage('Connection error: ' + error.message, 'error');
+                showMessage('Помилка з\'єднання: ' + error.message, 'error');
             }
         }
 
@@ -589,10 +589,10 @@
                     currentQuiz = data.current_quiz;
                     displayQuizzes(data.quizzes);
                 } else {
-                    showMessage(data.error || 'Failed to load quizzes', 'error');
+                    showMessage(data.error || 'Не вдалося завантажити quiz', 'error');
                 }
             } catch (error) {
-                showMessage('Error loading quizzes: ' + error.message, 'error');
+                showMessage('Помилка завантаження quiz: ' + error.message, 'error');
             }
         }
 
@@ -600,7 +600,7 @@
             const quizList = document.getElementById('quiz-list');
             
             if (quizzes.length === 0) {
-                quizList.innerHTML = '<div style="text-align: center; color: #666;">No quiz files found</div>';
+                quizList.innerHTML = '<div style="text-align: center; color: #666;">Файли quiz не знайдені</div>';
                 return;
             }
 
@@ -632,10 +632,10 @@
             
             if (selectedQuiz !== currentQuiz) {
                 switchBtn.disabled = false;
-                switchBtn.textContent = 'Switch to Selected Quiz';
+                switchBtn.textContent = 'Переключитися на Вибраний Quiz';
             } else {
                 switchBtn.disabled = false;
-                switchBtn.textContent = 'Restart Current Quiz';
+                switchBtn.textContent = 'Перезапустити Поточний Quiz';
             }
             
             // Enable edit and duplicate buttons (current quiz can be edited now)
@@ -646,7 +646,7 @@
 
         async function switchQuiz() {
             if (!selectedQuiz) {
-                showMessage('Please select a quiz', 'warning');
+                showMessage('Будь ласка, виберіть quiz', 'warning');
                 return;
             }
 
@@ -680,7 +680,7 @@
                     
                     // Reset selection
                     selectedQuiz = '';
-                    switchBtn.textContent = 'Switch to Selected Quiz';
+                    switchBtn.textContent = 'Переключитися на Вибраний Quiz';
                 } else {
                     showMessage(data.error || `Failed to ${isRestart ? 'restart' : 'switch'} quiz`, 'error');
                     switchBtn.disabled = false;
@@ -695,7 +695,7 @@
 
         async function refreshQuizzes() {
             await loadQuizzes();
-            showMessage('Quiz list refreshed', 'success');
+            showMessage('Список quiz оновлено', 'success');
         }
 
         function showMessage(text, type) {
@@ -731,7 +731,7 @@
         function createNewQuiz() {
             isEditMode = false;
             editingQuizName = '';
-            document.getElementById('modal-title').textContent = 'Create New Quiz';
+            document.getElementById('modal-title').textContent = 'Створити Новий Quiz';
             document.getElementById('quiz-filename').value = '';
             document.getElementById('quiz-filename').disabled = false;
             resetQuizEditor();
@@ -740,13 +740,13 @@
 
         async function editSelectedQuiz() {
             if (!selectedQuiz) {
-                showMessage('Please select a quiz to edit', 'warning');
+                showMessage('Будь ласка, виберіть quiz для редагування', 'warning');
                 return;
             }
 
             isEditMode = true;
             editingQuizName = selectedQuiz;
-            document.getElementById('modal-title').textContent = `Edit Quiz: ${selectedQuiz}`;
+            document.getElementById('modal-title').textContent = `Редагувати Quiz: ${selectedQuiz}`;
             document.getElementById('quiz-filename').value = selectedQuiz.replace('.yaml', '');
             document.getElementById('quiz-filename').disabled = true;
 
@@ -767,20 +767,20 @@
                     }
                     document.getElementById('quiz-editor-modal').style.display = 'block';
                 } else {
-                    showMessage(data.error || 'Failed to load quiz', 'error');
+                    showMessage(data.error || 'Не вдалося завантажити quiz', 'error');
                 }
             } catch (error) {
-                showMessage('Error loading quiz: ' + error.message, 'error');
+                showMessage('Помилка завантаження quiz: ' + error.message, 'error');
             }
         }
 
         async function duplicateSelectedQuiz() {
             if (!selectedQuiz) {
-                showMessage('Please select a quiz to duplicate', 'warning');
+                showMessage('Будь ласка, виберіть quiz для дублювання', 'warning');
                 return;
             }
 
-            const newFilename = prompt(`Enter name for the duplicated quiz:`, selectedQuiz.replace('.yaml', '_copy'));
+            const newFilename = prompt(`Введіть ім’я для дубльованого quiz:`, selectedQuiz.replace('.yaml', '_copy'));
             if (!newFilename) {
                 return;
             }
@@ -796,7 +796,7 @@
                 const getResult = await getResponse.json();
 
                 if (!getResponse.ok) {
-                    showMessage(getResult.error || 'Failed to load original quiz', 'error');
+                    showMessage(getResult.error || 'Не вдалося завантажити оригінальний quiz', 'error');
                     return;
                 }
 
@@ -820,25 +820,25 @@
                     showMessage(`Quiz duplicated successfully as "${createResult.filename}"`, 'success');
                     await loadQuizzes();
                 } else {
-                    showMessage(createResult.error || 'Failed to duplicate quiz', 'error');
+                    showMessage(createResult.error || 'Не вдалося дублювати quiz', 'error');
                 }
             } catch (error) {
-                showMessage('Error duplicating quiz: ' + error.message, 'error');
+                showMessage('Помилка дублювання quiz: ' + error.message, 'error');
             }
         }
 
         async function deleteSelectedQuiz() {
             if (!selectedQuiz) {
-                showMessage('Please select a quiz to delete', 'warning');
+                showMessage('Будь ласка, виберіть quiz для видалення', 'warning');
                 return;
             }
 
             if (selectedQuiz === currentQuiz) {
-                showMessage('Cannot delete the currently active quiz', 'error');
+                showMessage('Неможливо видалити поточний активний quiz', 'error');
                 return;
             }
 
-            if (!confirm(`Are you sure you want to delete "${selectedQuiz}"? This action cannot be undone.`)) {
+            if (!confirm(`Ви впевнені, що хочете видалити "${selectedQuiz}"? Ця дія не може бути скасована.`)) {
                 return;
             }
 
@@ -857,10 +857,10 @@
                     selectedQuiz = '';
                     await loadQuizzes();
                 } else {
-                    showMessage(data.error || 'Failed to delete quiz', 'error');
+                    showMessage(data.error || 'Не вдалося видалити quiz', 'error');
                 }
             } catch (error) {
-                showMessage('Error deleting quiz: ' + error.message, 'error');
+                showMessage('Помилка видалення quiz: ' + error.message, 'error');
             }
         }
 
@@ -925,35 +925,35 @@
                     </div>
                 </div>
                 <div class="form-group">
-                    <label>Question Text (optional if image provided):</label>
-                    <input type="text" class="question-text" placeholder="Enter question text" style="width: 100%;">
+                    <label>Текст Питання (необов'язково, якщо є зображення):</label>
+                    <input type="text" class="question-text" placeholder="Введіть текст питання" style="width: 100%;">
                 </div>
                 <div class="form-group">
-                    <label>Question Image (optional if text provided):</label>
+                    <label>Зображення Питання (необов'язково, якщо є текст):</label>
                     <div style="display: flex; align-items: center; gap: 5px;">
-                        <input type="text" class="question-image" placeholder="e.g., /imgs/diagram.png" style="width: 100%;">
+                        <input type="text" class="question-image" placeholder="напр., /imgs/diagram.png" style="width: 100%;">
                         <button type="button" onclick="openImagePicker('question-image', ${questionCounter})" style="padding: 5px 8px; font-size: 16px;" title="Select image">📷</button>
                     </div>
                     <small style="color: #666;">Enter a path starting with /imgs/ for images. Either question text OR image must be provided.</small>
                 </div>
                 <div class="form-group">
-                    <label>Answer Options:</label>
+                    <label>Варіанти Відповідей:</label>
                     <small style="color: #666; margin-bottom: 10px; display: block;">For image options, start with / (e.g., /static/option1.png)</small>
                     <div class="options-container">
                         <div class="option-item">
                             <input type="radio" name="correct-${questionCounter}" value="0" checked>
-                            <input type="text" class="option-text" placeholder="Option 1">
+                            <input type="text" class="option-text" placeholder="Варіант 1">
                             <button type="button" onclick="openImagePicker('option-text', ${questionCounter}, 0)" style="padding: 2px 5px; font-size: 12px;" title="Select image">📷</button>
                             <button type="button" onclick="removeOption(this)">×</button>
                         </div>
                         <div class="option-item">
                             <input type="radio" name="correct-${questionCounter}" value="1">
-                            <input type="text" class="option-text" placeholder="Option 2">
+                            <input type="text" class="option-text" placeholder="Варіант 2">
                             <button type="button" onclick="openImagePicker('option-text', ${questionCounter}, 1)" style="padding: 2px 5px; font-size: 12px;" title="Select image">📷</button>
                             <button type="button" onclick="removeOption(this)">×</button>
                         </div>
                     </div>
-                    <button type="button" onclick="addOption(${questionCounter})">+ Add Option</button>
+                    <button type="button" onclick="addOption(${questionCounter})">+ Додати Варіант</button>
                 </div>
             `;
             
@@ -1085,7 +1085,7 @@
             optionDiv.className = 'option-item';
             optionDiv.innerHTML = `
                 <input type="radio" name="correct-${questionId}" value="${optionIndex}">
-                <input type="text" class="option-text" placeholder="Option ${optionIndex + 1}">
+                <input type="text" class="option-text" placeholder="Варіант ${optionIndex + 1}">
                 <button type="button" onclick="openImagePicker('option-text', ${questionId}, ${optionIndex})" style="padding: 2px 5px; font-size: 12px;" title="Select image">📷</button>
                 <button type="button" onclick="removeOption(this)">×</button>
             `;
@@ -1106,7 +1106,7 @@
                     radio.value = index;
                 });
             } else {
-                showMessage('A question must have at least 2 options', 'warning');
+                showMessage('Питання має мати принаймні 2 варіанти', 'warning');
             }
         }
 
@@ -1130,7 +1130,7 @@
                         optionsHtml += `
                             <div class="option-item">
                                 <input type="radio" name="correct-${questionCounter}" value="${index}" ${isCorrect ? 'checked' : ''}>
-                                <input type="text" class="option-text" value="${option}" placeholder="Option ${index + 1}">
+                                <input type="text" class="option-text" value="${option}" placeholder="Варіант ${index + 1}">
                                 <button type="button" onclick="openImagePicker('option-text', ${questionCounter}, ${index})" style="padding: 2px 5px; font-size: 12px;" title="Select image">📷</button>
                                 <button type="button" onclick="removeOption(this)">×</button>
                             </div>
@@ -1147,24 +1147,24 @@
                             </div>
                         </div>
                         <div class="form-group">
-                            <label>Question Text (optional if image provided):</label>
-                            <input type="text" class="question-text" value="${question.question || ''}" placeholder="Enter question text" style="width: 100%;">
+                            <label>Текст Питання (необов'язково, якщо є зображення):</label>
+                            <input type="text" class="question-text" value="${question.question || ''}" placeholder="Введіть текст питання" style="width: 100%;">
                         </div>
                         <div class="form-group">
-                            <label>Question Image (optional if text provided):</label>
+                            <label>Зображення Питання (необов'язково, якщо є текст):</label>
                             <div style="display: flex; align-items: center; gap: 5px;">
-                                <input type="text" class="question-image" value="${question.image || ''}" placeholder="e.g., /imgs/diagram.png" style="width: 100%;">
+                                <input type="text" class="question-image" value="${question.image || ''}" placeholder="напр., /imgs/diagram.png" style="width: 100%;">
                                 <button type="button" onclick="openImagePicker('question-image', ${questionCounter})" style="padding: 5px 8px; font-size: 16px;" title="Select image">📷</button>
                             </div>
                             <small style="color: #666;">Enter a path starting with /imgs/ for images. Either question text OR image must be provided.</small>
                         </div>
                         <div class="form-group">
-                            <label>Answer Options:</label>
+                            <label>Варіанти Відповідей:</label>
                             <small style="color: #666; margin-bottom: 10px; display: block;">For image options, start with / (e.g., /static/option1.png)</small>
                             <div class="options-container">
                                 ${optionsHtml}
                             </div>
-                            <button type="button" onclick="addOption(${questionCounter})">+ Add Option</button>
+                            <button type="button" onclick="addOption(${questionCounter})">+ Додати Варіант</button>
                         </div>
                     `;
                     
@@ -1200,10 +1200,10 @@
                     // Basic YAML parsing simulation - in production, you'd want proper YAML parsing
                     const lines = content.split('\n');
                     // This is a simplified sync - full implementation would need proper YAML parsing
-                    showMessage('Text to wizard sync - manual refresh may be needed', 'warning');
+                    showMessage('Синхронізація тексту з майстром - може знадобитися ручне оновлення', 'warning');
                 }
             } catch (error) {
-                showMessage('Error syncing text to wizard: ' + error.message, 'error');
+                showMessage('Помилка синхронізації тексту з майстром: ' + error.message, 'error');
             }
         }
 
@@ -1257,7 +1257,7 @@
             const resultsDiv = document.getElementById('validation-results');
             
             if (!content) {
-                resultsDiv.innerHTML = '<div class="validation-errors">Content is empty</div>';
+                resultsDiv.innerHTML = '<div class="validation-errors">Контент порожній</div>';
                 return;
             }
             
@@ -1291,7 +1291,7 @@
             const filename = document.getElementById('quiz-filename').value.trim();
             
             if (!filename) {
-                showMessage('Please enter a filename', 'error');
+                showMessage('Будь ласка, введіть ім’я файлу', 'error');
                 return;
             }
             
@@ -1300,13 +1300,13 @@
             if (editorMode === 'wizard') {
                 quizData = getWizardData();
                 if (!quizData.questions || quizData.questions.length === 0) {
-                    showMessage('Please add at least one question', 'error');
+                    showMessage('Будь ласка, додайте принаймні одне питання', 'error');
                     return;
                 }
             } else {
                 content = document.getElementById('quiz-content').value.trim();
                 if (!content) {
-                    showMessage('Please enter quiz content', 'error');
+                    showMessage('Будь ласка, введіть контент quiz', 'error');
                     return;
                 }
             }
@@ -1336,17 +1336,17 @@
                     closeQuizEditor();
                     await loadQuizzes();
                 } else {
-                    showMessage(data.error || 'Failed to save quiz', 'error');
+                    showMessage(data.error || 'Не вдалося зберегти quiz', 'error');
                 }
             } catch (error) {
-                showMessage('Error saving quiz: ' + error.message, 'error');
+                showMessage('Помилка збереження quiz: ' + error.message, 'error');
             }
         }
 
         // Network information display using server-generated data
         function displayNetworkInfo() {
             if (typeof NETWORK_INFO === 'undefined') {
-                document.getElementById('wifi-name').textContent = 'Network information not available';
+                document.getElementById('wifi-name').textContent = 'Мережева інформація недоступна';
                 document.getElementById('url-list').innerHTML = '<div class="url-item">Network detection failed</div>';
                 return;
             }
@@ -1365,9 +1365,9 @@
             } else {
                 urlHtml += `
                     <div class="url-item">
-                        <div class="label">⚠️ No External Network Interfaces Found</div>
+                        <div class="label">⚠️ Зовнішні Мережеві Інтерфейси Не Знайдені</div>
                         <div class="url">
-                            Server is only accessible locally. Check network configuration or firewall settings.
+                            Сервер доступний тільки локально. Перевірте мережеві налаштування або параметри файрвола.
                         </div>
                     </div>
                 `;
@@ -1397,10 +1397,10 @@
                     displayImageGrid(data.images);
                     document.getElementById('image-picker-modal').style.display = 'block';
                 } else {
-                    showMessage(data.error || 'Failed to load images', 'error');
+                    showMessage(data.error || 'Не вдалося завантажити зображення', 'error');
                 }
             } catch (error) {
-                showMessage('Error loading images: ' + error.message, 'error');
+                showMessage('Помилка завантаження зображень: ' + error.message, 'error');
             }
         }
 
@@ -1410,7 +1410,7 @@
             if (!images || images.length === 0) {
                 gridContainer.innerHTML = `
                     <div style="text-align: center; padding: 40px; color: #666;">
-                        <p>No images found in quizzes/imgs directory</p>
+                        <p>Зображення не знайдені в директорії quizzes/imgs</p>
                         <small>Add image files to the quizzes/imgs directory to see them here</small>
                     </div>
                 `;
@@ -1476,7 +1476,7 @@
             document.getElementById('auth-section').style.display = 'none';
             document.getElementById('admin-panel').style.display = 'block';
             currentMasterKey = 'trusted-ip'; // Set a placeholder key for API calls
-            showMessage('Auto-authenticated from trusted IP', 'success');
+            showMessage('Авто-автентифікація з довіреного IP', 'success');
             loadQuizzes();
             displayNetworkInfo(); // Show network info for trusted IPs
         }
