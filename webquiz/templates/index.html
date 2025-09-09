@@ -682,6 +682,7 @@
                 testResults.push({
                     questionId: question.id,
                     question: question.question,
+                    image: question.image,
                     selectedAnswer: question.options[selectedAnswer],
                     isCorrect: data.is_correct,
                     timeTaken: data.time_taken || 0
@@ -749,6 +750,33 @@
             }
         }
         
+        function formatQuestionForDisplay(questionText, questionImage) {
+            if (questionImage && questionImage.startsWith('/')) {
+                // Display image with optional text
+                let html = `<img src="${questionImage}" alt="Question image" style="max-width: 200px; max-height: 150px; border-radius: 5px;">`;
+                if (questionText) {
+                    html = `${questionText}<br>${html}`;
+                }
+                return html;
+            } else if (questionText) {
+                // Text only
+                return questionText;
+            } else {
+                // Fallback
+                return questionImage || 'No question content';
+            }
+        }
+
+        function formatAnswerForDisplay(answerText) {
+            if (answerText && answerText.startsWith('/')) {
+                // Display image for answer option
+                return `<img src="${answerText}" alt="Answer option" style="max-width: 100px; max-height: 75px; border-radius: 3px;">`;
+            } else {
+                // Text answer
+                return answerText || '';
+            }
+        }
+
         function showFinalResults() {
             document.getElementById('test-section').classList.add('hidden');
             
@@ -780,12 +808,12 @@
                 const correctAnswer = questions[index] ? questions[index].options[questions[index].correct_answer] : 'N/A';
                 tableContent += `
                     <tr>
-                        <td data-label="Питання">${result.question}</td>
+                        <td data-label="Питання">${formatQuestionForDisplay(result.question, result.image)}</td>
                         <td data-label="Ваша відповідь">
                             <span class="${result.isCorrect ? 'answer-correct' : 'answer-incorrect'}">
-                                ${result.selectedAnswer}
+                                ${formatAnswerForDisplay(result.selectedAnswer)}
                             </span>
-                            ${!result.isCorrect ? `<div class="correct-answer-hint">Правильна: ${correctAnswer}</div>` : ''}
+                            ${!result.isCorrect ? `<div class="correct-answer-hint">Правильна: ${formatAnswerForDisplay(correctAnswer)}</div>` : ''}
                         </td>
                         <td data-label="Правильно" style="text-align: center;">
                             <span class="${result.isCorrect ? 'correct' : 'incorrect'}" style="font-size: 18px;">
@@ -831,12 +859,12 @@
                     <tbody>
                         ${finalResults.test_results.map((result, index) => `
                             <tr>
-                                <td data-label="Питання">${result.question}</td>
+                                <td data-label="Питання">${formatQuestionForDisplay(result.question, result.image)}</td>
                                 <td data-label="Ваша відповідь">
                                     <span class="${result.is_correct ? 'answer-correct' : 'answer-incorrect'}">
-                                        ${result.selected_answer}
+                                        ${formatAnswerForDisplay(result.selected_answer)}
                                     </span>
-                                    ${!result.is_correct ? `<div class="correct-answer-hint">Правильна: ${result.correct_answer}</div>` : ''}
+                                    ${!result.is_correct ? `<div class="correct-answer-hint">Правильна: ${formatAnswerForDisplay(result.correct_answer)}</div>` : ''}
                                 </td>
                                 <td data-label="Правильно" style="text-align: center;">
                                     <span class="${result.is_correct ? 'correct' : 'incorrect'}" style="font-size: 18px;">

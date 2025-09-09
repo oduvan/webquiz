@@ -935,6 +935,7 @@ class TestingServer:
         
         answer_data = {
             'question': question['question'],
+            'image': question.get('image'),
             'selected_answer': question['options'][selected_answer],
             'correct_answer': question['options'][question['correct_answer']],
             'is_correct': is_correct,
