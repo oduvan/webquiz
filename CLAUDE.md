@@ -56,14 +56,14 @@ WebQuiz - A modern web-based quiz and testing system built with Python and aioht
 - `static/` - Static files folder (automatically generated, contains current quiz's index.html)
 - **`dist/webquiz`** - Standalone PyInstaller binary executable
 - `tests/` - Test suite
-  - `test_integration.py` - Integration tests with real HTTP requests (11 tests)
-  - `test_server.py` - Unit tests for internal functionality (3 tests)
-  - `test_live_stats.py` - Live statistics and WebSocket functionality tests (12 tests)
-  - `conftest.py` - Test fixtures and configuration
+  - `test_cli_directory_creation.py` - CLI directory and file creation tests (8 tests)
+  - `test_admin_api.py` - Admin API functionality tests (13 tests)  
+  - `conftest.py` - Test fixtures and configuration with parallel testing support
 - `pyproject.toml` - Poetry configuration and dependencies (includes PyInstaller 6.15)
 - `requirements.txt` - Legacy pip dependencies
 - `venv/` - Python virtual environment
 - `.gitignore` - Git ignore file (excludes generated files, logs, virtual env)
+- `.github/workflows/test.yml` - GitHub Actions CI/CD pipeline for automated testing
 
 ## API Endpoints
 
@@ -107,24 +107,12 @@ webquiz --status                     # Check status
 # Build binary
 poetry run build_binary              # Create standalone executable with PyInstaller
 
+# Run tests
+python -m pytest tests/ -v          # Run all tests with verbose output
+python -m pytest tests/ -v -n 4     # Run tests in parallel with 4 workers (requires pytest-xdist)
+
 # Alternative (without Poetry installation)
 python -m webquiz.cli
-
-# Add questions
-# Add YAML files to quizzes/ directory, use admin interface to switch between them
-
-# Run tests
-poetry run pytest   # With Poetry
-pytest tests/       # Direct
-pytest tests/ -v    # Verbose
-
-# Test coverage by file:
-# - test_integration.py: API endpoints and user flows (11 tests)
-# - test_server.py: Internal server functionality (3 tests)  
-# - test_quiz_selection.py: Multi-quiz loading scenarios (7 tests)
-# - test_admin_functionality.py: Admin interface and auth (13 tests)
-# - test_live_stats.py: WebSocket and live statistics (12 tests)
-```
 
 ## Technical Decisions
 - **Middleware over try-catch**: Used aiohttp middleware for cleaner error handling
@@ -160,17 +148,13 @@ pytest tests/ -v    # Verbose
 5. All existing users lose session (intentional isolation between quizzes)
 
 ## Test Strategy
-- **Integration Tests (11)**: Real HTTP requests testing full API functionality
-- **Unit Tests (3)**: Internal functionality not exposed via HTTP
-  - CSV writing with proper escaping
-  - Default YAML file creation
-  - User data structure validation
-- **Quiz Selection Tests (7)**: Test multi-quiz system functionality
-- **Admin Functionality Tests (13)**: Test admin interface and authentication
-- **Live Stats Tests (12)**: Test WebSocket connectivity and real-time broadcasting
-- **Total: 46 tests** with GitHub Actions CI/CD pipeline
+- **CLI Directory Creation Tests (8)**: Test directory and file creation by webquiz CLI command
+- **Admin API Tests (13)**: Test admin interface authentication, quiz management, and validation endpoints
+- **Total: 21 tests** with GitHub Actions CI/CD pipeline
+- **Parallel Testing**: Tests use predefined ports (8080-8087) with worker-based allocation to prevent conflicts
+- **Fast Server Startup**: Port availability checking instead of HTTP requests for efficient fixture startup
 - **Testing Philosophy**: Create new automated tests for newly implemented functionality instead of manual testing
-- **No duplicate tests**: Removed redundant unit tests covered by integration tests
+- **Test Organization**: Fixtures separated into `conftest.py` for reusability across test modules
 
 ## Notes
 - Username must be unique across all users (per quiz session)
