@@ -113,13 +113,7 @@
             color: var(--warning-color);
         }
 
-        .current-quiz {
-            padding: 15px;
-            background: var(--warning-bg);
-            border: 1px solid var(--warning-border);
-            border-radius: 5px;
-            margin: 20px 0;
-        }
+
 
         .quiz-list {
             max-height: 300px;
@@ -466,6 +460,25 @@
         #image-picker-modal .modal-content {
             max-width: 800px;
             width: 90%;
+        }
+
+        /* Quiz Editor Form Styles */
+        .question-text, .question-image, .option-text {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            font-size: 14px;
+            box-sizing: border-box;
+        }
+
+        .options-container {
+            margin: 10px 0;
+        }
+
+        /* Downloadable Quizzes Section */
+        .downloadable-quizzes {
+            margin-top: 30px;
         }
     </style>
 </head>
