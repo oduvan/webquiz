@@ -318,6 +318,51 @@
         .btn-danger:hover {
             background: #c82333;
         }
+        
+        .downloadable-quiz-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px;
+            border: 1px solid var(--border-color);
+            border-radius: 5px;
+            margin-bottom: 10px;
+            background: white;
+        }
+        
+        .downloadable-quiz-info {
+            flex: 1;
+        }
+        
+        .downloadable-quiz-name {
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+        
+        .downloadable-quiz-url {
+            font-size: 0.9em;
+            color: #666;
+            word-break: break-all;
+        }
+        
+        .download-btn {
+            background: #28a745;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.9em;
+        }
+        
+        .download-btn:hover {
+            background: #218838;
+        }
+        
+        .download-btn:disabled {
+            background: #6c757d;
+            cursor: not-allowed;
+        }
 
         .btn-danger:disabled {
             background: #dc3545;
@@ -461,6 +506,16 @@
                 <button id="delete-btn" onclick="deleteSelectedQuiz()" disabled class="btn-danger">🗑️ Видалити Quiz</button>
             </div>
 
+            <!-- Downloadable Quizzes Section -->
+            <div id="downloadable-quizzes-section" class="downloadable-quizzes hidden">
+                <div class="form-group">
+                    <label>Доступні Quiz для Завантаження:</label>
+                    <div id="downloadable-quiz-list" class="quiz-list">
+                        <!-- Downloadable quizzes will be populated by JavaScript -->
+                    </div>
+                </div>
+            </div>
+
             <!-- Network Access Information -->
             <div class="network-info" id="network-info">
                 <div id="access-urls" class="info-section">
@@ -581,6 +636,7 @@
                     showMessage('Успішна автентифікація!', 'success');
                     await loadQuizzes();
                     displayNetworkInfo();
+                    displayDownloadableQuizzes();
                 } else {
                     showMessage(data.error || 'Автентифікація невдала', 'error');
                 }
@@ -1484,6 +1540,79 @@
             currentImageTarget = null;
         }
 
+        // Downloadable Quizzes Functions
+        function displayDownloadableQuizzes() {
+            if (typeof DOWNLOADABLE_QUIZZES !== 'undefined' && DOWNLOADABLE_QUIZZES.length > 0) {
+                const section = document.getElementById('downloadable-quizzes-section');
+                const quizList = document.getElementById('downloadable-quiz-list');
+                
+                section.classList.remove('hidden');
+                
+                let html = '';
+                DOWNLOADABLE_QUIZZES.forEach((quiz, index) => {
+                    html += `
+                        <div class="downloadable-quiz-item">
+                            <div class="downloadable-quiz-info">
+                                <div class="downloadable-quiz-name">${quiz.name}</div>
+                                <div class="downloadable-quiz-url">${quiz.download_path}</div>
+                                <small style="color: #666;">Папка: ${quiz.folder}</small>
+                            </div>
+                            <button class="download-btn" onclick="downloadQuiz(${index})" id="download-btn-${index}">
+                                📥 Завантажити
+                            </button>
+                        </div>
+                    `;
+                });
+                quizList.innerHTML = html;
+            }
+        }
+
+        async function downloadQuiz(quizIndex) {
+            const quiz = DOWNLOADABLE_QUIZZES[quizIndex];
+            const button = document.getElementById(`download-btn-${quizIndex}`);
+            
+            // Show confirmation
+            const confirmed = confirm(`Завантажити quiz "${quiz.name}"?\n\nЦе завантажить та розпакує файли з:\n${quiz.download_path}\n\nФайли будуть перезаписані в директорії quizzes.`);
+            if (!confirmed) {
+                return;
+            }
+
+            // Disable button and show loading state
+            button.disabled = true;
+            button.innerHTML = '⏳ Завантаження...';
+
+            try {
+                const response = await fetch('/api/admin/download-quiz', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-Admin-Key': currentMasterKey
+                    },
+                    body: JSON.stringify({
+                        name: quiz.name,
+                        download_path: quiz.download_path,
+                        folder: quiz.folder
+                    })
+                });
+
+                const data = await response.json();
+                
+                if (response.ok) {
+                    showMessage(`✅ ${data.message} (Витягнуто файлів: ${data.extracted_files})`, 'success');
+                    // Refresh quiz list to show newly downloaded quizzes
+                    await loadQuizzes();
+                } else {
+                    showMessage(`❌ Помилка завантаження: ${data.error}`, 'error');
+                }
+            } catch (error) {
+                showMessage(`❌ Помилка мережі: ${error.message}`, 'error');
+            } finally {
+                // Re-enable button
+                button.disabled = false;
+                button.innerHTML = '📥 Завантажити';
+            }
+        }
+
         // Auto-authenticate for trusted IPs
         if (typeof IS_TRUSTED_IP !== 'undefined' && IS_TRUSTED_IP) {
             // Hide auth section and show admin panel immediately
@@ -1493,6 +1622,7 @@
             showMessage('Авто-автентифікація з довіреного IP', 'success');
             loadQuizzes();
             displayNetworkInfo(); // Show network info for trusted IPs
+            displayDownloadableQuizzes();
         }
 
     </script>

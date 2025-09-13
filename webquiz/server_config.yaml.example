@@ -18,6 +18,16 @@ admin:
 options:
   flush_interval: 30      # Seconds between CSV response flushes
 
+# Optional: Downloadable quizzes configuration
+# Uncomment and configure to enable quiz downloads in admin panel
+# quizzes:
+#   - name: "Basic Math Quiz"
+#     download_path: "https://example.com/quizzes/math.zip"
+#     folder: "math_questions/"
+#   - name: "Geography Quiz"
+#     download_path: "https://example.com/quizzes/geography.zip"
+#     folder: "geography/"
+
 # Usage examples:
 # webquiz --config server_config.yaml
 # webquiz --config server_config.yaml --master-key override-key

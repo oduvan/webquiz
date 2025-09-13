@@ -8,10 +8,12 @@ import sys
 import socket
 import subprocess
 import platform
+import zipfile
+import tempfile
 from datetime import datetime
 from pathlib import Path
 from typing import Dict, List, Any, Optional
-from aiohttp import web, WSMsgType
+from aiohttp import web, WSMsgType, ClientSession
 import aiofiles
 import logging
 from io import StringIO
@@ -83,12 +85,29 @@ class OptionsConfig:
     flush_interval: int = 30
 
 @dataclass
+class DownloadableQuiz:
+    """Downloadable quiz configuration"""
+    name: str
+    download_path: str
+    folder: str
+
+@dataclass
+class QuizzesConfig:
+    """Downloadable quizzes configuration data class"""
+    quizzes: List[DownloadableQuiz] = None
+    
+    def __post_init__(self):
+        if self.quizzes is None:
+            self.quizzes = []
+
+@dataclass
 class WebQuizConfig:
     """Main configuration data class"""
     server: ServerConfig = None
     paths: PathsConfig = None
     admin: AdminConfig = None
     options: OptionsConfig = None
+    quizzes: QuizzesConfig = None
     
     def __post_init__(self):
         if self.server is None:
@@ -99,6 +118,8 @@ class WebQuizConfig:
             self.admin = AdminConfig()
         if self.options is None:
             self.options = OptionsConfig()
+        if self.quizzes is None:
+            self.quizzes = QuizzesConfig()
 
 def ensure_directory_exists(path: str) -> str:
     """Create directory if it doesn't exist and return the path"""
@@ -120,11 +141,24 @@ def load_config_from_yaml(config_path: str) -> WebQuizConfig:
         admin_config = AdminConfig(**(config_data.get('admin', {})))
         options_config = OptionsConfig(**(config_data.get('options', {})))
         
+        # Parse downloadable quizzes configuration
+        quizzes_data = config_data.get('quizzes', [])
+        downloadable_quizzes = []
+        if quizzes_data:
+            for quiz_data in quizzes_data:
+                downloadable_quizzes.append(DownloadableQuiz(
+                    name=quiz_data['name'],
+                    download_path=quiz_data['download_path'],
+                    folder=quiz_data['folder']
+                ))
+        quizzes_config = QuizzesConfig(quizzes=downloadable_quizzes)
+        
         return WebQuizConfig(
             server=server_config,
             paths=paths_config,
             admin=admin_config,
-            options=options_config
+            options=options_config,
+            quizzes=quizzes_config
         )
     except FileNotFoundError:
         logger.warning(f"Config file not found: {config_path}, using defaults")
@@ -360,12 +394,6 @@ async def error_middleware(request, handler):
     except ValueError as e:
         logger.error(f"Validation error: {e}")
         return web.json_response({'error': str(e)}, status=400)
-    except KeyError as e:
-        logger.error(f"Missing field: {e}")
-        return web.json_response({'error': f'Missing required field: {e}'}, status=400)
-    except Exception as e:
-        logger.error(f"Unexpected error: {e}")
-        return web.json_response({'error': 'Internal server error'}, status=500)
 
 
 class TestingServer:
@@ -1428,6 +1456,99 @@ class TestingServer:
             logger.error(f"Error listing images: {e}")
             return web.json_response({'error': str(e)}, status=500)
     
+    @admin_auth_required
+    async def admin_download_quiz(self, request):
+        """Download and extract quiz from ZIP file"""
+        try:
+            data = await request.json()
+            quiz_name = data.get('name')
+            download_path = data.get('download_path')
+            folder = data.get('folder')
+            
+            if not all([quiz_name, download_path, folder]):
+                return web.json_response({'error': 'Missing required parameters'}, status=400)
+            
+            # Validate URL (basic HTTPS check)
+            if not download_path.startswith('https://'):
+                return web.json_response({'error': 'Only HTTPS URLs are allowed'}, status=400)
+            
+            logger.info(f"Starting download of quiz '{quiz_name}' from {download_path}")
+            
+            # Create temporary file for ZIP download  
+            temp_zip_path = None
+            try:
+                with tempfile.NamedTemporaryFile(suffix='.zip', delete=False) as temp_zip:
+                    temp_zip_path = temp_zip.name
+                    
+                    # Download ZIP file
+                    async with ClientSession() as session:
+                        async with session.get(download_path) as response:
+                            if response.status != 200:
+                                return web.json_response(
+                                    {'error': f'Failed to download: HTTP {response.status}'}, 
+                                    status=400
+                                )
+                            
+                            # Write downloaded content to temporary file
+                            async for chunk in response.content.iter_chunked(8192):
+                                temp_zip.write(chunk)
+                
+                # File is now closed, safe to open as ZIP
+                with zipfile.ZipFile(temp_zip_path, 'r') as zip_file:
+                    # Get all files in the specified folder
+                    folder_prefix = folder if folder.endswith('/') else folder + '/'
+                    files_to_extract = [f for f in zip_file.namelist() 
+                                      if f.startswith(folder_prefix) and not f.endswith('/')]
+                    
+                    if not files_to_extract:
+                        return web.json_response(
+                            {'error': f'No files found in folder "{folder}" within the ZIP'}, 
+                            status=400
+                        )
+                    
+                    # Extract files to quizzes directory
+                    extracted_count = 0
+                    for file_path in files_to_extract:
+                        # Remove folder prefix to get just the filename
+                        filename = file_path[len(folder_prefix):]
+                        if filename:  # Skip empty filenames
+                            target_path = os.path.join(self.quizzes_dir, filename)
+                            
+                            # Ensure target directory exists
+                            target_dir = os.path.dirname(target_path)
+                            os.makedirs(target_dir, exist_ok=True)
+                            
+                            # Extract and write file
+                            with zip_file.open(file_path) as source:
+                                with open(target_path, 'wb') as target:
+                                    target.write(source.read())
+                            extracted_count += 1
+                    
+                    logger.info(f"Extracted {extracted_count} files from quiz '{quiz_name}'")
+                
+            finally:
+                # Clean up temporary ZIP file
+                if temp_zip_path:
+                    try:
+                        os.unlink(temp_zip_path)
+                    except OSError:
+                        pass
+            
+            # Refresh quiz list to include newly extracted files
+            available_quizzes = await self.list_available_quizzes()
+            
+            return web.json_response({
+                'success': True,
+                'message': f'Successfully downloaded and extracted quiz "{quiz_name}"',
+                'extracted_files': extracted_count,
+                'available_quizzes': available_quizzes
+            })
+            
+        except Exception as e:
+            raise
+            logger.error(f"Error downloading quiz: {e}")
+            return web.json_response({'error': f'Download failed: {str(e)}'}, status=500)
+    
     async def serve_index_page(self, request):
         """Serve the index.html page from static directory"""
         index_path = f"{self.static_dir}/index.html"
@@ -1468,10 +1589,21 @@ class TestingServer:
                 'urls': urls
             }
             
-            # Inject both trusted IP status and network info into the template
+            # Get downloadable quizzes configuration
+            downloadable_quizzes = []
+            if hasattr(self.config, 'quizzes') and self.config.quizzes and self.config.quizzes.quizzes:
+                for quiz in self.config.quizzes.quizzes:
+                    downloadable_quizzes.append({
+                        'name': quiz.name,
+                        'download_path': quiz.download_path,
+                        'folder': quiz.folder
+                    })
+            
+            # Inject trusted IP status, network info, and downloadable quizzes into the template
             server_data_script = f"""
         const IS_TRUSTED_IP = {str(is_trusted_ip).lower()};
-        const NETWORK_INFO = {json.dumps(network_info)};"""
+        const NETWORK_INFO = {json.dumps(network_info)};
+        const DOWNLOADABLE_QUIZZES = {json.dumps(downloadable_quizzes)};"""
             
             template_content = template_content.replace(
                 '<script>',
@@ -1589,6 +1721,7 @@ async def create_app(config: WebQuizConfig):
     app.router.add_delete('/api/admin/quiz/{filename}', server.admin_delete_quiz)
     app.router.add_post('/api/admin/validate-quiz', server.admin_validate_quiz)
     app.router.add_get('/api/admin/list-images', server.admin_list_images)
+    app.router.add_post('/api/admin/download-quiz', server.admin_download_quiz)
     
     # Live stats routes (public access)
     app.router.add_get('/live-stats/', server.serve_live_stats_page)
