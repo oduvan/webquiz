@@ -112,8 +112,8 @@
         }
 
         .option.feedback-correct {
-            background: #d4edda !important;
-            border-color: #28a745 !important;
+            background: #ffffff !important;
+            border-color: #2d731c !important;
             border-width: 3px !important;
             color: #155724 !important;
             position: relative;
@@ -124,7 +124,7 @@
             position: absolute;
             top: -25px;
             right: 0;
-            background: #28a745;
+            background: #2d731c;
             color: white;
             padding: 2px 8px;
             border-radius: 3px;
@@ -169,8 +169,15 @@
             color: #a5d6a7 !important;
         }
 
+        [data-theme="dark"] .option.feedback-correct.disabled {
+            background: #2d5a2d !important;
+            border-color: #4caf50 !important;
+            color: #a5d6a7 !important;
+            opacity: 1 !important;
+        }
+
         [data-theme="dark"] .option.feedback-incorrect {
-            background: #5a2d2d !important;
+            background: #c20909 !important;
             border-color: #f44336 !important;
             color: #ef9a9a !important;
         }
@@ -317,6 +324,18 @@
                 display: block;
                 white-space: nowrap;
             }
+            
+            /* Mobile responsive input */
+            #username {
+                width: 100% !important;
+                max-width: 100% !important;
+                box-sizing: border-box !important;
+            }
+            
+            /* Mobile spacing between top controls and H1 */
+            h1 {
+                margin-top: 60px !important;
+            }
             .results-table thead, 
             .results-table tbody, 
             .results-table th, 
@@ -402,7 +421,7 @@
         <!-- Registration Form -->
         <div id="registration" class="section hidden">
             <h2>Зареєструйтеся для початку тесту</h2>
-            <input type="text" id="username" placeholder="Введіть ваше ім'я користувача" style="padding: 10px; width: 300px;">
+            <input type="text" id="username" placeholder="Введіть ваше ім'я користувача" style="padding: 10px; width: 100%; max-width: 300px; box-sizing: border-box;">
             <button onclick="registerUser()">Зареєструватися</button>
         </div>
         
