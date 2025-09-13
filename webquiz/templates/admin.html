@@ -21,6 +21,18 @@
             --warning-bg: #fff3cd;
             --warning-border: #ffeaa7;
             --warning-color: #856404;
+            --disabled-bg: #ccc;
+            --light-bg: #fafafa;
+            --success-green: #28a745;
+            --success-green-hover: #218838;
+            --danger-red: #dc3545;
+            --danger-red-hover: #c82333;
+            --muted-gray: #6c757d;
+            --light-gray: #aaa;
+            --text-muted: #666;
+            --white: white;
+            --shadow: rgba(0,0,0,0.1);
+            --modal-overlay: rgba(0,0,0,0.5);
         }
 
         body {
@@ -36,7 +48,7 @@
             background: var(--container-bg);
             padding: 30px;
             border-radius: 10px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            box-shadow: 0 2px 10px var(--shadow);
             margin-bottom: 20px;
         }
 
@@ -67,7 +79,7 @@
 
         button {
             background: var(--button-bg);
-            color: white;
+            color: var(--white);
             border: none;
             padding: 12px 24px;
             border-radius: 5px;
@@ -81,7 +93,7 @@
         }
 
         button:disabled {
-            background: #ccc;
+            background: var(--disabled-bg);
             cursor: not-allowed;
         }
 
@@ -113,13 +125,7 @@
             color: var(--warning-color);
         }
 
-        .current-quiz {
-            padding: 15px;
-            background: var(--warning-bg);
-            border: 1px solid var(--warning-border);
-            border-radius: 5px;
-            margin: 20px 0;
-        }
+
 
         .quiz-list {
             max-height: 300px;
@@ -127,13 +133,13 @@
             border: 1px solid var(--border-color);
             border-radius: 5px;
             padding: 10px;
-            background: #fafafa;
+            background: var(--light-bg);
         }
 
         .quiz-item {
             padding: 8px;
             margin: 2px 0;
-            background: white;
+            background: var(--white);
             border-radius: 3px;
             cursor: pointer;
             border: 1px solid transparent;
@@ -145,7 +151,7 @@
 
         .quiz-item.selected {
             background: var(--button-bg);
-            color: white;
+            color: var(--white);
         }
 
         .quiz-item.current {
@@ -155,9 +161,9 @@
         }
 
         .quiz-item.current.selected {
-            background: #28a745;
-            color: white;
-            border-color: #28a745;
+            background: var(--success-green);
+            color: var(--white);
+            border-color: var(--success-green);
         }
 
         .actions {
@@ -188,7 +194,7 @@
             top: 0;
             width: 100%;
             height: 100%;
-            background-color: rgba(0,0,0,0.5);
+            background-color: var(--modal-overlay);
         }
 
         .modal-content {
@@ -215,7 +221,7 @@
             font-size: 28px;
             font-weight: bold;
             cursor: pointer;
-            color: #aaa;
+            color: var(--light-gray);
         }
 
         .close:hover {
@@ -256,7 +262,7 @@
             border-radius: 5px;
             padding: 15px;
             margin: 10px 0;
-            background: #fafafa;
+            background: var(--light-bg);
         }
 
         .question-header {
@@ -312,11 +318,11 @@
         }
 
         .btn-danger {
-            background: #dc3545;
+            background: var(--danger-red);
         }
 
         .btn-danger:hover {
-            background: #c82333;
+            background: var(--danger-red-hover);
         }
         
         .downloadable-quiz-item {
@@ -327,7 +333,7 @@
             border: 1px solid var(--border-color);
             border-radius: 5px;
             margin-bottom: 10px;
-            background: white;
+            background: var(--white);
         }
         
         .downloadable-quiz-info {
@@ -341,13 +347,13 @@
         
         .downloadable-quiz-url {
             font-size: 0.9em;
-            color: #666;
+            color: var(--text-muted);
             word-break: break-all;
         }
         
         .download-btn {
-            background: #28a745;
-            color: white;
+            background: var(--success-green);
+            color: var(--white);
             border: none;
             padding: 8px 16px;
             border-radius: 4px;
@@ -356,17 +362,17 @@
         }
         
         .download-btn:hover {
-            background: #218838;
+            background: var(--success-green-hover);
         }
         
         .download-btn:disabled {
-            background: #6c757d;
+            background: var(--muted-gray);
             cursor: not-allowed;
         }
 
         .btn-danger:disabled {
-            background: #dc3545;
-            color: white;
+            background: var(--danger-red);
+            color: var(--white);
             opacity: 0.6;
         }
 
@@ -393,8 +399,8 @@
         }
 
         .url-item {
-            background: white;
-            border: 1px solid #ddd;
+            background: var(--white);
+            border: 1px solid var(--border-color);
             border-radius: 3px;
             padding: 10px;
             margin: 5px 0;
@@ -408,7 +414,7 @@
         }
 
         .url-item .url {
-            color: #666;
+            color: var(--text-muted);
             font-size: 14px;
         }
 
@@ -466,6 +472,25 @@
         #image-picker-modal .modal-content {
             max-width: 800px;
             width: 90%;
+        }
+
+        /* Quiz Editor Form Styles */
+        .question-text, .question-image, .option-text {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            font-size: 14px;
+            box-sizing: border-box;
+        }
+
+        .options-container {
+            margin: 10px 0;
+        }
+
+        /* Downloadable Quizzes Section */
+        .downloadable-quizzes {
+            margin-top: 30px;
         }
     </style>
 </head>
@@ -561,7 +586,7 @@
                     <div class="form-group">
                         <label>Назва Quiz (необов'язково):</label>
                         <input type="text" id="quiz-title" placeholder="наприклад, Математичний Quiz" style="width: 100%; margin-bottom: 20px;">
-                        <small style="color: #666;">Якщо не вказано, буде використана стандартна назва</small>
+                        <small style="color: var(--text-muted);">Якщо не вказано, буде використана стандартна назва</small>
                     </div>
                     <div class="form-group">
                         <div id="questions-container">
@@ -670,7 +695,7 @@
             const quizList = document.getElementById('quiz-list');
             
             if (quizzes.length === 0) {
-                quizList.innerHTML = '<div style="text-align: center; color: #666;">Файли quiz не знайдені</div>';
+                quizList.innerHTML = '<div style="text-align: center; color: var(--text-muted);">Файли quiz не знайдені</div>';
                 return;
             }
 
@@ -1004,11 +1029,11 @@
                         <input type="text" class="question-image" placeholder="напр., /imgs/diagram.png" style="width: 100%;">
                         <button type="button" onclick="openImagePicker('question-image', ${questionCounter})" style="padding: 5px 8px; font-size: 16px;" title="Select image">📷</button>
                     </div>
-                    <small style="color: #666;">Enter a path starting with /imgs/ for images. Either question text OR image must be provided.</small>
+                    <small style="color: var(--text-muted);">Enter a path starting with /imgs/ for images. Either question text OR image must be provided.</small>
                 </div>
                 <div class="form-group">
                     <label>Варіанти Відповідей:</label>
-                    <small style="color: #666; margin-bottom: 10px; display: block;">For image options, start with / (e.g., /static/option1.png)</small>
+                    <small style="color: var(--text-muted); margin-bottom: 10px; display: block;">For image options, start with / (e.g., /static/option1.png)</small>
                     <div class="options-container">
                         <div class="option-item">
                             <input type="radio" name="correct-${questionCounter}" value="0" checked>
@@ -1226,11 +1251,11 @@
                                 <input type="text" class="question-image" value="${question.image || ''}" placeholder="напр., /imgs/diagram.png" style="width: 100%;">
                                 <button type="button" onclick="openImagePicker('question-image', ${questionCounter})" style="padding: 5px 8px; font-size: 16px;" title="Select image">📷</button>
                             </div>
-                            <small style="color: #666;">Enter a path starting with /imgs/ for images. Either question text OR image must be provided.</small>
+                            <small style="color: var(--text-muted);">Enter a path starting with /imgs/ for images. Either question text OR image must be provided.</small>
                         </div>
                         <div class="form-group">
                             <label>Варіанти Відповідей:</label>
-                            <small style="color: #666; margin-bottom: 10px; display: block;">For image options, start with / (e.g., /static/option1.png)</small>
+                            <small style="color: var(--text-muted); margin-bottom: 10px; display: block;">For image options, start with / (e.g., /static/option1.png)</small>
                             <div class="options-container">
                                 ${optionsHtml}
                             </div>
@@ -1479,7 +1504,7 @@
             
             if (!images || images.length === 0) {
                 gridContainer.innerHTML = `
-                    <div style="text-align: center; padding: 40px; color: #666;">
+                    <div style="text-align: center; padding: 40px; color: var(--text-muted);">
                         <p>Зображення не знайдені в директорії quizzes/imgs</p>
                         <small>Add image files to the quizzes/imgs directory to see them here</small>
                     </div>
@@ -1555,7 +1580,7 @@
                             <div class="downloadable-quiz-info">
                                 <div class="downloadable-quiz-name">${quiz.name}</div>
                                 <div class="downloadable-quiz-url">${quiz.download_path}</div>
-                                <small style="color: #666;">Папка: ${quiz.folder}</small>
+                                <small style="color: var(--text-muted);">Папка: ${quiz.folder}</small>
                             </div>
                             <button class="download-btn" onclick="downloadQuiz(${index})" id="download-btn-${index}">
                                 📥 Завантажити
