@@ -111,12 +111,12 @@ jobs:
 
     - name: Update webquiz-ansible repository
       env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        ANSIBLE_REPO_TOKEN: ${{ secrets.ANSIBLE_REPO_TOKEN }}
       run: |
         echo "Updating webquiz-ansible repository with new version ${{ github.event.inputs.version }}"
         
         # Clone the webquiz-ansible repository
-        git clone https://github.com/oduvan/webquiz-ansible.git
+        git clone https://$ANSIBLE_REPO_TOKEN@github.com/oduvan/webquiz-ansible.git
         cd webquiz-ansible
         
         # Configure git for the action
