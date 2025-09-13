@@ -154,6 +154,12 @@
             font-weight: bold;
         }
 
+        .quiz-item.current.selected {
+            background: #28a745;
+            color: white;
+            border-color: #28a745;
+        }
+
         .actions {
             text-align: center;
             margin-top: 20px;
@@ -313,6 +319,12 @@
             background: #c82333;
         }
 
+        .btn-danger:disabled {
+            background: #dc3545;
+            color: white;
+            opacity: 0.6;
+        }
+
         /* Network info styles */
         .network-info {
             background: var(--warning-bg);
@@ -461,6 +473,8 @@
 
             <div class="back-link">
                 <a href="/">← Назад до Quiz</a>
+                <span style="margin: 0 10px;">|</span>
+                <a href="/live-stats/">📊 Live Stats</a>
             </div>
         </div>
 
