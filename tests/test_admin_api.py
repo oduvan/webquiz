@@ -229,19 +229,20 @@ def test_admin_validate_invalid_quiz_endpoint(webquiz_server):
     assert data['valid'] is False
     assert len(data['errors']) > 0
 
+SECURE_ENDPOINTS = [
+    ('POST', '/api/admin/auth', {}),
+    ('GET', '/api/admin/list-quizzes', {}),
+    ('POST', '/api/admin/switch-quiz', {'quiz_filename': 'test_quiz.yaml'}),
+    ('GET', '/api/admin/quiz/test_quiz.yaml', {}),
+    ('POST', '/api/admin/create-quiz', {'title': 'Test', 'description': 'Test', 'questions': []}),
+    ('PUT', '/api/admin/quiz/test_quiz.yaml', {'content': 'title: Test'}),
+    ('DELETE', '/api/admin/quiz/test_quiz.yaml', {}),
+    ('POST', '/api/admin/validate-quiz', {'content': 'title: Test'}),
+    ('GET', '/api/admin/list-images', {}),
+    ('POST', '/api/admin/download-quiz', {'url': 'https://example.com/quiz.zip'})
+]
 
-@pytest.mark.parametrize("endpoint_config", [
-    ("POST", "/api/admin/auth", {}),
-    ("GET", "/api/admin/list-quizzes", {}),
-    ("POST", "/api/admin/switch-quiz", {"quiz_filename": "test_quiz.yaml"}),
-    ("GET", "/api/admin/quiz/test_quiz.yaml", {}),
-    ("POST", "/api/admin/create-quiz", {"title": "Test", "description": "Test", "questions": []}),
-    ("PUT", "/api/admin/quiz/test_quiz.yaml", {"content": "title: Test"}),
-    ("DELETE", "/api/admin/quiz/test_quiz.yaml", {}),
-    ("POST", "/api/admin/validate-quiz", {"content": "title: Test"}),
-    ("GET", "/api/admin/list-images", {}),
-    ("POST", "/api/admin/download-quiz", {"url": "https://example.com/quiz.zip"})
-])
+@pytest.mark.parametrize("endpoint_config", SECURE_ENDPOINTS)])
 def test_admin_endpoints_require_authentication(webquiz_server, endpoint_config):
     """Test that all admin endpoints require authentication and return 401 without master key."""
     _, port = webquiz_server
@@ -261,18 +262,7 @@ def test_admin_endpoints_require_authentication(webquiz_server, endpoint_config)
     assert response.status_code == 401, f"Expected 401 for {method} {endpoint}, got {response.status_code}"
 
 
-@pytest.mark.parametrize("endpoint_config", [
-    ("POST", "/api/admin/auth", {}),
-    ("GET", "/api/admin/list-quizzes", {}),
-    ("POST", "/api/admin/switch-quiz", {"quiz_filename": "test_quiz.yaml"}),
-    ("GET", "/api/admin/quiz/test_quiz.yaml", {}),
-    ("POST", "/api/admin/create-quiz", {"title": "Test", "description": "Test", "questions": []}),
-    ("PUT", "/api/admin/quiz/test_quiz.yaml", {"content": "title: Test"}),
-    ("DELETE", "/api/admin/quiz/test_quiz.yaml", {}),
-    ("POST", "/api/admin/validate-quiz", {"content": "title: Test"}),
-    ("GET", "/api/admin/list-images", {}),
-    ("POST", "/api/admin/download-quiz", {"url": "https://example.com/quiz.zip"})
-])
+@pytest.mark.parametrize("endpoint_config", SECURE_ENDPOINTS)])
 def test_admin_endpoints_reject_invalid_authentication(webquiz_server, endpoint_config):
     """Test that all admin endpoints reject invalid master keys and return 401."""
     _, port = webquiz_server
