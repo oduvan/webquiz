@@ -24,12 +24,36 @@ from webquiz import __version__ as package_version
 # Logger will be configured in create_app() with custom log file
 logger = logging.getLogger(__name__)
 
+# Global template cache - loaded once at startup
+TEMPLATES = {}
+
 def get_package_version() -> str:
     """Get the webquiz package version"""
     try:
         return package_version
     except Exception:
         return 'unknown'
+
+def load_templates():
+    """Load all package templates into global cache"""
+    try:
+        # Try modern importlib.resources first (Python 3.9+)
+        import importlib.resources as pkg_resources
+        templates_path = pkg_resources.files('webquiz') / 'templates'
+        for template_file in templates_path.iterdir():
+            if template_file.is_file() and template_file.suffix == '.html':
+                TEMPLATES[template_file.name] = template_file.read_text(encoding='utf-8')
+                logger.info(f"Loaded template: {template_file.name}")
+    except (ImportError, AttributeError):
+        # Fallback to pkg_resources for older Python versions
+        import pkg_resources
+        template_files = pkg_resources.resource_listdir('webquiz', 'templates')
+        for template_name in template_files:
+            if template_name.endswith('.html'):
+                TEMPLATES[template_name] = pkg_resources.resource_string('webquiz', f'templates/{template_name}').decode('utf-8')
+                logger.info(f"Loaded template: {template_name}")
+    
+    logger.info(f"Loaded {len(TEMPLATES)} templates into cache")
 
 def resolve_path_relative_to_binary(path_str: str) -> str:
     """Resolve relative paths relative to binary directory when running as binary."""
@@ -507,6 +531,12 @@ class TestingServer:
         ensure_directory_exists(self.static_dir)
         index_path = f"{self.static_dir}/index.html"
         
+        # Get template from cache
+        template_content = TEMPLATES.get('admin_selection.html')
+        if not template_content:
+            logger.error("admin_selection.html template not found in cache")
+            return
+        
         # Get list of available quizzes for display
         available_quizzes = await self.list_available_quizzes()
         quiz_list_html = ""
@@ -515,88 +545,13 @@ class TestingServer:
         
         admin_url = f"/admin" if self.master_key else "#"
         admin_message = "Access admin panel" if self.master_key else "Admin panel disabled (no master key set)"
+        admin_class = "disabled" if not self.master_key else ""
         
-        selection_html = f'''<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>WebQuiz - Admin Selection Required</title>
-    <style>
-        body {{
-            font-family: Arial, sans-serif;
-            max-width: 800px;
-            margin: 0 auto;
-            padding: 20px;
-            background-color: #f5f5f5;
-            color: #333;
-        }}
-        .container {{
-            background: white;
-            padding: 30px;
-            border-radius: 10px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-            text-align: center;
-        }}
-        .quiz-list {{
-            text-align: left;
-            background: #f8f9fa;
-            padding: 20px;
-            border-radius: 5px;
-            margin: 20px 0;
-        }}
-        .admin-button {{
-            display: inline-block;
-            background: #007bff;
-            color: white;
-            padding: 12px 24px;
-            text-decoration: none;
-            border-radius: 5px;
-            margin: 10px;
-        }}
-        .admin-button:hover {{
-            background: #0056b3;
-        }}
-        .disabled {{
-            background: #6c757d;
-            cursor: not-allowed;
-        }}
-        .warning {{
-            background: #fff3cd;
-            border: 1px solid #ffeaa7;
-            color: #856404;
-            padding: 15px;
-            border-radius: 5px;
-            margin: 20px 0;
-        }}
-    </style>
-</head>
-<body>
-    <div class="container">
-        <h1>🎯 WebQuiz System</h1>
-        
-        <div class="warning">
-            <h3>⚠️ Quiz Selection Required</h3>
-            <p>Multiple quiz files are available, but no default quiz is set. An administrator must select which quiz to use.</p>
-        </div>
-        
-        <h3>📋 Available Quiz Files:</h3>
-        <div class="quiz-list">
-            <ul>
-                {quiz_list_html}
-            </ul>
-        </div>
-        
-        <p>To set a default quiz, rename one of the files to <code>default.yaml</code> or use the admin panel to select a quiz.</p>
-        
-        <a href="{admin_url}" class="admin-button {'disabled' if not self.master_key else ''}">{admin_message}</a>
-        
-        <div style="margin-top: 30px; font-size: 0.9em; color: #666;">
-            <p>💡 <strong>Tip:</strong> Rename your preferred quiz file to <code>default.yaml</code> to make it load automatically.</p>
-        </div>
-    </div>
-</body>
-</html>'''
+        # Replace template placeholders
+        selection_html = template_content.replace('{{QUIZ_LIST}}', quiz_list_html)
+        selection_html = selection_html.replace('{{ADMIN_URL}}', admin_url)
+        selection_html = selection_html.replace('{{ADMIN_MESSAGE}}', admin_message)
+        selection_html = selection_html.replace('{{ADMIN_CLASS}}', admin_class)
         
         try:
             async with aiofiles.open(index_path, 'w', encoding='utf-8') as f:
@@ -647,58 +602,49 @@ class TestingServer:
 
     async def load_questions_from_file(self, quiz_file_path: str):
         """Load questions from specific quiz file for quiz execution"""
-        try:
-            async with aiofiles.open(quiz_file_path, 'r') as f:
-                content = await f.read()
-                data = yaml.safe_load(content)
-                self.questions = data['questions']
-                
-                # Store quiz title or use default
-                self.quiz_title = data.get('title', 'Система Тестування')
-                
-                # Add automatic IDs based on array index (for quiz execution only)
-                for i, question in enumerate(self.questions):
-                    question['id'] = i + 1
-                        
-                logger.info(f"Loaded {len(self.questions)} questions from {quiz_file_path}")
-        except Exception as e:
-            logger.error(f"Error loading questions from {quiz_file_path}: {e}")
-            raise
+        async with aiofiles.open(quiz_file_path, 'r') as f:
+            content = await f.read()
+            data = yaml.safe_load(content)
+            self.questions = data['questions']
+            
+            # Store quiz title or use default
+            self.quiz_title = data.get('title', 'Система Тестування')
+            
+            # Add automatic IDs based on array index (for quiz execution only)
+            for i, question in enumerate(self.questions):
+                question['id'] = i + 1
+                    
+            logger.info(f"Loaded {len(self.questions)} questions from {quiz_file_path}")
             
     async def load_questions(self):
         """Load questions based on available quiz files"""
-        try:
-            # Check if quizzes directory exists
-            if not os.path.exists(self.quizzes_dir):
-                os.makedirs(self.quizzes_dir)
-                logger.info(f"Created quizzes directory: {self.quizzes_dir}")
-            
-            # Get available quiz files
-            available_quizzes = await self.list_available_quizzes()
-            
-            if not available_quizzes:
-                # No quiz files found, create default
-                default_path = os.path.join(self.quizzes_dir, 'default.yaml')
-                await self.create_default_config_yaml(default_path)
-                available_quizzes = ['default.yaml']
-                await self.switch_quiz('default.yaml')
-            elif len(available_quizzes) == 1:
-                # Only one quiz file - use it as default
-                await self.switch_quiz(available_quizzes[0])
-                logger.info(f"Using single quiz file as default: {available_quizzes[0]}")
-            elif 'default.yaml' in available_quizzes or 'default.yml' in available_quizzes:
-                # Multiple files but default.yaml exists - use it
-                default_file = 'default.yaml' if 'default.yaml' in available_quizzes else 'default.yml'
-                await self.switch_quiz(default_file)
-                logger.info(f"Using explicit default file: {default_file}")
-            else:
-                # Multiple files but no default.yaml - don't load any quiz
-                logger.info(f"Multiple quiz files found but no default.yaml - admin must select quiz first")
-                await self.create_admin_selection_page()
-            
-        except Exception as e:
-            logger.error(f"Error in load_questions: {e}")
-            raise
+        # Check if quizzes directory exists
+        if not os.path.exists(self.quizzes_dir):
+            os.makedirs(self.quizzes_dir)
+            logger.info(f"Created quizzes directory: {self.quizzes_dir}")
+        
+        # Get available quiz files
+        available_quizzes = await self.list_available_quizzes()
+        
+        if not available_quizzes:
+            # No quiz files found, create default
+            default_path = os.path.join(self.quizzes_dir, 'default.yaml')
+            await self.create_default_config_yaml(default_path)
+            available_quizzes = ['default.yaml']
+            await self.switch_quiz('default.yaml')
+        elif len(available_quizzes) == 1:
+            # Only one quiz file - use it as default
+            await self.switch_quiz(available_quizzes[0])
+            logger.info(f"Using single quiz file as default: {available_quizzes[0]}")
+        elif 'default.yaml' in available_quizzes or 'default.yml' in available_quizzes:
+            # Multiple files but default.yaml exists - use it
+            default_file = 'default.yaml' if 'default.yaml' in available_quizzes else 'default.yml'
+            await self.switch_quiz(default_file)
+            logger.info(f"Using explicit default file: {default_file}")
+        else:
+            # Multiple files but no default.yaml - don't load any quiz
+            logger.info(f"Multiple quiz files found but no default.yaml - admin must select quiz first")
+            await self.create_admin_selection_page()
             
             
     async def create_default_index_html(self):
@@ -724,18 +670,11 @@ class TestingServer:
         # Convert questions to JSON string for embedding
         questions_json = json.dumps(questions_for_client, indent=2)
         
-        # Copy template from package
+        # Copy template from cache
         try:
-            try:
-                # Try modern importlib.resources first (Python 3.9+)
-                import importlib.resources as pkg_resources
-                template_content = (pkg_resources.files('webquiz') / 'templates' / 'index.html').read_text(encoding='utf-8')
-            except (ImportError, AttributeError):
-                # Fallback to pkg_resources for older Python versions
-                import pkg_resources
-                template_path = pkg_resources.resource_filename('webquiz', 'templates/index.html')
-                async with aiofiles.open(template_path, 'r', encoding='utf-8') as template_file:
-                    template_content = await template_file.read()
+            template_content = TEMPLATES.get('index.html')
+            if not template_content:
+                raise KeyError('index.html template not found in cache')
             
             # Inject questions data, title, and version into template
             html_content = template_content.replace('{{QUESTIONS_DATA}}', questions_json)
@@ -752,39 +691,17 @@ class TestingServer:
             logger.error(f"Error copying template index.html: {e}")
             # Continue to fallback
             
-        # Fallback: create minimal HTML if template is not available
-        fallback_html = '''<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>WebQuiz Testing System</title>
-    <style>
-        body { font-family: Arial, sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; }
-        .container { background: white; padding: 30px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
-        button { background: #007bff; color: white; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer; }
-        input { padding: 10px; width: 300px; margin: 10px 0; border: 1px solid #ddd; border-radius: 3px; }
-        .hidden { display: none; }
-    </style>
-</head>
-<body>
-    <div class="container">
-        <h1>WebQuiz Testing System</h1>
-        <div id="error">
-            <h2>Template Error</h2>
-            <p>Unable to load the full interface template. Please ensure the WebQuiz package is properly installed.</p>
-            <p>You can manually create an index.html file in the static directory with your custom interface.</p>
-        </div>
-    </div>
-</body>
-</html>'''
-        
-        try:
-            async with aiofiles.open(index_path, 'w', encoding='utf-8') as f:
-                await f.write(fallback_html)
-            logger.warning(f"Created fallback index.html file: {index_path}")
-        except Exception as e:
-            logger.error(f"Error creating fallback index.html: {e}")
+        # Fallback: use fallback template if available
+        fallback_template = TEMPLATES.get('fallback.html')
+        if fallback_template:
+            try:
+                async with aiofiles.open(index_path, 'w', encoding='utf-8') as f:
+                    await f.write(fallback_template)
+                logger.warning(f"Created fallback index.html file: {index_path}")
+            except Exception as e:
+                logger.error(f"Error creating fallback index.html: {e}")
+        else:
+            logger.error("No fallback template available and main template failed to load")
             
     async def flush_responses_to_csv(self):
         """Flush in-memory responses to CSV file"""
@@ -1074,54 +991,54 @@ class TestingServer:
         user_id = request.match_info['user_id']
         
         # Find user by user_id
-        if user_id in self.users:
-            user_data = self.users[user_id]
-            username = user_data['username']
-            # Get last answered question ID from progress tracking
-            last_answered_question_id = self.user_progress.get(user_id, 0)
-            
-            # Find the index of next question to answer
-            next_question_index = 0
-            if last_answered_question_id > 0:
-                # Find the index of last answered question, then add 1
-                for i, question in enumerate(self.questions):
-                    if question['id'] == last_answered_question_id:
-                        next_question_index = i + 1
-                        break
-            
-            # Ensure we don't go beyond available questions
-            if next_question_index >= len(self.questions):
-                next_question_index = len(self.questions)
-            
-            # Check if test is completed
-            test_completed = next_question_index >= len(self.questions)
-            
-            response_data = {
-                'valid': True,
-                'user_id': user_id,
-                'username': username,
-                'next_question_index': next_question_index,
-                'total_questions': len(self.questions),
-                'last_answered_question_id': last_answered_question_id,
-                'test_completed': test_completed
-            }
-            
-            if test_completed:
-                # Get final results for completed test
-                final_results = self.get_user_final_results(user_id)
-                response_data['final_results'] = final_results
-                logger.info(f"User {user_id} verification: test completed, returning final results")
-            else:
-                # Start timing for current question if user has questions left
-                self.question_start_times[user_id] = datetime.now()
-                logger.info(f"User {user_id} verification: last_answered={last_answered_question_id}, next_index={next_question_index}")
-                
-            return web.json_response(response_data)
-        else:
+        if user_id not in self.users:
+            logger.warning(f"User ID {user_id} not found")
             return web.json_response({
                 'valid': False,
                 'message': 'User ID not found'
             })
+        user_data = self.users[user_id]
+        username = user_data['username']
+        # Get last answered question ID from progress tracking
+        last_answered_question_id = self.user_progress.get(user_id, 0)
+        
+        # Find the index of next question to answer
+        next_question_index = 0
+        if last_answered_question_id > 0:
+            # Find the index of last answered question, then add 1
+            for i, question in enumerate(self.questions):
+                if question['id'] == last_answered_question_id:
+                    next_question_index = i + 1
+                    break
+        
+        # Ensure we don't go beyond available questions
+        if next_question_index >= len(self.questions):
+            next_question_index = len(self.questions)
+        
+        # Check if test is completed
+        test_completed = next_question_index >= len(self.questions)
+        
+        response_data = {
+            'valid': True,
+            'user_id': user_id,
+            'username': username,
+            'next_question_index': next_question_index,
+            'total_questions': len(self.questions),
+            'last_answered_question_id': last_answered_question_id,
+            'test_completed': test_completed
+        }
+        
+        if test_completed:
+            # Get final results for completed test
+            final_results = self.get_user_final_results(user_id)
+            response_data['final_results'] = final_results
+            logger.info(f"User {user_id} verification: test completed, returning final results")
+        else:
+            # Start timing for current question if user has questions left
+            self.question_start_times[user_id] = datetime.now()
+            logger.info(f"User {user_id} verification: last_answered={last_answered_question_id}, next_index={next_question_index}")
+            
+        return web.json_response(response_data)
     
     # Admin API endpoints
     @admin_auth_required
@@ -1136,21 +1053,17 @@ class TestingServer:
     @admin_auth_required  
     async def admin_switch_quiz(self, request):
         """Switch to a different quiz"""
-        try:
-            data = await request.json()
-            quiz_filename = data['quiz_filename']
-            
-            await self.switch_quiz(quiz_filename)
-            
-            return web.json_response({
-                'success': True,
-                'message': f'Switched to quiz: {quiz_filename}',
-                'current_quiz': quiz_filename,
-                'csv_file': os.path.basename(self.csv_file)
-            })
-        except Exception as e:
-            logger.error(f"Error switching quiz: {e}")
-            return web.json_response({'error': str(e)}, status=400)
+        data = await request.json()
+        quiz_filename = data['quiz_filename']
+        
+        await self.switch_quiz(quiz_filename)
+        
+        return web.json_response({
+            'success': True,
+            'message': f'Switched to quiz: {quiz_filename}',
+            'current_quiz': quiz_filename,
+            'csv_file': os.path.basename(self.csv_file)
+        })
     
     @admin_auth_required
     async def admin_auth_test(self, request):
@@ -1163,211 +1076,191 @@ class TestingServer:
     @admin_auth_required
     async def admin_get_quiz(self, request):
         """Get quiz content for editing"""
+        filename = request.match_info['filename']
+        quiz_path = os.path.join(self.quizzes_dir, filename)
+        
+        if not os.path.exists(quiz_path):
+            return web.json_response({'error': 'Quiz file not found'}, status=404)
+        
+        with open(quiz_path, 'r', encoding='utf-8') as f:
+            quiz_content = f.read()
+        
+        # Also return parsed YAML for wizard mode
         try:
-            filename = request.match_info['filename']
-            quiz_path = os.path.join(self.quizzes_dir, filename)
-            
-            if not os.path.exists(quiz_path):
-                return web.json_response({'error': 'Quiz file not found'}, status=404)
-            
-            with open(quiz_path, 'r', encoding='utf-8') as f:
-                quiz_content = f.read()
-            
-            # Also return parsed YAML for wizard mode
-            try:
-                import yaml
-                parsed_quiz = yaml.safe_load(quiz_content)
-                return web.json_response({
-                    'filename': filename,
-                    'content': quiz_content,
-                    'parsed': parsed_quiz
-                })
-            except yaml.YAMLError as e:
-                return web.json_response({
-                    'filename': filename,
-                    'content': quiz_content,
-                    'parsed': None,
-                    'yaml_error': str(e)
-                })
-        except Exception as e:
-            logger.error(f"Error getting quiz: {e}")
-            return web.json_response({'error': str(e)}, status=500)
+            import yaml
+            parsed_quiz = yaml.safe_load(quiz_content)
+            return web.json_response({
+                'filename': filename,
+                'content': quiz_content,
+                'parsed': parsed_quiz
+            })
+        except yaml.YAMLError as e:
+            return web.json_response({
+                'filename': filename,
+                'content': quiz_content,
+                'parsed': None,
+                'yaml_error': str(e)
+            })
     
     @admin_auth_required
     async def admin_create_quiz(self, request):
         """Create new quiz from wizard or text input"""
-        try:
-            data = await request.json()
-            filename = data.get('filename', '').strip()
-            mode = data.get('mode', 'wizard')  # 'wizard' or 'text'
+        data = await request.json()
+        filename = data.get('filename', '').strip()
+        mode = data.get('mode', 'wizard')  # 'wizard' or 'text'
+        
+        if not filename:
+            return web.json_response({'error': 'Filename is required'}, status=400)
+        
+        if not filename.endswith('.yaml'):
+            filename += '.yaml'
+        
+        quiz_path = os.path.join(self.quizzes_dir, filename)
+        
+        # Check if file already exists
+        if os.path.exists(quiz_path):
+            return web.json_response({'error': 'Quiz file already exists'}, status=409)
+        
+        # Validate and create quiz content
+        if mode == 'wizard':
+            quiz_data = data.get('quiz_data', {})
+            if not self._validate_quiz_data(quiz_data):
+                return web.json_response({'error': 'Invalid quiz data structure'}, status=400)
             
-            if not filename:
-                return web.json_response({'error': 'Filename is required'}, status=400)
+            import yaml
+            quiz_content = yaml.dump(quiz_data, default_flow_style=False, allow_unicode=True)
+        else:  # text mode
+            quiz_content = data.get('content', '').strip()
+            if not quiz_content:
+                return web.json_response({'error': 'Quiz content is required'}, status=400)
             
-            if not filename.endswith('.yaml'):
-                filename += '.yaml'
-            
-            quiz_path = os.path.join(self.quizzes_dir, filename)
-            
-            # Check if file already exists
-            if os.path.exists(quiz_path):
-                return web.json_response({'error': 'Quiz file already exists'}, status=409)
-            
-            # Validate and create quiz content
-            if mode == 'wizard':
-                quiz_data = data.get('quiz_data', {})
-                if not self._validate_quiz_data(quiz_data):
-                    return web.json_response({'error': 'Invalid quiz data structure'}, status=400)
-                
+            # Validate YAML
+            try:
                 import yaml
-                quiz_content = yaml.dump(quiz_data, default_flow_style=False, allow_unicode=True)
-            else:  # text mode
-                quiz_content = data.get('content', '').strip()
-                if not quiz_content:
-                    return web.json_response({'error': 'Quiz content is required'}, status=400)
-                
-                # Validate YAML
-                try:
-                    import yaml
-                    parsed = yaml.safe_load(quiz_content)
-                    if not self._validate_quiz_data(parsed):
-                        return web.json_response({'error': 'Invalid quiz data structure'}, status=400)
-                except yaml.YAMLError as e:
-                    return web.json_response({'error': f'Invalid YAML: {str(e)}'}, status=400)
-            
-            # Write the quiz file
-            with open(quiz_path, 'w', encoding='utf-8') as f:
-                f.write(quiz_content)
-            
-            logger.info(f"Created new quiz: {filename}")
-            return web.json_response({
-                'success': True,
-                'message': f'Quiz "{filename}" created successfully',
-                'filename': filename
-            })
-        except Exception as e:
-            logger.error(f"Error creating quiz: {e}")
-            return web.json_response({'error': str(e)}, status=500)
+                parsed = yaml.safe_load(quiz_content)
+                if not self._validate_quiz_data(parsed):
+                    return web.json_response({'error': 'Invalid quiz data structure'}, status=400)
+            except yaml.YAMLError as e:
+                return web.json_response({'error': f'Invalid YAML: {str(e)}'}, status=400)
+        
+        # Write the quiz file
+        with open(quiz_path, 'w', encoding='utf-8') as f:
+            f.write(quiz_content)
+        
+        logger.info(f"Created new quiz: {filename}")
+        return web.json_response({
+            'success': True,
+            'message': f'Quiz "{filename}" created successfully',
+            'filename': filename
+        })
     
     @admin_auth_required
     async def admin_update_quiz(self, request):
         """Update existing quiz"""
-        try:
-            filename = request.match_info['filename']
-            data = await request.json()
-            mode = data.get('mode', 'wizard')
+        filename = request.match_info['filename']
+        data = await request.json()
+        mode = data.get('mode', 'wizard')
+        
+        quiz_path = os.path.join(self.quizzes_dir, filename)
+        
+        if not os.path.exists(quiz_path):
+            return web.json_response({'error': 'Quiz file not found'}, status=404)
+        
+        # Create backup
+        backup_path = quiz_path + '.backup'
+        import shutil
+        shutil.copy2(quiz_path, backup_path)
+        
+        # Prepare new content
+        if mode == 'wizard':
+            quiz_data = data.get('quiz_data', {})
+            if not self._validate_quiz_data(quiz_data):
+                return web.json_response({'error': 'Invalid quiz data structure'}, status=400)
             
-            quiz_path = os.path.join(self.quizzes_dir, filename)
+            import yaml
+            quiz_content = yaml.dump(quiz_data, default_flow_style=False, allow_unicode=True)
+        else:  # text mode
+            quiz_content = data.get('content', '').strip()
+            if not quiz_content:
+                return web.json_response({'error': 'Quiz content is required'}, status=400)
             
-            if not os.path.exists(quiz_path):
-                return web.json_response({'error': 'Quiz file not found'}, status=404)
-            
-            # Create backup
-            backup_path = quiz_path + '.backup'
-            import shutil
-            shutil.copy2(quiz_path, backup_path)
-            
-            # Prepare new content
-            if mode == 'wizard':
-                quiz_data = data.get('quiz_data', {})
-                if not self._validate_quiz_data(quiz_data):
-                    return web.json_response({'error': 'Invalid quiz data structure'}, status=400)
-                
+            # Validate YAML
+            try:
                 import yaml
-                quiz_content = yaml.dump(quiz_data, default_flow_style=False, allow_unicode=True)
-            else:  # text mode
-                quiz_content = data.get('content', '').strip()
-                if not quiz_content:
-                    return web.json_response({'error': 'Quiz content is required'}, status=400)
-                
-                # Validate YAML
-                try:
-                    import yaml
-                    parsed = yaml.safe_load(quiz_content)
-                    if not self._validate_quiz_data(parsed):
-                        return web.json_response({'error': 'Invalid quiz data structure'}, status=400)
-                except yaml.YAMLError as e:
-                    return web.json_response({'error': f'Invalid YAML: {str(e)}'}, status=400)
-            
-            # Write updated content
-            with open(quiz_path, 'w', encoding='utf-8') as f:
-                f.write(quiz_content)
-            
-            # If this is the current quiz, reload it
-            if self.current_quiz_file and os.path.basename(self.current_quiz_file) == filename:
-                await self.switch_quiz(filename)
-            
-            logger.info(f"Updated quiz: {filename}")
-            return web.json_response({
-                'success': True,
-                'message': f'Quiz "{filename}" updated successfully',
-                'backup_created': os.path.basename(backup_path)
-            })
-        except Exception as e:
-            logger.error(f"Error updating quiz: {e}")
-            return web.json_response({'error': str(e)}, status=500)
+                parsed = yaml.safe_load(quiz_content)
+                if not self._validate_quiz_data(parsed):
+                    return web.json_response({'error': 'Invalid quiz data structure'}, status=400)
+            except yaml.YAMLError as e:
+                return web.json_response({'error': f'Invalid YAML: {str(e)}'}, status=400)
+        
+        # Write updated content
+        with open(quiz_path, 'w', encoding='utf-8') as f:
+            f.write(quiz_content)
+        
+        # If this is the current quiz, reload it
+        if self.current_quiz_file and os.path.basename(self.current_quiz_file) == filename:
+            await self.switch_quiz(filename)
+        
+        logger.info(f"Updated quiz: {filename}")
+        return web.json_response({
+            'success': True,
+            'message': f'Quiz "{filename}" updated successfully',
+            'backup_created': os.path.basename(backup_path)
+        })
     
     @admin_auth_required
     async def admin_delete_quiz(self, request):
         """Delete quiz file"""
-        try:
-            filename = request.match_info['filename']
-            quiz_path = os.path.join(self.quizzes_dir, filename)
-            
-            if not os.path.exists(quiz_path):
-                return web.json_response({'error': 'Quiz file not found'}, status=404)
-            
-            # Don't allow deleting the current quiz
-            if self.current_quiz_file and os.path.basename(self.current_quiz_file) == filename:
-                return web.json_response({'error': 'Cannot delete the currently active quiz'}, status=400)
-            
-            # Create backup before deletion
-            backup_path = quiz_path + '.deleted_backup'
-            import shutil
-            shutil.copy2(quiz_path, backup_path)
-            
-            # Delete the file
-            os.remove(quiz_path)
-            
-            logger.info(f"Deleted quiz: {filename} (backup: {backup_path})")
-            return web.json_response({
-                'success': True,
-                'message': f'Quiz "{filename}" deleted successfully',
-                'backup_created': os.path.basename(backup_path)
-            })
-        except Exception as e:
-            logger.error(f"Error deleting quiz: {e}")
-            return web.json_response({'error': str(e)}, status=500)
+        filename = request.match_info['filename']
+        quiz_path = os.path.join(self.quizzes_dir, filename)
+        
+        if not os.path.exists(quiz_path):
+            return web.json_response({'error': 'Quiz file not found'}, status=404)
+        
+        # Don't allow deleting the current quiz
+        if self.current_quiz_file and os.path.basename(self.current_quiz_file) == filename:
+            return web.json_response({'error': 'Cannot delete the currently active quiz'}, status=400)
+        
+        # Create backup before deletion
+        backup_path = quiz_path + '.deleted_backup'
+        import shutil
+        shutil.copy2(quiz_path, backup_path)
+        
+        # Delete the file
+        os.remove(quiz_path)
+        
+        logger.info(f"Deleted quiz: {filename} (backup: {backup_path})")
+        return web.json_response({
+            'success': True,
+            'message': f'Quiz "{filename}" deleted successfully',
+            'backup_created': os.path.basename(backup_path)
+        })
     
     @admin_auth_required
     async def admin_validate_quiz(self, request):
         """Validate quiz YAML structure"""
+        data = await request.json()
+        content = data.get('content', '').strip()
+        
+        if not content:
+            return web.json_response({'valid': False, 'errors': ['Content is empty']})
+        
         try:
-            data = await request.json()
-            content = data.get('content', '').strip()
+            import yaml
+            parsed = yaml.safe_load(content)
+        except yaml.YAMLError as e:
+            return web.json_response({'valid': False, 'errors': [f'YAML syntax error: {str(e)}']})
             
-            if not content:
-                return web.json_response({'valid': False, 'errors': ['Content is empty']})
-            
-            try:
-                import yaml
-                parsed = yaml.safe_load(content)
-                
-                # Validate structure
-                errors = []
-                if not self._validate_quiz_data(parsed, errors):
-                    return web.json_response({'valid': False, 'errors': errors})
-                
-                return web.json_response({
-                    'valid': True,
-                    'parsed': parsed,
-                    'question_count': len(parsed.get('questions', []))
-                })
-            except yaml.YAMLError as e:
-                return web.json_response({'valid': False, 'errors': [f'YAML syntax error: {str(e)}']})
-        except Exception as e:
-            logger.error(f"Error validating quiz: {e}")
-            return web.json_response({'error': str(e)}, status=500)
+        # Validate structure
+        errors = []
+        if not self._validate_quiz_data(parsed, errors):
+            return web.json_response({'valid': False, 'errors': errors})
+        
+        return web.json_response({
+            'valid': True,
+            'parsed': parsed,
+            'question_count': len(parsed.get('questions', []))
+        })
     
     def _validate_quiz_data(self, data, errors=None):
         """Validate quiz data structure"""
@@ -1431,123 +1324,114 @@ class TestingServer:
     @admin_auth_required
     async def admin_list_images(self, request):
         """List all images in quizzes/imgs directory"""
-        try:
-            imgs_dir = os.path.join(self.quizzes_dir, 'imgs')
-            images = []
+        imgs_dir = os.path.join(self.quizzes_dir, 'imgs')
+        images = []
+        
+        if os.path.exists(imgs_dir) and os.path.isdir(imgs_dir):
+            # Get all image files (common image extensions)
+            image_extensions = {'.jpg', '.jpeg', '.png', '.gif', '.bmp', '.svg', '.webp'}
             
-            if os.path.exists(imgs_dir) and os.path.isdir(imgs_dir):
-                # Get all image files (common image extensions)
-                image_extensions = {'.jpg', '.jpeg', '.png', '.gif', '.bmp', '.svg', '.webp'}
-                
-                for filename in os.listdir(imgs_dir):
-                    if os.path.isfile(os.path.join(imgs_dir, filename)):
-                        _, ext = os.path.splitext(filename.lower())
-                        if ext in image_extensions:
-                            images.append({
-                                'filename': filename,
-                                'path': f'/imgs/{filename}'  # Relative path for quiz usage
-                            })
-                
-                # Sort alphabetically
-                images.sort(key=lambda x: x['filename'].lower())
+            for filename in os.listdir(imgs_dir):
+                if os.path.isfile(os.path.join(imgs_dir, filename)):
+                    _, ext = os.path.splitext(filename.lower())
+                    if ext in image_extensions:
+                        images.append({
+                            'filename': filename,
+                            'path': f'/imgs/{filename}'  # Relative path for quiz usage
+                        })
             
-            return web.json_response({'images': images})
-        except Exception as e:
-            logger.error(f"Error listing images: {e}")
-            return web.json_response({'error': str(e)}, status=500)
+            # Sort alphabetically
+            images.sort(key=lambda x: x['filename'].lower())
+        
+        return web.json_response({'images': images})
     
     @admin_auth_required
     async def admin_download_quiz(self, request):
         """Download and extract quiz from ZIP file"""
+        data = await request.json()
+        quiz_name = data.get('name')
+        download_path = data.get('download_path')
+        folder = data.get('folder')
+        
+        if not all([quiz_name, download_path, folder]):
+            return web.json_response({'error': 'Missing required parameters'}, status=400)
+        
+        # Validate URL (basic HTTPS check)
+        if not download_path.startswith('https://'):
+            return web.json_response({'error': 'Only HTTPS URLs are allowed'}, status=400)
+        
+        logger.info(f"Starting download of quiz '{quiz_name}' from {download_path}")
+        
+        # Create temporary file for ZIP download  
+        temp_zip_path = None
         try:
-            data = await request.json()
-            quiz_name = data.get('name')
-            download_path = data.get('download_path')
-            folder = data.get('folder')
-            
-            if not all([quiz_name, download_path, folder]):
-                return web.json_response({'error': 'Missing required parameters'}, status=400)
-            
-            # Validate URL (basic HTTPS check)
-            if not download_path.startswith('https://'):
-                return web.json_response({'error': 'Only HTTPS URLs are allowed'}, status=400)
-            
-            logger.info(f"Starting download of quiz '{quiz_name}' from {download_path}")
-            
-            # Create temporary file for ZIP download  
-            temp_zip_path = None
-            try:
-                with tempfile.NamedTemporaryFile(suffix='.zip', delete=False) as temp_zip:
-                    temp_zip_path = temp_zip.name
-                    
-                    # Download ZIP file
-                    async with ClientSession() as session:
-                        async with session.get(download_path) as response:
-                            if response.status != 200:
-                                return web.json_response(
-                                    {'error': f'Failed to download: HTTP {response.status}'}, 
-                                    status=400
-                                )
-                            
-                            # Write downloaded content to temporary file
-                            async for chunk in response.content.iter_chunked(8192):
-                                temp_zip.write(chunk)
+            with tempfile.NamedTemporaryFile(suffix='.zip', delete=False) as temp_zip:
+                temp_zip_path = temp_zip.name
                 
-                # File is now closed, safe to open as ZIP
-                with zipfile.ZipFile(temp_zip_path, 'r') as zip_file:
-                    # Get all files in the specified folder
-                    folder_prefix = folder if folder.endswith('/') else folder + '/'
-                    files_to_extract = [f for f in zip_file.namelist() 
-                                      if f.startswith(folder_prefix) and not f.endswith('/')]
-                    
-                    if not files_to_extract:
-                        return web.json_response(
-                            {'error': f'No files found in folder "{folder}" within the ZIP'}, 
-                            status=400
-                        )
-                    
-                    # Extract files to quizzes directory
-                    extracted_count = 0
-                    for file_path in files_to_extract:
-                        # Remove folder prefix to get just the filename
-                        filename = file_path[len(folder_prefix):]
-                        if filename:  # Skip empty filenames
-                            target_path = os.path.join(self.quizzes_dir, filename)
-                            
-                            # Ensure target directory exists
-                            target_dir = os.path.dirname(target_path)
-                            os.makedirs(target_dir, exist_ok=True)
-                            
-                            # Extract and write file
-                            with zip_file.open(file_path) as source:
-                                with open(target_path, 'wb') as target:
-                                    target.write(source.read())
-                            extracted_count += 1
-                    
-                    logger.info(f"Extracted {extracted_count} files from quiz '{quiz_name}'")
+                # Download ZIP file
+                async with ClientSession() as session:
+                    async with session.get(download_path) as response:
+                        if response.status != 200:
+                            return web.json_response(
+                                {'error': f'Failed to download: HTTP {response.status}'}, 
+                                status=400
+                            )
+                        
+                        # Write downloaded content to temporary file
+                        async for chunk in response.content.iter_chunked(8192):
+                            temp_zip.write(chunk)
+            
+            # File is now closed, safe to open as ZIP
+            with zipfile.ZipFile(temp_zip_path, 'r') as zip_file:
+                # Get all files in the specified folder
+                folder_prefix = folder if folder.endswith('/') else folder + '/'
+                files_to_extract = [f for f in zip_file.namelist() 
+                                    if f.startswith(folder_prefix) and not f.endswith('/')]
                 
-            finally:
-                # Clean up temporary ZIP file
-                if temp_zip_path:
-                    try:
-                        os.unlink(temp_zip_path)
-                    except OSError:
-                        pass
+                if not files_to_extract:
+                    return web.json_response(
+                        {'error': f'No files found in folder "{folder}" within the ZIP'}, 
+                        status=400
+                    )
+                
+                # Extract files to quizzes directory
+                extracted_count = 0
+                for file_path in files_to_extract:
+                    # Remove folder prefix to get just the filename
+                    filename = file_path[len(folder_prefix):]
+                    if filename:  # Skip empty filenames
+                        target_path = os.path.join(self.quizzes_dir, filename)
+                        
+                        # Ensure target directory exists
+                        target_dir = os.path.dirname(target_path)
+                        os.makedirs(target_dir, exist_ok=True)
+                        
+                        # Extract and write file
+                        with zip_file.open(file_path) as source:
+                            with open(target_path, 'wb') as target:
+                                target.write(source.read())
+                        extracted_count += 1
+                
+                logger.info(f"Extracted {extracted_count} files from quiz '{quiz_name}'")
             
-            # Refresh quiz list to include newly extracted files
-            available_quizzes = await self.list_available_quizzes()
+        finally:
+            # Clean up temporary ZIP file
+            if temp_zip_path:
+                try:
+                    os.unlink(temp_zip_path)
+                except OSError:
+                    pass
+        
+        # Refresh quiz list to include newly extracted files
+        available_quizzes = await self.list_available_quizzes()
+        
+        return web.json_response({
+            'success': True,
+            'message': f'Successfully downloaded and extracted quiz "{quiz_name}"',
+            'extracted_files': extracted_count,
+            'available_quizzes': available_quizzes
+        })
             
-            return web.json_response({
-                'success': True,
-                'message': f'Successfully downloaded and extracted quiz "{quiz_name}"',
-                'extracted_files': extracted_count,
-                'available_quizzes': available_quizzes
-            })
-            
-        except Exception as e:
-            raise
-            logger.error(f"Error downloading quiz: {e}")
-            return web.json_response({'error': f'Download failed: {str(e)}'}, status=500)
     
     async def serve_index_page(self, request):
         """Serve the index.html page from static directory"""
@@ -1556,83 +1440,61 @@ class TestingServer:
         
     async def serve_admin_page(self, request):
         """Serve the admin interface page"""
-        try:
-            try:
-                # Try modern importlib.resources first (Python 3.9+)
-                import importlib.resources as pkg_resources
-                template_content = (pkg_resources.files('webquiz') / 'templates' / 'admin.html').read_text(encoding='utf-8')
-            except (ImportError, AttributeError):
-                # Fallback to pkg_resources for older Python versions
-                import pkg_resources
-                template_path = pkg_resources.resource_filename('webquiz', 'templates/admin.html')
-                async with aiofiles.open(template_path, 'r', encoding='utf-8') as template_file:
-                    template_content = await template_file.read()
-            
-            # Check if client IP is trusted and inject auto-auth flag
-            client_ip = get_client_ip(request)
-            is_trusted_ip = client_ip in self.admin_config.trusted_ips if hasattr(self, 'admin_config') else False
-            
-            # Get network information (external interfaces only)
-            interfaces = get_network_interfaces()  # This already excludes localhost
-            port = self.config.server.port
-            
-            # Generate URLs for external network interfaces only
-            urls = []
-            for ip in interfaces:
-                urls.append({
-                    'label': f'Network Access ({ip})',
-                    'quiz_url': f'http://{ip}:{port}/'
+        template_content = TEMPLATES.get('admin.html')
+        if not template_content:
+            raise KeyError('admin.html template not found in cache')
+        
+        # Check if client IP is trusted and inject auto-auth flag
+        client_ip = get_client_ip(request)
+        is_trusted_ip = client_ip in self.admin_config.trusted_ips if hasattr(self, 'admin_config') else False
+        
+        # Get network information (external interfaces only)
+        interfaces = get_network_interfaces()  # This already excludes localhost
+        port = self.config.server.port
+        
+        # Generate URLs for external network interfaces only
+        urls = []
+        for ip in interfaces:
+            urls.append({
+                'label': f'Network Access ({ip})',
+                'quiz_url': f'http://{ip}:{port}/'
+            })
+        
+        # Prepare network info for JavaScript (only what's actually used)
+        network_info = {
+            'urls': urls
+        }
+        
+        # Get downloadable quizzes configuration
+        downloadable_quizzes = []
+        if hasattr(self.config, 'quizzes') and self.config.quizzes and self.config.quizzes.quizzes:
+            for quiz in self.config.quizzes.quizzes:
+                downloadable_quizzes.append({
+                    'name': quiz.name,
+                    'download_path': quiz.download_path,
+                    'folder': quiz.folder
                 })
-            
-            # Prepare network info for JavaScript (only what's actually used)
-            network_info = {
-                'urls': urls
-            }
-            
-            # Get downloadable quizzes configuration
-            downloadable_quizzes = []
-            if hasattr(self.config, 'quizzes') and self.config.quizzes and self.config.quizzes.quizzes:
-                for quiz in self.config.quizzes.quizzes:
-                    downloadable_quizzes.append({
-                        'name': quiz.name,
-                        'download_path': quiz.download_path,
-                        'folder': quiz.folder
-                    })
-            
-            # Inject trusted IP status, network info, and downloadable quizzes into the template
-            server_data_script = f"""
+        
+        # Inject trusted IP status, network info, and downloadable quizzes into the template
+        server_data_script = f"""
         const IS_TRUSTED_IP = {str(is_trusted_ip).lower()};
         const NETWORK_INFO = {json.dumps(network_info)};
         const DOWNLOADABLE_QUIZZES = {json.dumps(downloadable_quizzes)};"""
-            
-            template_content = template_content.replace(
-                '<script>',
-                f'<script>{server_data_script}\n'
-            )
-            
-            return web.Response(text=template_content, content_type='text/html')
-        except Exception as e:
-            logger.error(f"Error serving admin page: {e}")
-            return web.Response(text='<h1>Admin page not found</h1>', content_type='text/html', status=404)
+        
+        template_content = template_content.replace(
+            '<script>',
+            f'<script>{server_data_script}\n'
+        )
+        
+        return web.Response(text=template_content, content_type='text/html')
     
     async def serve_live_stats_page(self, request):
         """Serve the live stats page"""
-        try:
-            try:
-                # Try modern importlib.resources first (Python 3.9+)
-                import importlib.resources as pkg_resources
-                template_content = (pkg_resources.files('webquiz') / 'templates' / 'live_stats.html').read_text(encoding='utf-8')
-            except (ImportError, AttributeError):
-                # Fallback to pkg_resources for older Python versions
-                import pkg_resources
-                template_path = pkg_resources.resource_filename('webquiz', 'templates/live_stats.html')
-                async with aiofiles.open(template_path, 'r', encoding='utf-8') as template_file:
-                    template_content = await template_file.read()
-            
-            return web.Response(text=template_content, content_type='text/html')
-        except Exception as e:
-            logger.error(f"Error serving live stats page: {e}")
-            return web.Response(text='<h1>Live stats page not found</h1>', content_type='text/html', status=404)
+        template_content = TEMPLATES.get('live_stats.html')
+        if not template_content:
+            raise KeyError('live_stats.html template not found in cache')
+        
+        return web.Response(text=template_content, content_type='text/html')
     
     async def websocket_live_stats(self, request):
         """WebSocket endpoint for live stats updates"""
@@ -1696,6 +1558,9 @@ async def create_app(config: WebQuizConfig):
         force=True  # Override any existing configuration
     )
     
+    # Load templates into global cache
+    load_templates()
+    
     # Load questions and create HTML with embedded data (CSV will be initialized in switch_quiz)
     await server.load_questions()
     
@@ -1742,5 +1607,3 @@ async def create_app(config: WebQuizConfig):
     app.router.add_static('/', path=config.paths.static_dir, name='static')
     
     return app
-
-# Server is now started via CLI (aiotests.cli:main)
