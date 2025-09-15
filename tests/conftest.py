@@ -53,11 +53,21 @@ def webquiz_server(temp_dir):  # temp_dir dependency ensures working directory i
     os.makedirs('quizzes', exist_ok=True)
     quiz_data = {
         'title': 'Test Quiz',
-        'description': 'A test quiz for admin API testing',
+        'description': 'A test quiz for API testing',
         'questions': [
             {
                 'question': 'What is 2 + 2?',
                 'options': ['3', '4', '5', '6'],
+                'correct_answer': 1
+            },
+            {
+                'question': 'What is 3 + 3?',
+                'options': ['5', '6', '7', '8'],
+                'correct_answer': 1
+            },
+            {
+                'question': 'What is 5 + 5?',
+                'options': ['9', '10', '11', '12'],
                 'correct_answer': 1
             }
         ]
@@ -80,9 +90,14 @@ def webquiz_server(temp_dir):  # temp_dir dependency ensures working directory i
     with open('webquiz_config.yaml', 'w') as f:
         yaml.dump(config_data, f)
     
-    # Start server with config file
+    # Start server with config file and proper PYTHONPATH
+    env = os.environ.copy()
+    # Add parent directory to PYTHONPATH so webquiz module can be found
+    parent_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    env['PYTHONPATH'] = parent_dir + ':' + env.get('PYTHONPATH', '')
+    
     cmd = ['python', '-m', 'webquiz.cli', '--config', 'webquiz_config.yaml']
-    proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+    proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, env=env)
     
     # Wait for server port to be ready
     import socket
