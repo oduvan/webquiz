@@ -57,7 +57,8 @@ WebQuiz - A modern web-based quiz and testing system built with Python and aioht
 - **`dist/webquiz`** - Standalone PyInstaller binary executable
 - `tests/` - Test suite
   - `test_cli_directory_creation.py` - CLI directory and file creation tests (8 tests)
-  - `test_admin_api.py` - Admin API functionality tests (13 tests)  
+  - `test_admin_api.py` - Admin API functionality tests (13 tests)
+  - `test_user_quiz_flow.py` - Complete user quiz flow tests (9 tests)
   - `conftest.py` - Test fixtures and configuration with parallel testing support
 - `pyproject.toml` - Poetry configuration and dependencies (includes PyInstaller 6.15)
 - `requirements.txt` - Legacy pip dependencies
@@ -150,11 +151,22 @@ python -m webquiz.cli
 ## Test Strategy
 - **CLI Directory Creation Tests (8)**: Test directory and file creation by webquiz CLI command
 - **Admin API Tests (13)**: Test admin interface authentication, quiz management, and validation endpoints
-- **Total: 21 tests** with GitHub Actions CI/CD pipeline
+- **User Quiz Flow Tests (9)**: Test complete user journey from registration through quiz completion to results
+- **Total: 30 tests** with GitHub Actions CI/CD pipeline
 - **Parallel Testing**: Tests use predefined ports (8080-8087) with worker-based allocation to prevent conflicts
 - **Fast Server Startup**: Port availability checking instead of HTTP requests for efficient fixture startup
 - **Testing Philosophy**: Create new automated tests for newly implemented functionality instead of manual testing
 - **Test Organization**: Fixtures separated into `conftest.py` for reusability across test modules
+
+## User Flow Test Coverage
+The new `test_user_quiz_flow.py` provides comprehensive coverage of actual user quiz-taking scenarios:
+- **User Registration**: Unique username validation and UUID generation
+- **Complete Quiz Flow**: Sequential answering of all questions with timing validation
+- **Results Verification**: Final score calculation and data integrity checks
+- **Session Persistence**: Cookie-based session management and state recovery
+- **Edge Cases**: Invalid users, duplicate usernames, non-existent questions
+- **Partial Completion**: Quiz resumption after interruption
+- **Timing Accuracy**: Server-side timing measurement validation
 
 ## Notes
 - Username must be unique across all users (per quiz session)

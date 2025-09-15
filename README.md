@@ -87,10 +87,11 @@ webquiz/
 │   └── server.py          # Main application server
 ├── static/                 # Frontend files
 │   └── index.html         # Single-page web application
-├── tests/                  # Test suite
-│   ├── conftest.py        # Test configuration
-│   ├── test_integration.py # Integration tests (11 tests)
-│   └── test_server.py     # Unit tests (3 tests)
+├── tests/                        # Test suite
+│   ├── conftest.py               # Test fixtures and configuration
+│   ├── test_admin_api.py         # Admin API tests (13 tests)
+│   ├── test_cli_directory_creation.py # CLI directory tests (8 tests)
+│   └── test_user_quiz_flow.py    # User quiz flow tests (9 tests)
 └── venv/                  # Virtual environment (excluded from git)
 
 # Generated at runtime (excluded from git):
@@ -259,17 +260,21 @@ pytest tests/
 # Run with verbose output
 pytest tests/ -v
 
-# Run only integration tests
-pytest tests/test_integration.py
+# Run only admin API tests
+pytest tests/test_admin_api.py
 
-# Run only unit tests  
-pytest tests/test_server.py
+# Run only CLI directory creation tests  
+pytest tests/test_cli_directory_creation.py
+
+# Run only user quiz flow tests
+pytest tests/test_user_quiz_flow.py
 ```
 
 ### Test Coverage
-- **11 Integration Tests**: End-to-end API testing with real HTTP requests
-- **3 Unit Tests**: Internal functionality testing (CSV, YAML, data structures)
-- **Total**: 14 tests covering all critical functionality
+- **13 Admin API Tests**: Admin authentication and quiz management functionality
+- **8 CLI Directory Creation Tests**: CLI interface and directory setup testing  
+- **9 User Quiz Flow Tests**: Complete user journey from registration to completion
+- **Total**: 30 tests covering all critical functionality including the complete user flow
 
 ## 📋 Configuration Format
 

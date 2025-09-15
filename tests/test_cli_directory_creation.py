@@ -14,10 +14,15 @@ import time
 
 def run_webquiz_cli_briefly(args=None):
     """Helper to start webquiz CLI briefly for directory creation tests."""
+    env = os.environ.copy()
+    # Add parent directory to PYTHONPATH so webquiz module can be found
+    parent_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    env['PYTHONPATH'] = parent_dir + ':' + env.get('PYTHONPATH', '')
+    
     cmd = ['python', '-m', 'webquiz.cli']
     if args:
         cmd += args
-    proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+    proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, env=env)
     # Let it initialize
     time.sleep(2)
     # Terminate the process

@@ -2,6 +2,7 @@ import subprocess
 import time
 import requests
 import yaml
+import os
 
 from conftest import get_worker_port
 
@@ -134,8 +135,13 @@ def test_admin_endpoints_require_master_key_configuration(temp_dir):
         yaml.dump(config_data, f)
     
     # Start server without master key
+    env = os.environ.copy()
+    # Add parent directory to PYTHONPATH so webquiz module can be found
+    parent_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    env['PYTHONPATH'] = parent_dir + ':' + env.get('PYTHONPATH', '')
+    
     cmd = ['python', '-m', 'webquiz.cli', '--config', 'no_master_key_config.yaml']
-    proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+    proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, env=env)
     
     time.sleep(3)
     
