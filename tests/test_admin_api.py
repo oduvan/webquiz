@@ -242,7 +242,7 @@ SECURE_ENDPOINTS = [
     ('POST', '/api/admin/download-quiz', {'url': 'https://example.com/quiz.zip'})
 ]
 
-@pytest.mark.parametrize("endpoint_config", SECURE_ENDPOINTS)])
+@pytest.mark.parametrize("endpoint_config", SECURE_ENDPOINTS))
 def test_admin_endpoints_require_authentication(webquiz_server, endpoint_config):
     """Test that all admin endpoints require authentication and return 401 without master key."""
     _, port = webquiz_server
@@ -262,7 +262,7 @@ def test_admin_endpoints_require_authentication(webquiz_server, endpoint_config)
     assert response.status_code == 401, f"Expected 401 for {method} {endpoint}, got {response.status_code}"
 
 
-@pytest.mark.parametrize("endpoint_config", SECURE_ENDPOINTS)])
+@pytest.mark.parametrize("endpoint_config", SECURE_ENDPOINTS))
 def test_admin_endpoints_reject_invalid_authentication(webquiz_server, endpoint_config):
     """Test that all admin endpoints reject invalid master keys and return 401."""
     _, port = webquiz_server
