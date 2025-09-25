@@ -3,7 +3,7 @@ import time
 import requests
 import yaml
 
-from conftest import get_worker_port
+from conftest import get_worker_port, custom_webquiz_server
 
 
 def test_admin_auth_endpoint_with_valid_key(webquiz_server):
@@ -227,3 +227,99 @@ def test_admin_validate_invalid_quiz_endpoint(webquiz_server):
     data = response.json()
     assert data['valid'] is False
     assert len(data['errors']) > 0
+
+
+def test_trusted_ip_bypass_authentication(temp_dir):
+    """Test that trusted IPs can access admin endpoints without master key."""
+    config = {
+        'admin': {
+            'trusted_ips': ['127.0.0.1']
+        }
+    }
+
+    with custom_webquiz_server(config=config) as (proc, port):
+        # Access admin endpoint from localhost (trusted IP) without providing master key
+        response = requests.post(f'http://localhost:{port}/api/admin/auth')
+        assert response.status_code == 200  # Should succeed without master key
+        data = response.json()
+        assert data['authenticated'] is True
+
+        # Test another admin endpoint
+        response = requests.get(f'http://localhost:{port}/api/admin/list-quizzes')
+        assert response.status_code == 200  # Should also succeed without master key
+        data = response.json()
+        assert 'quizzes' in data
+
+
+def test_non_trusted_ip_requires_authentication(temp_dir):
+    """Test that non-trusted IPs still require master key authentication."""
+    config = {
+        'admin': {
+            'trusted_ips': ['192.168.1.100']  # Different IP, not localhost
+        }
+    }
+
+    with custom_webquiz_server(config=config) as (proc, port):
+        # Access from localhost (which is NOT in trusted list) should require auth
+        response = requests.post(f'http://localhost:{port}/api/admin/auth')
+        assert response.status_code == 401  # Should fail without master key
+
+        # But should work with master key
+        headers = {'X-Master-Key': 'test123'}
+        response = requests.post(f'http://localhost:{port}/api/admin/auth', headers=headers)
+        assert response.status_code == 200
+        data = response.json()
+        assert data['authenticated'] is True
+
+
+def test_trusted_ip_with_proxy_headers(temp_dir):
+    """Test IP detection through proxy headers."""
+    config = {
+        'admin': {
+            'trusted_ips': ['192.168.1.50', '10.0.0.100']
+        }
+    }
+
+    with custom_webquiz_server(config=config) as (proc, port):
+        # Test X-Forwarded-For header with trusted IP
+        headers = {'X-Forwarded-For': '192.168.1.50, 192.168.1.1'}
+        response = requests.post(f'http://localhost:{port}/api/admin/auth', headers=headers)
+        assert response.status_code == 200  # Should succeed due to trusted forwarded IP
+
+        # Test X-Real-IP header with trusted IP
+        headers = {'X-Real-IP': '10.0.0.100'}
+        response = requests.post(f'http://localhost:{port}/api/admin/auth', headers=headers)
+        assert response.status_code == 200  # Should succeed due to trusted real IP
+
+        # Test with non-trusted forwarded IP
+        headers = {'X-Forwarded-For': '192.168.1.200'}
+        response = requests.post(f'http://localhost:{port}/api/admin/auth', headers=headers)
+        assert response.status_code == 401  # Should fail - not trusted
+
+
+def test_multiple_trusted_ips_configuration(temp_dir):
+    """Test configuration with multiple trusted IPs."""
+    config = {
+        'admin': {
+            'trusted_ips': ['127.0.0.1', '192.168.1.10', '10.0.0.5']
+        }
+    }
+
+    with custom_webquiz_server(config=config) as (proc, port):
+        # Test localhost (trusted)
+        response = requests.post(f'http://localhost:{port}/api/admin/auth')
+        assert response.status_code == 200
+
+        # Test simulated trusted IPs via headers
+        headers = {'X-Forwarded-For': '192.168.1.10'}
+        response = requests.post(f'http://localhost:{port}/api/admin/auth', headers=headers)
+        assert response.status_code == 200
+
+        headers = {'X-Real-IP': '10.0.0.5'}
+        response = requests.post(f'http://localhost:{port}/api/admin/auth', headers=headers)
+        assert response.status_code == 200
+
+        # Test non-trusted IP
+        headers = {'X-Forwarded-For': '192.168.1.99'}
+        response = requests.post(f'http://localhost:{port}/api/admin/auth', headers=headers)
+        assert response.status_code == 401  # Should fail

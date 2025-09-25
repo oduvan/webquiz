@@ -5,6 +5,7 @@ import tempfile
 import shutil
 import os
 import yaml
+from contextlib import contextmanager
 
 
 # Predefined ports for parallel testing (8 workers max)
@@ -112,3 +113,116 @@ def webquiz_server(temp_dir):  # temp_dir dependency ensures working directory i
         except subprocess.TimeoutExpired:
             proc.kill()
             proc.wait()
+
+
+@contextmanager
+def custom_webquiz_server(config=None, quizzes=None):
+    """Context manager for creating webquiz servers with custom configurations.
+
+    Args:
+        config: Full configuration dictionary (uses default if None)
+        quizzes: Dictionary of quiz_filename -> quiz_data (uses default if None)
+
+    Yields:
+        Tuple of (process, port)
+    """
+    port = get_worker_port()
+
+    # Create default config with port-specific directories to avoid conflicts
+    default_config = {
+        'server': {
+            'port': port
+        },
+        'paths': {
+            'quizzes_dir': f'quizzes_{port}',
+            'logs_dir': f'logs_{port}',
+            'csv_dir': f'data_{port}',
+            'static_dir': f'static_{port}'
+        },
+        'admin': {
+            'master_key': 'test123',
+            'trusted_ips': []
+        }
+    }
+
+    # Default quiz set
+    default_quizzes = {
+        'test_quiz.yaml': {
+            'title': 'Test Quiz',
+            'description': 'A test quiz for admin API testing',
+            'questions': [
+                {
+                    'question': 'What is 2 + 2?',
+                    'options': ['3', '4', '5', '6'],
+                    'correct_answer': 1
+                }
+            ]
+        }
+    }
+
+    # Start with default config and deep merge with provided config
+    final_config = default_config.copy()
+    if config is not None:
+        def deep_merge(base, override):
+            """Deep merge configuration dictionaries."""
+            for key, value in override.items():
+                if key in base and isinstance(base[key], dict) and isinstance(value, dict):
+                    deep_merge(base[key], value)
+                else:
+                    base[key] = value
+        deep_merge(final_config, config)
+
+    # Always ensure port is set correctly
+    final_config['server']['port'] = port
+
+    # Use provided quizzes or default
+    final_quizzes = quizzes if quizzes is not None else default_quizzes
+
+    # Create quiz directory and quiz files
+    quizzes_dir = final_config['paths']['quizzes_dir']
+    os.makedirs(quizzes_dir, exist_ok=True)
+
+    for quiz_filename, quiz_data in final_quizzes.items():
+        quiz_file_path = os.path.join(quizzes_dir, quiz_filename)
+        with open(quiz_file_path, 'w') as f:
+            yaml.dump(quiz_data, f)
+
+    # Write config file
+    config_filename = f'custom_config_{port}.yaml'
+    with open(config_filename, 'w') as f:
+        yaml.dump(final_config, f)
+
+    # Start server
+    cmd = ['python', '-m', 'webquiz.cli', '--config', config_filename]
+    proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+
+    try:
+        # Wait for server to be ready
+        import socket
+        max_attempts = 30
+        for _ in range(max_attempts):
+            try:
+                with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+                    sock.settimeout(0.1)
+                    result = sock.connect_ex(('localhost', port))
+                    if result == 0:  # Port is open
+                        break
+            except (socket.error, OSError):
+                pass
+            time.sleep(0.1)
+        else:
+            # Server failed to start
+            stdout, stderr = proc.communicate()
+            raise Exception(f"Server failed to start within {max_attempts * 0.1}s\nSTDOUT: {stdout}\nSTDERR: {stderr}")
+
+        yield proc, port
+
+    finally:
+        # Cleanup
+        if proc.poll() is None:  # Process is still running
+            proc.terminate()
+            try:
+                proc.wait(timeout=5)
+            except subprocess.TimeoutExpired:
+                proc.kill()
+                proc.wait()
