@@ -29,8 +29,14 @@ This directory contains comprehensive end-to-end tests using Selenium WebDriver 
 - **Python 3.9+**: For async support and modern features
 
 ### Python Dependencies
+**Via Poetry (recommended):**
 ```bash
-pip install selenium webdriver-manager pytest-html
+poetry install  # Includes all dev dependencies including Selenium
+```
+
+**Via pip:**
+```bash
+pip install -r requirements.txt
 ```
 
 ### Installation Instructions
@@ -120,12 +126,11 @@ jobs:
 
     - name: Install dependencies
       run: |
-        pip install -r requirements.txt
-        pip install selenium webdriver-manager pytest-html
+        poetry install --no-interaction --no-ansi
 
     - name: Run Selenium tests
       run: |
-        pytest tests/test_user_journey_selenium.py -v --html=selenium-report.html --self-contained-html
+        poetry run pytest tests/test_user_journey_selenium.py -v --html=selenium-report.html --self-contained-html
 
     - name: Upload test results
       if: always()
