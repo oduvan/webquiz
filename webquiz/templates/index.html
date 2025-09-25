@@ -400,6 +400,20 @@
         .user-info:hover {
             background: var(--option-hover);
         }
+        .error-message {
+            background-color: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+            padding: 10px;
+            border-radius: 5px;
+            margin: 10px 0;
+            font-size: 14px;
+        }
+        [data-theme="dark"] .error-message {
+            background-color: #2d1b1b;
+            color: #f8d7da;
+            border-color: #721c24;
+        }
     </style>
 </head>
 <body>
@@ -421,6 +435,7 @@
         <!-- Registration Form -->
         <div id="registration" class="section hidden">
             <h2>Зареєструйтеся для початку тесту</h2>
+            <div id="registration-error" class="error-message hidden"></div>
             <input type="text" id="username" placeholder="Введіть ваше ім'я користувача" style="padding: 10px; width: 100%; max-width: 300px; box-sizing: border-box;">
             <button onclick="registerUser()">Зареєструватися</button>
         </div>
@@ -431,6 +446,7 @@
                 <div id="progress-fill"></div>
                 <span id="progress-text">Питання 1 з 5</span>
             </div>
+            <div id="test-error" class="error-message hidden"></div>
             <div id="current-question-container"></div>
             <div class="button-container">
                 <button id="submit-answer-btn" onclick="submitCurrentAnswer()" disabled>Відправити відповідь</button>
@@ -451,7 +467,27 @@
         let currentQuestionIndex = 0;
         let selectedAnswer = null;
         let testResults = [];
-        
+
+        // Error message utilities
+        function showError(elementId, message) {
+            const errorElement = document.getElementById(elementId);
+            if (errorElement) {
+                errorElement.textContent = message;
+                errorElement.classList.remove('hidden');
+                setTimeout(() => {
+                    hideError(elementId);
+                }, 5000); // Auto-hide after 5 seconds
+            }
+        }
+
+        function hideError(elementId) {
+            const errorElement = document.getElementById(elementId);
+            if (errorElement) {
+                errorElement.classList.add('hidden');
+                errorElement.textContent = '';
+            }
+        }
+
         // Theme management
         function initializeTheme() {
             const savedTheme = localStorage.getItem('theme') || 'light';
@@ -562,9 +598,12 @@
         async function registerUser() {
             const username = document.getElementById('username').value.trim();
             if (!username) {
-                alert('Будь ласка, введіть ім\'я користувача');
+                showError('registration-error', 'Будь ласка, введіть ім\'я користувача');
                 return;
             }
+
+            // Clear previous errors
+            hideError('registration-error');
             
             try {
                 const response = await fetch('/api/register', {
@@ -588,10 +627,10 @@
                     document.getElementById('registration').classList.add('hidden');
                     await startTest();
                 } else {
-                    alert(data.error || 'Помилка реєстрації');
+                    showError('registration-error', data.error || 'Помилка реєстрації');
                 }
             } catch (error) {
-                alert('Помилка: ' + error.message);
+                showError('registration-error', 'Помилка: ' + error.message);
             }
         }
         
@@ -678,9 +717,12 @@
         
         async function submitCurrentAnswer() {
             if (selectedAnswer === null) {
-                alert('Будь ласка, оберіть відповідь');
+                showError('test-error', 'Будь ласка, оберіть відповідь');
                 return;
             }
+
+            // Clear previous errors
+            hideError('test-error');
             
             const question = questions[currentQuestionIndex];
             
@@ -696,8 +738,21 @@
                         selected_answer: selectedAnswer
                     })
                 });
-                
-                const data = await response.json();
+
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    throw new Error(`HTTP ${response.status}: ${errorText}`);
+                }
+
+                const responseText = await response.text();
+                let data;
+                try {
+                    data = JSON.parse(responseText);
+                } catch (parseError) {
+                    console.error('JSON Parse Error:', parseError);
+                    console.error('Response text:', responseText);
+                    throw new Error(`Invalid JSON response: ${responseText.substring(0, 100)}`);
+                }
                 testResults.push({
                     questionId: question.id,
                     question: question.question,
@@ -711,7 +766,7 @@
                 showAnswerFeedback(data.is_correct, data.correct_answer);
                 
             } catch (error) {
-                alert('Помилка відправки відповіді: ' + error.message);
+                showError('test-error', 'Помилка відправки відповіді: ' + error.message);
             }
         }
 

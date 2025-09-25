@@ -943,7 +943,7 @@ class TestingServer:
             'user_id': user_id,
             'username': username,
             'question_id': question_id,
-            'question_text': question['question'],
+            'question_text': question.get('question', ''),  # Handle image-only questions
             'selected_answer_text': question['options'][selected_answer],
             'correct_answer_text': question['options'][question['correct_answer']],
             'is_correct': is_correct,
@@ -958,7 +958,7 @@ class TestingServer:
             self.user_answers[user_id] = []
         
         answer_data = {
-            'question': question['question'],
+            'question': question.get('question', ''),  # Handle image-only questions
             'image': question.get('image'),
             'selected_answer': question['options'][selected_answer],
             'correct_answer': question['options'][question['correct_answer']],
