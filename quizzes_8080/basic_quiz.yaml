@@ -1,9 +1,0 @@
-questions:
-- correct_answer: 1
-  options:
-  - '3'
-  - '4'
-  - '5'
-  - '6'
-  question: What is 2 + 2?
-title: Basic Quiz

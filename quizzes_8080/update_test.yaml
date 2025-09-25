@@ -1,9 +1,0 @@
-questions:
-- correct_answer: 1
-  options:
-  - X
-  - Y
-  - Z
-  question: Updated question?
-show_right_answer: false
-title: Updated Quiz
