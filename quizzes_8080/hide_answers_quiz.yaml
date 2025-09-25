@@ -1,0 +1,10 @@
+questions:
+- correct_answer: 2
+  options:
+  - '8'
+  - '9'
+  - '10'
+  - '11'
+  question: What is 5 + 5?
+show_right_answer: false
+title: Hide Answers Quiz

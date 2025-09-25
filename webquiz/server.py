@@ -409,6 +409,7 @@ class TestingServer:
         self.log_file = None  # Will be set during initialization
         self.csv_file = None  # Will be set when quiz is selected
         self.quiz_title = 'Система Тестування'  # Default title, updated when quiz is loaded
+        self.show_right_answer = True  # Default setting, updated when quiz is loaded
         self.users: Dict[str, Dict[str, Any]] = {}  # user_id -> user data
         self.questions: List[Dict[str, Any]] = []
         self.user_responses: List[Dict[str, Any]] = []
@@ -624,6 +625,7 @@ class TestingServer:
             file_path = self.config_file if hasattr(self, 'config_file') else 'config.yaml'
         default_questions = {
             'title': 'Тестовий Quiz',
+            'show_right_answer': True,
             'questions': [
                 {
                     'question': 'Скільки буде 2 + 2?',
@@ -656,11 +658,14 @@ class TestingServer:
                 # Store quiz title or use default
                 self.quiz_title = data.get('title', 'Система Тестування')
                 
+                # Store show_right_answer setting (default: True)
+                self.show_right_answer = data.get('show_right_answer', True)
+                
                 # Add automatic IDs based on array index (for quiz execution only)
                 for i, question in enumerate(self.questions):
                     question['id'] = i + 1
                         
-                logger.info(f"Loaded {len(self.questions)} questions from {quiz_file_path}")
+                logger.info(f"Loaded {len(self.questions)} questions from {quiz_file_path}, show_right_answer: {self.show_right_answer}")
         except Exception as e:
             logger.error(f"Error loading questions from {quiz_file_path}: {e}")
             raise
@@ -1010,12 +1015,18 @@ class TestingServer:
         logger.info(f"Answer submitted by {username} (ID: {user_id}) for question {question_id}: {'Correct' if is_correct else 'Incorrect'} (took {time_taken:.2f}s)")
         logger.info(f"Updated progress for user {user_id}: last answered question = {question_id}")
         
-        return web.json_response({
+        # Prepare response data
+        response_data = {
             'is_correct': is_correct,
-            'correct_answer': question['correct_answer'],
             'time_taken': time_taken,
             'message': 'Answer submitted successfully'
-        })
+        }
+        
+        # Only include correct answer if show_right_answer is enabled
+        if self.show_right_answer:
+            response_data['correct_answer'] = question['correct_answer']
+        
+        return web.json_response(response_data)
             
         
 
@@ -1058,6 +1069,17 @@ class TestingServer:
             # Return stored stats (without the completed_at timestamp for the frontend)
             stats = self.user_stats[user_id].copy()
             stats.pop('completed_at', None)  # Remove timestamp from response
+            
+            # If show_right_answer is disabled, remove correct answer information from test results
+            if not self.show_right_answer:
+                # Create a copy of test_results without correct_answer field
+                modified_results = []
+                for result in stats.get('test_results', []):
+                    result_copy = result.copy()
+                    result_copy.pop('correct_answer', None)  # Remove correct_answer field
+                    modified_results.append(result_copy)
+                stats['test_results'] = modified_results
+            
             return stats
         
         # Fallback - should not happen if calculate_and_store_user_stats was called

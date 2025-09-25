@@ -1,0 +1,17 @@
+questions:
+- correct_answer: 1
+  options:
+  - '1'
+  - '2'
+  - '3'
+  - '4'
+  question: What is 1 + 1?
+- correct_answer: 2
+  options:
+  - '2'
+  - '3'
+  - '4'
+  - '5'
+  question: What is 2 * 2?
+show_right_answer: false
+title: Multi Question Quiz

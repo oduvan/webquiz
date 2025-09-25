@@ -1,0 +1,10 @@
+questions:
+- correct_answer: 1
+  options:
+  - A
+  - B
+  - C
+  - D
+  question: Admin question?
+show_right_answer: false
+title: Admin Created Quiz
