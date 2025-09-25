@@ -192,8 +192,11 @@ def test_complete_quiz_journey(temp_dir, browser):
         continue_button = wait_for_clickable(browser, By.ID, 'continue-btn')
         continue_button.click()
 
-        # Wait for results
-        results_section = wait_for_element(browser, By.ID, 'results')
+        # Wait for results section to be visible (not just present)
+        from selenium.webdriver.support import expected_conditions as EC
+        results_section = WebDriverWait(browser, 10).until(
+            EC.visibility_of_element_located((By.ID, 'results'))
+        )
         assert results_section.is_displayed()
 
         # Verify results content
@@ -482,6 +485,7 @@ def test_different_question_types(temp_dir, browser):
 
         # Should reach results
         wait_for_element(browser, By.ID, 'results')
+        assert 'Результат:' in browser.page_source
         assert '3/3 (100%)' in browser.page_source
 
 
@@ -578,6 +582,7 @@ def test_results_display_accuracy(temp_dir, browser):
         wait_for_element(browser, By.ID, 'results')
 
         # Should show 1/2 (50%)
+        assert 'Результат:' in browser.page_source
         assert '1/2 (50%)' in browser.page_source
 
         # Check results table exists
