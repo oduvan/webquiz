@@ -379,7 +379,7 @@ def admin_auth_required(func):
                 pass
         
         if not provided_key or provided_key != self.master_key:
-            return web.json_response({'error': 'Invalid or missing master key'}, status=401)
+            return web.json_response({'error': 'Недійсний або відсутній головний ключ'}, status=401)
         
         return await func(self, request)
     return wrapper
@@ -716,7 +716,8 @@ class TestingServer:
         for q in self.questions:
             client_question = {
                 'id': q['id'],
-                'options': q['options']
+                'options': q['options'],
+                'is_multiple_choice': isinstance(q['correct_answer'], list)
             }
             # Include question text if present
             if 'question' in q and q['question']:
@@ -724,6 +725,9 @@ class TestingServer:
             # Include optional image attribute if present
             if 'image' in q and q['image']:
                 client_question['image'] = q['image']
+            # Include min_correct for multiple choice questions
+            if isinstance(q['correct_answer'], list):
+                client_question['min_correct'] = q.get('min_correct', len(q['correct_answer']))
             questions_for_client.append(client_question)
         
         # Convert questions to JSON string for embedding
@@ -858,6 +862,50 @@ class TestingServer:
         
         self.websocket_clients = active_clients
     
+    def _validate_answer(self, selected_answer, question):
+        """Validate answer for both single and multiple choice questions"""
+        correct_answer = question['correct_answer']
+
+        if isinstance(correct_answer, int):
+            # Single answer question
+            return selected_answer == correct_answer
+        elif isinstance(correct_answer, list):
+            # Multiple answer question
+            if not isinstance(selected_answer, list):
+                return False
+
+            # Convert to sets for comparison
+            selected_set = set(selected_answer)
+            correct_set = set(correct_answer)
+
+            # Check if any incorrect answers were selected
+            if not selected_set.issubset(set(range(len(question['options'])))):
+                return False  # Invalid option indices
+
+            # Check if any incorrect answers were selected
+            incorrect_selected = selected_set - correct_set
+            if incorrect_selected:
+                return False  # Any incorrect answer makes it wrong
+
+            # Check minimum correct requirement
+            min_correct = question.get('min_correct', len(correct_answer))
+            correct_selected = selected_set & correct_set
+
+            return len(correct_selected) >= min_correct
+        else:
+            return False  # Invalid correct_answer format
+
+    def _format_answer_text(self, answer_indices, options):
+        """Format answer text for CSV with | separator for multiple answers"""
+        if isinstance(answer_indices, int):
+            return options[answer_indices]
+        elif isinstance(answer_indices, list):
+            # Sort indices and join corresponding option texts with |
+            sorted_indices = sorted(answer_indices)
+            return '|'.join(options[idx] for idx in sorted_indices)
+        else:
+            return str(answer_indices)
+
     def update_live_stats(self, user_id: str, question_id: int, state: str, time_taken: float = None):
         """Update live stats for a user and question"""
         if user_id not in self.live_stats:
@@ -875,12 +923,12 @@ class TestingServer:
         username = data['username'].strip()
         
         if not username:
-            raise ValueError('Username cannot be empty')
+            raise ValueError('Ім\'я користувача не може бути порожнім')
             
         # Check if username already exists
         for existing_user in self.users.values():
             if existing_user['username'] == username:
-                raise ValueError('Username already exists')
+                raise ValueError('Ім\'я користувача вже існує')
         
         # Generate unique user ID
         user_id = str(uuid.uuid4())
@@ -925,14 +973,14 @@ class TestingServer:
         
         # Find user by user_id
         if user_id not in self.users:
-            return web.json_response({'error': 'User not found'}, status=404)
+            return web.json_response({'error': 'Користувача не знайдено'}, status=404)
         
         username = self.users[user_id]['username']
             
         # Find the question
         question = next((q for q in self.questions if q['id'] == question_id), None)
         if not question:
-            return web.json_response({'error': 'Question not found'}, status=404)
+            return web.json_response({'error': 'Питання не знайдено'}, status=404)
             
         # Calculate time taken server-side
         time_taken = 0
@@ -941,8 +989,8 @@ class TestingServer:
             # Clean up the start time
             del self.question_start_times[user_id]
         
-        # Check if answer is correct
-        is_correct = selected_answer == question['correct_answer']
+        # Check if answer is correct (handle both single and multiple answers)
+        is_correct = self._validate_answer(selected_answer, question)
         
         # Store response in memory
         response_data = {
@@ -950,8 +998,8 @@ class TestingServer:
             'username': username,
             'question_id': question_id,
             'question_text': question.get('question', ''),  # Handle image-only questions
-            'selected_answer_text': question['options'][selected_answer],
-            'correct_answer_text': question['options'][question['correct_answer']],
+            'selected_answer_text': self._format_answer_text(selected_answer, question['options']),
+            'correct_answer_text': self._format_answer_text(question['correct_answer'], question['options']),
             'is_correct': is_correct,
             'time_taken_seconds': time_taken,
             'timestamp': datetime.now().isoformat()
@@ -966,8 +1014,8 @@ class TestingServer:
         answer_data = {
             'question': question.get('question', ''),  # Handle image-only questions
             'image': question.get('image'),
-            'selected_answer': question['options'][selected_answer],
-            'correct_answer': question['options'][question['correct_answer']],
+            'selected_answer': self._format_answer_text(selected_answer, question['options']),
+            'correct_answer': self._format_answer_text(question['correct_answer'], question['options']),
             'is_correct': is_correct,
             'time_taken': time_taken
         }
@@ -1026,6 +1074,7 @@ class TestingServer:
         if self.show_right_answer:
             response_data['is_correct'] = is_correct
             response_data['correct_answer'] = question['correct_answer']
+            response_data['is_multiple_choice'] = isinstance(question['correct_answer'], list)
         
         return web.json_response(response_data)
             
@@ -1241,7 +1290,7 @@ class TestingServer:
             if mode == 'wizard':
                 quiz_data = data.get('quiz_data', {})
                 if not self._validate_quiz_data(quiz_data):
-                    return web.json_response({'error': 'Invalid quiz data structure'}, status=400)
+                    return web.json_response({'error': 'Неправильна структура даних квізу'}, status=400)
                 
                 import yaml
                 quiz_content = yaml.dump(quiz_data, default_flow_style=False, allow_unicode=True)
@@ -1255,9 +1304,9 @@ class TestingServer:
                     import yaml
                     parsed = yaml.safe_load(quiz_content)
                     if not self._validate_quiz_data(parsed):
-                        return web.json_response({'error': 'Invalid quiz data structure'}, status=400)
+                        return web.json_response({'error': 'Неправильна структура даних квізу'}, status=400)
                 except yaml.YAMLError as e:
-                    return web.json_response({'error': f'Invalid YAML: {str(e)}'}, status=400)
+                    return web.json_response({'error': f'Неправильний YAML: {str(e)}'}, status=400)
             
             # Write the quiz file
             with open(quiz_path, 'w', encoding='utf-8') as f:
@@ -1295,7 +1344,7 @@ class TestingServer:
             if mode == 'wizard':
                 quiz_data = data.get('quiz_data', {})
                 if not self._validate_quiz_data(quiz_data):
-                    return web.json_response({'error': 'Invalid quiz data structure'}, status=400)
+                    return web.json_response({'error': 'Неправильна структура даних квізу'}, status=400)
                 
                 import yaml
                 quiz_content = yaml.dump(quiz_data, default_flow_style=False, allow_unicode=True)
@@ -1309,9 +1358,9 @@ class TestingServer:
                     import yaml
                     parsed = yaml.safe_load(quiz_content)
                     if not self._validate_quiz_data(parsed):
-                        return web.json_response({'error': 'Invalid quiz data structure'}, status=400)
+                        return web.json_response({'error': 'Неправильна структура даних квізу'}, status=400)
                 except yaml.YAMLError as e:
-                    return web.json_response({'error': f'Invalid YAML: {str(e)}'}, status=400)
+                    return web.json_response({'error': f'Неправильний YAML: {str(e)}'}, status=400)
             
             # Write updated content
             with open(quiz_path, 'w', encoding='utf-8') as f:
@@ -1399,20 +1448,20 @@ class TestingServer:
             errors = []
         
         if not isinstance(data, dict):
-            errors.append("Quiz data must be a dictionary")
+            errors.append("Дані квізу повинні бути словником")
             return False
         
         if 'questions' not in data:
-            errors.append("Quiz must contain 'questions' field")
+            errors.append("Квіз повинен містити поле 'questions'")
             return False
         
         questions = data['questions']
         if not isinstance(questions, list):
-            errors.append("'questions' must be a list")
+            errors.append("'questions' повинно бути списком")
             return False
         
         if len(questions) == 0:
-            errors.append("Quiz must contain at least one question")
+            errors.append("Квіз повинен містити принаймні одне питання")
             return False
         
         for i, question in enumerate(questions):
@@ -1442,13 +1491,41 @@ class TestingServer:
                 elif not all(isinstance(opt, str) for opt in options):
                     errors.append(f"Question {i+1} all options must be strings")
             
-            # Validate correct_answer
+            # Validate correct_answer (can be integer for single answer or list for multiple answers)
             if 'correct_answer' in question and 'options' in question:
                 correct_answer = question['correct_answer']
-                if not isinstance(correct_answer, int):
-                    errors.append(f"Question {i+1} correct_answer must be an integer")
-                elif correct_answer < 0 or correct_answer >= len(question['options']):
-                    errors.append(f"Question {i+1} correct_answer index out of range")
+                options_count = len(question['options'])
+
+                if isinstance(correct_answer, int):
+                    # Single answer validation
+                    if correct_answer < 0 or correct_answer >= options_count:
+                        errors.append(f"Question {i+1} correct_answer index out of range")
+                elif isinstance(correct_answer, list):
+                    # Multiple answers validation
+                    if len(correct_answer) == 0:
+                        errors.append(f"Question {i+1} correct_answer array cannot be empty")
+                    elif not all(isinstance(idx, int) for idx in correct_answer):
+                        errors.append(f"Question {i+1} correct_answer array must contain only integers")
+                    elif any(idx < 0 or idx >= options_count for idx in correct_answer):
+                        errors.append(f"Question {i+1} correct_answer array contains index out of range")
+                    elif len(set(correct_answer)) != len(correct_answer):
+                        errors.append(f"Question {i+1} correct_answer array contains duplicate indices")
+                else:
+                    errors.append(f"Question {i+1} correct_answer must be an integer or array of integers")
+
+            # Validate min_correct (only valid for multiple answers)
+            if 'min_correct' in question:
+                min_correct = question['min_correct']
+                if 'correct_answer' not in question:
+                    errors.append(f"Question {i+1} has min_correct but no correct_answer")
+                elif not isinstance(question['correct_answer'], list):
+                    errors.append(f"Question {i+1} min_correct is only valid for multiple answer questions")
+                elif not isinstance(min_correct, int):
+                    errors.append(f"Question {i+1} min_correct must be an integer")
+                elif min_correct < 1:
+                    errors.append(f"Question {i+1} min_correct must be at least 1")
+                elif min_correct > len(question['correct_answer']):
+                    errors.append(f"Question {i+1} min_correct cannot exceed number of correct answers")
         
         return len(errors) == 0
     

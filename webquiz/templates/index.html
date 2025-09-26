@@ -157,6 +157,30 @@
             z-index: 10;
         }
 
+        .option.feedback-missed {
+            background: #e3f2fd !important;
+            border-color: #1976d2 !important;
+            border-width: 3px !important;
+            border-style: dashed !important;
+            color: #0d47a1 !important;
+            position: relative;
+        }
+
+        .option.feedback-missed::after {
+            content: '✓ Теж правильна відповідь';
+            position: absolute;
+            top: -25px;
+            right: 0;
+            background: #1976d2;
+            color: white;
+            padding: 2px 8px;
+            border-radius: 3px;
+            font-size: 12px;
+            font-weight: bold;
+            white-space: nowrap;
+            z-index: 10;
+        }
+
         .option.disabled {
             cursor: not-allowed !important;
             opacity: 0.6 !important;
@@ -180,6 +204,12 @@
             background: #c20909 !important;
             border-color: #f44336 !important;
             color: #ef9a9a !important;
+        }
+
+        [data-theme="dark"] .option.feedback-missed {
+            background: #1a237e !important;
+            border-color: #3f51b5 !important;
+            color: #9fa8da !important;
         }
         .question-image {
             max-width: 100%;
@@ -467,6 +497,7 @@
         let showRightAnswer = {{SHOW_RIGHT_ANSWER}};
         let currentQuestionIndex = 0;
         let selectedAnswer = null;
+        let selectedAnswers = []; // For multiple choice questions
         let testResults = [];
 
         // Error message utilities
@@ -652,6 +683,7 @@
             
             const question = questions[currentQuestionIndex];
             selectedAnswer = null;
+            selectedAnswers = [];
             
             // Update progress
             const progress = ((currentQuestionIndex + 1) / questions.length) * 100;
@@ -665,8 +697,10 @@
                     ${question.question ? `<h3>${question.question}</h3>` : ''}
                     ${question.image ? `<a href="${question.image}" target="_blank"><img src="${question.image}" alt="Question image" class="question-image"></a>` : ''}
                     <div class="options">
+                        ${question.is_multiple_choice ? '<p style="font-size: 14px; color: var(--text-muted); margin-bottom: 10px;">📋 Можна обрати кілька відповідей</p>' : ''}
                         ${question.options.map((option, optionIndex) => {
                             const isImageOption = option.startsWith('/');
+
                             if (isImageOption) {
                                 return `
                                     <div class="option" onclick="selectCurrentAnswer(${optionIndex})" id="option_${optionIndex}">
@@ -701,31 +735,63 @@
             if (document.querySelector('.option.disabled')) {
                 return;
             }
-            
-            selectedAnswer = optionIndex;
-            
-            // Clear previous selections
-            document.querySelectorAll('.option').forEach(option => {
-                option.classList.remove('selected');
-            });
-            
-            // Select current option
-            document.getElementById(`option_${optionIndex}`).classList.add('selected');
-            
-            // Enable submit button
-            document.getElementById('submit-answer-btn').disabled = false;
+
+            const question = questions[currentQuestionIndex];
+            const optionElement = document.getElementById(`option_${optionIndex}`);
+
+            if (question.is_multiple_choice) {
+                // Multiple choice logic - toggle selection
+                if (selectedAnswers.includes(optionIndex)) {
+                    // Deselect if already selected
+                    selectedAnswers = selectedAnswers.filter(idx => idx !== optionIndex);
+                    optionElement.classList.remove('selected');
+                } else {
+                    // Select if not selected
+                    selectedAnswers.push(optionIndex);
+                    optionElement.classList.add('selected');
+                }
+
+                // Enable submit button if at least one answer is selected
+                document.getElementById('submit-answer-btn').disabled = selectedAnswers.length === 0;
+            } else {
+                // Single choice logic - selecting new option deselects previous
+                if (selectedAnswer === optionIndex) {
+                    // Deselect if clicking the same option
+                    selectedAnswer = null;
+                    optionElement.classList.remove('selected');
+                    document.getElementById('submit-answer-btn').disabled = true;
+                } else {
+                    // Clear previous selections
+                    document.querySelectorAll('.option').forEach(option => {
+                        option.classList.remove('selected');
+                    });
+
+                    // Select current option
+                    selectedAnswer = optionIndex;
+                    optionElement.classList.add('selected');
+                    document.getElementById('submit-answer-btn').disabled = false;
+                }
+            }
         }
         
         async function submitCurrentAnswer() {
-            if (selectedAnswer === null) {
-                showError('test-error', 'Будь ласка, оберіть відповідь');
-                return;
+            const question = questions[currentQuestionIndex];
+
+            // Validate selection based on question type
+            if (question.is_multiple_choice) {
+                if (selectedAnswers.length === 0) {
+                    showError('test-error', 'Будь ласка, оберіть хоча б одну відповідь');
+                    return;
+                }
+            } else {
+                if (selectedAnswer === null) {
+                    showError('test-error', 'Будь ласка, оберіть відповідь');
+                    return;
+                }
             }
 
             // Clear previous errors
             hideError('test-error');
-            
-            const question = questions[currentQuestionIndex];
             
             try {
                 const response = await fetch('/api/submit-answer', {
@@ -736,7 +802,7 @@
                     body: JSON.stringify({
                         user_id: currentUserId,
                         question_id: question.id,
-                        selected_answer: selectedAnswer
+                        selected_answer: question.is_multiple_choice ? selectedAnswers.slice().sort((a, b) => a - b) : selectedAnswer
                     })
                 });
 
@@ -754,13 +820,22 @@
                     console.error('Response text:', responseText);
                     throw new Error(`Invalid JSON response: ${responseText.substring(0, 100)}`);
                 }
+                // Format selected answer for display
+                let selectedAnswerDisplay;
+                if (question.is_multiple_choice) {
+                    selectedAnswerDisplay = selectedAnswers.map(idx => question.options[idx]).join(' | ');
+                } else {
+                    selectedAnswerDisplay = question.options[selectedAnswer];
+                }
+
                 testResults.push({
                     questionId: question.id,
                     question: question.question,
                     image: question.image,
-                    selectedAnswer: question.options[selectedAnswer],
+                    selectedAnswer: selectedAnswerDisplay,
                     isCorrect: data.is_correct !== undefined ? data.is_correct : null,  // null when not provided
-                    timeTaken: data.time_taken || 0
+                    timeTaken: data.time_taken || 0,
+                    isMultipleChoice: question.is_multiple_choice
                 });
                 
                 // Show feedback on selected answer
@@ -772,45 +847,75 @@
         }
 
         function showAnswerFeedback(isCorrect, correctAnswer) {
+            const question = questions[currentQuestionIndex];
+
             // If isCorrect is undefined, don't show any feedback (show_right_answer is false)
             if (isCorrect === undefined) {
                 // Disable all options to prevent further selection but don't show any visual feedback
                 document.querySelectorAll('.option').forEach(option => {
                     option.classList.add('disabled');
                 });
-                
+
                 // Hide submit button and show continue button
                 const submitBtn = document.getElementById('submit-answer-btn');
                 const continueBtn = document.getElementById('continue-btn');
-                
+
                 submitBtn.classList.add('hidden');
                 continueBtn.classList.remove('hidden');
                 return;
             }
-            
-            // Apply feedback styling to selected answer
-            const selectedOption = document.querySelector('.option.selected');
-            if (selectedOption) {
-                selectedOption.classList.add(isCorrect ? 'feedback-correct' : 'feedback-incorrect');
-            }
-            
-            // If answer is incorrect and correctAnswer is provided, highlight the correct answer
-            if (!isCorrect && correctAnswer !== undefined && correctAnswer !== null) {
-                const correctOption = document.getElementById(`option_${correctAnswer}`);
-                if (correctOption) {
-                    correctOption.classList.add('feedback-correct');
+
+            if (question.is_multiple_choice) {
+                // Multiple choice feedback
+                const correctAnswerArray = Array.isArray(correctAnswer) ? correctAnswer : [];
+
+                // First, mark all user's selected answers
+                selectedAnswers.forEach(answerIndex => {
+                    const optionElement = document.getElementById(`option_${answerIndex}`);
+                    if (correctAnswerArray.includes(answerIndex)) {
+                        // User selected a correct answer
+                        optionElement.classList.add('feedback-correct');
+                    } else {
+                        // User selected an incorrect answer
+                        optionElement.classList.add('feedback-incorrect');
+                    }
+                });
+
+                // Then, highlight any missed correct answers (always show all correct answers)
+                correctAnswerArray.forEach(correctIndex => {
+                    if (!selectedAnswers.includes(correctIndex)) {
+                        // This is a correct answer the user missed
+                        const correctOption = document.getElementById(`option_${correctIndex}`);
+                        if (correctOption) {
+                            correctOption.classList.add('feedback-missed');
+                        }
+                    }
+                });
+            } else {
+                // Single choice feedback
+                const selectedOption = document.querySelector('.option.selected');
+                if (selectedOption) {
+                    selectedOption.classList.add(isCorrect ? 'feedback-correct' : 'feedback-incorrect');
+                }
+
+                // If answer is incorrect and correctAnswer is provided, highlight the correct answer
+                if (!isCorrect && correctAnswer !== undefined && correctAnswer !== null) {
+                    const correctOption = document.getElementById(`option_${correctAnswer}`);
+                    if (correctOption) {
+                        correctOption.classList.add('feedback-correct');
+                    }
                 }
             }
-            
+
             // Disable all options to prevent further selection
             document.querySelectorAll('.option').forEach(option => {
                 option.classList.add('disabled');
             });
-            
+
             // Hide submit button and show continue button
             const submitBtn = document.getElementById('submit-answer-btn');
             const continueBtn = document.getElementById('continue-btn');
-            
+
             submitBtn.classList.add('hidden');
             continueBtn.classList.remove('hidden');
         }
@@ -854,17 +959,35 @@
                 return questionText;
             } else {
                 // Fallback
-                return questionImage || 'No question content';
+                return questionImage || 'Немає контенту питання';
             }
         }
 
         function formatAnswerForDisplay(answerText) {
-            if (answerText && answerText.startsWith('/')) {
-                // Display image for answer option
-                return `<img src="${answerText}" alt="Answer option" style="max-width: 100px; max-height: 75px; border-radius: 3px;">`;
+            if (!answerText) return '';
+
+            // Check if it's multiple answers (contains | separator)
+            if (answerText.includes('|')) {
+                const answers = answerText.split('|');
+                return answers.map(answer => {
+                    const trimmedAnswer = answer.trim();
+                    if (trimmedAnswer.startsWith('/')) {
+                        // Image answer
+                        return `<div style="margin: 2px 0;"><img src="${trimmedAnswer}" alt="Answer option" style="max-width: 100px; max-height: 75px; border-radius: 3px;"></div>`;
+                    } else {
+                        // Text answer
+                        return `<div style="margin: 2px 0;">${trimmedAnswer}</div>`;
+                    }
+                }).join('');
             } else {
-                // Text answer
-                return answerText || '';
+                // Single answer
+                if (answerText.startsWith('/')) {
+                    // Display image for answer option
+                    return `<img src="${answerText}" alt="Answer option" style="max-width: 100px; max-height: 75px; border-radius: 3px;">`;
+                } else {
+                    // Text answer
+                    return answerText;
+                }
             }
         }
 
@@ -888,7 +1011,7 @@
                         <tr>
                             <th>Питання</th>
                             <th>Ваша відповідь</th>
-                            <th style="text-align: center;">Правильно</th>
+                            <th style="text-align: center;">Зараховано</th>
                         </tr>
                     </thead>
                     <tbody>
