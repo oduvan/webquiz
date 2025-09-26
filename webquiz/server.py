@@ -1017,13 +1017,13 @@ class TestingServer:
         
         # Prepare response data
         response_data = {
-            'is_correct': is_correct,
             'time_taken': time_taken,
             'message': 'Answer submitted successfully'
         }
         
-        # Only include correct answer if show_right_answer is enabled
+        # Only include correctness feedback and correct answer if show_right_answer is enabled
         if self.show_right_answer:
+            response_data['is_correct'] = is_correct
             response_data['correct_answer'] = question['correct_answer']
         
         return web.json_response(response_data)
@@ -1072,11 +1072,12 @@ class TestingServer:
             
             # If show_right_answer is disabled, remove correct answer information from test results
             if not self.show_right_answer:
-                # Create a copy of test_results without correct_answer field
+                # Create a copy of test_results without correct_answer and is_correct fields
                 modified_results = []
                 for result in stats.get('test_results', []):
                     result_copy = result.copy()
                     result_copy.pop('correct_answer', None)  # Remove correct_answer field
+                    result_copy.pop('is_correct', None)  # Remove is_correct field
                     modified_results.append(result_copy)
                 stats['test_results'] = modified_results
             

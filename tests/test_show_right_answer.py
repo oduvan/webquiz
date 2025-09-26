@@ -146,9 +146,9 @@ def test_show_right_answer_false():
         assert submit_response.status_code == 200
         submit_data = submit_response.json()
         
-        # Should NOT include correct_answer since show_right_answer is false
+        # Should NOT include correct_answer or is_correct since show_right_answer is false
         assert 'correct_answer' not in submit_data
-        assert submit_data['is_correct'] is False
+        assert 'is_correct' not in submit_data
 
         # Verify user final results
         verify_response = requests.get(f'http://localhost:{port}/api/verify-user/{user_id}')
@@ -160,10 +160,10 @@ def test_show_right_answer_false():
         final_results = verify_data['final_results']
         assert len(final_results['test_results']) == 1
         
-        # Final results should NOT include correct_answer
+        # Final results should NOT include correct_answer or is_correct
         result = final_results['test_results'][0]
         assert 'correct_answer' not in result
-        assert result['is_correct'] is False
+        assert 'is_correct' not in result
 
 
 def test_show_right_answer_correct_answers_not_leaked():
@@ -204,9 +204,9 @@ def test_show_right_answer_correct_answers_not_leaked():
         assert submit_response.status_code == 200
         submit_data = submit_response.json()
         
-        # Should NOT include correct_answer even for correct submissions when show_right_answer is false
+        # Should NOT include correct_answer or is_correct even for correct submissions when show_right_answer is false
         assert 'correct_answer' not in submit_data
-        assert submit_data['is_correct'] is True
+        assert 'is_correct' not in submit_data
 
 
 def test_show_right_answer_multiple_questions():
@@ -252,7 +252,7 @@ def test_show_right_answer_multiple_questions():
         assert submit_response1.status_code == 200
         submit_data1 = submit_response1.json()
         assert 'correct_answer' not in submit_data1
-        assert submit_data1['is_correct'] is False
+        assert 'is_correct' not in submit_data1
 
         # Submit answer for question 2 (correct)
         submit_response2 = requests.post(
@@ -266,7 +266,7 @@ def test_show_right_answer_multiple_questions():
         assert submit_response2.status_code == 200
         submit_data2 = submit_response2.json()
         assert 'correct_answer' not in submit_data2
-        assert submit_data2['is_correct'] is True
+        assert 'is_correct' not in submit_data2
 
         # Verify final results
         verify_response = requests.get(f'http://localhost:{port}/api/verify-user/{user_id}')

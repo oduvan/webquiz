@@ -735,9 +735,12 @@ def test_show_right_answer_false_visual_feedback(temp_dir, browser):
         # Wait for feedback
         wait_for_clickable(browser, By.ID, 'continue-btn')
 
-        # With show_right_answer: false, only wrong answer should be highlighted, correct answer should remain unmarked
-        assert 'feedback-incorrect' in wrong_option.get_attribute('class'), "Wrong answer should be highlighted as incorrect"
+        # With show_right_answer: false, NO visual feedback should be shown at all
+        assert 'feedback-incorrect' not in wrong_option.get_attribute('class'), "Wrong answer should NOT be highlighted when show_right_answer is false"
         assert 'feedback-correct' not in correct_option.get_attribute('class'), "Correct answer should NOT be highlighted when show_right_answer is false"
+        
+        # Options should still be disabled after submission
+        assert 'disabled' in wrong_option.get_attribute('class'), "Options should be disabled after submission"
         
         # Continue to results
         continue_button = browser.find_element(By.ID, 'continue-btn')
@@ -791,8 +794,11 @@ def test_show_right_answer_false_correct_answer_visual_feedback(temp_dir, browse
         # Wait for feedback
         wait_for_clickable(browser, By.ID, 'continue-btn')
 
-        # With show_right_answer: false, correct answer should still get positive feedback
-        assert 'feedback-correct' in correct_option.get_attribute('class'), "Correct answer should be highlighted as correct even when show_right_answer is false"
+        # With show_right_answer: false, NO visual feedback should be shown even for correct answers
+        assert 'feedback-correct' not in correct_option.get_attribute('class'), "No feedback should be shown when show_right_answer is false"
+        
+        # Options should still be disabled after submission
+        assert 'disabled' in correct_option.get_attribute('class'), "Options should be disabled after submission"
         
         # Continue to results
         continue_button = browser.find_element(By.ID, 'continue-btn')
@@ -847,9 +853,9 @@ def test_show_right_answer_multi_question_journey(temp_dir, browser):
         correct_option_1.click()
         browser.find_element(By.ID, 'submit-answer-btn').click()
         
-        # Should show correct feedback but no green highlight on other options
+        # Should show NO feedback at all when show_right_answer is false
         wait_for_clickable(browser, By.ID, 'continue-btn')
-        assert 'feedback-correct' in correct_option_1.get_attribute('class')
+        assert 'feedback-correct' not in correct_option_1.get_attribute('class'), "No feedback should be shown when show_right_answer is false"
         
         # Continue to next question
         browser.find_element(By.ID, 'continue-btn').click()
@@ -862,10 +868,10 @@ def test_show_right_answer_multi_question_journey(temp_dir, browser):
         wrong_option_2.click()
         browser.find_element(By.ID, 'submit-answer-btn').click()
         
-        # Should show incorrect feedback on selected option, but NO feedback on correct option
+        # Should show NO feedback on any option when show_right_answer is false
         wait_for_clickable(browser, By.ID, 'continue-btn')
-        assert 'feedback-incorrect' in wrong_option_2.get_attribute('class')
-        assert 'feedback-correct' not in correct_option_2.get_attribute('class'), "Correct answer should not be highlighted when show_right_answer is false"
+        assert 'feedback-incorrect' not in wrong_option_2.get_attribute('class'), "No feedback should be shown when show_right_answer is false"
+        assert 'feedback-correct' not in correct_option_2.get_attribute('class'), "No feedback should be shown when show_right_answer is false"
         
         # Continue to next question
         browser.find_element(By.ID, 'continue-btn').click()
@@ -878,10 +884,10 @@ def test_show_right_answer_multi_question_journey(temp_dir, browser):
         wrong_option_3.click()
         browser.find_element(By.ID, 'submit-answer-btn').click()
         
-        # Should show incorrect feedback on selected option, but NO feedback on correct option
+        # Should show NO feedback on any option when show_right_answer is false
         wait_for_clickable(browser, By.ID, 'continue-btn')
-        assert 'feedback-incorrect' in wrong_option_3.get_attribute('class')
-        assert 'feedback-correct' not in correct_option_3.get_attribute('class'), "Correct answer should not be highlighted when show_right_answer is false"
+        assert 'feedback-incorrect' not in wrong_option_3.get_attribute('class'), "No feedback should be shown when show_right_answer is false"
+        assert 'feedback-correct' not in correct_option_3.get_attribute('class'), "No feedback should be shown when show_right_answer is false"
         
         # Continue to results
         browser.find_element(By.ID, 'continue-btn').click()

@@ -758,7 +758,7 @@
                     question: question.question,
                     image: question.image,
                     selectedAnswer: question.options[selectedAnswer],
-                    isCorrect: data.is_correct,
+                    isCorrect: data.is_correct !== undefined ? data.is_correct : null,  // null when not provided
                     timeTaken: data.time_taken || 0
                 });
                 
@@ -771,6 +771,22 @@
         }
 
         function showAnswerFeedback(isCorrect, correctAnswer) {
+            // If isCorrect is undefined, don't show any feedback (show_right_answer is false)
+            if (isCorrect === undefined) {
+                // Disable all options to prevent further selection but don't show any visual feedback
+                document.querySelectorAll('.option').forEach(option => {
+                    option.classList.add('disabled');
+                });
+                
+                // Hide submit button and show continue button
+                const submitBtn = document.getElementById('submit-answer-btn');
+                const continueBtn = document.getElementById('continue-btn');
+                
+                submitBtn.classList.add('hidden');
+                continueBtn.classList.remove('hidden');
+                return;
+            }
+            
             // Apply feedback styling to selected answer
             const selectedOption = document.querySelector('.option.selected');
             if (selectedOption) {
@@ -857,7 +873,7 @@
             const container = document.getElementById('results-content');
             container.innerHTML = '';
             
-            const correctCount = testResults.filter(r => r.isCorrect).length;
+            const correctCount = testResults.filter(r => r.isCorrect === true).length;  // Only count explicitly true values
             const totalCount = testResults.length;
             const percentage = Math.round((correctCount / totalCount) * 100);
             const totalTime = testResults.reduce((sum, r) => sum + r.timeTaken, 0);
@@ -884,15 +900,13 @@
                     <tr>
                         <td data-label="Питання">${formatQuestionForDisplay(result.question, result.image)}</td>
                         <td data-label="Ваша відповідь">
-                            <span class="${result.isCorrect ? 'answer-correct' : 'answer-incorrect'}">
+                            <span class="${result.isCorrect === true ? 'answer-correct' : (result.isCorrect === false ? 'answer-incorrect' : '')}">
                                 ${formatAnswerForDisplay(result.selectedAnswer)}
                             </span>
-                            ${!result.isCorrect && correctAnswer ? `<div class="correct-answer-hint">Правильна: ${formatAnswerForDisplay(correctAnswer)}</div>` : ''}
+                            ${result.isCorrect === false && correctAnswer ? `<div class="correct-answer-hint">Правильна: ${formatAnswerForDisplay(correctAnswer)}</div>` : ''}
                         </td>
                         <td data-label="Правильно" style="text-align: center;">
-                            <span class="${result.isCorrect ? 'correct' : 'incorrect'}" style="font-size: 18px;">
-                                ${result.isCorrect ? '✓' : '✗'}
-                            </span>
+                            ${result.isCorrect !== null ? `<span class="${result.isCorrect ? 'correct' : 'incorrect'}" style="font-size: 18px;">${result.isCorrect ? '✓' : '✗'}</span>` : '<span style="color: #666;">—</span>'}
                         </td>
                     </tr>
                 `;
@@ -935,15 +949,13 @@
                             <tr>
                                 <td data-label="Питання">${formatQuestionForDisplay(result.question, result.image)}</td>
                                 <td data-label="Ваша відповідь">
-                                    <span class="${result.is_correct ? 'answer-correct' : 'answer-incorrect'}">
+                                    <span class="${result.is_correct === true ? 'answer-correct' : (result.is_correct === false ? 'answer-incorrect' : '')}">
                                         ${formatAnswerForDisplay(result.selected_answer)}
                                     </span>
-                                    ${!result.is_correct && result.correct_answer ? `<div class="correct-answer-hint">Правильна: ${formatAnswerForDisplay(result.correct_answer)}</div>` : ''}
+                                    ${result.is_correct === false && result.correct_answer ? `<div class="correct-answer-hint">Правильна: ${formatAnswerForDisplay(result.correct_answer)}</div>` : ''}
                                 </td>
                                 <td data-label="Правильно" style="text-align: center;">
-                                    <span class="${result.is_correct ? 'correct' : 'incorrect'}" style="font-size: 18px;">
-                                        ${result.is_correct ? '✓' : '✗'}
-                                    </span>
+                                    ${result.is_correct !== undefined ? `<span class="${result.is_correct ? 'correct' : 'incorrect'}" style="font-size: 18px;">${result.is_correct ? '✓' : '✗'}</span>` : '<span style="color: #666;">—</span>'}
                                 </td>
                             </tr>
                         `).join('')}
