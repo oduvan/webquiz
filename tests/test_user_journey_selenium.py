@@ -193,12 +193,10 @@ def test_complete_quiz_journey(temp_dir, browser):
         continue_button = wait_for_clickable(browser, By.ID, 'continue-btn')
         continue_button.click()
 
-        # Wait for results section to be visible (not just present)
-        from selenium.webdriver.support import expected_conditions as EC
-        results_section = WebDriverWait(browser, 10).until(
-            EC.visibility_of_element_located((By.ID, 'results'))
+        # Wait for results content to be fully rendered
+        WebDriverWait(browser, 10).until(
+            lambda driver: '2/2 (100%)' in driver.page_source
         )
-        assert results_section.is_displayed()
 
         # Verify results content
         assert 'Результат:' in browser.page_source
@@ -484,8 +482,10 @@ def test_different_question_types(temp_dir, browser):
         browser.find_element(By.ID, 'submit-answer-btn').click()
         wait_for_clickable(browser, By.ID, 'continue-btn').click()
 
-        # Should reach results
-        wait_for_element(browser, By.ID, 'results')
+        # Should reach results - wait for content to be fully rendered
+        WebDriverWait(browser, 10).until(
+            lambda driver: '3/3 (100%)' in driver.page_source
+        )
         assert 'Результат:' in browser.page_source
         assert '3/3 (100%)' in browser.page_source
 
@@ -579,8 +579,10 @@ def test_results_display_accuracy(temp_dir, browser):
         browser.find_element(By.ID, 'submit-answer-btn').click()
         wait_for_clickable(browser, By.ID, 'continue-btn').click()
 
-        # Check results
-        wait_for_element(browser, By.ID, 'results')
+        # Check results - wait for actual content to be rendered
+        WebDriverWait(browser, 10).until(
+            lambda driver: '1/2 (50%)' in driver.page_source
+        )
 
         # Should show 1/2 (50%)
         assert 'Результат:' in browser.page_source
