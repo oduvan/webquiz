@@ -498,7 +498,9 @@ class TestingServer:
             'current_quiz': quiz_filename,
             'questions': self.questions,
             'total_questions': len(self.questions),
-            'message': f'Quiz switched to: {quiz_filename}'
+            'message': f'Quiz switched to: {quiz_filename}',
+            'user_statistics': self.calculate_user_statistics(),
+            'question_statistics': self.calculate_question_statistics()
         })
         
         logger.info(f"Switched to quiz: {quiz_filename}, CSV: {self.csv_file}")
@@ -868,6 +870,50 @@ class TestingServer:
             'state': state,
             'time_taken': time_taken
         }
+    
+    def calculate_user_statistics(self) -> Dict[str, Dict[str, int]]:
+        """Calculate statistics for each user: correct/total answers"""
+        user_stats = {}
+        
+        for user_id, questions_data in self.live_stats.items():
+            correct_count = 0
+            total_answered = 0
+            
+            for question_id, data in questions_data.items():
+                state = data.get('state', 'empty')
+                if state in ['ok', 'fail']:  # Only count answered questions
+                    total_answered += 1
+                    if state == 'ok':
+                        correct_count += 1
+            
+            user_stats[user_id] = {
+                'correct_count': correct_count,
+                'total_answered': total_answered
+            }
+        
+        return user_stats
+    
+    def calculate_question_statistics(self) -> Dict[int, Dict[str, int]]:
+        """Calculate statistics for each question: correct/total attempts"""
+        question_stats = {}
+        
+        # Initialize stats for all questions
+        for i in range(1, len(self.questions) + 1):
+            question_stats[i] = {
+                'correct_count': 0,
+                'total_attempts': 0
+            }
+        
+        # Count attempts and correct answers for each question
+        for user_id, questions_data in self.live_stats.items():
+            for question_id, data in questions_data.items():
+                state = data.get('state', 'empty')
+                if state in ['ok', 'fail']:  # Only count answered questions
+                    question_stats[question_id]['total_attempts'] += 1
+                    if state == 'ok':
+                        question_stats[question_id]['correct_count'] += 1
+        
+        return question_stats
             
     async def register_user(self, request):
         """Register a new user"""
@@ -898,7 +944,7 @@ class TestingServer:
         if len(self.questions) > 0:
             self.update_live_stats(user_id, 1, "think")
             
-            # Broadcast new user registration
+            # Broadcast new user registration with statistics
             await self.broadcast_to_websockets({
                 'type': 'user_registered',
                 'user_id': user_id,
@@ -906,7 +952,9 @@ class TestingServer:
                 'question_id': 1,
                 'state': 'think',
                 'time_taken': None,
-                'total_questions': len(self.questions)
+                'total_questions': len(self.questions),
+                'user_statistics': self.calculate_user_statistics(),
+                'question_statistics': self.calculate_question_statistics()
             })
         
         logger.info(f"Registered user: {username} with ID: {user_id}")
@@ -980,7 +1028,7 @@ class TestingServer:
         state = "ok" if is_correct else "fail"
         self.update_live_stats(user_id, question_id, state, time_taken)
         
-        # Broadcast current question result
+        # Broadcast current question result with updated statistics
         await self.broadcast_to_websockets({
             'type': 'state_update',
             'user_id': user_id,
@@ -988,7 +1036,9 @@ class TestingServer:
             'question_id': question_id,
             'state': state,
             'time_taken': time_taken,
-            'total_questions': len(self.questions)
+            'total_questions': len(self.questions),
+            'user_statistics': self.calculate_user_statistics(),
+            'question_statistics': self.calculate_question_statistics()
         })
         
         # Check if this was the last question and calculate final stats
@@ -1002,7 +1052,7 @@ class TestingServer:
             self.question_start_times[user_id] = datetime.now()
             self.update_live_stats(user_id, next_question_id, "think")
             
-            # Broadcast next question thinking state
+            # Broadcast next question thinking state with updated statistics
             await self.broadcast_to_websockets({
                 'type': 'state_update',
                 'user_id': user_id,
@@ -1010,7 +1060,9 @@ class TestingServer:
                 'question_id': next_question_id,
                 'state': 'think',
                 'time_taken': None,
-                'total_questions': len(self.questions)
+                'total_questions': len(self.questions),
+                'user_statistics': self.calculate_user_statistics(),
+                'question_statistics': self.calculate_question_statistics()
             })
         
         logger.info(f"Answer submitted by {username} (ID: {user_id}) for question {question_id}: {'Correct' if is_correct else 'Incorrect'} (took {time_taken:.2f}s)")
@@ -1675,7 +1727,9 @@ class TestingServer:
                 'users': {user_id: user_data['username'] for user_id, user_data in self.users.items()},
                 'questions': self.questions,
                 'total_questions': len(self.questions),
-                'current_quiz': os.path.basename(self.current_quiz_file) if self.current_quiz_file else None
+                'current_quiz': os.path.basename(self.current_quiz_file) if self.current_quiz_file else None,
+                'user_statistics': self.calculate_user_statistics(),
+                'question_statistics': self.calculate_question_statistics()
             }
             await ws.send_str(json.dumps(initial_data))
         except Exception as e:
