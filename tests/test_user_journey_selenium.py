@@ -1,4 +1,5 @@
 import pytest
+import os
 import time
 from selenium import webdriver
 from selenium.webdriver.common.by import By
@@ -10,6 +11,12 @@ from selenium.common.exceptions import TimeoutException, NoSuchElementException
 from webdriver_manager.chrome import ChromeDriverManager
 
 from conftest import custom_webquiz_server, get_worker_port
+
+# Skip decorator for Selenium tests when SKIP_SELENIUM environment variable is set
+skip_if_selenium_disabled = pytest.mark.skipif(
+    os.getenv('SKIP_SELENIUM', '').lower() in ('true', '1', 'yes'),
+    reason="Selenium tests skipped (SKIP_SELENIUM environment variable is set)"
+)
 
 
 @pytest.fixture
@@ -64,6 +71,7 @@ def wait_for_clickable(browser, by, selector, timeout=10):
     )
 
 
+@skip_if_selenium_disabled
 def test_user_registration_complete_flow(temp_dir, browser):
     """Test complete user registration workflow."""
     quiz_data = {
@@ -105,6 +113,7 @@ def test_user_registration_complete_flow(temp_dir, browser):
         assert 'TestUser123' in user_info.text
 
 
+@skip_if_selenium_disabled
 def test_registration_form_validation(temp_dir, browser):
     """Test registration form validation with empty username."""
     with custom_webquiz_server() as (proc, port):
@@ -126,6 +135,7 @@ def test_registration_form_validation(temp_dir, browser):
         assert not registration_section.get_attribute('class').__contains__('hidden')
 
 
+@skip_if_selenium_disabled
 def test_complete_quiz_journey(temp_dir, browser):
     """Test complete end-to-end quiz taking journey."""
     quiz_data = {
@@ -203,6 +213,7 @@ def test_complete_quiz_journey(temp_dir, browser):
         assert '2/2 (100%)' in browser.page_source
 
 
+@skip_if_selenium_disabled
 def test_question_selection_and_feedback(temp_dir, browser):
     """Test question selection and visual feedback system."""
     quiz_data = {
@@ -259,6 +270,7 @@ def test_question_selection_and_feedback(temp_dir, browser):
         assert 'disabled' in correct_option.get_attribute('class')
 
 
+@skip_if_selenium_disabled
 def test_progress_bar_functionality(temp_dir, browser):
     """Test progress bar updates throughout quiz."""
     quiz_data = {
@@ -323,6 +335,7 @@ def test_progress_bar_functionality(temp_dir, browser):
         assert 'Питання 3 з 3' in progress_text.text
 
 
+@skip_if_selenium_disabled
 def test_theme_toggle_functionality(temp_dir, browser):
     """Test dark/light theme switching."""
     with custom_webquiz_server() as (proc, port):
@@ -355,6 +368,7 @@ def test_theme_toggle_functionality(temp_dir, browser):
         assert final_theme == initial_theme
 
 
+@skip_if_selenium_disabled
 def test_session_persistence_on_reload(temp_dir, browser):
     """Test that user session persists across page reload."""
     quiz_data = {
@@ -414,6 +428,7 @@ def test_session_persistence_on_reload(temp_dir, browser):
         assert 'SessionTester' in browser.page_source
 
 
+@skip_if_selenium_disabled
 def test_different_question_types(temp_dir, browser):
     """Test quiz with different question formats."""
     quiz_data = {
@@ -490,6 +505,7 @@ def test_different_question_types(temp_dir, browser):
         assert '3/3 (100%)' in browser.page_source
 
 
+@skip_if_selenium_disabled
 def test_button_state_management(temp_dir, browser):
     """Test submit/continue button behavior and state management."""
     quiz_data = {
@@ -538,6 +554,7 @@ def test_button_state_management(temp_dir, browser):
         assert 'hidden' not in continue_button.get_attribute('class')
 
 
+@skip_if_selenium_disabled
 def test_results_display_accuracy(temp_dir, browser):
     """Test that results display matches expected calculations."""
     quiz_data = {
@@ -597,6 +614,7 @@ def test_results_display_accuracy(temp_dir, browser):
         assert '✗' in browser.page_source
 
 
+@skip_if_selenium_disabled
 def test_browser_navigation_behavior(temp_dir, browser):
     """Test back/forward button behavior during quiz."""
     quiz_data = {
@@ -644,6 +662,7 @@ def test_browser_navigation_behavior(temp_dir, browser):
         wait_for_element(browser, By.ID, 'results')
 
 
+@skip_if_selenium_disabled
 def test_show_right_answer_true_visual_feedback(temp_dir, browser):
     """Test visual feedback when show_right_answer is true (default behavior)."""
     quiz_data = {
@@ -699,6 +718,7 @@ def test_show_right_answer_true_visual_feedback(temp_dir, browser):
         assert '4' in browser.page_source, "Results should show the correct answer '4'"
 
 
+@skip_if_selenium_disabled
 def test_show_right_answer_false_visual_feedback(temp_dir, browser):
     """Test visual feedback when show_right_answer is false (hides correct answers)."""
     quiz_data = {
@@ -767,6 +787,7 @@ def test_show_right_answer_false_visual_feedback(temp_dir, browser):
         assert '0/1' in browser.page_source or '0%' in browser.page_source, "Results should show score"
 
 
+@skip_if_selenium_disabled
 def test_show_right_answer_false_correct_answer_visual_feedback(temp_dir, browser):
     """Test visual feedback when show_right_answer is false and user answers correctly."""
     quiz_data = {
@@ -824,6 +845,7 @@ def test_show_right_answer_false_correct_answer_visual_feedback(temp_dir, browse
         assert 'Правильна:' not in results_content, "Results should NOT show 'Correct:' hint even for correct answers when show_right_answer is false"
 
 
+@skip_if_selenium_disabled
 def test_show_right_answer_multi_question_journey(temp_dir, browser):
     """Test complete quiz journey with mixed correct/incorrect answers and show_right_answer disabled."""
     quiz_data = {
