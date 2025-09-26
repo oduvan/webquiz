@@ -135,11 +135,17 @@ dmypy.json
 server_*.log
 *_user_responses*.csv
 static/
+static_*/
 data/
+data_*/
 logs/
+logs_*/
 quizzes/
+quizzes_*/
+test_quizzes/
 webquiz.yaml
 webquiz.pid
+custom_config_*.yaml
 
 # IDE files
 .vscode/

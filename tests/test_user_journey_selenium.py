@@ -639,3 +639,271 @@ def test_browser_navigation_behavior(temp_dir, browser):
         # Should be able to complete quiz
         wait_for_clickable(browser, By.ID, 'continue-btn').click()
         wait_for_element(browser, By.ID, 'results')
+
+
+def test_show_right_answer_true_visual_feedback(temp_dir, browser):
+    """Test visual feedback when show_right_answer is true (default behavior)."""
+    quiz_data = {
+        'default.yaml': {
+            'title': 'Show Answers Quiz',
+            'show_right_answer': True,
+            'questions': [
+                {
+                    'question': 'What is 2 + 2?',
+                    'options': ['3', '4', '5', '6'],
+                    'correct_answer': 1  # '4' is correct
+                }
+            ]
+        }
+    }
+
+    with custom_webquiz_server(quizzes=quiz_data) as (proc, port):
+        browser.get(f'http://localhost:{port}/')
+
+        # Register user
+        username_input = wait_for_element(browser, By.ID, 'username')
+        username_input.send_keys('ShowAnswersTester')
+        browser.find_element(By.XPATH, '//button[contains(text(), "Зареєструватися")]').click()
+
+        wait_for_element(browser, By.ID, 'current-question-container')
+
+        # Select WRONG answer intentionally
+        wrong_option = browser.find_element(By.XPATH, '//div[@class="option" and contains(text(), "3")]')  # Wrong answer
+        correct_option = browser.find_element(By.XPATH, '//div[@class="option" and contains(text(), "4")]')  # Correct answer
+        
+        wrong_option.click()
+        
+        # Submit answer
+        submit_button = browser.find_element(By.ID, 'submit-answer-btn')
+        submit_button.click()
+
+        # Wait for feedback
+        wait_for_clickable(browser, By.ID, 'continue-btn')
+
+        # With show_right_answer: true, BOTH wrong and correct answers should be highlighted
+        assert 'feedback-incorrect' in wrong_option.get_attribute('class'), "Wrong answer should be highlighted as incorrect"
+        assert 'feedback-correct' in correct_option.get_attribute('class'), "Correct answer should be highlighted as correct"
+        
+        # Continue to results
+        continue_button = browser.find_element(By.ID, 'continue-btn')
+        continue_button.click()
+
+        # Wait for results
+        wait_for_element(browser, By.ID, 'results')
+        
+        # Results should show correct answer hint
+        assert 'Правильна:' in browser.page_source, "Results should show 'Correct:' hint"
+        assert '4' in browser.page_source, "Results should show the correct answer '4'"
+
+
+def test_show_right_answer_false_visual_feedback(temp_dir, browser):
+    """Test visual feedback when show_right_answer is false (hides correct answers)."""
+    quiz_data = {
+        'default.yaml': {
+            'title': 'Hide Answers Quiz',
+            'show_right_answer': False,
+            'questions': [
+                {
+                    'question': 'What is 3 + 3?',
+                    'options': ['5', '6', '7', '8'],
+                    'correct_answer': 1  # '6' is correct
+                }
+            ]
+        }
+    }
+
+    with custom_webquiz_server(quizzes=quiz_data) as (proc, port):
+        browser.get(f'http://localhost:{port}/')
+
+        # Register user
+        username_input = wait_for_element(browser, By.ID, 'username')
+        username_input.send_keys('HideAnswersTester')
+        browser.find_element(By.XPATH, '//button[contains(text(), "Зареєструватися")]').click()
+
+        wait_for_element(browser, By.ID, 'current-question-container')
+
+        # Select WRONG answer intentionally
+        wrong_option = browser.find_element(By.XPATH, '//div[@class="option" and contains(text(), "5")]')  # Wrong answer
+        correct_option = browser.find_element(By.XPATH, '//div[@class="option" and contains(text(), "6")]')  # Correct answer
+        
+        wrong_option.click()
+        
+        # Submit answer
+        submit_button = browser.find_element(By.ID, 'submit-answer-btn')
+        submit_button.click()
+
+        # Wait for feedback
+        wait_for_clickable(browser, By.ID, 'continue-btn')
+
+        # With show_right_answer: false, NO visual feedback should be shown at all
+        assert 'feedback-incorrect' not in wrong_option.get_attribute('class'), "Wrong answer should NOT be highlighted when show_right_answer is false"
+        assert 'feedback-correct' not in correct_option.get_attribute('class'), "Correct answer should NOT be highlighted when show_right_answer is false"
+        
+        # Options should still be disabled after submission
+        assert 'disabled' in wrong_option.get_attribute('class'), "Options should be disabled after submission"
+        
+        # Continue to results
+        continue_button = browser.find_element(By.ID, 'continue-btn')
+        continue_button.click()
+
+        # Wait for results
+        wait_for_element(browser, By.ID, 'results')
+        
+        # Results should NOT show correct answer hints
+        assert 'Правильна:' not in browser.page_source, "Results should NOT show 'Correct:' hint when show_right_answer is false"
+        
+        # Should show the score but not the correct answers
+        assert '0/1' in browser.page_source or '0%' in browser.page_source, "Results should show score"
+
+
+def test_show_right_answer_false_correct_answer_visual_feedback(temp_dir, browser):
+    """Test visual feedback when show_right_answer is false and user answers correctly."""
+    quiz_data = {
+        'default.yaml': {
+            'title': 'Hide Answers Quiz',
+            'show_right_answer': False,
+            'questions': [
+                {
+                    'question': 'What is 4 + 4?',
+                    'options': ['6', '7', '8', '9'],
+                    'correct_answer': 2  # '8' is correct
+                }
+            ]
+        }
+    }
+
+    with custom_webquiz_server(quizzes=quiz_data) as (proc, port):
+        browser.get(f'http://localhost:{port}/')
+
+        # Register user
+        username_input = wait_for_element(browser, By.ID, 'username')
+        username_input.send_keys('CorrectAnswerTester')
+        browser.find_element(By.XPATH, '//button[contains(text(), "Зареєструватися")]').click()
+
+        wait_for_element(browser, By.ID, 'current-question-container')
+
+        # Select CORRECT answer
+        correct_option = browser.find_element(By.XPATH, '//div[@class="option" and contains(text(), "8")]')  # Correct answer
+        
+        correct_option.click()
+        
+        # Submit answer
+        submit_button = browser.find_element(By.ID, 'submit-answer-btn')
+        submit_button.click()
+
+        # Wait for feedback
+        wait_for_clickable(browser, By.ID, 'continue-btn')
+
+        # With show_right_answer: false, NO visual feedback should be shown even for correct answers
+        assert 'feedback-correct' not in correct_option.get_attribute('class'), "No feedback should be shown when show_right_answer is false"
+        
+        # Options should still be disabled after submission
+        assert 'disabled' in correct_option.get_attribute('class'), "Options should be disabled after submission"
+        
+        # Continue to results
+        continue_button = browser.find_element(By.ID, 'continue-btn')
+        continue_button.click()
+
+        # Wait for results
+        wait_for_element(browser, By.ID, 'results')
+        
+        # Results should show perfect score but no correct answer hints
+        assert '1/1' in browser.page_source or '100%' in browser.page_source, "Results should show perfect score"
+        assert 'Правильна:' not in browser.page_source, "Results should NOT show 'Correct:' hint even for correct answers when show_right_answer is false"
+
+
+def test_show_right_answer_multi_question_journey(temp_dir, browser):
+    """Test complete quiz journey with mixed correct/incorrect answers and show_right_answer disabled."""
+    quiz_data = {
+        'default.yaml': {
+            'title': 'Multi Question Hide Answers Quiz',
+            'show_right_answer': False,
+            'questions': [
+                {
+                    'question': 'What is 1 + 1?',
+                    'options': ['1', '2', '3', '4'],
+                    'correct_answer': 1  # '2' is correct
+                },
+                {
+                    'question': 'What is 2 * 3?',
+                    'options': ['4', '5', '6', '7'],
+                    'correct_answer': 2  # '6' is correct
+                },
+                {
+                    'question': 'What is 10 / 2?',
+                    'options': ['3', '4', '5', '6'],
+                    'correct_answer': 2  # '5' is correct
+                }
+            ]
+        }
+    }
+
+    with custom_webquiz_server(quizzes=quiz_data) as (proc, port):
+        browser.get(f'http://localhost:{port}/')
+
+        # Register user
+        username_input = wait_for_element(browser, By.ID, 'username')
+        username_input.send_keys('MultiQuestionTester')
+        browser.find_element(By.XPATH, '//button[contains(text(), "Зареєструватися")]').click()
+
+        wait_for_element(browser, By.ID, 'current-question-container')
+
+        # Question 1: Answer CORRECTLY
+        correct_option_1 = browser.find_element(By.XPATH, '//div[@class="option" and contains(text(), "2")]')
+        correct_option_1.click()
+        browser.find_element(By.ID, 'submit-answer-btn').click()
+        
+        # Should show NO feedback at all when show_right_answer is false
+        wait_for_clickable(browser, By.ID, 'continue-btn')
+        assert 'feedback-correct' not in correct_option_1.get_attribute('class'), "No feedback should be shown when show_right_answer is false"
+        
+        # Continue to next question
+        browser.find_element(By.ID, 'continue-btn').click()
+
+        # Question 2: Answer INCORRECTLY  
+        wait_for_element(browser, By.XPATH, '//h3[contains(text(), "What is 2 * 3?")]')
+        wrong_option_2 = browser.find_element(By.XPATH, '//div[@class="option" and contains(text(), "4")]')  # Wrong: should be 6
+        correct_option_2 = browser.find_element(By.XPATH, '//div[@class="option" and contains(text(), "6")]')  # Correct answer
+        
+        wrong_option_2.click()
+        browser.find_element(By.ID, 'submit-answer-btn').click()
+        
+        # Should show NO feedback on any option when show_right_answer is false
+        wait_for_clickable(browser, By.ID, 'continue-btn')
+        assert 'feedback-incorrect' not in wrong_option_2.get_attribute('class'), "No feedback should be shown when show_right_answer is false"
+        assert 'feedback-correct' not in correct_option_2.get_attribute('class'), "No feedback should be shown when show_right_answer is false"
+        
+        # Continue to next question
+        browser.find_element(By.ID, 'continue-btn').click()
+
+        # Question 3: Answer INCORRECTLY
+        wait_for_element(browser, By.XPATH, '//h3[contains(text(), "What is 10 / 2?")]')
+        wrong_option_3 = browser.find_element(By.XPATH, '//div[@class="option" and contains(text(), "3")]')  # Wrong: should be 5
+        correct_option_3 = browser.find_element(By.XPATH, '//div[@class="option" and contains(text(), "5")]')  # Correct answer
+        
+        wrong_option_3.click()
+        browser.find_element(By.ID, 'submit-answer-btn').click()
+        
+        # Should show NO feedback on any option when show_right_answer is false
+        wait_for_clickable(browser, By.ID, 'continue-btn')
+        assert 'feedback-incorrect' not in wrong_option_3.get_attribute('class'), "No feedback should be shown when show_right_answer is false"
+        assert 'feedback-correct' not in correct_option_3.get_attribute('class'), "No feedback should be shown when show_right_answer is false"
+        
+        # Continue to results
+        browser.find_element(By.ID, 'continue-btn').click()
+
+        # Wait for results
+        wait_for_element(browser, By.ID, 'results')
+        
+        # Should show 1/3 (33%) but NO correct answer hints anywhere
+        assert '1/3' in browser.page_source, "Results should show 1 out of 3 correct"
+        assert '33%' in browser.page_source or '(33%)' in browser.page_source, "Results should show 33% score"
+        assert 'Правильна:' not in browser.page_source, "Results should NOT show any 'Correct:' hints when show_right_answer is false"
+        
+        # Results table should exist but without correct answer columns/hints
+        results_table = browser.find_element(By.CLASS_NAME, 'results-table')
+        assert results_table.is_displayed()
+        
+        # Should have checkmarks and X marks for user's answers
+        assert '✓' in browser.page_source, "Should show checkmark for correct answer"
+        assert '✗' in browser.page_source, "Should show X marks for incorrect answers"
