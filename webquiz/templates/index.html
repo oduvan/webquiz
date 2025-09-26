@@ -500,6 +500,24 @@
         let selectedAnswers = []; // For multiple choice questions
         let testResults = [];
 
+        // Notify server when question starts (for timing and live stats)
+        async function notifyQuestionStart(questionId) {
+            try {
+                await fetch('/api/question-start', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        user_id: currentUserId,
+                        question_id: questionId
+                    })
+                });
+            } catch (error) {
+                console.log('Failed to notify question start:', error);
+            }
+        }
+
         // Error message utilities
         function showError(elementId, message) {
             const errorElement = document.getElementById(elementId);
@@ -724,7 +742,7 @@
             // Reset button states
             const submitBtn = document.getElementById('submit-answer-btn');
             const continueBtn = document.getElementById('continue-btn');
-            
+
             submitBtn.classList.remove('hidden');
             submitBtn.disabled = true;
             continueBtn.classList.add('hidden');
@@ -792,7 +810,7 @@
 
             // Clear previous errors
             hideError('test-error');
-            
+
             try {
                 const response = await fetch('/api/submit-answer', {
                     method: 'POST',
@@ -923,6 +941,11 @@
         async function continueToNextQuestion() {
             // Move to next question
             currentQuestionIndex++;
+
+            // Notify server that question is being displayed (for live stats and timing)
+            // This should ONLY happen when user clicks "Продовжити" to open next question
+            notifyQuestionStart(questions[currentQuestionIndex].id);
+
             await showCurrentQuestion();
         }
         

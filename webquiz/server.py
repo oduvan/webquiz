@@ -982,7 +982,7 @@ class TestingServer:
         if not question:
             return web.json_response({'error': 'Питання не знайдено'}, status=404)
             
-        # Calculate time taken server-side
+        # Calculate time taken server-side from when question was displayed
         time_taken = 0
         if user_id in self.question_start_times:
             time_taken = (datetime.now() - self.question_start_times[user_id]).total_seconds()
@@ -1044,24 +1044,8 @@ class TestingServer:
             # Test completed - calculate and store final stats
             self.calculate_and_store_user_stats(user_id)
             logger.info(f"Test completed for user {user_id} - final stats calculated")
-        else:
-            # Start timing for next question and update live stats
-            next_question_id = question_id + 1
-            self.question_start_times[user_id] = datetime.now()
-            self.update_live_stats(user_id, next_question_id, "think")
-            
-            # Broadcast next question thinking state
-            await self.broadcast_to_websockets({
-                'type': 'state_update',
-                'user_id': user_id,
-                'username': username,
-                'question_id': next_question_id,
-                'state': 'think',
-                'time_taken': None,
-                'total_questions': len(self.questions)
-            })
         
-        logger.info(f"Answer submitted by {username} (ID: {user_id}) for question {question_id}: {'Correct' if is_correct else 'Incorrect'} (took {time_taken:.2f}s)")
+        logger.info(f"Answer submitted by {username} (ID: {user_id}) for question {question_id}: {'Correct' if is_correct else 'Incorrect'} (took {time_taken}s)")
         logger.info(f"Updated progress for user {user_id}: last answered question = {question_id}")
         
         # Prepare response data
@@ -1077,8 +1061,38 @@ class TestingServer:
             response_data['is_multiple_choice'] = isinstance(question['correct_answer'], list)
         
         return web.json_response(response_data)
+
+    async def question_start(self, request):
+        """Handle notification that a user started viewing a question"""
+        try:
+            data = await request.json()
+            user_id = data['user_id']
+            question_id = data['question_id']
+            username = self.users[user_id]['username']
+
+            # Verify user exists
+            if user_id not in self.users:
+                return web.json_response({'error': 'Користувача не знайдено'}, status=404)
             
-        
+
+            self.question_start_times[user_id] = datetime.now()
+            self.update_live_stats(user_id, question_id, "think")
+            
+            await self.broadcast_to_websockets({
+                'type': 'state_update',
+                'user_id': user_id,
+                'username': username,
+                'question_id': question_id,
+                'state': 'think',
+                'time_taken': None,
+                'total_questions': len(self.questions)
+            })
+
+            return web.json_response({'status': 'success'})
+
+        except Exception as e:
+            logger.error(f"Error in question_start: {e}")
+            return web.json_response({'error': 'Помилка сервера'}, status=500)
 
     def calculate_and_store_user_stats(self, user_id):
         """Calculate and store final stats for a completed user using user_answers (not user_responses)"""
@@ -1809,6 +1823,7 @@ async def create_app(config: WebQuizConfig):
     # Routes
     app.router.add_post('/api/register', server.register_user)
     app.router.add_post('/api/submit-answer', server.submit_answer)
+    app.router.add_post('/api/question-start', server.question_start)
     app.router.add_get('/api/verify-user/{user_id}', server.verify_user_id)
     
     # Admin routes
