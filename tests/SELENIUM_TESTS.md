@@ -18,6 +18,12 @@ This directory contains comprehensive end-to-end tests using Selenium WebDriver 
 - ✅ `test_results_display_accuracy()` - Results calculation verification
 - ✅ `test_different_question_types()` - Text, image, and mixed questions
 
+### Show Right Answer Configuration (4 tests)
+- ✅ `test_show_right_answer_true_visual_feedback()` - Correct answer highlighting when enabled
+- ✅ `test_show_right_answer_false_visual_feedback()` - Correct answer hiding when disabled  
+- ✅ `test_show_right_answer_false_correct_answer_visual_feedback()` - User correct answer feedback when showing disabled
+- ✅ `test_show_right_answer_multi_question_journey()` - Complete quiz with mixed answers and hidden correct answers
+
 ### UI Behavior & Interaction (3 tests)
 - ✅ `test_theme_toggle_functionality()` - Dark/light theme switching
 - ✅ `test_browser_navigation_behavior()` - Back/forward button handling
@@ -154,6 +160,7 @@ jobs:
 - ✅ Visual feedback on answer submission
 - ✅ Results calculation and display
 - ✅ Session persistence across page reloads
+- ✅ Show/hide correct answers configuration testing
 
 ### Cross-browser Compatibility
 - ✅ Headless Chrome (default)
