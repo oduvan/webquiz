@@ -1073,9 +1073,9 @@ class TestingServer:
             # Verify user exists
             if user_id not in self.users:
                 return web.json_response({'error': 'Користувача не знайдено'}, status=404)
-            
 
-            self.question_start_times[user_id] = datetime.now()
+            if user_id not in self.question_start_times:
+                self.question_start_times[user_id] = datetime.now()
             self.update_live_stats(user_id, question_id, "think")
             
             await self.broadcast_to_websockets({
@@ -1161,54 +1161,53 @@ class TestingServer:
         user_id = request.match_info['user_id']
         
         # Find user by user_id
-        if user_id in self.users:
-            user_data = self.users[user_id]
-            username = user_data['username']
-            # Get last answered question ID from progress tracking
-            last_answered_question_id = self.user_progress.get(user_id, 0)
-            
-            # Find the index of next question to answer
-            next_question_index = 0
-            if last_answered_question_id > 0:
-                # Find the index of last answered question, then add 1
-                for i, question in enumerate(self.questions):
-                    if question['id'] == last_answered_question_id:
-                        next_question_index = i + 1
-                        break
-            
-            # Ensure we don't go beyond available questions
-            if next_question_index >= len(self.questions):
-                next_question_index = len(self.questions)
-            
-            # Check if test is completed
-            test_completed = next_question_index >= len(self.questions)
-            
-            response_data = {
-                'valid': True,
-                'user_id': user_id,
-                'username': username,
-                'next_question_index': next_question_index,
-                'total_questions': len(self.questions),
-                'last_answered_question_id': last_answered_question_id,
-                'test_completed': test_completed
-            }
-            
-            if test_completed:
-                # Get final results for completed test
-                final_results = self.get_user_final_results(user_id)
-                response_data['final_results'] = final_results
-                logger.info(f"User {user_id} verification: test completed, returning final results")
-            else:
-                # Start timing for current question if user has questions left
-                self.question_start_times[user_id] = datetime.now()
-                logger.info(f"User {user_id} verification: last_answered={last_answered_question_id}, next_index={next_question_index}")
-                
-            return web.json_response(response_data)
-        else:
+        if user_id not in self.users:
             return web.json_response({
                 'valid': False,
                 'message': 'User ID not found'
             })
+    
+        user_data = self.users[user_id]
+        username = user_data['username']
+        # Get last answered question ID from progress tracking
+        last_answered_question_id = self.user_progress.get(user_id, 0)
+        
+        # Find the index of next question to answer
+        next_question_index = 0
+        if last_answered_question_id > 0:
+            # Find the index of last answered question, then add 1
+            for i, question in enumerate(self.questions):
+                if question['id'] == last_answered_question_id:
+                    next_question_index = i + 1
+                    break
+        
+        # Ensure we don't go beyond available questions
+        if next_question_index >= len(self.questions):
+            next_question_index = len(self.questions)
+        
+        # Check if test is completed
+        test_completed = next_question_index >= len(self.questions)
+        
+        response_data = {
+            'valid': True,
+            'user_id': user_id,
+            'username': username,
+            'next_question_index': next_question_index,
+            'total_questions': len(self.questions),
+            'last_answered_question_id': last_answered_question_id,
+            'test_completed': test_completed
+        }
+        
+        if test_completed:
+            # Get final results for completed test
+            final_results = self.get_user_final_results(user_id)
+            response_data['final_results'] = final_results
+            logger.info(f"User {user_id} verification: test completed, returning final results")
+        else:
+            logger.info(f"User {user_id} verification: last_answered={last_answered_question_id}, next_index={next_question_index}")
+            
+        return web.json_response(response_data)
+
     
     # Admin API endpoints
     @admin_auth_required

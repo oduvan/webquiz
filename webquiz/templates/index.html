@@ -618,6 +618,7 @@
                         } else {
                             // Test not completed, resume test
                             await hideLoadingShowTest();
+                            await notifyQuestionStart(questions[currentQuestionIndex].id);
                         }
                     } else {
                         // Invalid user ID, need registration
