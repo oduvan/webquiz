@@ -464,6 +464,7 @@
         let currentUsername = null;
         let currentUserId = null;
         let questions = {{QUESTIONS_DATA}};
+        let showRightAnswer = {{SHOW_RIGHT_ANSWER}};
         let currentQuestionIndex = 0;
         let selectedAnswer = null;
         let testResults = [];
@@ -903,7 +904,7 @@
                             <span class="${result.isCorrect === true ? 'answer-correct' : (result.isCorrect === false ? 'answer-incorrect' : '')}">
                                 ${formatAnswerForDisplay(result.selectedAnswer)}
                             </span>
-                            ${result.isCorrect === false && correctAnswer ? `<div class="correct-answer-hint">Правильна: ${formatAnswerForDisplay(correctAnswer)}</div>` : ''}
+                            ${result.isCorrect === false && correctAnswer && showRightAnswer ? `<div class="correct-answer-hint">Правильна: ${formatAnswerForDisplay(correctAnswer)}</div>` : ''}
                         </td>
                         <td data-label="Правильно" style="text-align: center;">
                             ${result.isCorrect !== null ? `<span class="${result.isCorrect ? 'correct' : 'incorrect'}" style="font-size: 18px;">${result.isCorrect ? '✓' : '✗'}</span>` : '<span style="color: #666;">—</span>'}
@@ -952,7 +953,7 @@
                                     <span class="${result.is_correct === true ? 'answer-correct' : (result.is_correct === false ? 'answer-incorrect' : '')}">
                                         ${formatAnswerForDisplay(result.selected_answer)}
                                     </span>
-                                    ${result.is_correct === false && result.correct_answer ? `<div class="correct-answer-hint">Правильна: ${formatAnswerForDisplay(result.correct_answer)}</div>` : ''}
+                                    ${result.is_correct === false && result.correct_answer && showRightAnswer ? `<div class="correct-answer-hint">Правильна: ${formatAnswerForDisplay(result.correct_answer)}</div>` : ''}
                                 </td>
                                 <td data-label="Правильно" style="text-align: center;">
                                     ${result.is_correct !== undefined ? `<span class="${result.is_correct ? 'correct' : 'incorrect'}" style="font-size: 18px;">${result.is_correct ? '✓' : '✗'}</span>` : '<span style="color: #666;">—</span>'}

@@ -748,9 +748,17 @@ def test_show_right_answer_false_visual_feedback(temp_dir, browser):
 
         # Wait for results
         wait_for_element(browser, By.ID, 'results')
-        
-        # Results should NOT show correct answer hints
-        assert 'Правильна:' not in browser.page_source, "Results should NOT show 'Correct:' hint when show_right_answer is false"
+
+        # Debug: Check the showRightAnswer variable value and results HTML
+        show_right_answer_value = browser.execute_script("return showRightAnswer;")
+        print(f"DEBUG: showRightAnswer = {show_right_answer_value}")
+
+        results_content = browser.execute_script("return document.getElementById('results-content').innerHTML;")
+        print(f"DEBUG: results content = {results_content[:500]}")
+
+        # Results should NOT show correct answer hints (check actual rendered content, not page source)
+        results_content = browser.execute_script("return document.getElementById('results-content').innerHTML;")
+        assert 'Правильна:' not in results_content, "Results should NOT show 'Correct:' hint when show_right_answer is false"
         
         # Should show the score but not the correct answers
         assert '0/1' in browser.page_source or '0%' in browser.page_source, "Results should show score"
@@ -809,7 +817,8 @@ def test_show_right_answer_false_correct_answer_visual_feedback(temp_dir, browse
         
         # Results should show perfect score but no correct answer hints
         assert '1/1' in browser.page_source or '100%' in browser.page_source, "Results should show perfect score"
-        assert 'Правильна:' not in browser.page_source, "Results should NOT show 'Correct:' hint even for correct answers when show_right_answer is false"
+        results_content = browser.execute_script("return document.getElementById('results-content').innerHTML;")
+        assert 'Правильна:' not in results_content, "Results should NOT show 'Correct:' hint even for correct answers when show_right_answer is false"
 
 
 def test_show_right_answer_multi_question_journey(temp_dir, browser):
@@ -894,11 +903,12 @@ def test_show_right_answer_multi_question_journey(temp_dir, browser):
 
         # Wait for results
         wait_for_element(browser, By.ID, 'results')
-        
+
         # Should show 1/3 (33%) but NO correct answer hints anywhere
-        assert '1/3' in browser.page_source, "Results should show 1 out of 3 correct"
+        assert 'Результат: 1/3' in browser.page_source or '1/3' in browser.page_source, "Results should show 1 out of 3 correct"
         assert '33%' in browser.page_source or '(33%)' in browser.page_source, "Results should show 33% score"
-        assert 'Правильна:' not in browser.page_source, "Results should NOT show any 'Correct:' hints when show_right_answer is false"
+        results_content = browser.execute_script("return document.getElementById('results-content').innerHTML;")
+        assert 'Правильна:' not in results_content, "Results should NOT show any 'Correct:' hints when show_right_answer is false"
         
         # Results table should exist but without correct answer columns/hints
         results_table = browser.find_element(By.CLASS_NAME, 'results-table')

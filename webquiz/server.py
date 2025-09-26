@@ -742,9 +742,10 @@ class TestingServer:
                 async with aiofiles.open(template_path, 'r', encoding='utf-8') as template_file:
                     template_content = await template_file.read()
             
-            # Inject questions data, title, and version into template
+            # Inject questions data, title, version, and show_right_answer setting into template
             html_content = template_content.replace('{{QUESTIONS_DATA}}', questions_json)
             html_content = html_content.replace('{{QUIZ_TITLE}}', self.quiz_title)
+            html_content = html_content.replace('{{SHOW_RIGHT_ANSWER}}', 'true' if self.show_right_answer else 'false')
             html_content = html_content.replace('{{WEBQUIZ_VERSION}}', get_package_version())
             
             # Write to destination
