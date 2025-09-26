@@ -464,8 +464,9 @@
                 this.questions = data.questions || [];
                 this.totalQuestions = data.total_questions || 0;
                 this.currentQuiz = data.current_quiz || 'No quiz selected';
-                this.userStatistics = data.user_statistics || {};
-                this.questionStatistics = data.question_statistics || {};
+                
+                // Calculate statistics client-side
+                this.calculateStatistics();
                 
                 this.updateQuizInfo();
                 this.buildTable();
@@ -503,13 +504,8 @@
                     time_taken: data.time_taken
                 };
                 
-                // Update statistics if provided
-                if (data.user_statistics) {
-                    this.userStatistics = data.user_statistics;
-                }
-                if (data.question_statistics) {
-                    this.questionStatistics = data.question_statistics;
-                }
+                // Calculate statistics client-side
+                this.calculateStatistics();
                 
                 this.updateQuizInfo();
                 this.buildTable();
@@ -524,21 +520,11 @@
                     time_taken: data.time_taken
                 };
                 
-                // Update statistics if provided
-                if (data.user_statistics) {
-                    this.userStatistics = data.user_statistics;
-                }
-                if (data.question_statistics) {
-                    this.questionStatistics = data.question_statistics;
-                }
+                // Calculate statistics client-side
+                this.calculateStatistics();
                 
-                // If statistics were updated, rebuild the entire table to update headers
-                if (data.user_statistics || data.question_statistics) {
-                    this.buildTable();
-                } else {
-                    // Otherwise, just update the individual cell
-                    this.updateCell(data.user_id, data.question_id, data.state, data.time_taken);
-                }
+                // Always rebuild table to update headers with new statistics
+                this.buildTable();
             }
 
             handleQuizSwitched(data) {
@@ -547,11 +533,58 @@
                 this.questions = data.questions || [];
                 this.totalQuestions = data.total_questions || 0;
                 this.currentQuiz = data.current_quiz || 'No quiz selected';
-                this.userStatistics = data.user_statistics || {};
-                this.questionStatistics = data.question_statistics || {};
+                
+                // Calculate statistics client-side
+                this.calculateStatistics();
                 
                 this.updateQuizInfo();
                 this.buildTable();
+            }
+
+            calculateStatistics() {
+                // Calculate user statistics
+                this.userStatistics = {};
+                for (const userId in this.liveStats) {
+                    let correctCount = 0;
+                    let totalAnswered = 0;
+                    
+                    for (const questionId in this.liveStats[userId]) {
+                        const state = this.liveStats[userId][questionId].state;
+                        if (state === 'ok' || state === 'fail') {
+                            totalAnswered++;
+                            if (state === 'ok') {
+                                correctCount++;
+                            }
+                        }
+                    }
+                    
+                    this.userStatistics[userId] = {
+                        correct_count: correctCount,
+                        total_answered: totalAnswered
+                    };
+                }
+                
+                // Calculate question statistics
+                this.questionStatistics = {};
+                for (let i = 1; i <= this.questions.length; i++) {
+                    this.questionStatistics[i] = {
+                        correct_count: 0,
+                        total_attempts: 0
+                    };
+                }
+                
+                for (const userId in this.liveStats) {
+                    for (const questionId in this.liveStats[userId]) {
+                        const state = this.liveStats[userId][questionId].state;
+                        if (state === 'ok' || state === 'fail') {
+                            const qId = parseInt(questionId);
+                            this.questionStatistics[qId].total_attempts++;
+                            if (state === 'ok') {
+                                this.questionStatistics[qId].correct_count++;
+                            }
+                        }
+                    }
+                }
             }
 
             updateQuizInfo() {
