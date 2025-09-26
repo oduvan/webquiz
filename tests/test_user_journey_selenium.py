@@ -96,8 +96,9 @@ def test_user_registration_complete_flow(temp_dir, browser):
         register_button.click()
 
         # Wait for quiz section to appear (registration successful)
-        quiz_section = wait_for_element(browser, By.ID, 'test-section')
-        assert quiz_section.is_displayed()
+        quiz_section = WebDriverWait(browser, 10).until(
+            EC.visibility_of_element_located((By.ID, 'test-section'))
+        )
 
         # Verify user info is displayed
         user_info = wait_for_element(browser, By.ID, 'user-info')
