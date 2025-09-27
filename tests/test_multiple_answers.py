@@ -4,6 +4,7 @@ Test suite for multiple correct answers functionality
 import pytest
 import json
 from unittest.mock import patch, MagicMock
+from datetime import datetime, timedelta
 from webquiz.server import TestingServer, WebQuizConfig
 
 
@@ -142,7 +143,7 @@ class TestMultipleAnswersAPI:
         # Mock user and timing
         user_id = 'test-user'
         server.users[user_id] = {'username': 'testuser'}
-        server.question_start_times[user_id] = MagicMock()
+        server.question_start_times[user_id] = datetime.now() - timedelta(seconds=5)
 
         # Mock request
         mock_request = MagicMock()
@@ -154,9 +155,7 @@ class TestMultipleAnswersAPI:
             }
         mock_request.json = mock_json
 
-        with patch('webquiz.server.datetime') as mock_datetime:
-            mock_datetime.now.return_value = MagicMock()
-            response = await server.submit_answer(mock_request)
+        response = await server.submit_answer(mock_request)
 
         # Should be successful
         assert response.status == 200
@@ -180,7 +179,7 @@ class TestMultipleAnswersAPI:
         # Mock user and timing
         user_id = 'test-user'
         server.users[user_id] = {'username': 'testuser'}
-        server.question_start_times[user_id] = MagicMock()
+        server.question_start_times[user_id] = datetime.now() - timedelta(seconds=3)
 
         # Mock request with single answer
         mock_request = MagicMock()
@@ -192,9 +191,7 @@ class TestMultipleAnswersAPI:
             }
         mock_request.json = mock_json
 
-        with patch('webquiz.server.datetime') as mock_datetime:
-            mock_datetime.now.return_value = MagicMock()
-            response = await server.submit_answer(mock_request)
+        response = await server.submit_answer(mock_request)
 
         # Should be successful
         assert response.status == 200

@@ -943,6 +943,13 @@
             // Move to next question
             currentQuestionIndex++;
 
+            // Check if we've reached the end before notifying server
+            if (currentQuestionIndex >= questions.length) {
+                // Test completed - go directly to results
+                await showCurrentQuestion();
+                return;
+            }
+
             // Notify server that question is being displayed (for live stats and timing)
             // This should ONLY happen when user clicks "Продовжити" to open next question
             notifyQuestionStart(questions[currentQuestionIndex].id);

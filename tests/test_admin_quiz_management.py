@@ -541,7 +541,7 @@ questions: []
         assert response.status_code == 200
         data = response.json()
         assert data['valid'] is False
-        assert any('at least one question' in error for error in data['errors'])
+        assert any('принаймні одне питання' in error for error in data['errors'])
 
 
 def test_update_active_quiz_affects_server_state(temp_dir):
