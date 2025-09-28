@@ -927,7 +927,9 @@ def test_show_right_answer_multi_question_journey(temp_dir, browser):
         browser.find_element(By.ID, 'continue-btn').click()
 
         # Wait for results
-        wait_for_element(browser, By.ID, 'results')
+        WebDriverWait(browser, 10).until(
+            EC.visibility_of_element_located((By.ID, 'results'))
+        )
 
         # Should show 1/3 (33%) but NO correct answer hints anywhere
         assert 'Результат: 1/3' in browser.page_source or '1/3' in browser.page_source, "Results should show 1 out of 3 correct"

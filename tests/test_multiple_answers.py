@@ -124,7 +124,6 @@ class TestMultipleAnswersValidation:
 class TestMultipleAnswersAPI:
     """Test API endpoints with multiple answers"""
 
-    @pytest.mark.asyncio
     async def test_submit_multiple_answers(self):
         """Test submitting multiple answers via API"""
         config = WebQuizConfig()
@@ -160,7 +159,6 @@ class TestMultipleAnswersAPI:
         # Should be successful
         assert response.status == 200
 
-    @pytest.mark.asyncio
     async def test_backward_compatibility(self):
         """Test that existing single-answer quizzes still work"""
         config = WebQuizConfig()
