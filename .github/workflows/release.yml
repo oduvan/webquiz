@@ -72,10 +72,10 @@ jobs:
       run: |
         poetry build
         
-    - name: Install pandoc for PDF generation
+    - name: Install pandoc and LaTeX for PDF generation
       run: |
         sudo apt-get update
-        sudo apt-get install -y pandoc texlive-latex-base texlive-fonts-recommended texlive-fonts-extra texlive-latex-extra
+        sudo apt-get install -y pandoc texlive-latex-base texlive-fonts-recommended texlive-fonts-extra texlive-latex-extra texlive-xetex
         
     - name: Generate Ukrainian documentation PDF
       run: |
@@ -111,9 +111,9 @@ jobs:
         echo -e "\n\n\\newpage\n\n# Конфігурація та Файли\n" >> combined-docs.md
         cat configuration.md >> combined-docs.md
         
-        # Generate PDF
+        # Generate PDF with Unicode support
         pandoc combined-docs.md -o WebQuiz-Documentation-Ukrainian-v${{ github.event.inputs.version }}.pdf \
-          --pdf-engine=pdflatex \
+          --pdf-engine=xelatex \
           --variable geometry:margin=2cm \
           --variable fontsize=11pt \
           --variable documentclass=article \
