@@ -81,24 +81,45 @@ pytest tests/test_user_journey_selenium.py::test_complete_quiz_journey -v
 pytest tests/test_user_journey_selenium.py --html=selenium-report.html --self-contained-html
 ```
 
-### Debug Mode (Headed Browser)
-For debugging, you can modify the browser fixture to remove `--headless`:
+### Debug Mode (Visible Browser)
+For debugging and development, use the `SHOW_BROWSER` environment variable to display the browser window:
 
-```python
-# In test_user_journey_selenium.py, comment out this line:
-# options.add_argument('--headless')
+```bash
+# Show browser window during tests (for debugging)
+SHOW_BROWSER=true pytest tests/test_user_journey_selenium.py -v
+
+# Single test with visible browser
+SHOW_BROWSER=1 pytest tests/test_user_journey_selenium.py::test_complete_quiz_journey -v
+
+# Combined with other options
+SHOW_BROWSER=yes pytest tests/test_user_journey_selenium.py -v --html=report.html
+```
+
+### Environment Variables
+Control test behavior with environment variables:
+
+```bash
+# Skip Selenium tests entirely (useful for CI environments without browser)
+SKIP_SELENIUM=true pytest tests/ -v
+
+# Show browser window during tests (for debugging and development)
+SHOW_BROWSER=true pytest tests/test_user_journey_selenium.py -v
+
+# Default behavior: headless mode, run all tests
+pytest tests/test_user_journey_selenium.py -v
 ```
 
 ### CI/CD Pipeline
 ```bash
-# Headless mode (default)
+# Headless mode (default) - no environment variables needed
 pytest tests/test_user_journey_selenium.py --tb=short
 ```
 
 ## Test Architecture
 
 ### Browser Configuration
-- **Headless Mode**: No visible browser window (CI/CD friendly)
+- **Headless Mode**: No visible browser window by default (CI/CD friendly)
+- **Debug Mode**: Visible browser window via `SHOW_BROWSER=true` (development friendly)
 - **Automatic WebDriver Management**: Downloads correct ChromeDriver automatically
 - **Cross-platform**: Works on Windows, macOS, Linux
 - **GitHub Actions Ready**: Pre-configured for CI/CD

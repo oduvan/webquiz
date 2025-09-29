@@ -28,7 +28,12 @@ def browser():
     debug_port = 9222 + (worker_port - 8080)
 
     options = Options()
-    options.add_argument('--headless')  # Always headless for CI/CD
+
+    # Check SHOW_BROWSER environment variable for debugging
+    show_browser = os.getenv('SHOW_BROWSER', '').lower() in ('true', '1', 'yes')
+    if not show_browser:
+        options.add_argument('--headless')  # Headless mode unless SHOW_BROWSER is set
+
     options.add_argument('--no-sandbox')  # Required for GitHub Actions
     options.add_argument('--disable-dev-shm-usage')  # Overcome limited resource problems
     options.add_argument('--disable-gpu')  # Disable GPU acceleration
