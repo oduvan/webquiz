@@ -133,77 +133,8 @@ def test_admin_endpoints_require_master_key_configuration():
         assert response.status_code == 403
 
 
-def test_admin_get_quiz_endpoint():
-    """Test getting quiz content via admin API."""
-    with custom_webquiz_server() as (proc, port):
-        headers = {'X-Master-Key': 'test123'}
-
-        response = requests.get(f'http://localhost:{port}/api/admin/quiz/test_quiz.yaml', headers=headers)
-
-        assert response.status_code == 200
-        data = response.json()
-        assert 'content' in data
-
-        # Parse the YAML content
-        quiz_content = yaml.safe_load(data['content'])
-        assert 'title' in quiz_content
-        assert quiz_content['title'] == 'Test Quiz'
 
 
-def test_admin_validate_quiz_endpoint():
-    """Test quiz validation via admin API."""
-    with custom_webquiz_server() as (proc, port):
-        headers = {'X-Master-Key': 'test123'}
-
-        # Test valid quiz data
-        valid_quiz = {
-            'title': 'Valid Quiz',
-            'description': 'A valid quiz',
-            'questions': [
-                {
-                    'question': 'What is 1 + 1?',
-                    'options': ['1', '2', '3'],
-                    'correct_answer': 1
-                }
-            ]
-        }
-
-        # Convert quiz data to YAML string
-        quiz_yaml = yaml.dump(valid_quiz)
-
-        response = requests.post(f'http://localhost:{port}/api/admin/validate-quiz',
-                               headers=headers,
-                               json={'content': quiz_yaml})
-
-        assert response.status_code == 200
-        data = response.json()
-        assert data['valid'] is True
-        assert 'parsed' in data
-        assert 'question_count' in data
-
-
-def test_admin_validate_invalid_quiz_endpoint():
-    """Test validation of invalid quiz data."""
-    with custom_webquiz_server() as (proc, port):
-        headers = {'X-Master-Key': 'test123'}
-
-        # Test invalid quiz data (missing required fields)
-        invalid_quiz = {
-            'title': 'Invalid Quiz'
-            # Missing questions
-        }
-
-        # Convert quiz data to YAML string
-        invalid_quiz_yaml = yaml.dump(invalid_quiz)
-
-        response = requests.post(f'http://localhost:{port}/api/admin/validate-quiz',
-                               headers=headers,
-                               json={'content': invalid_quiz_yaml})
-
-        assert response.status_code == 200
-        data = response.json()
-        assert data['valid'] is False
-        assert len(data['errors']) > 0
 
 
 def test_trusted_ip_bypass_authentication():

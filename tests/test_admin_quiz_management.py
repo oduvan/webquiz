@@ -406,25 +406,43 @@ questions:
         assert 'parsed' in data
 
 
-def test_validate_quiz_missing_questions(temp_dir):
-    """Test validation of quiz without questions array."""
-    invalid_quiz_yaml = '''title: Invalid Quiz
+def test_validate_quiz_missing_or_empty_questions(temp_dir):
+    """Test validation of quiz without questions array or empty questions array."""
+    # Test 1: Quiz without questions array
+    missing_questions_yaml = '''title: Invalid Quiz
 description: This quiz has no questions
+'''
+
+    # Test 2: Quiz with empty questions array
+    empty_questions_yaml = '''title: Empty Quiz
+questions: []
 '''
 
     with custom_webquiz_server() as (proc, port):
         headers = {'X-Master-Key': 'test123'}
-        response = requests.post(
+
+        # Test missing questions array
+        response1 = requests.post(
             f'http://localhost:{port}/api/admin/validate-quiz',
             headers=headers,
-            json={'content': invalid_quiz_yaml}
+            json={'content': missing_questions_yaml}
         )
+        assert response1.status_code == 200
+        data1 = response1.json()
+        assert data1['valid'] is False
+        assert len(data1['errors']) > 0
+        assert any('questions' in error for error in data1['errors'])
 
-        assert response.status_code == 200
-        data = response.json()
-        assert data['valid'] is False
-        assert len(data['errors']) > 0
-        assert any('questions' in error for error in data['errors'])
+        # Test empty questions array
+        response2 = requests.post(
+            f'http://localhost:{port}/api/admin/validate-quiz',
+            headers=headers,
+            json={'content': empty_questions_yaml}
+        )
+        assert response2.status_code == 200
+        data2 = response2.json()
+        assert data2['valid'] is False
+        assert any('принаймні одне питання' in error for error in data2['errors'])
 
 
 def test_validate_quiz_invalid_yaml(temp_dir):
@@ -451,8 +469,9 @@ questions:
         assert any('YAML syntax error' in error for error in data['errors'])
 
 
-def test_validate_quiz_missing_required_fields(temp_dir):
-    """Test validation of questions missing required fields."""
+def test_validate_quiz_invalid_question_structure(temp_dir):
+    """Test validation of questions with missing required fields or invalid answer indices."""
+    # Test 1: Missing required fields
     incomplete_quiz_yaml = '''title: Incomplete Quiz
 questions:
   - question: Where are my options?
@@ -461,22 +480,7 @@ questions:
     # Missing question and correct_answer
 '''
 
-    with custom_webquiz_server() as (proc, port):
-        headers = {'X-Master-Key': 'test123'}
-        response = requests.post(
-            f'http://localhost:{port}/api/admin/validate-quiz',
-            headers=headers,
-            json={'content': incomplete_quiz_yaml}
-        )
-
-        assert response.status_code == 200
-        data = response.json()
-        assert data['valid'] is False
-        assert len(data['errors']) > 0
-
-
-def test_validate_quiz_invalid_correct_answer_index(temp_dir):
-    """Test validation of out-of-range correct answer indices."""
+    # Test 2: Invalid correct answer index
     invalid_index_yaml = '''title: Invalid Index Quiz
 questions:
   - question: What's the answer?
@@ -486,16 +490,30 @@ questions:
 
     with custom_webquiz_server() as (proc, port):
         headers = {'X-Master-Key': 'test123'}
-        response = requests.post(
+
+        # Test missing required fields
+        response1 = requests.post(
+            f'http://localhost:{port}/api/admin/validate-quiz',
+            headers=headers,
+            json={'content': incomplete_quiz_yaml}
+        )
+        assert response1.status_code == 200
+        data1 = response1.json()
+        assert data1['valid'] is False
+        assert len(data1['errors']) > 0
+
+        # Test invalid correct answer index
+        response2 = requests.post(
             f'http://localhost:{port}/api/admin/validate-quiz',
             headers=headers,
             json={'content': invalid_index_yaml}
         )
+        assert response2.status_code == 200
+        data2 = response2.json()
+        assert data2['valid'] is False
+        assert any('out of range' in error for error in data2['errors'])
 
-        assert response.status_code == 200
-        data = response.json()
-        assert data['valid'] is False
-        assert any('out of range' in error for error in data['errors'])
+
 
 
 def test_validate_quiz_image_only_questions(temp_dir):
@@ -523,25 +541,6 @@ questions:
         assert data['valid'] is True  # Image-only questions should be valid
         assert data['question_count'] == 2
 
-
-def test_validate_quiz_empty_questions_array(temp_dir):
-    """Test validation of quiz with empty questions array."""
-    empty_quiz_yaml = '''title: Empty Quiz
-questions: []
-'''
-
-    with custom_webquiz_server() as (proc, port):
-        headers = {'X-Master-Key': 'test123'}
-        response = requests.post(
-            f'http://localhost:{port}/api/admin/validate-quiz',
-            headers=headers,
-            json={'content': empty_quiz_yaml}
-        )
-
-        assert response.status_code == 200
-        data = response.json()
-        assert data['valid'] is False
-        assert any('принаймні одне питання' in error for error in data['errors'])
 
 
 def test_update_active_quiz_affects_server_state(temp_dir):

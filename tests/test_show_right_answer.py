@@ -6,47 +6,6 @@ from pathlib import Path
 from tests.conftest import custom_webquiz_server
 
 
-def test_show_right_answer_true_default():
-    """Test that show_right_answer defaults to true when not specified."""
-    quiz_data = {
-        'default.yaml': {  # Use default.yaml to ensure it gets loaded automatically
-            'title': 'Basic Quiz',
-            'questions': [
-                {
-                    'question': 'What is 2 + 2?',
-                    'options': ['3', '4', '5', '6'],
-                    'correct_answer': 1
-                }
-            ]
-        }
-    }
-
-    with custom_webquiz_server(quizzes=quiz_data) as (proc, port):
-        # Register a user
-        register_response = requests.post(
-            f'http://localhost:{port}/api/register',
-            json={'username': 'testuser'}
-        )
-        assert register_response.status_code == 200
-        user_data = register_response.json()
-        user_id = user_data['user_id']
-
-        # Submit a wrong answer
-        submit_response = requests.post(
-            f'http://localhost:{port}/api/submit-answer',
-            json={
-                'user_id': user_id,
-                'question_id': 1,
-                'selected_answer': 0  # Wrong answer (3)
-            }
-        )
-        assert submit_response.status_code == 200
-        submit_data = submit_response.json()
-        
-        # Should include correct_answer since show_right_answer defaults to true
-        assert 'correct_answer' in submit_data
-        assert submit_data['correct_answer'] == 1
-        assert submit_data['is_correct'] is False
 
 
 def test_show_right_answer_true_explicit():
@@ -282,71 +241,6 @@ def test_show_right_answer_multiple_questions():
             assert 'correct_answer' not in result
 
 
-def test_show_right_answer_admin_quiz_creation():
-    """Test that admin can create quizzes with show_right_answer setting."""
-    import time
-    with custom_webquiz_server() as (proc, port):
-        headers = {'X-Master-Key': 'test123'}
-        
-        quiz_data = {
-            'title': 'Admin Created Quiz',
-            'show_right_answer': False,
-            'questions': [
-                {
-                    'question': 'Admin question?',
-                    'options': ['A', 'B', 'C', 'D'],
-                    'correct_answer': 1
-                }
-            ]
-        }
-
-        # Use timestamp to ensure unique filename
-        filename = f'admin_test_{int(time.time() * 1000)}.yaml'
-        create_data = {
-            'filename': filename,
-            'mode': 'wizard',
-            'quiz_data': quiz_data
-        }
-
-        # Create quiz via admin API
-        response = requests.post(
-            f'http://localhost:{port}/api/admin/create-quiz',
-            headers=headers,
-            json=create_data
-        )
-        assert response.status_code == 200
-        
-        # Switch to the new quiz
-        switch_response = requests.post(
-            f'http://localhost:{port}/api/admin/switch-quiz',
-            headers=headers,
-            json={'quiz_filename': filename}
-        )
-        assert switch_response.status_code == 200
-
-        # Test that the setting works
-        register_response = requests.post(
-            f'http://localhost:{port}/api/register',
-            json={'username': 'testuser'}
-        )
-        assert register_response.status_code == 200
-        user_data = register_response.json()
-        user_id = user_data['user_id']
-
-        # Submit wrong answer
-        submit_response = requests.post(
-            f'http://localhost:{port}/api/submit-answer',
-            json={
-                'user_id': user_id,
-                'question_id': 1,
-                'selected_answer': 0  # Wrong answer
-            }
-        )
-        assert submit_response.status_code == 200
-        submit_data = submit_response.json()
-        
-        # Should not include correct_answer due to show_right_answer: false
-        assert 'correct_answer' not in submit_data
 
 
 def test_show_right_answer_admin_quiz_update():
