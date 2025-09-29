@@ -76,6 +76,36 @@ def wait_for_clickable(browser, by, selector, timeout=10):
     )
 
 
+# Helper methods for improved element selection
+def find_register_button(browser):
+    """Find the registration button using CSS class."""
+    return browser.find_element(By.CSS_SELECTOR, '.register-btn')
+
+
+def find_option_by_index(browser, index):
+    """Find an option by its index using data attribute."""
+    return browser.find_element(By.CSS_SELECTOR, f'[data-option-index="{index}"]')
+
+
+def find_option_by_text(browser, text):
+    """Find an option by its text content (fallback method)."""
+    options = browser.find_elements(By.CSS_SELECTOR, '.quiz-option')
+    for option in options:
+        if text in option.text:
+            return option
+    raise NoSuchElementException(f"Option with text '{text}' not found")
+
+
+def find_question_text(browser):
+    """Find the current question text element."""
+    return browser.find_element(By.CSS_SELECTOR, '.question-text')
+
+
+def wait_for_question_text(browser, timeout=10):
+    """Wait for question text to be present."""
+    return wait_for_element(browser, By.CSS_SELECTOR, '.question-text', timeout)
+
+
 @skip_if_selenium_disabled
 def test_user_registration_complete_flow(temp_dir, browser):
     """Test complete user registration workflow."""
@@ -101,7 +131,7 @@ def test_user_registration_complete_flow(temp_dir, browser):
 
         # Verify registration form elements
         assert username_input.is_displayed()
-        register_button = browser.find_element(By.XPATH, '//button[contains(text(), "Зареєструватися")]')
+        register_button = find_register_button(browser)
         assert register_button.is_displayed()
 
         # Test registration with valid username
@@ -126,7 +156,7 @@ def test_registration_form_validation(temp_dir, browser):
 
         # Wait for registration form
         username_input = wait_for_element(browser, By.ID, 'username')
-        register_button = browser.find_element(By.XPATH, '//button[contains(text(), "Зареєструватися")]')
+        register_button = find_register_button(browser)
 
         # Try to register with empty username
         register_button.click()
@@ -167,7 +197,7 @@ def test_complete_quiz_journey(temp_dir, browser):
         # Register user
         username_input = wait_for_element(browser, By.ID, 'username')
         username_input.send_keys('JourneyTester')
-        register_button = browser.find_element(By.XPATH, '//button[contains(text(), "Зареєструватися")]')
+        register_button = find_register_button(browser)
         register_button.click()
 
         # Wait for quiz to start
@@ -177,7 +207,7 @@ def test_complete_quiz_journey(temp_dir, browser):
         assert 'What is 2 + 2?' in browser.page_source
 
         # Select correct answer (option with text "4")
-        option_element = browser.find_element(By.XPATH, '//div[@class="option" and contains(text(), "4")]')
+        option_element = find_option_by_text(browser, "4")
         option_element.click()
 
         # Verify option is selected
@@ -197,9 +227,9 @@ def test_complete_quiz_journey(temp_dir, browser):
         continue_button.click()
 
         # Answer second question
-        wait_for_element(browser, By.XPATH, '//h3[contains(text(), "What is the capital of France?")]')
+        wait_for_question_text(browser)
 
-        paris_option = browser.find_element(By.XPATH, '//div[@class="option" and contains(text(), "Paris")]')
+        paris_option = find_option_by_text(browser, "Paris")
         paris_option.click()
 
         submit_button = browser.find_element(By.ID, 'submit-answer-btn')
@@ -240,13 +270,13 @@ def test_question_selection_and_feedback(temp_dir, browser):
         # Register and start quiz
         username_input = wait_for_element(browser, By.ID, 'username')
         username_input.send_keys('FeedbackTester')
-        browser.find_element(By.XPATH, '//button[contains(text(), "Зареєструватися")]').click()
+        find_register_button(browser).click()
 
         wait_for_element(browser, By.ID, 'current-question-container')
 
         # Test selecting different options
-        wrong_option = browser.find_element(By.XPATH, '//div[@class="option" and contains(text(), "Wrong")]')
-        correct_option = browser.find_element(By.XPATH, '//div[@class="option" and contains(text(), "Correct")]')
+        wrong_option = find_option_by_text(browser, "Wrong")
+        correct_option = find_option_by_text(browser, "Correct")
 
         # Select wrong option first
         wrong_option.click()
@@ -307,7 +337,7 @@ def test_progress_bar_functionality(temp_dir, browser):
         # Register
         username_input = wait_for_element(browser, By.ID, 'username')
         username_input.send_keys('ProgressTester')
-        browser.find_element(By.XPATH, '//button[contains(text(), "Зареєструватися")]').click()
+        find_register_button(browser).click()
 
         wait_for_element(browser, By.ID, 'current-question-container')
 
@@ -316,7 +346,7 @@ def test_progress_bar_functionality(temp_dir, browser):
         assert 'Питання 1 з 3' in progress_text.text
 
         # Answer first question and continue
-        browser.find_element(By.XPATH, '//div[@class="option"][1]').click()
+        find_option_by_index(browser, 0).click()
         browser.find_element(By.ID, 'submit-answer-btn').click()
         wait_for_clickable(browser, By.ID, 'continue-btn').click()
 
@@ -331,7 +361,7 @@ def test_progress_bar_functionality(temp_dir, browser):
         assert '66' in width or '67' in width
 
         # Complete second question
-        browser.find_element(By.XPATH, '//div[@class="option"][2]').click()
+        find_option_by_index(browser, 1).click()
         browser.find_element(By.ID, 'submit-answer-btn').click()
         wait_for_clickable(browser, By.ID, 'continue-btn').click()
 
@@ -400,18 +430,20 @@ def test_session_persistence_on_reload(temp_dir, browser):
         # Register user
         username_input = wait_for_element(browser, By.ID, 'username')
         username_input.send_keys('SessionTester')
-        browser.find_element(By.XPATH, '//button[contains(text(), "Зареєструватися")]').click()
+        find_register_button(browser).click()
 
         # Start quiz
         wait_for_element(browser, By.ID, 'current-question-container')
 
         # Answer first question
-        browser.find_element(By.XPATH, '//div[@class="option" and contains(text(), "B")]').click()
+        find_option_by_text(browser, "B").click()
         browser.find_element(By.ID, 'submit-answer-btn').click()
         wait_for_clickable(browser, By.ID, 'continue-btn').click()
 
         # Verify we're on second question
-        wait_for_element(browser, By.XPATH, '//h3[contains(text(), "Second question?")]')
+        wait_for_element(browser, By.CSS_SELECTOR, '.question-text')
+        question_text = browser.find_element(By.CSS_SELECTOR, '.question-text')
+        assert 'Second question?' in question_text.text
 
         # Reload page
         browser.refresh()
@@ -467,18 +499,20 @@ def test_different_question_types(temp_dir, browser):
         # Register
         username_input = wait_for_element(browser, By.ID, 'username')
         username_input.send_keys('TypeTester')
-        browser.find_element(By.XPATH, '//button[contains(text(), "Зареєструватися")]').click()
+        find_register_button(browser).click()
 
         wait_for_element(browser, By.ID, 'current-question-container')
 
         # Question 1: Text only
         assert 'Text only question?' in browser.page_source
-        browser.find_element(By.XPATH, '//div[@class="option" and contains(text(), "Text A")]').click()
+        find_option_by_text(browser, "Text A").click()
         browser.find_element(By.ID, 'submit-answer-btn').click()
         wait_for_clickable(browser, By.ID, 'continue-btn').click()
 
         # Question 2: Text with image
-        wait_for_element(browser, By.XPATH, '//h3[contains(text(), "Question with image?")]')
+        wait_for_element(browser, By.CSS_SELECTOR, '.question-text')
+        question_text = browser.find_element(By.CSS_SELECTOR, '.question-text')
+        assert 'Question with image?' in question_text.text
         # Should have both text and image
         assert 'Question with image?' in browser.page_source
         try:
@@ -486,10 +520,10 @@ def test_different_question_types(temp_dir, browser):
             assert image.is_displayed()
         except NoSuchElementException:
             # Image might not load in headless mode, but img tag should exist
-            img_tag = browser.find_element(By.XPATH, '//img[contains(@src, "/imgs/test.jpg")]')
+            img_tag = browser.find_element(By.CSS_SELECTOR, 'img[src*="/imgs/test.jpg"]')
             assert img_tag
 
-        browser.find_element(By.XPATH, '//div[@class="option" and contains(text(), "With image B")]').click()
+        find_option_by_text(browser, "With image B").click()
         browser.find_element(By.ID, 'submit-answer-btn').click()
         wait_for_clickable(browser, By.ID, 'continue-btn').click()
 
@@ -498,7 +532,7 @@ def test_different_question_types(temp_dir, browser):
         current_html = browser.page_source
         assert 'Image only A' in current_html  # Options should be there
 
-        browser.find_element(By.XPATH, '//div[@class="option" and contains(text(), "Image only A")]').click()
+        find_option_by_text(browser, 'Image only A').click()
         browser.find_element(By.ID, 'submit-answer-btn').click()
         wait_for_clickable(browser, By.ID, 'continue-btn').click()
 
@@ -532,7 +566,7 @@ def test_button_state_management(temp_dir, browser):
         # Register
         username_input = wait_for_element(browser, By.ID, 'username')
         username_input.send_keys('ButtonTester')
-        browser.find_element(By.XPATH, '//button[contains(text(), "Зареєструватися")]').click()
+        find_register_button(browser).click()
 
         wait_for_element(browser, By.ID, 'current-question-container')
 
@@ -544,7 +578,7 @@ def test_button_state_management(temp_dir, browser):
         assert 'hidden' in continue_button.get_attribute('class')
 
         # Select an option - submit button should be enabled
-        browser.find_element(By.XPATH, '//div[@class="option" and contains(text(), "Option 1")]').click()
+        find_option_by_text(browser, 'Option 1').click()
         assert submit_button.get_attribute('disabled') is None
 
         # Submit answer
@@ -586,18 +620,20 @@ def test_results_display_accuracy(temp_dir, browser):
         # Register
         username_input = wait_for_element(browser, By.ID, 'username')
         username_input.send_keys('ResultsTester')
-        browser.find_element(By.XPATH, '//button[contains(text(), "Зареєструватися")]').click()
+        find_register_button(browser).click()
 
         wait_for_element(browser, By.ID, 'current-question-container')
 
         # Answer first question correctly
-        browser.find_element(By.XPATH, '//div[@class="option" and contains(text(), "Right")]').click()
+        find_option_by_text(browser, 'Right').click()
         browser.find_element(By.ID, 'submit-answer-btn').click()
         wait_for_clickable(browser, By.ID, 'continue-btn').click()
 
         # Answer second question incorrectly
-        wait_for_element(browser, By.XPATH, '//h3[contains(text(), "Incorrect answer question?")]')
-        browser.find_element(By.XPATH, '//div[@class="option" and contains(text(), "Wrong")]').click()
+        wait_for_element(browser, By.CSS_SELECTOR, '.question-text')
+        question_text = browser.find_element(By.CSS_SELECTOR, '.question-text')
+        assert 'Incorrect answer question?' in question_text.text
+        find_option_by_text(browser, 'Wrong').click()
         browser.find_element(By.ID, 'submit-answer-btn').click()
         wait_for_clickable(browser, By.ID, 'continue-btn').click()
 
@@ -641,7 +677,7 @@ def test_browser_navigation_behavior(temp_dir, browser):
         # Register
         username_input = wait_for_element(browser, By.ID, 'username')
         username_input.send_keys('NavTester')
-        browser.find_element(By.XPATH, '//button[contains(text(), "Зареєструватися")]').click()
+        find_register_button(browser).click()
 
         wait_for_element(browser, By.ID, 'current-question-container')
 
@@ -659,7 +695,7 @@ def test_browser_navigation_behavior(temp_dir, browser):
             wait_for_element(browser, By.ID, 'current-question-container')
 
         # Quiz should still be functional
-        browser.find_element(By.XPATH, '//div[@class="option" and contains(text(), "A")]').click()
+        find_option_by_text(browser, 'A').click()
         browser.find_element(By.ID, 'submit-answer-btn').click()
 
         # Should be able to complete quiz
@@ -690,13 +726,13 @@ def test_show_right_answer_true_visual_feedback(temp_dir, browser):
         # Register user
         username_input = wait_for_element(browser, By.ID, 'username')
         username_input.send_keys('ShowAnswersTester')
-        browser.find_element(By.XPATH, '//button[contains(text(), "Зареєструватися")]').click()
+        find_register_button(browser).click()
 
         wait_for_element(browser, By.ID, 'current-question-container')
 
         # Select WRONG answer intentionally
-        wrong_option = browser.find_element(By.XPATH, '//div[@class="option" and contains(text(), "3")]')  # Wrong answer
-        correct_option = browser.find_element(By.XPATH, '//div[@class="option" and contains(text(), "4")]')  # Correct answer
+        wrong_option = find_option_by_text(browser, '3')  # Wrong answer
+        correct_option = find_option_by_text(browser, '4')  # Correct answer
         
         wrong_option.click()
         
@@ -746,13 +782,13 @@ def test_show_right_answer_false_visual_feedback(temp_dir, browser):
         # Register user
         username_input = wait_for_element(browser, By.ID, 'username')
         username_input.send_keys('HideAnswersTester')
-        browser.find_element(By.XPATH, '//button[contains(text(), "Зареєструватися")]').click()
+        find_register_button(browser).click()
 
         wait_for_element(browser, By.ID, 'current-question-container')
 
         # Select WRONG answer intentionally
-        wrong_option = browser.find_element(By.XPATH, '//div[@class="option" and contains(text(), "5")]')  # Wrong answer
-        correct_option = browser.find_element(By.XPATH, '//div[@class="option" and contains(text(), "6")]')  # Correct answer
+        wrong_option = find_option_by_text(browser, '5')  # Wrong answer
+        correct_option = find_option_by_text(browser, '6')  # Correct answer
         
         wrong_option.click()
         
@@ -815,12 +851,12 @@ def test_show_right_answer_false_correct_answer_visual_feedback(temp_dir, browse
         # Register user
         username_input = wait_for_element(browser, By.ID, 'username')
         username_input.send_keys('CorrectAnswerTester')
-        browser.find_element(By.XPATH, '//button[contains(text(), "Зареєструватися")]').click()
+        find_register_button(browser).click()
 
         wait_for_element(browser, By.ID, 'current-question-container')
 
         # Select CORRECT answer
-        correct_option = browser.find_element(By.XPATH, '//div[@class="option" and contains(text(), "8")]')  # Correct answer
+        correct_option = find_option_by_text(browser, '8')  # Correct answer
         
         correct_option.click()
         
@@ -883,12 +919,12 @@ def test_show_right_answer_multi_question_journey(temp_dir, browser):
         # Register user
         username_input = wait_for_element(browser, By.ID, 'username')
         username_input.send_keys('MultiQuestionTester')
-        browser.find_element(By.XPATH, '//button[contains(text(), "Зареєструватися")]').click()
+        find_register_button(browser).click()
 
         wait_for_element(browser, By.ID, 'current-question-container')
 
         # Question 1: Answer CORRECTLY
-        correct_option_1 = browser.find_element(By.XPATH, '//div[@class="option" and contains(text(), "2")]')
+        correct_option_1 = find_option_by_text(browser, '2')
         correct_option_1.click()
         browser.find_element(By.ID, 'submit-answer-btn').click()
         
@@ -900,9 +936,11 @@ def test_show_right_answer_multi_question_journey(temp_dir, browser):
         browser.find_element(By.ID, 'continue-btn').click()
 
         # Question 2: Answer INCORRECTLY  
-        wait_for_element(browser, By.XPATH, '//h3[contains(text(), "What is 2 * 3?")]')
-        wrong_option_2 = browser.find_element(By.XPATH, '//div[@class="option" and contains(text(), "4")]')  # Wrong: should be 6
-        correct_option_2 = browser.find_element(By.XPATH, '//div[@class="option" and contains(text(), "6")]')  # Correct answer
+        wait_for_element(browser, By.CSS_SELECTOR, '.question-text')
+        question_text = browser.find_element(By.CSS_SELECTOR, '.question-text')
+        assert 'What is 2 * 3?' in question_text.text
+        wrong_option_2 = find_option_by_text(browser, '4')  # Wrong: should be 6
+        correct_option_2 = find_option_by_text(browser, '6')  # Correct answer
         
         wrong_option_2.click()
         browser.find_element(By.ID, 'submit-answer-btn').click()
@@ -916,9 +954,11 @@ def test_show_right_answer_multi_question_journey(temp_dir, browser):
         browser.find_element(By.ID, 'continue-btn').click()
 
         # Question 3: Answer INCORRECTLY
-        wait_for_element(browser, By.XPATH, '//h3[contains(text(), "What is 10 / 2?")]')
-        wrong_option_3 = browser.find_element(By.XPATH, '//div[@class="option" and contains(text(), "3")]')  # Wrong: should be 5
-        correct_option_3 = browser.find_element(By.XPATH, '//div[@class="option" and contains(text(), "5")]')  # Correct answer
+        wait_for_element(browser, By.CSS_SELECTOR, '.question-text')
+        question_text = browser.find_element(By.CSS_SELECTOR, '.question-text')
+        assert 'What is 10 / 2?' in question_text.text
+        wrong_option_3 = find_option_by_text(browser, '3')  # Wrong: should be 5
+        correct_option_3 = find_option_by_text(browser, '5')  # Correct answer
         
         wrong_option_3.click()
         browser.find_element(By.ID, 'submit-answer-btn').click()

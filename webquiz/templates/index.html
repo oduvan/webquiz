@@ -467,7 +467,7 @@
             <h2>Зареєструйтеся для початку тесту</h2>
             <div id="registration-error" class="error-message hidden"></div>
             <input type="text" id="username" placeholder="Введіть ваше ім'я користувача" style="padding: 10px; width: 100%; max-width: 300px; box-sizing: border-box;">
-            <button onclick="registerUser()">Зареєструватися</button>
+            <button class="register-btn" onclick="registerUser()">Зареєструватися</button>
         </div>
         
         <!-- Test Section -->
@@ -712,9 +712,9 @@
             // Show current question
             const container = document.getElementById('current-question-container');
             container.innerHTML = `
-                <div class="current-question">
-                    ${question.question ? `<h3>${question.question}</h3>` : ''}
-                    ${question.image ? `<a href="${question.image}" target="_blank"><img src="${question.image}" alt="Question image" class="question-image"></a>` : ''}
+                <div class="current-question active-question">
+                    ${question.question ? `<h3 class="question-text">${question.question}</h3>` : ''}
+                    ${question.image ? `<a href="${question.image}" target="_blank"><img src="${question.image}" alt="Question image" class="question-image quiz-question-img"></a>` : ''}
                     <div class="options">
                         ${question.is_multiple_choice ? '<p style="font-size: 14px; color: var(--text-muted); margin-bottom: 10px;">📋 Можна обрати кілька відповідей</p>' : ''}
                         ${question.options.map((option, optionIndex) => {
@@ -722,7 +722,7 @@
 
                             if (isImageOption) {
                                 return `
-                                    <div class="option" onclick="selectCurrentAnswer(${optionIndex})" id="option_${optionIndex}">
+                                    <div class="option quiz-option" data-option-index="${optionIndex}" onclick="selectCurrentAnswer(${optionIndex})" id="option_${optionIndex}">
                                         <div class="option-content">
                                             <img src="${option}" alt="Option ${optionIndex + 1}" class="option-image">
                                         </div>
@@ -730,7 +730,7 @@
                                 `;
                             } else {
                                 return `
-                                    <div class="option" onclick="selectCurrentAnswer(${optionIndex})" id="option_${optionIndex}">
+                                    <div class="option quiz-option" data-option-index="${optionIndex}" onclick="selectCurrentAnswer(${optionIndex})" id="option_${optionIndex}">
                                         ${option}
                                     </div>
                                 `;
