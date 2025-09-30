@@ -169,6 +169,48 @@
             font-style: italic;
         }
 
+        /* Statistics styling */
+        .question-header {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 5px;
+        }
+
+        .question-text {
+            font-weight: bold;
+            text-align: center;
+            margin-bottom: 4px;
+        }
+
+        .question-stats {
+            font-size: 11px;
+            font-weight: normal;
+            color: #dddddd;
+            background: rgba(0,0,0,0.1);
+            padding: 2px 6px;
+            border-radius: 3px;
+        }
+
+        .username-text {
+            font-weight: bold;
+        }
+
+        .user-stats {
+            font-size: 11px;
+            font-weight: normal;
+            color: #666;
+            background: rgba(0,0,0,0.1);
+            padding: 2px 6px;
+            border-radius: 3px;
+            margin-top: 4px;
+            text-align: center;
+        }
+
+        .image-header .question-stats {
+            margin-top: 4px;
+        }
+
         .table-wrapper {
             overflow: auto;
             max-height: 70vh;
@@ -305,6 +347,8 @@
                 this.questions = [];
                 this.totalQuestions = 0;
                 this.currentQuiz = null;
+                this.userStatistics = {};  // user_id -> {correct_count, total_answered}
+                this.questionStatistics = {};  // question_id -> {correct_count, total_attempts}
                 this.reconnectAttempts = 0;
                 this.maxReconnectAttempts = 5;
                 this.reconnectDelay = 1000;
@@ -416,6 +460,9 @@
                 this.totalQuestions = data.total_questions || 0;
                 this.currentQuiz = data.current_quiz || 'No quiz selected';
                 
+                // Calculate statistics client-side
+                this.calculateStatistics();
+                
                 this.updateQuizInfo();
                 this.buildTable();
             }
@@ -452,6 +499,9 @@
                     time_taken: data.time_taken
                 };
                 
+                // Calculate statistics client-side
+                this.calculateStatistics();
+                
                 this.updateQuizInfo();
                 this.buildTable();
             }
@@ -465,7 +515,11 @@
                     time_taken: data.time_taken
                 };
                 
-                this.updateCell(data.user_id, data.question_id, data.state, data.time_taken);
+                // Calculate statistics client-side
+                this.calculateStatistics();
+                
+                // Always rebuild table to update headers with new statistics
+                this.buildTable();
             }
 
             handleQuizSwitched(data) {
@@ -475,8 +529,57 @@
                 this.totalQuestions = data.total_questions || 0;
                 this.currentQuiz = data.current_quiz || 'No quiz selected';
                 
+                // Calculate statistics client-side
+                this.calculateStatistics();
+                
                 this.updateQuizInfo();
                 this.buildTable();
+            }
+
+            calculateStatistics() {
+                // Calculate user statistics
+                this.userStatistics = {};
+                for (const userId in this.liveStats) {
+                    let correctCount = 0;
+                    let totalAnswered = 0;
+                    
+                    for (const questionId in this.liveStats[userId]) {
+                        const state = this.liveStats[userId][questionId].state;
+                        if (state === 'ok' || state === 'fail') {
+                            totalAnswered++;
+                            if (state === 'ok') {
+                                correctCount++;
+                            }
+                        }
+                    }
+                    
+                    this.userStatistics[userId] = {
+                        correct_count: correctCount,
+                        total_answered: totalAnswered
+                    };
+                }
+                
+                // Calculate question statistics
+                this.questionStatistics = {};
+                for (let i = 1; i <= this.questions.length; i++) {
+                    this.questionStatistics[i] = {
+                        correct_count: 0,
+                        total_attempts: 0
+                    };
+                }
+                
+                for (const userId in this.liveStats) {
+                    for (const questionId in this.liveStats[userId]) {
+                        const state = this.liveStats[userId][questionId].state;
+                        if (state === 'ok' || state === 'fail') {
+                            const qId = parseInt(questionId);
+                            this.questionStatistics[qId].total_attempts++;
+                            if (state === 'ok') {
+                                this.questionStatistics[qId].correct_count++;
+                            }
+                        }
+                    }
+                }
             }
 
             updateQuizInfo() {
@@ -487,30 +590,41 @@
             }
 
             buildTable() {
-                // Build header
+                // Build header with question statistics
                 let headerHtml = '<th class="username-header">User</th>';
                 for (let i = 0; i < this.questions.length; i++) {
                     const question = this.questions[i];
+                    const questionId = i + 1;
+                    
+                    // Get question statistics
+                    const questionStats = this.questionStatistics[questionId] || { correct_count: 0, total_attempts: 0 };
+                    const statsText = `${questionStats.correct_count}/${questionStats.total_attempts}`;
                     
                     if (question.image && !question.question) {
                         // Image-only question: show filename and small image
                         const imagePath = question.image;
                         const filename = imagePath.split('/').pop().split('.').slice(0, -1).join('.');
-                        headerHtml += `<th title="${filename}">
+                        headerHtml += `<th title="${filename} - Correct: ${statsText}">
                             <div class="image-header">
                                 <img src="${imagePath}" alt="${filename}" class="header-image">
                                 <div class="image-filename">${filename}</div>
+                                <div class="question-stats">${statsText}</div>
                             </div>
                         </th>`;
                     } else {
                         // Regular question with text
                         const questionText = question.question || `Q${i + 1}`;
-                        headerHtml += `<th title="${questionText}">${questionText}</th>`;
+                        headerHtml += `<th title="${questionText} - Correct: ${statsText}">
+                            <div class="question-header">
+                                <div class="question-text">${questionText}</div>
+                                <div class="question-stats">${statsText}</div>
+                            </div>
+                        </th>`;
                     }
                 }
                 this.tableHeaderElement.innerHTML = headerHtml;
 
-                // Build body
+                // Build body with user statistics
                 const userIds = Object.keys(this.users);
                 if (userIds.length === 0) {
                     this.tableBodyElement.innerHTML = `
@@ -526,8 +640,18 @@
                 let bodyHtml = '';
                 userIds.forEach(userId => {
                     const username = this.users[userId];
+                    
+                    // Get user statistics
+                    const userStats = this.userStatistics[userId] || { correct_count: 0, total_answered: 0 };
+                    const userStatsText = `${userStats.correct_count}/${userStats.total_answered}`;
+                    
                     bodyHtml += `<tr id="user-${userId}">`;
-                    bodyHtml += `<td class="username-cell">${username}</td>`;
+                    bodyHtml += `<td class="username-cell">
+                        <div class="username-content">
+                            <div class="username-text">${username}</div>
+                            <span class="user-stats">${userStatsText}</span>
+                        </div>
+                    </td>`;
                     
                     for (let questionId = 1; questionId <= this.questions.length; questionId++) {
                         const cellData = this.liveStats[userId] && this.liveStats[userId][questionId] 
