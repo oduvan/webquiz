@@ -24,6 +24,17 @@ from webquiz import __version__ as package_version
 # Logger will be configured in create_app() with custom log file
 logger = logging.getLogger(__name__)
 
+def read_package_resource(filename: str) -> str:
+    """Read a file from the webquiz package resources"""
+    try:
+        # Try modern importlib.resources first (Python 3.9+)
+        import importlib.resources as pkg_resources
+        return (pkg_resources.files('webquiz') / filename).read_text(encoding='utf-8')
+    except (ImportError, AttributeError):
+        # Fallback to pkg_resources for older Python versions
+        import pkg_resources
+        return pkg_resources.resource_string('webquiz', filename).decode('utf-8')
+
 def get_package_version() -> str:
     """Get the webquiz package version"""
     try:
@@ -190,15 +201,8 @@ def get_default_config_path() -> Optional[str]:
 
 def create_default_config_file(config_path: Path):
     """Create a default config file with example content."""
-    try:
-        # Try modern importlib.resources first (Python 3.9+)
-        import importlib.resources as pkg_resources
-        example_content = (pkg_resources.files('webquiz') / 'server_config.yaml.example').read_text(encoding='utf-8')
-    except (ImportError, AttributeError):
-        # Fallback to pkg_resources for older Python versions
-        import pkg_resources
-        example_content = pkg_resources.resource_string('webquiz', 'server_config.yaml.example').decode('utf-8')
-    
+    example_content = read_package_resource('server_config.yaml.example')
+
     with open(config_path, 'w', encoding='utf-8') as f:
         f.write(example_content)
     logger.info(f"Created default config file: {config_path}")
@@ -421,7 +425,31 @@ class TestingServer:
         # Live stats WebSocket infrastructure
         self.websocket_clients: List[web.WebSocketResponse] = []  # Connected WebSocket clients
         self.live_stats: Dict[str, Dict[int, str]] = {}  # user_id -> {question_id: state}
-        
+
+        # Preload templates
+        self.templates = self._load_templates()
+
+    def _load_templates(self) -> Dict[str, str]:
+        """Preload all templates at startup"""
+        templates = {}
+        template_files = [
+            'index.html',
+            'admin.html',
+            'files.html',
+            'live_stats.html',
+            'quiz_selection_required.html',
+            'template_error.html'
+        ]
+
+        for template_file in template_files:
+            try:
+                templates[template_file] = read_package_resource(f'templates/{template_file}')
+                logger.info(f"Loaded template: {template_file}")
+            except Exception as e:
+                logger.warning(f"Failed to load template {template_file}: {e}")
+
+        return templates
+
     def generate_log_path(self) -> str:
         """Generate log file path in logs directory with simple numeric naming"""
         ensure_directory_exists(self.logs_dir)
@@ -514,91 +542,10 @@ class TestingServer:
         for quiz in available_quizzes:
             quiz_list_html += f"<li>{quiz}</li>"
         
-        admin_url = f"/admin" if self.master_key else "#"
-        admin_message = "Access admin panel" if self.master_key else "Admin panel disabled (no master key set)"
-        
-        selection_html = f'''<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>WebQuiz - Admin Selection Required</title>
-    <style>
-        body {{
-            font-family: Arial, sans-serif;
-            max-width: 800px;
-            margin: 0 auto;
-            padding: 20px;
-            background-color: #f5f5f5;
-            color: #333;
-        }}
-        .container {{
-            background: white;
-            padding: 30px;
-            border-radius: 10px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-            text-align: center;
-        }}
-        .quiz-list {{
-            text-align: left;
-            background: #f8f9fa;
-            padding: 20px;
-            border-radius: 5px;
-            margin: 20px 0;
-        }}
-        .admin-button {{
-            display: inline-block;
-            background: #007bff;
-            color: white;
-            padding: 12px 24px;
-            text-decoration: none;
-            border-radius: 5px;
-            margin: 10px;
-        }}
-        .admin-button:hover {{
-            background: #0056b3;
-        }}
-        .disabled {{
-            background: #6c757d;
-            cursor: not-allowed;
-        }}
-        .warning {{
-            background: #fff3cd;
-            border: 1px solid #ffeaa7;
-            color: #856404;
-            padding: 15px;
-            border-radius: 5px;
-            margin: 20px 0;
-        }}
-    </style>
-</head>
-<body>
-    <div class="container">
-        <h1>🎯 WebQuiz System</h1>
-        
-        <div class="warning">
-            <h3>⚠️ Quiz Selection Required</h3>
-            <p>Multiple quiz files are available, but no default quiz is set. An administrator must select which quiz to use.</p>
-        </div>
-        
-        <h3>📋 Available Quiz Files:</h3>
-        <div class="quiz-list">
-            <ul>
-                {quiz_list_html}
-            </ul>
-        </div>
-        
-        <p>To set a default quiz, rename one of the files to <code>default.yaml</code> or use the admin panel to select a quiz.</p>
-        
-        <a href="{admin_url}" class="admin-button {'disabled' if not self.master_key else ''}">{admin_message}</a>
-        
-        <div style="margin-top: 30px; font-size: 0.9em; color: #666;">
-            <p>💡 <strong>Tip:</strong> Rename your preferred quiz file to <code>default.yaml</code> to make it load automatically.</p>
-        </div>
-    </div>
-</body>
-</html>'''
-        
+        # Load template and replace placeholders
+        template_content = self.templates.get('quiz_selection_required.html', '')
+        selection_html = template_content.replace('{{QUIZ_LIST}}', quiz_list_html)
+
         try:
             async with aiofiles.open(index_path, 'w', encoding='utf-8') as f:
                 await f.write(selection_html)
@@ -735,17 +682,8 @@ class TestingServer:
         
         # Copy template from package
         try:
-            try:
-                # Try modern importlib.resources first (Python 3.9+)
-                import importlib.resources as pkg_resources
-                template_content = (pkg_resources.files('webquiz') / 'templates' / 'index.html').read_text(encoding='utf-8')
-            except (ImportError, AttributeError):
-                # Fallback to pkg_resources for older Python versions
-                import pkg_resources
-                template_path = pkg_resources.resource_filename('webquiz', 'templates/index.html')
-                async with aiofiles.open(template_path, 'r', encoding='utf-8') as template_file:
-                    template_content = await template_file.read()
-            
+            template_content = self.templates.get('index.html', '')
+
             # Inject questions data, title, version, and show_right_answer setting into template
             html_content = template_content.replace('{{QUESTIONS_DATA}}', questions_json)
             html_content = html_content.replace('{{QUIZ_TITLE}}', self.quiz_title)
@@ -761,35 +699,10 @@ class TestingServer:
         except Exception as e:
             logger.error(f"Error copying template index.html: {e}")
             # Continue to fallback
-            
+
         # Fallback: create minimal HTML if template is not available
-        fallback_html = '''<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>WebQuiz Testing System</title>
-    <style>
-        body { font-family: Arial, sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; }
-        .container { background: white; padding: 30px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
-        button { background: #007bff; color: white; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer; }
-        input { padding: 10px; width: 300px; margin: 10px 0; border: 1px solid #ddd; border-radius: 3px; }
-        .hidden { display: none; }
-    </style>
-</head>
-<body>
-    <div class="container">
-        <h1>WebQuiz Testing System</h1>
-        <div id="error">
-            <h2>Template Error</h2>
-            <p>Unable to load the full interface template. Please ensure the WebQuiz package is properly installed.</p>
-            <p>You can manually create an index.html file in the static directory with your custom interface.</p>
-        </div>
-    </div>
-</body>
-</html>'''
-        
         try:
+            fallback_html = self.templates.get('template_error.html', '<html><body><h1>Template Error</h1></body></html>')
             async with aiofiles.open(index_path, 'w', encoding='utf-8') as f:
                 await f.write(fallback_html)
             logger.warning(f"Created fallback index.html file: {index_path}")
@@ -1662,7 +1575,173 @@ class TestingServer:
             raise
             logger.error(f"Error downloading quiz: {e}")
             return web.json_response({'error': f'Download failed: {str(e)}'}, status=500)
-    
+
+    # File Management API endpoints
+    async def serve_files_page(self, request):
+        """Serve the files management page"""
+        try:
+            template_content = self.templates.get('files.html', '')
+
+            # Check if client IP is trusted and inject auto-auth flag
+            client_ip = get_client_ip(request)
+            is_trusted_ip = client_ip in self.admin_config.trusted_ips if hasattr(self, 'admin_config') else False
+
+            # Inject JavaScript variables for trusted IP auto-auth
+            js_variables = f"""
+                const IS_TRUSTED_IP = {str(is_trusted_ip).lower()};
+            """
+
+            # Inject the JavaScript variables before </head>
+            template_content = template_content.replace('</head>', f'<script>{js_variables}</script>\n    </head>')
+
+            return web.Response(text=template_content, content_type='text/html')
+        except Exception as e:
+            logger.error(f"Error serving files page: {e}")
+            return web.json_response({'error': 'Failed to load files page'}, status=500)
+
+    def _list_files_in_directory(self, directory, file_type):
+        """Helper to list files in a directory with metadata"""
+        files = []
+        if os.path.exists(directory):
+            for filename in os.listdir(directory):
+                file_path = os.path.join(directory, filename)
+                if os.path.isfile(file_path):
+                    stat = os.stat(file_path)
+                    files.append({
+                        'name': filename,
+                        'size': stat.st_size,
+                        'modified': datetime.fromtimestamp(stat.st_mtime).isoformat(),
+                        'type': file_type
+                    })
+        # Sort files by modified date (newest first)
+        files.sort(key=lambda x: x['modified'], reverse=True)
+        return files
+
+    @admin_auth_required
+    async def files_list(self, request):
+        """List all files in logs_dir and csv_dir with metadata"""
+        logs_files = self._list_files_in_directory(self.logs_dir, 'log')
+        csv_files = self._list_files_in_directory(self.csv_dir, 'csv')
+
+        return web.json_response({
+            'logs': logs_files,
+            'csv': csv_files
+        })
+
+    def _get_file_path_and_validate(self, file_type, filename):
+        """Helper to validate file type, filename, and return file path.
+        Returns tuple (file_path, error_response) where error_response is None on success"""
+        # Determine base directory from file type
+        if file_type == 'csv':
+            base_dir = self.csv_dir
+        elif file_type == 'logs':
+            base_dir = self.logs_dir
+        else:
+            return None, web.json_response({'error': 'Invalid file type'}, status=400)
+
+        # Validate filename (prevent path traversal)
+        if not self._is_safe_filename(filename):
+            return None, web.json_response({'error': 'Invalid filename'}, status=400)
+
+        file_path = os.path.join(base_dir, filename)
+
+        # Check if file exists
+        if not os.path.exists(file_path):
+            return None, web.json_response({'error': 'File not found'}, status=404)
+
+        # Check if it's actually a file (not directory)
+        if not os.path.isfile(file_path):
+            return None, web.json_response({'error': 'Path is not a file'}, status=400)
+
+        return file_path, None
+
+    @admin_auth_required
+    async def files_view(self, request):
+        """View file contents (text files only, with size limit)"""
+        file_type = request.match_info['type']
+        filename = request.match_info['filename']
+
+        # Validate and get file path
+        file_path, error = self._get_file_path_and_validate(file_type, filename)
+        if error:
+            return error
+
+        # Check file size (limit to 10MB for viewing)
+        MAX_VIEW_SIZE = 1024 * 1024 * 10  # 10MB
+        file_size = os.path.getsize(file_path)
+
+        if file_size > MAX_VIEW_SIZE:
+            return web.json_response({
+                'error': f'File too large for viewing (>10MB). Size: {file_size} bytes. Use download instead.',
+                'size': file_size
+            }, status=400)
+
+        # Read file content
+        try:
+            async with aiofiles.open(file_path, 'r', encoding='utf-8') as f:
+                content = await f.read()
+        except UnicodeDecodeError:
+            return web.json_response({'error': 'File contains non-UTF-8 content. Use download instead.'}, status=400)
+
+        return web.Response(
+            text=content,
+            content_type='text/plain',
+            headers={
+                'Content-Disposition': f'inline; filename="{filename}"'
+            }
+        )
+
+    @admin_auth_required
+    async def files_download(self, request):
+        """Download file directly"""
+        try:
+            file_type = request.match_info['type']
+            filename = request.match_info['filename']
+
+            # Validate and get file path
+            file_path, error = self._get_file_path_and_validate(file_type, filename)
+            if error:
+                return error
+
+            # Determine content type
+            content_type = 'text/csv' if file_type == 'csv' else 'text/plain'
+
+            # Return file response with proper headers
+            return web.FileResponse(
+                file_path,
+                headers={
+                    'Content-Disposition': f'attachment; filename="{filename}"',
+                    'Content-Type': content_type
+                }
+            )
+
+        except Exception as e:
+            logger.error(f"Error downloading file: {e}")
+            return web.json_response({'error': 'Failed to download file'}, status=500)
+
+    def _is_safe_filename(self, filename):
+        """Check if filename is safe (no path traversal attempts)"""
+        if not filename:
+            return False
+
+        # Check for path traversal attempts
+        if '..' in filename or '/' in filename or '\\' in filename:
+            return False
+
+        # Check for null bytes
+        if '\0' in filename:
+            return False
+
+        # Check for special filenames
+        if filename in ['.', '..']:
+            return False
+
+        # Check for overly long filenames
+        if len(filename) > 255:
+            return False
+
+        return True
+
     async def serve_index_page(self, request):
         """Serve the index.html page from static directory"""
         index_path = f"{self.static_dir}/index.html"
@@ -1671,17 +1750,8 @@ class TestingServer:
     async def serve_admin_page(self, request):
         """Serve the admin interface page"""
         try:
-            try:
-                # Try modern importlib.resources first (Python 3.9+)
-                import importlib.resources as pkg_resources
-                template_content = (pkg_resources.files('webquiz') / 'templates' / 'admin.html').read_text(encoding='utf-8')
-            except (ImportError, AttributeError):
-                # Fallback to pkg_resources for older Python versions
-                import pkg_resources
-                template_path = pkg_resources.resource_filename('webquiz', 'templates/admin.html')
-                async with aiofiles.open(template_path, 'r', encoding='utf-8') as template_file:
-                    template_content = await template_file.read()
-            
+            template_content = self.templates.get('admin.html', '')
+
             # Check if client IP is trusted and inject auto-auth flag
             client_ip = get_client_ip(request)
             is_trusted_ip = client_ip in self.admin_config.trusted_ips if hasattr(self, 'admin_config') else False
@@ -1732,17 +1802,8 @@ class TestingServer:
     async def serve_live_stats_page(self, request):
         """Serve the live stats page"""
         try:
-            try:
-                # Try modern importlib.resources first (Python 3.9+)
-                import importlib.resources as pkg_resources
-                template_content = (pkg_resources.files('webquiz') / 'templates' / 'live_stats.html').read_text(encoding='utf-8')
-            except (ImportError, AttributeError):
-                # Fallback to pkg_resources for older Python versions
-                import pkg_resources
-                template_path = pkg_resources.resource_filename('webquiz', 'templates/live_stats.html')
-                async with aiofiles.open(template_path, 'r', encoding='utf-8') as template_file:
-                    template_content = await template_file.read()
-            
+            template_content = self.templates.get('live_stats.html', '')
+
             return web.Response(text=template_content, content_type='text/html')
         except Exception as e:
             logger.error(f"Error serving live stats page: {e}")
@@ -1837,7 +1898,13 @@ async def create_app(config: WebQuizConfig):
     app.router.add_post('/api/admin/validate-quiz', server.admin_validate_quiz)
     app.router.add_get('/api/admin/list-images', server.admin_list_images)
     app.router.add_post('/api/admin/download-quiz', server.admin_download_quiz)
-    
+
+    # File management routes (admin access)
+    app.router.add_get('/files/', server.serve_files_page)
+    app.router.add_get('/api/files/list', server.files_list)
+    app.router.add_get('/api/files/{type}/view/{filename}', server.files_view)
+    app.router.add_get('/api/files/{type}/download/{filename}', server.files_download)
+
     # Live stats routes (public access)
     app.router.add_get('/live-stats/', server.serve_live_stats_page)
     app.router.add_get('/ws/live-stats', server.websocket_live_stats)
