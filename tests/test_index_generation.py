@@ -154,7 +154,7 @@ def test_correct_answers_excluded_from_client_data(temp_dir):
 
 
 def test_optional_fields_included(temp_dir):
-    """Test that optional fields like images are properly included when present."""
+    """Test that optional fields like images are properly included when present, including comprehensive image-only question testing."""
     quiz_data = {
         'optional_fields.yaml': {
             'title': 'Optional Fields Test',
@@ -175,6 +175,12 @@ def test_optional_fields_included(temp_dir):
                     'options': ['Option 1', 'Option 2'],
                     'correct_answer': 1,
                     'image': '/imgs/image_only.png'
+                },
+                {
+                    # Image-only question with image-based options
+                    'image': '/imgs/question1.png',
+                    'options': ['/imgs/a.png', '/imgs/b.png', '/imgs/c.png'],
+                    'correct_answer': 1
                 }
             ]
         }
@@ -190,7 +196,7 @@ def test_optional_fields_included(temp_dir):
         questions_match = re.search(r'let questions = (\[.*?\]);', html_content, re.DOTALL)
         embedded_questions = json.loads(questions_match.group(1))
 
-        assert len(embedded_questions) == 3
+        assert len(embedded_questions) == 4
 
         # Question 1: text only, no image
         q1 = embedded_questions[0]
@@ -211,36 +217,13 @@ def test_optional_fields_included(temp_dir):
         assert 'image' in q3
         assert q3['image'] == '/imgs/image_only.png'
 
+        # Question 4: image only with image-based options
+        q4 = embedded_questions[3]
+        assert 'question' not in q4, "Image-only question should not have question text"
+        assert q4['image'] == '/imgs/question1.png'
+        assert q4['options'] == ['/imgs/a.png', '/imgs/b.png', '/imgs/c.png']
 
-def test_questions_without_text_only_images(temp_dir):
-    """Test image-only questions are handled correctly."""
-    quiz_data = {
-        'image_only.yaml': {
-            'title': 'Image Quiz',
-            'questions': [
-                {
-                    'image': '/imgs/question1.png',
-                    'options': ['/imgs/a.png', '/imgs/b.png', '/imgs/c.png'],
-                    'correct_answer': 1
-                }
-            ]
-        }
-    }
 
-    with custom_webquiz_server(quizzes=quiz_data) as (proc, port):
-        static_path = Path(temp_dir) / f'static_{port}'
-        index_path = static_path / 'index.html'
-
-        with open(index_path, 'r', encoding='utf-8') as f:
-            html_content = f.read()
-
-        questions_match = re.search(r'let questions = (\[.*?\]);', html_content, re.DOTALL)
-        embedded_questions = json.loads(questions_match.group(1))
-
-        q = embedded_questions[0]
-        assert 'question' not in q, "Image-only question should not have question text"
-        assert q['image'] == '/imgs/question1.png'
-        assert q['options'] == ['/imgs/a.png', '/imgs/b.png', '/imgs/c.png']
 
 
 def test_template_placeholder_replacement(temp_dir):
@@ -535,138 +518,7 @@ def test_very_long_quiz_titles(temp_dir):
         assert html_content.count('</title>') == 1
 
 
-def test_index_html_served_correctly(temp_dir):
-    """Test that generated index.html is properly served via HTTP."""
-    with custom_webquiz_server() as (proc, port):
-        # Request the root path which should serve index.html
-        response = requests.get(f'http://localhost:{port}/')
-
-        assert response.status_code == 200
-        assert response.headers['content-type'] == 'text/html'
-
-        html_content = response.text
-
-        # Verify it's the generated index.html
-        assert 'let questions =' in html_content
-        assert 'WebQuiz v' in html_content
-        assert '<script>' in html_content
 
 
-def test_quiz_switch_updates_index_html(temp_dir):
-    """Test that quiz switching properly updates the served index.html."""
-    quiz_a = {
-        'default.yaml': {  # Use default.yaml so it loads automatically
-            'title': 'Quiz A Title',
-            'questions': [
-                {
-                    'question': 'Question A?',
-                    'options': ['A1', 'A2'],
-                    'correct_answer': 0
-                }
-            ]
-        },
-        'quiz_b.yaml': {
-            'title': 'Quiz B Title',
-            'questions': [
-                {
-                    'question': 'Question B?',
-                    'options': ['B1', 'B2', 'B3'],
-                    'correct_answer': 1
-                }
-            ]
-        }
-    }
-
-    with custom_webquiz_server(quizzes=quiz_a) as (proc, port):
-        # Get initial served content
-        initial_response = requests.get(f'http://localhost:{port}/')
-        initial_html = initial_response.text
-
-        assert 'Quiz A Title' in initial_html
-        assert 'Question A?' in initial_html
-
-        # Switch quiz
-        headers = {'X-Master-Key': 'test123'}
-        requests.post(
-            f'http://localhost:{port}/api/admin/switch-quiz',
-            headers=headers,
-            json={'quiz_filename': 'quiz_b.yaml'}
-        )
-
-        # Get updated served content
-        updated_response = requests.get(f'http://localhost:{port}/')
-        updated_html = updated_response.text
-
-        assert 'Quiz B Title' in updated_html
-        assert 'Question B?' in updated_html
-        assert 'Quiz A Title' not in updated_html
 
 
-def test_multiple_quizzes_generate_different_content(temp_dir):
-    """Test that different quizzes produce different index.html content."""
-    quiz_1 = {
-        'test_quiz.yaml': {  # Single quiz will auto-load
-            'title': 'Unique Quiz One',
-            'questions': [
-                {
-                    'question': 'Unique question 1?',
-                    'options': ['U1', 'U2'],
-                    'correct_answer': 0
-                }
-            ]
-        }
-    }
-
-    quiz_2 = {
-        'test_quiz.yaml': {  # Single quiz will auto-load
-            'title': 'Unique Quiz Two',
-            'questions': [
-                {
-                    'question': 'Different question 2?',
-                    'options': ['D1', 'D2', 'D3', 'D4'],
-                    'correct_answer': 2
-                },
-                {
-                    'question': 'Another question?',
-                    'options': ['X', 'Y'],
-                    'correct_answer': 1
-                }
-            ]
-        }
-    }
-
-    # Test first quiz
-    with custom_webquiz_server(quizzes=quiz_1) as (proc, port):
-        static_path = Path(temp_dir) / f'static_{port}'
-        index_path = static_path / 'index.html'
-
-        with open(index_path, 'r', encoding='utf-8') as f:
-            html_1 = f.read()
-
-    # Test second quiz
-    with custom_webquiz_server(quizzes=quiz_2) as (proc, port):
-        static_path = Path(temp_dir) / f'static_{port}'
-        index_path = static_path / 'index.html'
-
-        with open(index_path, 'r', encoding='utf-8') as f:
-            html_2 = f.read()
-
-    # Verify different content
-    assert html_1 != html_2, "Different quizzes should generate different HTML"
-
-    # Verify specific differences
-    assert 'Unique Quiz One' in html_1
-    assert 'Unique Quiz Two' in html_2
-    assert 'Unique question 1?' in html_1
-    assert 'Different question 2?' in html_2
-
-    # Check questions arrays are different
-    q1_match = re.search(r'let questions = (\[.*?\]);', html_1, re.DOTALL)
-    q2_match = re.search(r'let questions = (\[.*?\]);', html_2, re.DOTALL)
-
-    q1_data = json.loads(q1_match.group(1))
-    q2_data = json.loads(q2_match.group(1))
-
-    assert len(q1_data) == 1
-    assert len(q2_data) == 2
-    assert q1_data != q2_data

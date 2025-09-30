@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WebQuiz - Admin Selection Required</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+            color: #333;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            text-align: center;
+        }
+        .quiz-list {
+            text-align: left;
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 5px;
+            margin: 20px 0;
+        }
+        .admin-button {
+            display: inline-block;
+            background: #007bff;
+            color: white;
+            padding: 12px 24px;
+            text-decoration: none;
+            border-radius: 5px;
+            margin: 10px;
+        }
+        .admin-button:hover {
+            background: #0056b3;
+        }
+        .disabled {
+            background: #6c757d;
+            cursor: not-allowed;
+        }
+        .warning {
+            background: #fff3cd;
+            border: 1px solid #ffeaa7;
+            color: #856404;
+            padding: 15px;
+            border-radius: 5px;
+            margin: 20px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎯 WebQuiz System</h1>
+
+        <div class="warning">
+            <h3>⚠️ Quiz Selection Required</h3>
+            <p>Multiple quiz files are available, but no default quiz is set. An administrator must select which quiz to use.</p>
+        </div>
+
+        <h3>📋 Available Quiz Files:</h3>
+        <div class="quiz-list">
+            <ul>
+                {{QUIZ_LIST}}
+            </ul>
+        </div>
+
+        <p>To select a quiz, please use the admin panel:</p>
+        <a href="/admin/" class="admin-button">🔧 Go to Admin Panel</a>
+
+        <p style="margin-top: 30px; color: #666; font-size: 14px;">
+            If you are an administrator and need to set up the master key,<br>
+            please configure the <code>admin.master_key</code> in your server configuration.
+        </p>
+    </div>
+</body>
+</html>

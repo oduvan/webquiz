@@ -1,0 +1,702 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WebQuiz File Manager</title>
+    <style>
+        :root {
+            --bg-color: #f5f5f5;
+            --container-bg: white;
+            --text-color: #333;
+            --border-color: #ddd;
+            --button-bg: #007bff;
+            --button-hover: #0056b3;
+            --success-bg: #d4edda;
+            --success-border: #c3e6cb;
+            --success-color: #155724;
+            --error-bg: #f8d7da;
+            --error-border: #f5c6cb;
+            --error-color: #721c24;
+            --warning-bg: #fff3cd;
+            --warning-border: #ffeaa7;
+            --warning-color: #856404;
+            --disabled-bg: #ccc;
+            --light-bg: #fafafa;
+            --success-green: #28a745;
+            --success-green-hover: #218838;
+            --danger-red: #dc3545;
+            --danger-red-hover: #c82333;
+            --muted-gray: #6c757d;
+            --light-gray: #aaa;
+            --text-muted: #666;
+            --white: white;
+            --shadow: rgba(0,0,0,0.1);
+            --modal-overlay: rgba(0,0,0,0.5);
+            --tab-active: #007bff;
+            --tab-inactive: #6c757d;
+        }
+
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+        }
+
+        .container {
+            background: var(--container-bg);
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px var(--shadow);
+            margin-bottom: 20px;
+        }
+
+        h1 {
+            text-align: center;
+            color: var(--text-color);
+            margin-bottom: 30px;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+
+        input[type="password"], input[type="text"] {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid var(--border-color);
+            border-radius: 5px;
+            font-size: 16px;
+            box-sizing: border-box;
+        }
+
+        button {
+            background: var(--button-bg);
+            color: var(--white);
+            border: none;
+            padding: 12px 24px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            margin: 5px;
+        }
+
+        button:hover {
+            background: var(--button-hover);
+        }
+
+        button:disabled {
+            background: var(--disabled-bg);
+            cursor: not-allowed;
+        }
+
+        .hidden {
+            display: none;
+        }
+
+        .message {
+            padding: 10px;
+            border-radius: 5px;
+            margin: 10px 0;
+        }
+
+        .success {
+            background: var(--success-bg);
+            border: 1px solid var(--success-border);
+            color: var(--success-color);
+        }
+
+        .error {
+            background: var(--error-bg);
+            border: 1px solid var(--error-border);
+            color: var(--error-color);
+        }
+
+        /* Tabs */
+        .tabs {
+            display: flex;
+            border-bottom: 2px solid var(--border-color);
+            margin-bottom: 20px;
+        }
+
+        .tab {
+            padding: 12px 24px;
+            cursor: pointer;
+            background: transparent;
+            border: none;
+            border-bottom: 3px solid transparent;
+            font-size: 16px;
+            font-weight: 500;
+            color: var(--tab-inactive);
+            transition: all 0.3s ease;
+            margin: 0;
+        }
+
+        .tab:hover {
+            background: var(--light-bg);
+            color: var(--text-color);
+        }
+
+        .tab.active {
+            color: var(--tab-active);
+            border-bottom-color: var(--tab-active);
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        .file-grid {
+            display: grid;
+            gap: 10px;
+        }
+
+        .file-item {
+            display: grid;
+            grid-template-columns: 1fr auto auto auto;
+            align-items: center;
+            padding: 15px;
+            background: var(--light-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 5px;
+            gap: 15px;
+        }
+
+        .file-item:hover {
+            background: #f0f8ff;
+            border-color: var(--button-bg);
+        }
+
+        .file-info {
+            display: grid;
+            gap: 5px;
+        }
+
+        .file-name {
+            font-weight: bold;
+            color: var(--text-color);
+            word-break: break-word;
+        }
+
+        .file-meta {
+            font-size: 0.9em;
+            color: var(--text-muted);
+        }
+
+        .file-actions {
+            display: flex;
+            gap: 5px;
+        }
+
+        .btn-small {
+            padding: 6px 12px;
+            font-size: 14px;
+            min-width: auto;
+        }
+
+        .btn-view {
+            background: var(--success-green);
+        }
+
+        .btn-view:hover {
+            background: var(--success-green-hover);
+        }
+
+        .btn-download {
+            background: var(--button-bg);
+        }
+
+        .btn-download:hover {
+            background: var(--button-hover);
+        }
+
+        .controls {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+
+        .search-box {
+            flex: 1;
+            min-width: 200px;
+            max-width: 400px;
+        }
+
+        .refresh-btn {
+            background: var(--muted-gray);
+        }
+
+        .refresh-btn:hover {
+            background: #545b62;
+        }
+
+        .back-link {
+            text-align: center;
+            margin-top: 20px;
+        }
+
+        .back-link a {
+            color: var(--button-bg);
+            text-decoration: none;
+        }
+
+        .back-link a:hover {
+            text-decoration: underline;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 40px 20px;
+            color: var(--text-muted);
+        }
+
+        .empty-state .icon {
+            font-size: 48px;
+            margin-bottom: 10px;
+        }
+
+        .actions {
+            text-align: center;
+            margin-top: 20px;
+        }
+
+        /* File viewer modal */
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: var(--modal-overlay);
+        }
+
+        .modal-content {
+            background-color: var(--container-bg);
+            margin: 2% auto;
+            padding: 20px;
+            border-radius: 10px;
+            width: 95%;
+            max-width: 1000px;
+            height: 90vh;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            border-bottom: 1px solid var(--border-color);
+            padding-bottom: 10px;
+            flex-shrink: 0;
+        }
+
+        .modal-body {
+            flex: 1;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .file-content {
+            flex: 1;
+            overflow: auto;
+            background: #f8f9fa;
+            border: 1px solid var(--border-color);
+            padding: 15px;
+            font-family: 'Courier New', monospace;
+            font-size: 14px;
+            line-height: 1.4;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+
+        .close {
+            font-size: 28px;
+            font-weight: bold;
+            cursor: pointer;
+            color: var(--light-gray);
+        }
+
+        .close:hover {
+            color: var(--text-color);
+        }
+
+        .loading {
+            text-align: center;
+            padding: 20px;
+            color: var(--text-muted);
+        }
+
+        @media (max-width: 768px) {
+            .file-item {
+                grid-template-columns: 1fr;
+                text-align: center;
+            }
+
+            .file-actions {
+                justify-content: center;
+            }
+
+            .controls {
+                flex-direction: column;
+                align-items: stretch;
+            }
+
+            .search-box {
+                max-width: none;
+            }
+
+            .tabs {
+                overflow-x: auto;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>📁 WebQuiz File Manager</h1>
+
+        <!-- Authentication Section -->
+        <div id="auth-section">
+            <div class="form-group">
+                <label for="master-key">Master Key:</label>
+                <input type="password" id="master-key" placeholder="Enter master key">
+            </div>
+            <div class="actions">
+                <button onclick="authenticate()">Login</button>
+            </div>
+        </div>
+
+        <!-- File Manager Panel (hidden until authenticated) -->
+        <div id="files-panel" class="hidden">
+
+            <div class="controls">
+                <div class="search-box">
+                    <input type="text" id="search-input" placeholder="Search files..." onkeyup="filterFiles()">
+                </div>
+                <button class="refresh-btn" onclick="refreshFiles()">🔄 Refresh</button>
+            </div>
+
+            <!-- Tabs -->
+            <div class="tabs">
+                <button class="tab active" data-tab="csv" onclick="switchTab('csv')">📊 CSV Files</button>
+                <button class="tab" data-tab="logs" onclick="switchTab('logs')">📋 Log Files</button>
+            </div>
+
+            <!-- CSV Tab -->
+            <div id="csv-tab" class="tab-content active">
+                <div id="csv-files" class="file-grid">
+                    <div class="loading">Loading CSV files...</div>
+                </div>
+            </div>
+
+            <!-- Logs Tab -->
+            <div id="logs-tab" class="tab-content">
+                <div id="logs-files" class="file-grid">
+                    <div class="loading">Loading log files...</div>
+                </div>
+            </div>
+
+            <div class="back-link">
+                <a href="/admin/">← Back to Admin Panel</a>
+                <span style="margin: 0 10px;">|</span>
+                <a href="/">🏠 Quiz Home</a>
+                <span style="margin: 0 10px;">|</span>
+                <a href="/live-stats/">📊 Live Stats</a>
+            </div>
+        </div>
+
+        <!-- Messages -->
+        <div id="message-area"></div>
+    </div>
+
+    <!-- File Viewer Modal -->
+    <div id="file-viewer-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 id="file-viewer-title">File Viewer</h2>
+                <span class="close" onclick="closeFileViewer()">&times;</span>
+            </div>
+            <div class="modal-body">
+                <div id="file-content" class="file-content">
+                    <div class="loading">Loading file content...</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let currentMasterKey = '';
+        let allFiles = { logs: [], csv: [] };
+        let currentTab = 'csv';
+
+        function switchTab(tabName) {
+            currentTab = tabName;
+
+            // Update tab buttons
+            document.querySelectorAll('.tab').forEach(tab => {
+                if (tab.dataset.tab === tabName) {
+                    tab.classList.add('active');
+                } else {
+                    tab.classList.remove('active');
+                }
+            });
+
+            // Update tab content
+            document.querySelectorAll('.tab-content').forEach(content => {
+                content.classList.remove('active');
+            });
+            document.getElementById(`${tabName}-tab`).classList.add('active');
+
+            // Clear search when switching tabs
+            document.getElementById('search-input').value = '';
+            filterFiles();
+        }
+
+        async function authenticate() {
+            const masterKey = document.getElementById('master-key').value.trim();
+            if (!masterKey) {
+                showMessage('Please enter master key', 'error');
+                return;
+            }
+
+            try {
+                const response = await fetch('/api/admin/auth', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-Master-Key': masterKey
+                    },
+                    body: JSON.stringify({})
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    currentMasterKey = masterKey;
+                    document.getElementById('auth-section').style.display = 'none';
+                    document.getElementById('files-panel').classList.remove('hidden');
+                    showMessage('Authentication successful!', 'success');
+                    await loadFiles();
+                } else {
+                    showMessage(data.error || 'Authentication failed', 'error');
+                }
+            } catch (error) {
+                showMessage('Connection error: ' + error.message, 'error');
+            }
+        }
+
+        async function loadFiles() {
+            try {
+                const response = await fetch('/api/files/list', {
+                    headers: {
+                        'X-Master-Key': currentMasterKey
+                    }
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    allFiles = data;
+                    displayFiles();
+                } else {
+                    showMessage(data.error || 'Failed to load files', 'error');
+                }
+            } catch (error) {
+                showMessage('Error loading files: ' + error.message, 'error');
+            }
+        }
+
+        function displayFiles() {
+            displayFileSection('csv', allFiles.csv);
+            displayFileSection('logs', allFiles.logs);
+        }
+
+        function displayFileSection(type, files) {
+            const container = document.getElementById(`${type}-files`);
+
+            if (files.length === 0) {
+                container.innerHTML = `
+                    <div class="empty-state">
+                        <div class="icon">${type === 'logs' ? '📋' : '📊'}</div>
+                        <div>No ${type === 'csv' ? 'CSV' : 'log'} files found</div>
+                    </div>
+                `;
+                return;
+            }
+
+            let html = '';
+            files.forEach(file => {
+                const size = formatFileSize(file.size);
+                const date = formatDate(file.modified);
+
+                html += `
+                    <div class="file-item" data-filename="${file.name.toLowerCase()}">
+                        <div class="file-info">
+                            <div class="file-name">${file.name}</div>
+                            <div class="file-meta">Size: ${size} | Modified: ${date}</div>
+                        </div>
+                        <div class="file-actions">
+                            <button class="btn-small btn-view" onclick="viewFile('${type}', '${file.name}')">👁️ View</button>
+                            <button class="btn-small btn-download" onclick="downloadFile('${type}', '${file.name}')">💾 Download</button>
+                        </div>
+                    </div>
+                `;
+            });
+
+            container.innerHTML = html;
+        }
+
+        async function viewFile(type, filename) {
+            try {
+                document.getElementById('file-viewer-title').textContent = `${filename}`;
+                document.getElementById('file-content').innerHTML = '<div class="loading">Loading file content...</div>';
+                document.getElementById('file-viewer-modal').style.display = 'block';
+
+                const response = await fetch(`/api/files/${type}/view/${encodeURIComponent(filename)}`, {
+                    headers: {
+                        'X-Master-Key': currentMasterKey
+                    }
+                });
+
+                if (response.ok) {
+                    const content = await response.text();
+                    document.getElementById('file-content').textContent = content;
+                } else {
+                    const data = await response.json();
+                    document.getElementById('file-content').innerHTML = `<div class="error">Error: ${data.error}</div>`;
+                }
+            } catch (error) {
+                document.getElementById('file-content').innerHTML = `<div class="error">Error loading file: ${error.message}</div>`;
+            }
+        }
+
+        async function downloadFile(type, filename) {
+            try {
+                const response = await fetch(`/api/files/${type}/download/${encodeURIComponent(filename)}`, {
+                    headers: {
+                        'X-Master-Key': currentMasterKey
+                    }
+                });
+
+                if (response.ok) {
+                    const blob = await response.blob();
+                    const url = window.URL.createObjectURL(blob);
+                    const link = document.createElement('a');
+                    link.href = url;
+                    link.download = filename;
+                    document.body.appendChild(link);
+                    link.click();
+                    document.body.removeChild(link);
+                    window.URL.revokeObjectURL(url);
+                    showMessage(`Downloaded ${filename}`, 'success');
+                } else {
+                    const data = await response.json();
+                    showMessage(`Download failed: ${data.error}`, 'error');
+                }
+            } catch (error) {
+                showMessage(`Download error: ${error.message}`, 'error');
+            }
+        }
+
+        function closeFileViewer() {
+            document.getElementById('file-viewer-modal').style.display = 'none';
+        }
+
+        function filterFiles() {
+            const searchTerm = document.getElementById('search-input').value.toLowerCase().trim();
+            const container = document.getElementById(`${currentTab}-files`);
+            const fileItems = container.querySelectorAll('.file-item');
+
+            fileItems.forEach(item => {
+                const filename = item.dataset.filename;
+                if (!searchTerm || filename.includes(searchTerm)) {
+                    item.style.display = 'grid';
+                } else {
+                    item.style.display = 'none';
+                }
+            });
+        }
+
+        async function refreshFiles() {
+            await loadFiles();
+            showMessage('Files refreshed', 'success');
+        }
+
+        function formatFileSize(bytes) {
+            if (bytes === 0) return '0 B';
+            const k = 1024;
+            const sizes = ['B', 'KB', 'MB', 'GB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+        }
+
+        function formatDate(isoDate) {
+            const date = new Date(isoDate);
+            return date.toLocaleString();
+        }
+
+        function showMessage(text, type) {
+            const messageArea = document.getElementById('message-area');
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `message ${type}`;
+            messageDiv.textContent = text;
+
+            messageArea.appendChild(messageDiv);
+
+            // Auto-remove after 5 seconds
+            setTimeout(() => {
+                if (messageDiv.parentNode) {
+                    messageDiv.parentNode.removeChild(messageDiv);
+                }
+            }, 5000);
+        }
+
+        // Allow Enter key to authenticate
+        document.getElementById('master-key').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                authenticate();
+            }
+        });
+
+        // Auto-authenticate for trusted IPs
+        if (typeof IS_TRUSTED_IP !== 'undefined' && IS_TRUSTED_IP) {
+            // Hide auth section and show files panel immediately
+            document.getElementById('auth-section').style.display = 'none';
+            document.getElementById('files-panel').classList.remove('hidden');
+            currentMasterKey = 'trusted-ip'; // Set a placeholder key for API calls
+            showMessage('Auto-authenticated from trusted IP', 'success');
+            loadFiles();
+        }
+
+        // Close modal when clicking outside
+        window.onclick = function(event) {
+            const modal = document.getElementById('file-viewer-modal');
+            if (event.target === modal) {
+                closeFileViewer();
+            }
+        }
+    </script>
+</body>
+</html>

@@ -24,6 +24,17 @@ from webquiz import __version__ as package_version
 # Logger will be configured in create_app() with custom log file
 logger = logging.getLogger(__name__)
 
+def read_package_resource(filename: str) -> str:
+    """Read a file from the webquiz package resources"""
+    try:
+        # Try modern importlib.resources first (Python 3.9+)
+        import importlib.resources as pkg_resources
+        return (pkg_resources.files('webquiz') / filename).read_text(encoding='utf-8')
+    except (ImportError, AttributeError):
+        # Fallback to pkg_resources for older Python versions
+        import pkg_resources
+        return pkg_resources.resource_string('webquiz', filename).decode('utf-8')
+
 def get_package_version() -> str:
     """Get the webquiz package version"""
     try:
@@ -190,15 +201,8 @@ def get_default_config_path() -> Optional[str]:
 
 def create_default_config_file(config_path: Path):
     """Create a default config file with example content."""
-    try:
-        # Try modern importlib.resources first (Python 3.9+)
-        import importlib.resources as pkg_resources
-        example_content = (pkg_resources.files('webquiz') / 'server_config.yaml.example').read_text(encoding='utf-8')
-    except (ImportError, AttributeError):
-        # Fallback to pkg_resources for older Python versions
-        import pkg_resources
-        example_content = pkg_resources.resource_string('webquiz', 'server_config.yaml.example').decode('utf-8')
-    
+    example_content = read_package_resource('server_config.yaml.example')
+
     with open(config_path, 'w', encoding='utf-8') as f:
         f.write(example_content)
     logger.info(f"Created default config file: {config_path}")
@@ -379,7 +383,7 @@ def admin_auth_required(func):
                 pass
         
         if not provided_key or provided_key != self.master_key:
-            return web.json_response({'error': 'Invalid or missing master key'}, status=401)
+            return web.json_response({'error': 'Недійсний або відсутній головний ключ'}, status=401)
         
         return await func(self, request)
     return wrapper
@@ -421,7 +425,31 @@ class TestingServer:
         # Live stats WebSocket infrastructure
         self.websocket_clients: List[web.WebSocketResponse] = []  # Connected WebSocket clients
         self.live_stats: Dict[str, Dict[int, str]] = {}  # user_id -> {question_id: state}
-        
+
+        # Preload templates
+        self.templates = self._load_templates()
+
+    def _load_templates(self) -> Dict[str, str]:
+        """Preload all templates at startup"""
+        templates = {}
+        template_files = [
+            'index.html',
+            'admin.html',
+            'files.html',
+            'live_stats.html',
+            'quiz_selection_required.html',
+            'template_error.html'
+        ]
+
+        for template_file in template_files:
+            try:
+                templates[template_file] = read_package_resource(f'templates/{template_file}')
+                logger.info(f"Loaded template: {template_file}")
+            except Exception as e:
+                logger.warning(f"Failed to load template {template_file}: {e}")
+
+        return templates
+
     def generate_log_path(self) -> str:
         """Generate log file path in logs directory with simple numeric naming"""
         ensure_directory_exists(self.logs_dir)
@@ -514,91 +542,10 @@ class TestingServer:
         for quiz in available_quizzes:
             quiz_list_html += f"<li>{quiz}</li>"
         
-        admin_url = f"/admin" if self.master_key else "#"
-        admin_message = "Access admin panel" if self.master_key else "Admin panel disabled (no master key set)"
-        
-        selection_html = f'''<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>WebQuiz - Admin Selection Required</title>
-    <style>
-        body {{
-            font-family: Arial, sans-serif;
-            max-width: 800px;
-            margin: 0 auto;
-            padding: 20px;
-            background-color: #f5f5f5;
-            color: #333;
-        }}
-        .container {{
-            background: white;
-            padding: 30px;
-            border-radius: 10px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-            text-align: center;
-        }}
-        .quiz-list {{
-            text-align: left;
-            background: #f8f9fa;
-            padding: 20px;
-            border-radius: 5px;
-            margin: 20px 0;
-        }}
-        .admin-button {{
-            display: inline-block;
-            background: #007bff;
-            color: white;
-            padding: 12px 24px;
-            text-decoration: none;
-            border-radius: 5px;
-            margin: 10px;
-        }}
-        .admin-button:hover {{
-            background: #0056b3;
-        }}
-        .disabled {{
-            background: #6c757d;
-            cursor: not-allowed;
-        }}
-        .warning {{
-            background: #fff3cd;
-            border: 1px solid #ffeaa7;
-            color: #856404;
-            padding: 15px;
-            border-radius: 5px;
-            margin: 20px 0;
-        }}
-    </style>
-</head>
-<body>
-    <div class="container">
-        <h1>🎯 WebQuiz System</h1>
-        
-        <div class="warning">
-            <h3>⚠️ Quiz Selection Required</h3>
-            <p>Multiple quiz files are available, but no default quiz is set. An administrator must select which quiz to use.</p>
-        </div>
-        
-        <h3>📋 Available Quiz Files:</h3>
-        <div class="quiz-list">
-            <ul>
-                {quiz_list_html}
-            </ul>
-        </div>
-        
-        <p>To set a default quiz, rename one of the files to <code>default.yaml</code> or use the admin panel to select a quiz.</p>
-        
-        <a href="{admin_url}" class="admin-button {'disabled' if not self.master_key else ''}">{admin_message}</a>
-        
-        <div style="margin-top: 30px; font-size: 0.9em; color: #666;">
-            <p>💡 <strong>Tip:</strong> Rename your preferred quiz file to <code>default.yaml</code> to make it load automatically.</p>
-        </div>
-    </div>
-</body>
-</html>'''
-        
+        # Load template and replace placeholders
+        template_content = self.templates.get('quiz_selection_required.html', '')
+        selection_html = template_content.replace('{{QUIZ_LIST}}', quiz_list_html)
+
         try:
             async with aiofiles.open(index_path, 'w', encoding='utf-8') as f:
                 await f.write(selection_html)
@@ -716,7 +663,8 @@ class TestingServer:
         for q in self.questions:
             client_question = {
                 'id': q['id'],
-                'options': q['options']
+                'options': q['options'],
+                'is_multiple_choice': isinstance(q['correct_answer'], list)
             }
             # Include question text if present
             if 'question' in q and q['question']:
@@ -724,6 +672,9 @@ class TestingServer:
             # Include optional image attribute if present
             if 'image' in q and q['image']:
                 client_question['image'] = q['image']
+            # Include min_correct for multiple choice questions
+            if isinstance(q['correct_answer'], list):
+                client_question['min_correct'] = q.get('min_correct', len(q['correct_answer']))
             questions_for_client.append(client_question)
         
         # Convert questions to JSON string for embedding
@@ -731,17 +682,8 @@ class TestingServer:
         
         # Copy template from package
         try:
-            try:
-                # Try modern importlib.resources first (Python 3.9+)
-                import importlib.resources as pkg_resources
-                template_content = (pkg_resources.files('webquiz') / 'templates' / 'index.html').read_text(encoding='utf-8')
-            except (ImportError, AttributeError):
-                # Fallback to pkg_resources for older Python versions
-                import pkg_resources
-                template_path = pkg_resources.resource_filename('webquiz', 'templates/index.html')
-                async with aiofiles.open(template_path, 'r', encoding='utf-8') as template_file:
-                    template_content = await template_file.read()
-            
+            template_content = self.templates.get('index.html', '')
+
             # Inject questions data, title, version, and show_right_answer setting into template
             html_content = template_content.replace('{{QUESTIONS_DATA}}', questions_json)
             html_content = html_content.replace('{{QUIZ_TITLE}}', self.quiz_title)
@@ -757,35 +699,10 @@ class TestingServer:
         except Exception as e:
             logger.error(f"Error copying template index.html: {e}")
             # Continue to fallback
-            
+
         # Fallback: create minimal HTML if template is not available
-        fallback_html = '''<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>WebQuiz Testing System</title>
-    <style>
-        body { font-family: Arial, sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; }
-        .container { background: white; padding: 30px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
-        button { background: #007bff; color: white; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer; }
-        input { padding: 10px; width: 300px; margin: 10px 0; border: 1px solid #ddd; border-radius: 3px; }
-        .hidden { display: none; }
-    </style>
-</head>
-<body>
-    <div class="container">
-        <h1>WebQuiz Testing System</h1>
-        <div id="error">
-            <h2>Template Error</h2>
-            <p>Unable to load the full interface template. Please ensure the WebQuiz package is properly installed.</p>
-            <p>You can manually create an index.html file in the static directory with your custom interface.</p>
-        </div>
-    </div>
-</body>
-</html>'''
-        
         try:
+            fallback_html = self.templates.get('template_error.html', '<html><body><h1>Template Error</h1></body></html>')
             async with aiofiles.open(index_path, 'w', encoding='utf-8') as f:
                 await f.write(fallback_html)
             logger.warning(f"Created fallback index.html file: {index_path}")
@@ -858,6 +775,50 @@ class TestingServer:
         
         self.websocket_clients = active_clients
     
+    def _validate_answer(self, selected_answer, question):
+        """Validate answer for both single and multiple choice questions"""
+        correct_answer = question['correct_answer']
+
+        if isinstance(correct_answer, int):
+            # Single answer question
+            return selected_answer == correct_answer
+        elif isinstance(correct_answer, list):
+            # Multiple answer question
+            if not isinstance(selected_answer, list):
+                return False
+
+            # Convert to sets for comparison
+            selected_set = set(selected_answer)
+            correct_set = set(correct_answer)
+
+            # Check if any incorrect answers were selected
+            if not selected_set.issubset(set(range(len(question['options'])))):
+                return False  # Invalid option indices
+
+            # Check if any incorrect answers were selected
+            incorrect_selected = selected_set - correct_set
+            if incorrect_selected:
+                return False  # Any incorrect answer makes it wrong
+
+            # Check minimum correct requirement
+            min_correct = question.get('min_correct', len(correct_answer))
+            correct_selected = selected_set & correct_set
+
+            return len(correct_selected) >= min_correct
+        else:
+            return False  # Invalid correct_answer format
+
+    def _format_answer_text(self, answer_indices, options):
+        """Format answer text for CSV with | separator for multiple answers"""
+        if isinstance(answer_indices, int):
+            return options[answer_indices]
+        elif isinstance(answer_indices, list):
+            # Sort indices and join corresponding option texts with |
+            sorted_indices = sorted(answer_indices)
+            return '|'.join(options[idx] for idx in sorted_indices)
+        else:
+            return str(answer_indices)
+
     def update_live_stats(self, user_id: str, question_id: int, state: str, time_taken: float = None):
         """Update live stats for a user and question"""
         if user_id not in self.live_stats:
@@ -875,12 +836,12 @@ class TestingServer:
         username = data['username'].strip()
         
         if not username:
-            raise ValueError('Username cannot be empty')
+            raise ValueError('Ім\'я користувача не може бути порожнім')
             
         # Check if username already exists
         for existing_user in self.users.values():
             if existing_user['username'] == username:
-                raise ValueError('Username already exists')
+                raise ValueError('Ім\'я користувача вже існує')
         
         # Generate unique user ID
         user_id = str(uuid.uuid4())
@@ -925,24 +886,24 @@ class TestingServer:
         
         # Find user by user_id
         if user_id not in self.users:
-            return web.json_response({'error': 'User not found'}, status=404)
+            return web.json_response({'error': 'Користувача не знайдено'}, status=404)
         
         username = self.users[user_id]['username']
             
         # Find the question
         question = next((q for q in self.questions if q['id'] == question_id), None)
         if not question:
-            return web.json_response({'error': 'Question not found'}, status=404)
+            return web.json_response({'error': 'Питання не знайдено'}, status=404)
             
-        # Calculate time taken server-side
+        # Calculate time taken server-side from when question was displayed
         time_taken = 0
         if user_id in self.question_start_times:
             time_taken = (datetime.now() - self.question_start_times[user_id]).total_seconds()
             # Clean up the start time
             del self.question_start_times[user_id]
         
-        # Check if answer is correct
-        is_correct = selected_answer == question['correct_answer']
+        # Check if answer is correct (handle both single and multiple answers)
+        is_correct = self._validate_answer(selected_answer, question)
         
         # Store response in memory
         response_data = {
@@ -950,8 +911,8 @@ class TestingServer:
             'username': username,
             'question_id': question_id,
             'question_text': question.get('question', ''),  # Handle image-only questions
-            'selected_answer_text': question['options'][selected_answer],
-            'correct_answer_text': question['options'][question['correct_answer']],
+            'selected_answer_text': self._format_answer_text(selected_answer, question['options']),
+            'correct_answer_text': self._format_answer_text(question['correct_answer'], question['options']),
             'is_correct': is_correct,
             'time_taken_seconds': time_taken,
             'timestamp': datetime.now().isoformat()
@@ -966,8 +927,8 @@ class TestingServer:
         answer_data = {
             'question': question.get('question', ''),  # Handle image-only questions
             'image': question.get('image'),
-            'selected_answer': question['options'][selected_answer],
-            'correct_answer': question['options'][question['correct_answer']],
+            'selected_answer': self._format_answer_text(selected_answer, question['options']),
+            'correct_answer': self._format_answer_text(question['correct_answer'], question['options']),
             'is_correct': is_correct,
             'time_taken': time_taken
         }
@@ -996,24 +957,8 @@ class TestingServer:
             # Test completed - calculate and store final stats
             self.calculate_and_store_user_stats(user_id)
             logger.info(f"Test completed for user {user_id} - final stats calculated")
-        else:
-            # Start timing for next question and update live stats
-            next_question_id = question_id + 1
-            self.question_start_times[user_id] = datetime.now()
-            self.update_live_stats(user_id, next_question_id, "think")
-            
-            # Broadcast next question thinking state
-            await self.broadcast_to_websockets({
-                'type': 'state_update',
-                'user_id': user_id,
-                'username': username,
-                'question_id': next_question_id,
-                'state': 'think',
-                'time_taken': None,
-                'total_questions': len(self.questions)
-            })
         
-        logger.info(f"Answer submitted by {username} (ID: {user_id}) for question {question_id}: {'Correct' if is_correct else 'Incorrect'} (took {time_taken:.2f}s)")
+        logger.info(f"Answer submitted by {username} (ID: {user_id}) for question {question_id}: {'Correct' if is_correct else 'Incorrect'} (took {time_taken}s)")
         logger.info(f"Updated progress for user {user_id}: last answered question = {question_id}")
         
         # Prepare response data
@@ -1026,10 +971,41 @@ class TestingServer:
         if self.show_right_answer:
             response_data['is_correct'] = is_correct
             response_data['correct_answer'] = question['correct_answer']
+            response_data['is_multiple_choice'] = isinstance(question['correct_answer'], list)
         
         return web.json_response(response_data)
+
+    async def question_start(self, request):
+        """Handle notification that a user started viewing a question"""
+        try:
+            data = await request.json()
+            user_id = data['user_id']
+            question_id = data['question_id']
+            username = self.users[user_id]['username']
+
+            # Verify user exists
+            if user_id not in self.users:
+                return web.json_response({'error': 'Користувача не знайдено'}, status=404)
+
+            if user_id not in self.question_start_times:
+                self.question_start_times[user_id] = datetime.now()
+            self.update_live_stats(user_id, question_id, "think")
             
-        
+            await self.broadcast_to_websockets({
+                'type': 'state_update',
+                'user_id': user_id,
+                'username': username,
+                'question_id': question_id,
+                'state': 'think',
+                'time_taken': None,
+                'total_questions': len(self.questions)
+            })
+
+            return web.json_response({'status': 'success'})
+
+        except Exception as e:
+            logger.error(f"Error in question_start: {e}")
+            return web.json_response({'error': 'Помилка сервера'}, status=500)
 
     def calculate_and_store_user_stats(self, user_id):
         """Calculate and store final stats for a completed user using user_answers (not user_responses)"""
@@ -1098,54 +1074,53 @@ class TestingServer:
         user_id = request.match_info['user_id']
         
         # Find user by user_id
-        if user_id in self.users:
-            user_data = self.users[user_id]
-            username = user_data['username']
-            # Get last answered question ID from progress tracking
-            last_answered_question_id = self.user_progress.get(user_id, 0)
-            
-            # Find the index of next question to answer
-            next_question_index = 0
-            if last_answered_question_id > 0:
-                # Find the index of last answered question, then add 1
-                for i, question in enumerate(self.questions):
-                    if question['id'] == last_answered_question_id:
-                        next_question_index = i + 1
-                        break
-            
-            # Ensure we don't go beyond available questions
-            if next_question_index >= len(self.questions):
-                next_question_index = len(self.questions)
-            
-            # Check if test is completed
-            test_completed = next_question_index >= len(self.questions)
-            
-            response_data = {
-                'valid': True,
-                'user_id': user_id,
-                'username': username,
-                'next_question_index': next_question_index,
-                'total_questions': len(self.questions),
-                'last_answered_question_id': last_answered_question_id,
-                'test_completed': test_completed
-            }
-            
-            if test_completed:
-                # Get final results for completed test
-                final_results = self.get_user_final_results(user_id)
-                response_data['final_results'] = final_results
-                logger.info(f"User {user_id} verification: test completed, returning final results")
-            else:
-                # Start timing for current question if user has questions left
-                self.question_start_times[user_id] = datetime.now()
-                logger.info(f"User {user_id} verification: last_answered={last_answered_question_id}, next_index={next_question_index}")
-                
-            return web.json_response(response_data)
-        else:
+        if user_id not in self.users:
             return web.json_response({
                 'valid': False,
                 'message': 'User ID not found'
             })
+    
+        user_data = self.users[user_id]
+        username = user_data['username']
+        # Get last answered question ID from progress tracking
+        last_answered_question_id = self.user_progress.get(user_id, 0)
+        
+        # Find the index of next question to answer
+        next_question_index = 0
+        if last_answered_question_id > 0:
+            # Find the index of last answered question, then add 1
+            for i, question in enumerate(self.questions):
+                if question['id'] == last_answered_question_id:
+                    next_question_index = i + 1
+                    break
+        
+        # Ensure we don't go beyond available questions
+        if next_question_index >= len(self.questions):
+            next_question_index = len(self.questions)
+        
+        # Check if test is completed
+        test_completed = next_question_index >= len(self.questions)
+        
+        response_data = {
+            'valid': True,
+            'user_id': user_id,
+            'username': username,
+            'next_question_index': next_question_index,
+            'total_questions': len(self.questions),
+            'last_answered_question_id': last_answered_question_id,
+            'test_completed': test_completed
+        }
+        
+        if test_completed:
+            # Get final results for completed test
+            final_results = self.get_user_final_results(user_id)
+            response_data['final_results'] = final_results
+            logger.info(f"User {user_id} verification: test completed, returning final results")
+        else:
+            logger.info(f"User {user_id} verification: last_answered={last_answered_question_id}, next_index={next_question_index}")
+            
+        return web.json_response(response_data)
+
     
     # Admin API endpoints
     @admin_auth_required
@@ -1241,7 +1216,7 @@ class TestingServer:
             if mode == 'wizard':
                 quiz_data = data.get('quiz_data', {})
                 if not self._validate_quiz_data(quiz_data):
-                    return web.json_response({'error': 'Invalid quiz data structure'}, status=400)
+                    return web.json_response({'error': 'Неправильна структура даних квізу'}, status=400)
                 
                 import yaml
                 quiz_content = yaml.dump(quiz_data, default_flow_style=False, allow_unicode=True)
@@ -1255,9 +1230,9 @@ class TestingServer:
                     import yaml
                     parsed = yaml.safe_load(quiz_content)
                     if not self._validate_quiz_data(parsed):
-                        return web.json_response({'error': 'Invalid quiz data structure'}, status=400)
+                        return web.json_response({'error': 'Неправильна структура даних квізу'}, status=400)
                 except yaml.YAMLError as e:
-                    return web.json_response({'error': f'Invalid YAML: {str(e)}'}, status=400)
+                    return web.json_response({'error': f'Неправильний YAML: {str(e)}'}, status=400)
             
             # Write the quiz file
             with open(quiz_path, 'w', encoding='utf-8') as f:
@@ -1295,7 +1270,7 @@ class TestingServer:
             if mode == 'wizard':
                 quiz_data = data.get('quiz_data', {})
                 if not self._validate_quiz_data(quiz_data):
-                    return web.json_response({'error': 'Invalid quiz data structure'}, status=400)
+                    return web.json_response({'error': 'Неправильна структура даних квізу'}, status=400)
                 
                 import yaml
                 quiz_content = yaml.dump(quiz_data, default_flow_style=False, allow_unicode=True)
@@ -1309,9 +1284,9 @@ class TestingServer:
                     import yaml
                     parsed = yaml.safe_load(quiz_content)
                     if not self._validate_quiz_data(parsed):
-                        return web.json_response({'error': 'Invalid quiz data structure'}, status=400)
+                        return web.json_response({'error': 'Неправильна структура даних квізу'}, status=400)
                 except yaml.YAMLError as e:
-                    return web.json_response({'error': f'Invalid YAML: {str(e)}'}, status=400)
+                    return web.json_response({'error': f'Неправильний YAML: {str(e)}'}, status=400)
             
             # Write updated content
             with open(quiz_path, 'w', encoding='utf-8') as f:
@@ -1399,20 +1374,20 @@ class TestingServer:
             errors = []
         
         if not isinstance(data, dict):
-            errors.append("Quiz data must be a dictionary")
+            errors.append("Дані квізу повинні бути словником")
             return False
         
         if 'questions' not in data:
-            errors.append("Quiz must contain 'questions' field")
+            errors.append("Квіз повинен містити поле 'questions'")
             return False
         
         questions = data['questions']
         if not isinstance(questions, list):
-            errors.append("'questions' must be a list")
+            errors.append("'questions' повинно бути списком")
             return False
         
         if len(questions) == 0:
-            errors.append("Quiz must contain at least one question")
+            errors.append("Квіз повинен містити принаймні одне питання")
             return False
         
         for i, question in enumerate(questions):
@@ -1442,13 +1417,41 @@ class TestingServer:
                 elif not all(isinstance(opt, str) for opt in options):
                     errors.append(f"Question {i+1} all options must be strings")
             
-            # Validate correct_answer
+            # Validate correct_answer (can be integer for single answer or list for multiple answers)
             if 'correct_answer' in question and 'options' in question:
                 correct_answer = question['correct_answer']
-                if not isinstance(correct_answer, int):
-                    errors.append(f"Question {i+1} correct_answer must be an integer")
-                elif correct_answer < 0 or correct_answer >= len(question['options']):
-                    errors.append(f"Question {i+1} correct_answer index out of range")
+                options_count = len(question['options'])
+
+                if isinstance(correct_answer, int):
+                    # Single answer validation
+                    if correct_answer < 0 or correct_answer >= options_count:
+                        errors.append(f"Question {i+1} correct_answer index out of range")
+                elif isinstance(correct_answer, list):
+                    # Multiple answers validation
+                    if len(correct_answer) == 0:
+                        errors.append(f"Question {i+1} correct_answer array cannot be empty")
+                    elif not all(isinstance(idx, int) for idx in correct_answer):
+                        errors.append(f"Question {i+1} correct_answer array must contain only integers")
+                    elif any(idx < 0 or idx >= options_count for idx in correct_answer):
+                        errors.append(f"Question {i+1} correct_answer array contains index out of range")
+                    elif len(set(correct_answer)) != len(correct_answer):
+                        errors.append(f"Question {i+1} correct_answer array contains duplicate indices")
+                else:
+                    errors.append(f"Question {i+1} correct_answer must be an integer or array of integers")
+
+            # Validate min_correct (only valid for multiple answers)
+            if 'min_correct' in question:
+                min_correct = question['min_correct']
+                if 'correct_answer' not in question:
+                    errors.append(f"Question {i+1} has min_correct but no correct_answer")
+                elif not isinstance(question['correct_answer'], list):
+                    errors.append(f"Question {i+1} min_correct is only valid for multiple answer questions")
+                elif not isinstance(min_correct, int):
+                    errors.append(f"Question {i+1} min_correct must be an integer")
+                elif min_correct < 1:
+                    errors.append(f"Question {i+1} min_correct must be at least 1")
+                elif min_correct > len(question['correct_answer']):
+                    errors.append(f"Question {i+1} min_correct cannot exceed number of correct answers")
         
         return len(errors) == 0
     
@@ -1572,7 +1575,173 @@ class TestingServer:
             raise
             logger.error(f"Error downloading quiz: {e}")
             return web.json_response({'error': f'Download failed: {str(e)}'}, status=500)
-    
+
+    # File Management API endpoints
+    async def serve_files_page(self, request):
+        """Serve the files management page"""
+        try:
+            template_content = self.templates.get('files.html', '')
+
+            # Check if client IP is trusted and inject auto-auth flag
+            client_ip = get_client_ip(request)
+            is_trusted_ip = client_ip in self.admin_config.trusted_ips if hasattr(self, 'admin_config') else False
+
+            # Inject JavaScript variables for trusted IP auto-auth
+            js_variables = f"""
+                const IS_TRUSTED_IP = {str(is_trusted_ip).lower()};
+            """
+
+            # Inject the JavaScript variables before </head>
+            template_content = template_content.replace('</head>', f'<script>{js_variables}</script>\n    </head>')
+
+            return web.Response(text=template_content, content_type='text/html')
+        except Exception as e:
+            logger.error(f"Error serving files page: {e}")
+            return web.json_response({'error': 'Failed to load files page'}, status=500)
+
+    def _list_files_in_directory(self, directory, file_type):
+        """Helper to list files in a directory with metadata"""
+        files = []
+        if os.path.exists(directory):
+            for filename in os.listdir(directory):
+                file_path = os.path.join(directory, filename)
+                if os.path.isfile(file_path):
+                    stat = os.stat(file_path)
+                    files.append({
+                        'name': filename,
+                        'size': stat.st_size,
+                        'modified': datetime.fromtimestamp(stat.st_mtime).isoformat(),
+                        'type': file_type
+                    })
+        # Sort files by modified date (newest first)
+        files.sort(key=lambda x: x['modified'], reverse=True)
+        return files
+
+    @admin_auth_required
+    async def files_list(self, request):
+        """List all files in logs_dir and csv_dir with metadata"""
+        logs_files = self._list_files_in_directory(self.logs_dir, 'log')
+        csv_files = self._list_files_in_directory(self.csv_dir, 'csv')
+
+        return web.json_response({
+            'logs': logs_files,
+            'csv': csv_files
+        })
+
+    def _get_file_path_and_validate(self, file_type, filename):
+        """Helper to validate file type, filename, and return file path.
+        Returns tuple (file_path, error_response) where error_response is None on success"""
+        # Determine base directory from file type
+        if file_type == 'csv':
+            base_dir = self.csv_dir
+        elif file_type == 'logs':
+            base_dir = self.logs_dir
+        else:
+            return None, web.json_response({'error': 'Invalid file type'}, status=400)
+
+        # Validate filename (prevent path traversal)
+        if not self._is_safe_filename(filename):
+            return None, web.json_response({'error': 'Invalid filename'}, status=400)
+
+        file_path = os.path.join(base_dir, filename)
+
+        # Check if file exists
+        if not os.path.exists(file_path):
+            return None, web.json_response({'error': 'File not found'}, status=404)
+
+        # Check if it's actually a file (not directory)
+        if not os.path.isfile(file_path):
+            return None, web.json_response({'error': 'Path is not a file'}, status=400)
+
+        return file_path, None
+
+    @admin_auth_required
+    async def files_view(self, request):
+        """View file contents (text files only, with size limit)"""
+        file_type = request.match_info['type']
+        filename = request.match_info['filename']
+
+        # Validate and get file path
+        file_path, error = self._get_file_path_and_validate(file_type, filename)
+        if error:
+            return error
+
+        # Check file size (limit to 10MB for viewing)
+        MAX_VIEW_SIZE = 1024 * 1024 * 10  # 10MB
+        file_size = os.path.getsize(file_path)
+
+        if file_size > MAX_VIEW_SIZE:
+            return web.json_response({
+                'error': f'File too large for viewing (>10MB). Size: {file_size} bytes. Use download instead.',
+                'size': file_size
+            }, status=400)
+
+        # Read file content
+        try:
+            async with aiofiles.open(file_path, 'r', encoding='utf-8') as f:
+                content = await f.read()
+        except UnicodeDecodeError:
+            return web.json_response({'error': 'File contains non-UTF-8 content. Use download instead.'}, status=400)
+
+        return web.Response(
+            text=content,
+            content_type='text/plain',
+            headers={
+                'Content-Disposition': f'inline; filename="{filename}"'
+            }
+        )
+
+    @admin_auth_required
+    async def files_download(self, request):
+        """Download file directly"""
+        try:
+            file_type = request.match_info['type']
+            filename = request.match_info['filename']
+
+            # Validate and get file path
+            file_path, error = self._get_file_path_and_validate(file_type, filename)
+            if error:
+                return error
+
+            # Determine content type
+            content_type = 'text/csv' if file_type == 'csv' else 'text/plain'
+
+            # Return file response with proper headers
+            return web.FileResponse(
+                file_path,
+                headers={
+                    'Content-Disposition': f'attachment; filename="{filename}"',
+                    'Content-Type': content_type
+                }
+            )
+
+        except Exception as e:
+            logger.error(f"Error downloading file: {e}")
+            return web.json_response({'error': 'Failed to download file'}, status=500)
+
+    def _is_safe_filename(self, filename):
+        """Check if filename is safe (no path traversal attempts)"""
+        if not filename:
+            return False
+
+        # Check for path traversal attempts
+        if '..' in filename or '/' in filename or '\\' in filename:
+            return False
+
+        # Check for null bytes
+        if '\0' in filename:
+            return False
+
+        # Check for special filenames
+        if filename in ['.', '..']:
+            return False
+
+        # Check for overly long filenames
+        if len(filename) > 255:
+            return False
+
+        return True
+
     async def serve_index_page(self, request):
         """Serve the index.html page from static directory"""
         index_path = f"{self.static_dir}/index.html"
@@ -1581,17 +1750,8 @@ class TestingServer:
     async def serve_admin_page(self, request):
         """Serve the admin interface page"""
         try:
-            try:
-                # Try modern importlib.resources first (Python 3.9+)
-                import importlib.resources as pkg_resources
-                template_content = (pkg_resources.files('webquiz') / 'templates' / 'admin.html').read_text(encoding='utf-8')
-            except (ImportError, AttributeError):
-                # Fallback to pkg_resources for older Python versions
-                import pkg_resources
-                template_path = pkg_resources.resource_filename('webquiz', 'templates/admin.html')
-                async with aiofiles.open(template_path, 'r', encoding='utf-8') as template_file:
-                    template_content = await template_file.read()
-            
+            template_content = self.templates.get('admin.html', '')
+
             # Check if client IP is trusted and inject auto-auth flag
             client_ip = get_client_ip(request)
             is_trusted_ip = client_ip in self.admin_config.trusted_ips if hasattr(self, 'admin_config') else False
@@ -1642,17 +1802,8 @@ class TestingServer:
     async def serve_live_stats_page(self, request):
         """Serve the live stats page"""
         try:
-            try:
-                # Try modern importlib.resources first (Python 3.9+)
-                import importlib.resources as pkg_resources
-                template_content = (pkg_resources.files('webquiz') / 'templates' / 'live_stats.html').read_text(encoding='utf-8')
-            except (ImportError, AttributeError):
-                # Fallback to pkg_resources for older Python versions
-                import pkg_resources
-                template_path = pkg_resources.resource_filename('webquiz', 'templates/live_stats.html')
-                async with aiofiles.open(template_path, 'r', encoding='utf-8') as template_file:
-                    template_content = await template_file.read()
-            
+            template_content = self.templates.get('live_stats.html', '')
+
             return web.Response(text=template_content, content_type='text/html')
         except Exception as e:
             logger.error(f"Error serving live stats page: {e}")
@@ -1732,6 +1883,7 @@ async def create_app(config: WebQuizConfig):
     # Routes
     app.router.add_post('/api/register', server.register_user)
     app.router.add_post('/api/submit-answer', server.submit_answer)
+    app.router.add_post('/api/question-start', server.question_start)
     app.router.add_get('/api/verify-user/{user_id}', server.verify_user_id)
     
     # Admin routes
@@ -1746,7 +1898,13 @@ async def create_app(config: WebQuizConfig):
     app.router.add_post('/api/admin/validate-quiz', server.admin_validate_quiz)
     app.router.add_get('/api/admin/list-images', server.admin_list_images)
     app.router.add_post('/api/admin/download-quiz', server.admin_download_quiz)
-    
+
+    # File management routes (admin access)
+    app.router.add_get('/files/', server.serve_files_page)
+    app.router.add_get('/api/files/list', server.files_list)
+    app.router.add_get('/api/files/{type}/view/{filename}', server.files_view)
+    app.router.add_get('/api/files/{type}/download/{filename}', server.files_download)
+
     # Live stats routes (public access)
     app.router.add_get('/live-stats/', server.serve_live_stats_page)
     app.router.add_get('/ws/live-stats', server.websocket_live_stats)

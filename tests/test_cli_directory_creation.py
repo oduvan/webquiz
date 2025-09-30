@@ -41,15 +41,6 @@ def temp_dir():
         shutil.rmtree(temp_dir)
 
 
-def test_webquiz_cli_creates_default_directories(temp_dir):
-    """Test that webquiz CLI creates expected default directories."""
-    run_webquiz_cli_briefly()
-    expected_dirs = ['quizzes', 'logs', 'data', 'static']
-    for dir_name in expected_dirs:
-        dir_path = os.path.join(temp_dir, dir_name)
-        assert os.path.exists(dir_path), f"Directory {dir_name} was not created by CLI"
-        assert os.path.isdir(dir_path), f"Path {dir_name} is not a directory"
-
 
 def test_webquiz_cli_creates_all_files(temp_dir):
     """Test that webquiz CLI creates all expected directories and files."""
