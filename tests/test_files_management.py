@@ -607,7 +607,7 @@ def test_files_functionality_with_real_csv_data():
                         json={'user_id': user_id, 'question_id': 2, 'selected_answer': 1})
 
             import time
-            time.sleep(1)
+            time.sleep(5)
 
             headers = {'X-Master-Key': 'test123'}
             response = requests.get(f'http://localhost:{port}/api/files/list', headers=headers)

@@ -10,111 +10,24 @@ Tests focus on:
 - Results display with pipe separator
 - Complete quiz journeys
 """
-import pytest
-import os
 import time
-from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
-from selenium.webdriver.chrome.options import Options
-from selenium.webdriver.chrome.service import Service
-from selenium.common.exceptions import TimeoutException
-from webdriver_manager.chrome import ChromeDriverManager
 
-from conftest import custom_webquiz_server, get_worker_port
-
-# Skip decorator for Selenium tests
-skip_if_selenium_disabled = pytest.mark.skipif(
-    os.getenv('SKIP_SELENIUM', '').lower() in ('true', '1', 'yes'),
-    reason="Selenium tests skipped (SKIP_SELENIUM environment variable is set)"
+from conftest import custom_webquiz_server
+from selenium_helpers import (
+    skip_if_selenium_disabled,
+    browser,
+    wait_for_element,
+    wait_for_clickable,
+    register_user,
+    find_options,
+    is_multiple_choice_question,
+    is_option_selected,
+    get_selected_options,
+    find_option_by_text
 )
-
-
-@pytest.fixture
-def browser():
-    """Set up Chrome/Chromium browser in headless mode for testing."""
-    worker_port = get_worker_port()
-    debug_port = 9222 + (worker_port - 8080)
-
-    options = Options()
-    show_browser = os.getenv('SHOW_BROWSER', '').lower() in ('true', '1', 'yes')
-    if not show_browser:
-        options.add_argument('--headless')
-
-    options.add_argument('--no-sandbox')
-    options.add_argument('--disable-dev-shm-usage')
-    options.add_argument('--disable-gpu')
-    options.add_argument('--disable-extensions')
-    options.add_argument('--disable-web-security')
-    options.add_argument('--disable-features=VizDisplayCompositor')
-    options.add_argument(f'--remote-debugging-port={debug_port}')
-    options.add_argument('--window-size=1920,1080')
-
-    try:
-        service = Service(ChromeDriverManager().install())
-        driver = webdriver.Chrome(service=service, options=options)
-        driver.implicitly_wait(10)
-        yield driver
-        driver.quit()
-    except Exception as e:
-        pytest.skip(f"Chrome/Chromium browser not available: {e}")
-
-
-# Helper functions
-def wait_for_element(browser, by, selector, timeout=10):
-    """Wait for element to be present."""
-    try:
-        return WebDriverWait(browser, timeout).until(
-            EC.presence_of_element_located((by, selector))
-        )
-    except TimeoutException:
-        print(f"Timeout waiting for element: {by}={selector}")
-        print(f"Current page source: {browser.page_source[:500]}...")
-        raise
-
-
-def wait_for_clickable(browser, by, selector, timeout=10):
-    """Wait for element to be clickable."""
-    return WebDriverWait(browser, timeout).until(
-        EC.element_to_be_clickable((by, selector))
-    )
-
-
-def register_user(browser, port, username='MultiChoiceStudent'):
-    """Helper to register a user and start quiz."""
-    browser.get(f'http://localhost:{port}/')
-    username_input = wait_for_element(browser, By.ID, 'username')
-    username_input.send_keys(username)
-    register_button = browser.find_element(By.CSS_SELECTOR, '.register-btn')
-    register_button.click()
-    wait_for_element(browser, By.ID, 'current-question-container')
-
-
-def find_options(browser):
-    """Find all option div elements (works for both single and multiple choice)."""
-    return browser.find_elements(By.CSS_SELECTOR, '.quiz-option')
-
-
-def is_multiple_choice_question(browser):
-    """Check if current question is multiple choice by looking for the hint element."""
-    try:
-        # Check if the multiple-choice-hint element exists and is displayed
-        hint = browser.find_element(By.CSS_SELECTOR, '.multiple-choice-hint')
-        return hint.is_displayed()
-    except:
-        return False
-
-
-def is_option_selected(option_element):
-    """Check if an option is selected by checking for 'selected' class."""
-    return 'selected' in option_element.get_attribute('class')
-
-
-def get_selected_options(browser):
-    """Get all currently selected options."""
-    options = find_options(browser)
-    return [opt for opt in options if is_option_selected(opt)]
 
 
 # ============================================================================
@@ -1112,7 +1025,7 @@ def test_results_show_multiple_answers_with_pipe(browser):
         wait_for_clickable(browser, By.ID, 'continue-btn').click()
 
         # Check results
-        wait_for_element(browser, By.ID, 'results')
+        wait_for_element(browser, By.ID, 'results-content')
 
         # Results should show answers with | separator
         results_content = browser.execute_script("return document.getElementById('results-content').innerHTML;")
