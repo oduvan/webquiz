@@ -716,7 +716,7 @@
                     ${question.question ? `<h3 class="question-text">${question.question}</h3>` : ''}
                     ${question.image ? `<a href="${question.image}" target="_blank"><img src="${question.image}" alt="Question image" class="question-image quiz-question-img"></a>` : ''}
                     <div class="options">
-                        ${question.is_multiple_choice ? '<p style="font-size: 14px; color: var(--text-muted); margin-bottom: 10px;">📋 Можна обрати кілька відповідей</p>' : ''}
+                        ${question.is_multiple_choice ? '<p class="multiple-choice-hint" style="font-size: 14px; color: var(--text-muted); margin-bottom: 10px;">📋 Можна обрати кілька відповідей</p>' : ''}
                         ${question.options.map((option, optionIndex) => {
                             const isImageOption = option.startsWith('/');
 
