@@ -72,6 +72,62 @@ jobs:
       run: |
         poetry build
         
+    - name: Install pandoc and LaTeX for PDF generation
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y pandoc texlive-latex-base texlive-fonts-recommended texlive-fonts-extra texlive-latex-extra texlive-xetex
+        
+    - name: Generate Ukrainian documentation PDF
+      run: |
+        # Create combined markdown for PDF generation
+        cd docs-uk
+        cat > combined-docs.md << 'EOF'
+        ---
+        title: "WebQuiz - Українська Документація"
+        author: "WebQuiz Team"
+        date: "`date +%Y-%m-%d`"
+        geometry: margin=2cm
+        ---
+        
+        \newpage
+        \tableofcontents
+        \newpage
+        
+        EOF
+        
+        # Add all documentation files
+        echo -e "\n\n# Вступ\n" >> combined-docs.md
+        cat README.md >> combined-docs.md
+        
+        echo -e "\n\n\\newpage\n\n# Встановлення та Налаштування\n" >> combined-docs.md
+        cat installation.md >> combined-docs.md
+        
+        echo -e "\n\n\\newpage\n\n# Посібник Користувача\n" >> combined-docs.md
+        cat user-guide.md >> combined-docs.md
+        
+        echo -e "\n\n\\newpage\n\n# Адміністративний Інтерфейс\n" >> combined-docs.md
+        cat admin-interface.md >> combined-docs.md
+        
+        echo -e "\n\n\\newpage\n\n# Конфігурація та Файли\n" >> combined-docs.md
+        cat configuration.md >> combined-docs.md
+        
+        # Generate PDF with Unicode support
+        pandoc combined-docs.md -o WebQuiz-Documentation-Ukrainian-v${{ github.event.inputs.version }}.pdf \
+          --pdf-engine=xelatex \
+          --variable geometry:margin=2cm \
+          --variable fontsize=11pt \
+          --variable documentclass=article \
+          --variable colorlinks=true \
+          --variable linkcolor=blue \
+          --variable urlcolor=blue \
+          --variable toccolor=black \
+          --toc \
+          --toc-depth=3 \
+          --number-sections
+          
+        # Move PDF to dist directory
+        mv WebQuiz-Documentation-Ukrainian-v${{ github.event.inputs.version }}.pdf ../dist/
+        
     - name: Publish to PyPI
       uses: pypa/gh-action-pypi-publish@release/v1
       with:
@@ -89,6 +145,14 @@ jobs:
         This release includes:
         - 📦 Python wheel package (`webquiz-${{ github.event.inputs.version }}-py3-none-any.whl`)
         - 📋 Source distribution (`webquiz-${{ github.event.inputs.version }}.tar.gz`)
+        - 📚 **Ukrainian Documentation PDF** (`WebQuiz-Documentation-Ukrainian-v${{ github.event.inputs.version }}.pdf`)
+
+        ## 📚 Documentation
+        Complete Ukrainian documentation is now available as PDF including:
+        - **Installation Guide** - Step-by-step setup instructions
+        - **User Guide** - Complete user manual with examples  
+        - **Admin Interface** - Detailed admin panel documentation with screenshots
+        - **Configuration** - All config files and system structure explained
 
         ## Installation
         ```bash
