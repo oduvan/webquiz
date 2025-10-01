@@ -124,7 +124,7 @@ jobs:
         git config --local user.name "GitHub Action"
         
         # Update the version in playbooks/raspberry-pi.yml
-        sed -i 's/name: webquiz==[0-9]\+\(\.[0-9]\+\)\{0,2\}$/name: webquiz==${{ github.event.inputs.version }}/' playbooks/raspberry-pi.yml
+        sed -i 's/webquiz==[0-9]\+\(\.[0-9]\+\)\{0,2\}/webquiz==${{ github.event.inputs.version }}/g' playbooks/raspberry-pi.yml
         
         # Check if there are any changes to commit
         if git diff --quiet; then
