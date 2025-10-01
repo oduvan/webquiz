@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: 'Version to release (e.g., 1.0.6, 2.0.0)'
+        description: 'Version to release (e.g., 1, 1.0, or 1.0.6)'
         required: true
         type: string
 
@@ -18,8 +18,8 @@ jobs:
     steps:
     - name: Validate version format
       run: |
-        if [[ ! "${{ github.event.inputs.version }}" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-          echo "❌ Invalid version format. Expected: X.Y.Z (e.g., 1.0.6)"
+        if [[ ! "${{ github.event.inputs.version }}" =~ ^[0-9]+(\.[0-9]+)?(\.[0-9]+)?$ ]]; then
+          echo "❌ Invalid version format. Expected: X, X.Y, or X.Y.Z (e.g., 1, 1.0, or 1.0.6)"
           exit 1
         fi
         echo "✅ Version format is valid: ${{ github.event.inputs.version }}"
@@ -124,7 +124,7 @@ jobs:
         git config --local user.name "GitHub Action"
         
         # Update the version in playbooks/raspberry-pi.yml
-        sed -i 's/name: webquiz==[0-9]\+\.[0-9]\+\.[0-9]\+$/name: webquiz==${{ github.event.inputs.version }}/' playbooks/raspberry-pi.yml
+        sed -i 's/name: webquiz==[0-9]\+\(\.[0-9]\+\)\{0,2\}$/name: webquiz==${{ github.event.inputs.version }}/' playbooks/raspberry-pi.yml
         
         # Check if there are any changes to commit
         if git diff --quiet; then
