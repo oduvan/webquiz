@@ -122,8 +122,9 @@ def custom_webquiz_server(config=None, quizzes=None):
     with open(config_filename, 'w') as f:
         yaml.dump(final_config, f)
 
-    # Start server
-    cmd = ['python', '-m', 'webquiz.cli', '--config', config_filename]
+    # Start server using sys.executable to ensure we use the same Python interpreter
+    import sys
+    cmd = [sys.executable, '-m', 'webquiz.cli', '--config', config_filename]
     proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
 
     try:

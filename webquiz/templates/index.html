@@ -466,10 +466,12 @@
         <div id="registration" class="section hidden">
             <h2>Зареєструйтеся для початку тесту</h2>
             <div id="registration-error" class="error-message hidden"></div>
-            <input type="text" id="username" placeholder="Введіть ваше ім'я користувача" style="padding: 10px; width: 100%; max-width: 300px; box-sizing: border-box;">
-            <button class="register-btn" onclick="registerUser()">Зареєструватися</button>
+            {{REGISTRATION_FIELDS}}
+            <div style="text-align: center; margin-top: 15px;">
+                <button class="register-btn" onclick="registerUser()">Зареєструватися</button>
+            </div>
         </div>
-        
+
         <!-- Test Section -->
         <div id="test-section" class="section hidden">
             <div id="progress-bar" class="progress">
@@ -653,16 +655,36 @@
                 return;
             }
 
+            // Collect registration data
+            const registrationData = { username: username };
+
+            // Collect additional registration fields
+            const additionalFields = document.querySelectorAll('.registration-field');
+            for (const field of additionalFields) {
+                const fieldName = field.getAttribute('data-field-name');
+                const fieldValue = field.value.trim();
+
+                // Get field label from the table TD
+                const fieldRow = field.closest('tr');
+                const fieldLabel = fieldRow ? fieldRow.querySelector('td:first-child')?.textContent.replace(':', '').trim() : fieldName;
+
+                if (!fieldValue) {
+                    showError('registration-error', `Будь ласка, заповніть поле "${fieldLabel}"`);
+                    return;
+                }
+                registrationData[fieldName] = fieldValue;
+            }
+
             // Clear previous errors
             hideError('registration-error');
-            
+
             try {
                 const response = await fetch('/api/register', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json'
                     },
-                    body: JSON.stringify({ username: username })
+                    body: JSON.stringify(registrationData)
                 });
                 
                 const data = await response.json();

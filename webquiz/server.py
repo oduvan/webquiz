@@ -96,6 +96,15 @@ class OptionsConfig:
     flush_interval: int = 30
 
 @dataclass
+class RegistrationConfig:
+    """Registration configuration data class"""
+    fields: List[str] = None
+
+    def __post_init__(self):
+        if self.fields is None:
+            self.fields = []
+
+@dataclass
 class DownloadableQuiz:
     """Downloadable quiz configuration"""
     name: str
@@ -118,8 +127,9 @@ class WebQuizConfig:
     paths: PathsConfig = None
     admin: AdminConfig = None
     options: OptionsConfig = None
+    registration: RegistrationConfig = None
     quizzes: QuizzesConfig = None
-    
+
     def __post_init__(self):
         if self.server is None:
             self.server = ServerConfig()
@@ -129,6 +139,8 @@ class WebQuizConfig:
             self.admin = AdminConfig()
         if self.options is None:
             self.options = OptionsConfig()
+        if self.registration is None:
+            self.registration = RegistrationConfig()
         if self.quizzes is None:
             self.quizzes = QuizzesConfig()
 
@@ -151,7 +163,8 @@ def load_config_from_yaml(config_path: str) -> WebQuizConfig:
         paths_config = PathsConfig(**(config_data.get('paths', {})))
         admin_config = AdminConfig(**(config_data.get('admin', {})))
         options_config = OptionsConfig(**(config_data.get('options', {})))
-        
+        registration_config = RegistrationConfig(**(config_data.get('registration', {})))
+
         # Parse downloadable quizzes configuration
         quizzes_data = config_data.get('quizzes', [])
         downloadable_quizzes = []
@@ -163,12 +176,13 @@ def load_config_from_yaml(config_path: str) -> WebQuizConfig:
                     folder=quiz_data['folder']
                 ))
         quizzes_config = QuizzesConfig(quizzes=downloadable_quizzes)
-        
+
         return WebQuizConfig(
             server=server_config,
             paths=paths_config,
             admin=admin_config,
             options=options_config,
+            registration=registration_config,
             quizzes=quizzes_config
         )
     except FileNotFoundError:
@@ -411,7 +425,8 @@ class TestingServer:
         self.csv_dir = config.paths.csv_dir
         self.static_dir = config.paths.static_dir
         self.log_file = None  # Will be set during initialization
-        self.csv_file = None  # Will be set when quiz is selected
+        self.csv_file = None  # Will be set when quiz is selected (answers CSV)
+        self.user_csv_file = None  # Will be set when quiz is selected (users CSV)
         self.quiz_title = 'Система Тестування'  # Default title, updated when quiz is loaded
         self.show_right_answer = True  # Default setting, updated when quiz is loaded
         self.users: Dict[str, Dict[str, Any]] = {}  # user_id -> user data
@@ -462,18 +477,34 @@ class TestingServer:
                 return log_path
             suffix += 1
         
-    def generate_csv_path(self, quiz_name: str) -> str:
-        """Generate CSV file path in CSV directory with quiz name and numeric naming"""
+    def generate_csv_path(self, quiz_name: str, csv_type: str = 'answers') -> str:
+        """Generate CSV file path in CSV directory with quiz name and numeric naming
+
+        Args:
+            quiz_name: Name of the quiz file
+            csv_type: Type of CSV - 'answers' or 'users'
+
+        Returns:
+            Path to CSV file (answers: quiz_0001.csv, users: quiz_0001.users.csv)
+        """
         ensure_directory_exists(self.csv_dir)
-        
+
         # Clean quiz name (remove extension)
         quiz_prefix = quiz_name.replace('.yaml', '').replace('.yml', '')
-        
+
         # Find the next available number for this quiz
         suffix = 1
         while True:
-            csv_path = os.path.join(self.csv_dir, f"{quiz_prefix}_{suffix:04d}.csv")
-            if not os.path.exists(csv_path):
+            if csv_type == 'users':
+                csv_path = os.path.join(self.csv_dir, f"{quiz_prefix}_{suffix:04d}.users.csv")
+            else:  # answers
+                csv_path = os.path.join(self.csv_dir, f"{quiz_prefix}_{suffix:04d}.csv")
+
+            # Check both files to ensure they use the same number
+            answers_csv = os.path.join(self.csv_dir, f"{quiz_prefix}_{suffix:04d}.csv")
+            users_csv = os.path.join(self.csv_dir, f"{quiz_prefix}_{suffix:04d}.users.csv")
+
+            if not os.path.exists(answers_csv) and not os.path.exists(users_csv):
                 return csv_path
             suffix += 1
         
@@ -509,10 +540,11 @@ class TestingServer:
             
         # Reset server state
         self.reset_server_state()
-        
-        # Update current quiz and CSV filename
+
+        # Update current quiz and CSV filenames (both answers and users)
         self.current_quiz_file = quiz_path
-        self.csv_file = self.generate_csv_path(quiz_filename)
+        self.csv_file = self.generate_csv_path(quiz_filename, 'answers')
+        self.user_csv_file = self.generate_csv_path(quiz_filename, 'users')
         
         # Load new questions
         await self.load_questions_from_file(quiz_path)
@@ -684,12 +716,39 @@ class TestingServer:
         try:
             template_content = self.templates.get('index.html', '')
 
-            # Inject questions data, title, version, and show_right_answer setting into template
+            # Generate registration fields HTML as a table (always include username)
+            registration_fields_html = '<table style="margin: 10px auto; border-collapse: collapse;">'
+
+            # Add username field as first row
+            registration_fields_html += '''
+                <tr>
+                    <td style="padding: 5px 10px; text-align: right; font-weight: bold;">Ім'я користувача:</td>
+                    <td style="padding: 5px 10px;">
+                        <input type="text" id="username" style="padding: 8px; width: 250px; box-sizing: border-box;">
+                    </td>
+                </tr>'''
+
+            # Add additional registration fields if configured
+            if hasattr(self.config, 'registration') and self.config.registration.fields:
+                for field_label in self.config.registration.fields:
+                    field_name = field_label.lower().replace(' ', '_')
+                    registration_fields_html += f'''
+                <tr>
+                    <td style="padding: 5px 10px; text-align: right; font-weight: bold;">{field_label}:</td>
+                    <td style="padding: 5px 10px;">
+                        <input type="text" class="registration-field" data-field-name="{field_name}" style="padding: 8px; width: 250px; box-sizing: border-box;">
+                    </td>
+                </tr>'''
+
+            registration_fields_html += '</table>'
+
+            # Inject questions data, title, version, registration fields, and show_right_answer setting into template
             html_content = template_content.replace('{{QUESTIONS_DATA}}', questions_json)
             html_content = html_content.replace('{{QUIZ_TITLE}}', self.quiz_title)
+            html_content = html_content.replace('{{REGISTRATION_FIELDS}}', registration_fields_html)
             html_content = html_content.replace('{{SHOW_RIGHT_ANSWER}}', 'true' if self.show_right_answer else 'false')
             html_content = html_content.replace('{{WEBQUIZ_VERSION}}', get_package_version())
-            
+
             # Write to destination
             async with aiofiles.open(index_path, 'w', encoding='utf-8') as f:
                 await f.write(html_content)
@@ -724,12 +783,12 @@ class TestingServer:
             
             # Write headers if file doesn't exist
             if not file_exists:
-                csv_writer.writerow(['username', 'question_text', 'selected_answer_text', 'correct_answer_text', 'is_correct', 'time_taken_seconds'])
-            
+                csv_writer.writerow(['user_id', 'question_text', 'selected_answer_text', 'correct_answer_text', 'is_correct', 'time_taken_seconds'])
+
             # Write all responses to buffer
             for response in self.user_responses:
                 csv_writer.writerow([
-                    response['username'],
+                    response['user_id'],
                     response['question_text'],
                     response['selected_answer_text'],
                     response['correct_answer_text'],
@@ -751,12 +810,65 @@ class TestingServer:
             logger.info(f"{action} CSV file with {total_responses} responses: {self.csv_file}")
         except Exception as e:
             logger.error(f"Error flushing responses to CSV: {e}")
-            
+
+    async def flush_users_to_csv(self):
+        """Flush user registration data to separate CSV file"""
+        if not self.users or not self.user_csv_file:
+            return
+
+        try:
+            # Check if CSV file exists
+            file_exists = os.path.exists(self.user_csv_file)
+
+            # Use StringIO buffer to write CSV data
+            csv_buffer = StringIO()
+            csv_writer = csv.writer(csv_buffer)
+
+            # Determine headers based on registration fields
+            headers = ['user_id', 'username']
+            if hasattr(self.config, 'registration') and self.config.registration.fields:
+                for field_label in self.config.registration.fields:
+                    field_name = field_label.lower().replace(' ', '_')
+                    headers.append(field_name)
+            headers.append('registered_at')
+
+            # Write headers if file doesn't exist
+            if not file_exists:
+                csv_writer.writerow(headers)
+
+            # Write all user data to buffer
+            for user_id, user_data in self.users.items():
+                row = [user_id, user_data['username']]
+
+                # Add additional registration fields in order
+                if hasattr(self.config, 'registration') and self.config.registration.fields:
+                    for field_label in self.config.registration.fields:
+                        field_name = field_label.lower().replace(' ', '_')
+                        row.append(user_data.get(field_name, ''))
+
+                row.append(user_data.get('registered_at', ''))
+                csv_writer.writerow(row)
+
+            # Write buffer content to file
+            csv_content = csv_buffer.getvalue()
+            csv_buffer.close()
+            total_users = len(self.users)
+
+            # Always overwrite the file (users don't accumulate like responses do)
+            async with aiofiles.open(self.user_csv_file, 'w') as f:
+                await f.write(csv_content)
+
+            action = "Created" if not file_exists else "Updated"
+            logger.info(f"{action} user CSV file with {total_users} users: {self.user_csv_file}")
+        except Exception as e:
+            logger.error(f"Error flushing users to CSV: {e}")
+
     async def periodic_flush(self):
-        """Periodically flush responses to CSV"""
+        """Periodically flush responses and users to CSV"""
         while True:
             await asyncio.sleep(30)  # Flush every 30 seconds
             await self.flush_responses_to_csv()
+            await self.flush_users_to_csv()
     
     async def broadcast_to_websockets(self, message: dict):
         """Broadcast message to all connected WebSocket clients"""
@@ -834,23 +946,44 @@ class TestingServer:
         """Register a new user"""
         data = await request.json()
         username = data['username'].strip()
-        
+
         if not username:
             raise ValueError('Ім\'я користувача не може бути порожнім')
-            
+
         # Check if username already exists
         for existing_user in self.users.values():
             if existing_user['username'] == username:
                 raise ValueError('Ім\'я користувача вже існує')
-        
-        # Generate unique user ID
-        user_id = str(uuid.uuid4())
-        
-        self.users[user_id] = {
+
+        # Generate unique 6-digit user ID
+        import random
+        max_attempts = 100
+        for _ in range(max_attempts):
+            user_id = str(random.randint(100000, 999999))
+            if user_id not in self.users:
+                break
+        else:
+            raise ValueError('Could not generate unique user ID')
+
+        # Build user data with additional registration fields
+        user_data = {
             'user_id': user_id,
             'username': username,
             'registered_at': datetime.now().isoformat()
         }
+
+        # Add additional registration fields if configured
+        if hasattr(self.config, 'registration') and self.config.registration.fields:
+            for field_label in self.config.registration.fields:
+                # Convert field label to field name (lowercase, sanitized)
+                field_name = field_label.lower().replace(' ', '_')
+                # Get value from request data
+                field_value = data.get(field_name, '').strip()
+                if not field_value:
+                    raise ValueError(f'Поле "{field_label}" не може бути порожнім')
+                user_data[field_name] = field_value
+
+        self.users[user_id] = user_data
         
         # Start timing for first question
         self.question_start_times[user_id] = datetime.now()
@@ -1886,6 +2019,13 @@ async def create_app(config: WebQuizConfig):
     app.router.add_post('/api/question-start', server.question_start)
     app.router.add_get('/api/verify-user/{user_id}', server.verify_user_id)
     
+    # Test endpoint for manual CSV flush (only for testing)
+    async def manual_flush(request):
+        await server.flush_responses_to_csv()
+        await server.flush_users_to_csv()
+        return web.json_response({'status': 'flushed'})
+    app.router.add_post('/api/test/flush', manual_flush)
+
     # Admin routes
     app.router.add_get('/admin/', server.serve_admin_page)
     app.router.add_post('/api/admin/auth', server.admin_auth_test)

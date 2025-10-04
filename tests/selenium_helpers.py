@@ -160,11 +160,84 @@ def is_multiple_choice_question(browser):
 # USER REGISTRATION HELPERS
 # ============================================================================
 
-def register_user(browser, port, username='TestStudent'):
-    """Helper to register a user and start quiz."""
+def get_registration_fields(browser):
+    """
+    Get all additional registration fields (excluding username).
+
+    Returns:
+        List of WebElement objects with class 'registration-field'
+    """
+    return browser.find_elements(By.CLASS_NAME, 'registration-field')
+
+
+def fill_registration_field(browser, field_label, value):
+    """
+    Fill a registration field by its label text (from table row).
+
+    Args:
+        browser: Selenium WebDriver instance
+        field_label: The label text of the field (e.g., 'Grade', 'Клас')
+        value: The value to fill in the field
+
+    Raises:
+        NoSuchElementException: If field with given label is not found
+    """
+    # Find the table row containing the label
+    from selenium.webdriver.common.by import By
+    try:
+        # Look for TD containing the label text with colon
+        label_td = browser.find_element(By.XPATH, f"//td[contains(text(), '{field_label}:')]")
+        # Find the input field in the next sibling TD
+        parent_tr = label_td.find_element(By.XPATH, "..")
+        input_field = parent_tr.find_element(By.CSS_SELECTOR, "input.registration-field")
+        input_field.clear()
+        input_field.send_keys(value)
+    except:
+        raise NoSuchElementException(f"Registration field with label '{field_label}' not found")
+
+
+def fill_registration_field_by_name(browser, field_name, value):
+    """
+    Fill a registration field by its data-field-name attribute.
+
+    Args:
+        browser: Selenium WebDriver instance
+        field_name: The field name attribute (e.g., 'grade', 'school')
+        value: The value to fill in the field
+
+    Raises:
+        NoSuchElementException: If field with given name is not found
+    """
+    try:
+        field = browser.find_element(By.CSS_SELECTOR, f'[data-field-name="{field_name}"]')
+        field.clear()
+        field.send_keys(value)
+    except NoSuchElementException:
+        raise NoSuchElementException(f"Registration field with name '{field_name}' not found")
+
+
+def register_user(browser, port, username='TestStudent', **additional_fields):
+    """
+    Helper to register a user and start quiz.
+
+    Args:
+        browser: Selenium WebDriver instance
+        port: Server port number
+        username: Username to register with
+        **additional_fields: Additional registration fields as keyword arguments
+                           (e.g., grade='10', school='Central HS')
+
+    Example:
+        register_user(browser, port, 'Student1', grade='10', school='North HS')
+    """
     browser.get(f'http://localhost:{port}/')
     username_input = wait_for_element(browser, By.ID, 'username')
     username_input.send_keys(username)
+
+    # Fill additional registration fields if provided
+    for field_name, value in additional_fields.items():
+        fill_registration_field_by_name(browser, field_name, value)
+
     register_button = find_register_button(browser)
     register_button.click()
     wait_for_element(browser, By.ID, 'current-question-container')
