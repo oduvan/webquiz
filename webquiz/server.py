@@ -129,6 +129,7 @@ class WebQuizConfig:
     options: OptionsConfig = None
     registration: RegistrationConfig = None
     quizzes: QuizzesConfig = None
+    config_path: Optional[str] = None  # Path to the config file that was loaded
 
     def __post_init__(self):
         if self.server is None:
@@ -261,7 +262,10 @@ def load_config_with_overrides(config_path: Optional[str] = None, **cli_override
     if env_master_key and not cli_overrides.get('master_key'):
         config.admin.master_key = env_master_key
         logger.info("Master key loaded from environment variable")
-    
+
+    # Store the actual config path that was used
+    config.config_path = config_path
+
     return config
 
 def generate_unique_filename(base_path: str) -> str:
@@ -1587,7 +1591,106 @@ class TestingServer:
                     errors.append(f"Question {i+1} min_correct cannot exceed number of correct answers")
         
         return len(errors) == 0
-    
+
+    def _validate_config_data(self, data, errors=None):
+        """Validate server configuration data structure.
+        All sections are optional - empty config is valid."""
+        if errors is None:
+            errors = []
+
+        # Config can be None or empty dict - both are valid
+        if data is None:
+            return True
+
+        if not isinstance(data, dict):
+            errors.append("Config must be a dictionary")
+            return False
+
+        # Validate server section (optional)
+        if 'server' in data:
+            server = data['server']
+            if not isinstance(server, dict):
+                errors.append("'server' section must be a dictionary")
+            else:
+                if 'host' in server and not isinstance(server['host'], str):
+                    errors.append("'server.host' must be a string")
+                if 'port' in server:
+                    if not isinstance(server['port'], int):
+                        errors.append("'server.port' must be an integer")
+                    elif server['port'] < 1 or server['port'] > 65535:
+                        errors.append("'server.port' must be between 1 and 65535")
+
+        # Validate paths section (optional)
+        if 'paths' in data:
+            paths = data['paths']
+            if not isinstance(paths, dict):
+                errors.append("'paths' section must be a dictionary")
+            else:
+                path_fields = ['quizzes_dir', 'logs_dir', 'csv_dir', 'static_dir']
+                for field in path_fields:
+                    if field in paths and not isinstance(paths[field], str):
+                        errors.append(f"'paths.{field}' must be a string")
+
+        # Validate admin section (optional)
+        if 'admin' in data:
+            admin = data['admin']
+            if not isinstance(admin, dict):
+                errors.append("'admin' section must be a dictionary")
+            else:
+                if 'master_key' in admin:
+                    if admin['master_key'] is not None and not isinstance(admin['master_key'], str):
+                        errors.append("'admin.master_key' must be a string or null")
+                if 'trusted_ips' in admin:
+                    if not isinstance(admin['trusted_ips'], list):
+                        errors.append("'admin.trusted_ips' must be a list")
+                    elif not all(isinstance(ip, str) for ip in admin['trusted_ips']):
+                        errors.append("'admin.trusted_ips' must contain only strings")
+
+        # Validate options section (optional)
+        if 'options' in data:
+            options = data['options']
+            if not isinstance(options, dict):
+                errors.append("'options' section must be a dictionary")
+            else:
+                if 'flush_interval' in options:
+                    if not isinstance(options['flush_interval'], int):
+                        errors.append("'options.flush_interval' must be an integer")
+                    elif options['flush_interval'] <= 0:
+                        errors.append("'options.flush_interval' must be greater than 0")
+
+        # Validate registration section (optional)
+        if 'registration' in data:
+            registration = data['registration']
+            if not isinstance(registration, dict):
+                errors.append("'registration' section must be a dictionary")
+            else:
+                if 'fields' in registration:
+                    if not isinstance(registration['fields'], list):
+                        errors.append("'registration.fields' must be a list")
+                    elif not all(isinstance(field, str) for field in registration['fields']):
+                        errors.append("'registration.fields' must contain only strings")
+
+        # Validate quizzes section (optional)
+        if 'quizzes' in data:
+            quizzes = data['quizzes']
+            if not isinstance(quizzes, list):
+                errors.append("'quizzes' section must be a list")
+            else:
+                for i, quiz in enumerate(quizzes):
+                    if not isinstance(quiz, dict):
+                        errors.append(f"Quiz {i+1} must be a dictionary")
+                        continue
+
+                    # Check required fields for each quiz
+                    required_quiz_fields = ['name', 'download_path', 'folder']
+                    for field in required_quiz_fields:
+                        if field not in quiz:
+                            errors.append(f"Quiz {i+1} missing required field: '{field}'")
+                        elif not isinstance(quiz[field], str):
+                            errors.append(f"Quiz {i+1} field '{field}' must be a string")
+
+        return len(errors) == 0
+
     @admin_auth_required
     async def admin_list_images(self, request):
         """List all images in quizzes/imgs directory"""
@@ -1709,6 +1812,57 @@ class TestingServer:
             logger.error(f"Error downloading quiz: {e}")
             return web.json_response({'error': f'Download failed: {str(e)}'}, status=500)
 
+    @admin_auth_required
+    async def admin_update_config(self, request):
+        """Update server configuration file"""
+        try:
+            data = await request.json()
+            content = data.get('content', '').strip()
+
+            # Get config file path (use the actual path that was loaded)
+            config_path = self.config.config_path
+            if not config_path:
+                return web.json_response({
+                    'error': 'No config file was specified. Server started without --config parameter.'
+                }, status=400)
+
+            # Validate YAML syntax
+            try:
+                parsed_config = yaml.safe_load(content) if content else {}
+            except yaml.YAMLError as e:
+                return web.json_response({
+                    'error': f'Invalid YAML syntax: {str(e)}'
+                }, status=400)
+
+            # Validate config structure
+            errors = []
+            if not self._validate_config_data(parsed_config, errors):
+                return web.json_response({
+                    'error': 'Configuration validation failed',
+                    'errors': errors
+                }, status=400)
+
+            # Write to config file
+            try:
+                with open(config_path, 'w', encoding='utf-8') as f:
+                    f.write(content if content else '')
+
+                logger.info(f"Configuration file updated: {config_path}")
+                return web.json_response({
+                    'success': True,
+                    'message': 'Configuration saved successfully. Restart server to apply changes.',
+                    'config_path': config_path
+                })
+            except Exception as e:
+                logger.error(f"Error writing config file: {e}")
+                return web.json_response({
+                    'error': f'Failed to write config file: {str(e)}'
+                }, status=500)
+
+        except Exception as e:
+            logger.error(f"Error updating config: {e}")
+            return web.json_response({'error': str(e)}, status=500)
+
     # File Management API endpoints
     async def serve_files_page(self, request):
         """Serve the files management page"""
@@ -1719,9 +1873,21 @@ class TestingServer:
             client_ip = get_client_ip(request)
             is_trusted_ip = client_ip in self.admin_config.trusted_ips if hasattr(self, 'admin_config') else False
 
-            # Inject JavaScript variables for trusted IP auto-auth
+            # Read config file content (only if config file was provided)
+            config_path = self.config.config_path
+            config_content = ''
+            if config_path and os.path.exists(config_path):
+                try:
+                    with open(config_path, 'r', encoding='utf-8') as f:
+                        config_content = f.read()
+                except Exception as e:
+                    logger.warning(f"Could not read config file: {e}")
+
+            # Inject JavaScript variables for trusted IP auto-auth and config
             js_variables = f"""
                 const IS_TRUSTED_IP = {str(is_trusted_ip).lower()};
+                const CONFIG_CONTENT = {json.dumps(config_content) if config_path else 'null'};
+                const CONFIG_PATH = {json.dumps(config_path) if config_path else 'null'};
             """
 
             # Inject the JavaScript variables before </head>
@@ -2038,6 +2204,7 @@ async def create_app(config: WebQuizConfig):
     app.router.add_post('/api/admin/validate-quiz', server.admin_validate_quiz)
     app.router.add_get('/api/admin/list-images', server.admin_list_images)
     app.router.add_post('/api/admin/download-quiz', server.admin_download_quiz)
+    app.router.add_put('/api/admin/config', server.admin_update_config)
 
     # File management routes (admin access)
     app.router.add_get('/files/', server.serve_files_page)

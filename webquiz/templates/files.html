@@ -121,6 +121,12 @@
             color: var(--error-color);
         }
 
+        .warning {
+            background: var(--warning-bg);
+            border: 1px solid var(--warning-border);
+            color: var(--warning-color);
+        }
+
         /* Tabs */
         .tabs {
             display: flex;
@@ -402,6 +408,7 @@
             <div class="tabs">
                 <button class="tab active" data-tab="csv" onclick="switchTab('csv')">📊 CSV Files</button>
                 <button class="tab" data-tab="logs" onclick="switchTab('logs')">📋 Log Files</button>
+                <button class="tab" data-tab="config" onclick="switchTab('config')" id="config-tab-button" style="display: none;">⚙️ Config</button>
             </div>
 
             <!-- CSV Tab -->
@@ -416,6 +423,24 @@
                 <div id="logs-files" class="file-grid">
                     <div class="loading">Loading log files...</div>
                 </div>
+            </div>
+
+            <!-- Config Tab -->
+            <div id="config-tab" class="tab-content">
+                <div class="warning message">
+                    ⚠️ <strong>Warning:</strong> Changes will be applied after server restart
+                </div>
+
+                <div class="form-group">
+                    <label for="config-editor">Configuration File: <span id="config-file-path" style="font-weight: normal; color: var(--text-muted);"></span></label>
+                    <textarea id="config-editor" rows="25" style="width: 100%; font-family: 'Courier New', monospace; font-size: 14px; padding: 10px; border: 1px solid var(--border-color); border-radius: 5px; box-sizing: border-box;"></textarea>
+                </div>
+
+                <div class="actions">
+                    <button onclick="saveConfig()" class="save-config-btn">💾 Save Configuration</button>
+                </div>
+
+                <div id="config-message-area"></div>
             </div>
 
             <div class="back-link">
@@ -498,7 +523,7 @@
                     document.getElementById('auth-section').style.display = 'none';
                     document.getElementById('files-panel').classList.remove('hidden');
                     showMessage('Authentication successful!', 'success');
-                    await loadFiles();
+                    await initializePanelData();
                 } else {
                     showMessage(data.error || 'Authentication failed', 'error');
                 }
@@ -680,6 +705,55 @@
             }
         });
 
+        // Config editor functions
+        function initializeConfigEditor() {
+            // Only show config tab if a config file was provided
+            if (typeof CONFIG_PATH !== 'undefined' && CONFIG_PATH !== null) {
+                document.getElementById('config-tab-button').style.display = 'block';
+                if (typeof CONFIG_CONTENT !== 'undefined' && CONFIG_CONTENT !== null) {
+                    document.getElementById('config-editor').value = CONFIG_CONTENT;
+                }
+                document.getElementById('config-file-path').textContent = CONFIG_PATH;
+            }
+        }
+
+        async function saveConfig() {
+            const content = document.getElementById('config-editor').value;
+            const messageArea = document.getElementById('config-message-area');
+            messageArea.innerHTML = '';
+
+            try {
+                const response = await fetch('/api/admin/config', {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-Master-Key': currentMasterKey
+                    },
+                    body: JSON.stringify({ content })
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    messageArea.innerHTML = `<div class="message success">${data.message}</div>`;
+                } else {
+                    let errorMessage = data.error || 'Failed to save configuration';
+                    if (data.errors && data.errors.length > 0) {
+                        errorMessage += ':<ul>' + data.errors.map(err => `<li>${err}</li>`).join('') + '</ul>';
+                    }
+                    messageArea.innerHTML = `<div class="message error">${errorMessage}</div>`;
+                }
+            } catch (error) {
+                messageArea.innerHTML = `<div class="message error">Error: ${error.message}</div>`;
+            }
+        }
+
+        // Initialize config editor when panel is loaded
+        function initializePanelData() {
+            loadFiles();
+            initializeConfigEditor();
+        }
+
         // Auto-authenticate for trusted IPs
         if (typeof IS_TRUSTED_IP !== 'undefined' && IS_TRUSTED_IP) {
             // Hide auth section and show files panel immediately
@@ -687,7 +761,7 @@
             document.getElementById('files-panel').classList.remove('hidden');
             currentMasterKey = 'trusted-ip'; // Set a placeholder key for API calls
             showMessage('Auto-authenticated from trusted IP', 'success');
-            loadFiles();
+            initializePanelData();
         }
 
         // Close modal when clicking outside

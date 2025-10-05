@@ -9,6 +9,7 @@ WebQuiz - A modern web-based quiz and testing system built with Python and aioht
 - User registration with unique usernames and UUID-based user IDs
 - **Multi-quiz system**: Questions loaded from `quizzes/` directory with multiple YAML files
 - **Admin interface**: Web-based admin panel with master key authentication for quiz management
+- **Config file editor**: Web-based configuration editor with real-time validation in file manager
 - **Dynamic quiz switching**: Real-time quiz switching with automatic server state reset
 - **Smart file naming**: CSV files prefixed with quiz names, unique suffixes prevent overwrites
 - Web interface with auto-generated index.html if not present
@@ -50,6 +51,7 @@ WebQuiz - A modern web-based quiz and testing system built with Python and aioht
   - _(additional quiz files as needed)_
 - `webquiz/templates/index.html` - Main quiz interface template
 - **`webquiz/templates/admin.html`** - Admin interface template for quiz management
+- **`webquiz/templates/files.html`** - File manager template with logs, CSV, and config editor tabs
 - **`webquiz/templates/live_stats.html`** - Live statistics dashboard template with WebSocket client
 - **`{quiz_name}_user_responses.csv`** - User response storage with quiz name prefix (e.g., `math_quiz_user_responses.csv`)
 - **`server_{suffix}.log`** - Server activity logs with unique suffixes (no overwrites)
@@ -57,7 +59,8 @@ WebQuiz - A modern web-based quiz and testing system built with Python and aioht
 - **`dist/webquiz`** - Standalone PyInstaller binary executable
 - `tests/` - Test suite
   - `test_cli_directory_creation.py` - CLI directory and file creation tests (8 tests)
-  - `test_admin_api.py` - Admin API functionality tests (13 tests)  
+  - `test_admin_api.py` - Admin API functionality tests (13 tests)
+  - `test_config_management.py` - Config editor and validation tests (17 tests)
   - `conftest.py` - Test fixtures and configuration with parallel testing support
 - `pyproject.toml` - Poetry configuration and dependencies (includes PyInstaller 6.15)
 - `requirements.txt` - Legacy pip dependencies
@@ -77,6 +80,7 @@ WebQuiz - A modern web-based quiz and testing system built with Python and aioht
 - **`POST /api/admin/auth`** - Test admin authentication (master key required)
 - **`GET /api/admin/list-quizzes`** - List available quiz files and current active quiz
 - **`POST /api/admin/switch-quiz`** - Switch to different quiz file and reset server state
+- **`PUT /api/admin/config`** - Update server configuration file with validation (requires restart)
 
 ### Live Stats Endpoints (public access)
 - **`GET /live-stats`** - Serve live statistics dashboard webpage
@@ -107,9 +111,9 @@ webquiz --status                     # Check status
 # Build binary
 poetry run build_binary              # Create standalone executable with PyInstaller
 
-# Run tests
-python -m pytest tests/ -v          # Run all tests with verbose output
-python -m pytest tests/ -v -n 4     # Run tests in parallel with 4 workers (requires pytest-xdist)
+# Run tests (ALWAYS use venv!)
+source venv/bin/activate && python -m pytest tests/ -v          # Run all tests with verbose output
+source venv/bin/activate && python -m pytest tests/ -v -n 4     # Run tests in parallel with 4 workers (requires pytest-xdist)
 
 # Alternative (without Poetry installation)
 python -m webquiz.cli
@@ -120,6 +124,7 @@ python -m webquiz.cli
 - **Server-side timing**: Question timing tracked server-side for accuracy and security
 - **Multi-file quiz system**: `quizzes/` directory with multiple YAML files instead of single config
 - **Master key authentication**: Admin endpoints protected with decorator-based authentication
+- **Config validation**: All sections optional with defaults, comprehensive structure and type validation before save
 - **Smart file naming**: CSV files prefixed with quiz names, unique suffixes prevent overwrites
 - **Dynamic quiz switching**: Complete server state reset when switching quizzes for isolation
 - **Auto-YAML creation**: Server creates default quiz files if directory is empty
@@ -147,10 +152,19 @@ python -m webquiz.cli
 4. Server resets all state (users, progress, responses) → loads new quiz → regenerates HTML → creates new CSV file
 5. All existing users lose session (intentional isolation between quizzes)
 
+### Config Editor Flow
+1. Admin accesses `/files/` → navigates to Config tab
+2. Config content auto-loaded from `webquiz.yaml` and displayed in editor
+3. Admin edits config → clicks Save
+4. Server validates YAML syntax → validates structure and data types → saves to file
+5. Warning displayed: changes require server restart to take effect
+6. Validation errors shown if config is invalid (prevents saving bad configs)
+
 ## Test Strategy
 - **CLI Directory Creation Tests (8)**: Test directory and file creation by webquiz CLI command
 - **Admin API Tests (13)**: Test admin interface authentication, quiz management, and validation endpoints
-- **Total: 21 tests** with GitHub Actions CI/CD pipeline
+- **Config Management Tests (17)**: Test config editor, YAML validation, structure validation, and error handling
+- **Total: 38 tests** with GitHub Actions CI/CD pipeline
 - **Parallel Testing**: Tests use predefined ports (8080-8087) with worker-based allocation to prevent conflicts
 - **Fast Server Startup**: Port availability checking instead of HTTP requests for efficient fixture startup
 - **Testing Philosophy**: Create new automated tests for newly implemented functionality instead of manual testing
@@ -163,6 +177,8 @@ python -m webquiz.cli
 - **CSV headers**: user_id,username,question_text,selected_answer_text,correct_answer_text,is_correct,time_taken_seconds
 - **CSV naming**: `{quiz_name}_user_responses.csv` with unique suffixes (e.g., `math_quiz_user_responses_0001.csv`)
 - **Admin access**: Master key required for admin endpoints, can be set via CLI or environment variable
+- **Config editor**: Web-based YAML editor with validation in `/files/` (Config tab), changes require server restart
+- **Config validation**: All config sections optional (uses defaults), validates YAML syntax and data types before save
 - **Quiz isolation**: Switching quizzes resets all server state for complete isolation
 - **File safety**: Unique suffixes prevent overwriting existing log/CSV files
 - Middleware handles JSON parsing errors and validation
