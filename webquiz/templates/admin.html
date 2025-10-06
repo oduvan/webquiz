@@ -488,6 +488,56 @@
             margin: 10px 0;
         }
 
+        /* Pending Approvals Section */
+        .pending-approvals {
+            margin-top: 30px;
+            background: var(--warning-bg);
+            border: 2px solid var(--warning-border);
+            border-radius: 8px;
+            padding: 20px;
+        }
+
+        .pending-user-item {
+            background: var(--white);
+            border: 1px solid var(--border-color);
+            border-radius: 5px;
+            padding: 15px;
+            margin: 10px 0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .pending-user-info {
+            flex: 1;
+        }
+
+        .pending-user-name {
+            font-weight: bold;
+            font-size: 16px;
+            margin-bottom: 5px;
+        }
+
+        .pending-user-data {
+            color: var(--text-muted);
+            font-size: 14px;
+            margin: 3px 0;
+        }
+
+        .approve-btn {
+            background: var(--success-green);
+            color: var(--white);
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-weight: bold;
+        }
+
+        .approve-btn:hover {
+            background: var(--success-green-hover);
+        }
+
         /* Downloadable Quizzes Section */
         .downloadable-quizzes {
             margin-top: 30px;
@@ -559,6 +609,14 @@
             <div class="quiz-actions">
                 <button onclick="createNewQuiz()">📝 Створити Новий Quiz</button>
                 <button id="delete-btn" onclick="deleteSelectedQuiz()" disabled class="btn-danger">🗑️ Видалити Quiz</button>
+            </div>
+
+            <!-- Pending Approvals Section (only shown when registration.approve is true) -->
+            <div id="pending-approvals-section" class="pending-approvals hidden">
+                <h3 style="margin-top: 0;">⏳ Очікуючі Підтвердження</h3>
+                <div id="pending-users-list">
+                    <p style="text-align: center; color: var(--text-muted);">Немає користувачів, що очікують підтвердження</p>
+                </div>
             </div>
 
             <!-- Downloadable Quizzes Section -->
@@ -701,6 +759,7 @@
                     await loadQuizzes();
                     displayNetworkInfo();
                     displayDownloadableQuizzes();
+                    connectToAdminWebSocket(); // Connect to admin WebSocket for approvals
                 } else {
                     showMessage(data.error || 'Автентифікація невдала', 'error');
                 }
@@ -1788,6 +1847,148 @@
             }
         }
 
+        // Admin WebSocket for Pending Approvals
+        let adminWebSocket = null;
+        let pendingUsers = {};
+
+        function connectToAdminWebSocket() {
+            const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+            const wsUrl = `${protocol}//${window.location.host}/ws/admin`;
+
+            adminWebSocket = new WebSocket(wsUrl);
+
+            adminWebSocket.onopen = () => {
+                console.log('Admin WebSocket connected');
+            };
+
+            adminWebSocket.onmessage = (event) => {
+                try {
+                    const data = JSON.parse(event.data);
+                    handleAdminWebSocketMessage(data);
+                } catch (error) {
+                    console.error('Error parsing admin WebSocket message:', error);
+                }
+            };
+
+            adminWebSocket.onclose = () => {
+                console.log('Admin WebSocket disconnected');
+                // Reconnect after 5 seconds
+                setTimeout(connectToAdminWebSocket, 5000);
+            };
+
+            adminWebSocket.onerror = (error) => {
+                console.error('Admin WebSocket error:', error);
+            };
+        }
+
+        function handleAdminWebSocketMessage(data) {
+            if (data.type === 'initial_state') {
+                // Initial state - show/hide section based on requires_approval
+                if (data.requires_approval) {
+                    document.getElementById('pending-approvals-section').classList.remove('hidden');
+                    pendingUsers = data.pending_users || {};
+                    displayPendingUsers();
+                }
+            } else if (data.type === 'new_registration') {
+                // New user registered
+                const user_data = data.user_data;
+                pendingUsers[user_data.user_id] = user_data;
+                document.getElementById('pending-approvals-section').classList.remove('hidden');
+                displayPendingUsers();
+                showMessage(`Новий користувач: ${user_data.username}`, 'success');
+            } else if (data.type === 'registration_updated') {
+                // User updated registration data
+                const user_data = data.user_data;
+                pendingUsers[user_data.user_id] = user_data;
+                displayPendingUsers();
+                showMessage(`Користувач ${user_data.username} оновив дані`, 'success');
+            } else if (data.type === 'user_approved') {
+                // User was approved
+                const user_id = data.user_id;
+                if (pendingUsers[user_id]) {
+                    delete pendingUsers[user_id];
+                    displayPendingUsers();
+                }
+            }
+        }
+
+        function fieldNameToLabel(fieldName) {
+            // Convert field name to label: "моля_парола" -> "Моля Парола"
+            return fieldName
+                .split('_')
+                .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+                .join(' ');
+        }
+
+        function displayPendingUsers() {
+            const listContainer = document.getElementById('pending-users-list');
+            const userIds = Object.keys(pendingUsers);
+
+            if (userIds.length === 0) {
+                listContainer.innerHTML = '<p style="text-align: center; color: var(--text-muted);">Немає користувачів, що очікують підтвердження</p>';
+                return;
+            }
+
+            let html = '';
+            for (const user_id of userIds) {
+                const user = pendingUsers[user_id];
+                html += `
+                    <div class="pending-user-item" id="pending-user-${user_id}">
+                        <div class="pending-user-info">
+                            <div class="pending-user-name">👤 ${user.username}</div>
+                `;
+
+                // Add additional registration fields
+                for (const [key, value] of Object.entries(user)) {
+                    if (key !== 'user_id' && key !== 'username' && key !== 'approved' && key !== 'registered_at') {
+                        const label = fieldNameToLabel(key);
+                        html += `<div class="pending-user-data">${label}: ${value}</div>`;
+                    }
+                }
+
+                html += `
+                        </div>
+                        <button class="approve-btn" onclick="approveUser('${user_id}')">✓ Підтвердити</button>
+                    </div>
+                `;
+            }
+
+            listContainer.innerHTML = html;
+        }
+
+        async function approveUser(userId) {
+            if (!currentMasterKey) {
+                showMessage('Потрібна автентифікація', 'error');
+                return;
+            }
+
+            try {
+                const response = await fetch('/api/admin/approve-user', {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-Master-Key': currentMasterKey
+                    },
+                    body: JSON.stringify({ user_id: userId })
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    showMessage(`Користувача підтверджено!`, 'success');
+                    // Remove from pending list
+                    if (pendingUsers[userId]) {
+                        delete pendingUsers[userId];
+                        displayPendingUsers();
+                    }
+                } else {
+                    showMessage(data.error || 'Помилка підтвердження', 'error');
+                }
+            } catch (error) {
+                showMessage('Помилка з\'єднання: ' + error.message, 'error');
+            }
+        }
+
         // Auto-authenticate for trusted IPs
         if (typeof IS_TRUSTED_IP !== 'undefined' && IS_TRUSTED_IP) {
             // Hide auth section and show admin panel immediately
@@ -1798,6 +1999,7 @@
             loadQuizzes();
             displayNetworkInfo(); // Show network info for trusted IPs
             displayDownloadableQuizzes();
+            connectToAdminWebSocket(); // Connect to admin WebSocket for approvals
         }
 
     </script>

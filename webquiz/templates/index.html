@@ -472,6 +472,21 @@
             </div>
         </div>
 
+        <!-- Waiting for Approval Section -->
+        <div id="waiting-approval" class="section hidden">
+            <h2>Очікування підтвердження</h2>
+            <p style="text-align: center; color: var(--text-color); margin: 20px 0;">
+                Ваша реєстрація очікує підтвердження адміністратором.<br>
+                Ви можете змінити свої дані нижче та натиснути кнопку "Перевірити", щоб дізнатися чи вас підтвердили.
+            </p>
+            <div id="waiting-error" class="error-message hidden"></div>
+            <div id="waiting-registration-fields"></div>
+            <div style="text-align: center; margin-top: 20px;">
+                <button onclick="updateRegistrationData()" style="margin-right: 10px;">💾 Зберегти зміни</button>
+                <button onclick="checkApprovalStatus()">🔄 Перевірити</button>
+            </div>
+        </div>
+
         <!-- Test Section -->
         <div id="test-section" class="section hidden">
             <div id="progress-bar" class="progress">
@@ -598,27 +613,35 @@
         
         async function checkStoredUserId() {
             const storedUserId = getCookie('user_id');
-            
+
             if (storedUserId) {
                 // User ID stored, verify it with server
                 try {
                     const response = await fetch(`/api/verify-user/${storedUserId}`);
                     const data = await response.json();
-                    
+
                     if (response.ok && data.valid) {
                         // Valid user ID, set user data
                         currentUserId = data.user_id;
                         currentUsername = data.username;
-                        currentQuestionIndex = data.next_question_index;
-                        
+
                         // Show username on page
                         showUsername(currentUsername);
-                        
-                        if (data.test_completed && data.final_results) {
+
+                        // Check if user is waiting for approval
+                        if (data.requires_approval && !data.approved) {
+                            // User is waiting for approval
+                            document.getElementById('loading').classList.add('hidden');
+                            // Show waiting screen with user's data
+                            if (data.user_data) {
+                                showWaitingForApproval(data.user_data);
+                            }
+                        } else if (data.test_completed && data.final_results) {
                             // Test is completed, show final results
                             showCompletedTestResults(data.final_results);
                         } else {
-                            // Test not completed, resume test
+                            // Approved or no approval required - resume test
+                            currentQuestionIndex = data.next_question_index;
                             await hideLoadingShowTest();
                             await notifyQuestionStart(questions[currentQuestionIndex].id);
                         }
@@ -692,18 +715,138 @@
                     currentUsername = data.username;
                     currentUserId = data.user_id;
                     setCookie('user_id', currentUserId);
-                    currentQuestionIndex = 0; // New user starts from beginning
-                    
+
                     // Show username on page
                     showUsername(currentUsername);
-                    
-                    document.getElementById('registration').classList.add('hidden');
-                    await startTest();
+
+                    // Check if approval is required
+                    if (data.requires_approval && !data.approved) {
+                        // Hide registration, show waiting for approval
+                        document.getElementById('registration').classList.add('hidden');
+                        showWaitingForApproval(registrationData);
+                    } else {
+                        // Approved or no approval required - start test
+                        currentQuestionIndex = 0; // New user starts from beginning
+                        document.getElementById('registration').classList.add('hidden');
+                        await startTest();
+                    }
                 } else {
                     showError('registration-error', data.error || 'Помилка реєстрації');
                 }
             } catch (error) {
                 showError('registration-error', 'Помилка: ' + error.message);
+            }
+        }
+
+        function showWaitingForApproval(registrationData) {
+            // Populate the waiting approval form with current registration data
+            const waitingFieldsContainer = document.getElementById('waiting-registration-fields');
+
+            // Create a table similar to registration form
+            let fieldsHTML = '<table style="margin: 20px auto; max-width: 500px;">';
+            fieldsHTML += `<tr><td style="padding: 8px; text-align: right; width: 200px;">Ім'я користувача:</td><td style="padding: 8px;"><input type="text" id="waiting-username" value="${registrationData.username || ''}" style="width: 250px; padding: 8px; border: 1px solid var(--border-color); border-radius: 5px;" /></td></tr>`;
+
+            // Add additional registration fields if they exist
+            const additionalFields = document.querySelectorAll('.registration-field');
+            for (const field of additionalFields) {
+                const fieldName = field.getAttribute('data-field-name');
+                const fieldRow = field.closest('tr');
+                const fieldLabel = fieldRow ? fieldRow.querySelector('td:first-child')?.textContent.trim() : fieldName;
+                const fieldValue = registrationData[fieldName] || '';
+
+                fieldsHTML += `<tr><td style="padding: 8px; text-align: right;">${fieldLabel}</td><td style="padding: 8px;"><input type="text" class="waiting-field" data-field-name="${fieldName}" value="${fieldValue}" style="width: 250px; padding: 8px; border: 1px solid var(--border-color); border-radius: 5px;" /></td></tr>`;
+            }
+            fieldsHTML += '</table>';
+
+            waitingFieldsContainer.innerHTML = fieldsHTML;
+            document.getElementById('waiting-approval').classList.remove('hidden');
+        }
+
+        async function updateRegistrationData() {
+            const username = document.getElementById('waiting-username').value.trim();
+            if (!username) {
+                showError('waiting-error', 'Будь ласка, введіть ім\'я користувача');
+                return;
+            }
+
+            // Collect updated registration data
+            const updatedData = {
+                user_id: currentUserId,
+                username: username
+            };
+
+            // Collect additional fields
+            const waitingFields = document.querySelectorAll('.waiting-field');
+            for (const field of waitingFields) {
+                const fieldName = field.getAttribute('data-field-name');
+                updatedData[fieldName] = field.value.trim();
+            }
+
+            hideError('waiting-error');
+
+            try {
+                const response = await fetch('/api/update-registration', {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(updatedData)
+                });
+
+                const data = await response.json();
+                if (response.ok) {
+                    // Show success message
+                    const errorElement = document.getElementById('waiting-error');
+                    errorElement.textContent = '✓ Дані успішно оновлено!';
+                    errorElement.style.backgroundColor = '#d4edda';
+                    errorElement.style.color = '#155724';
+                    errorElement.style.borderColor = '#c3e6cb';
+                    errorElement.classList.remove('hidden');
+                    setTimeout(() => {
+                        hideError('waiting-error');
+                        errorElement.style.backgroundColor = '';
+                        errorElement.style.color = '';
+                        errorElement.style.borderColor = '';
+                    }, 3000);
+
+                    currentUsername = updatedData.username;
+                    showUsername(currentUsername);
+                } else {
+                    showError('waiting-error', data.error || 'Помилка оновлення даних');
+                }
+            } catch (error) {
+                showError('waiting-error', 'Помилка: ' + error.message);
+            }
+        }
+
+        async function checkApprovalStatus() {
+            if (!currentUserId) {
+                showError('waiting-error', 'User ID not found');
+                return;
+            }
+
+            hideError('waiting-error');
+
+            try {
+                const response = await fetch(`/api/verify-user/${currentUserId}`);
+                const data = await response.json();
+
+                if (response.ok && data.valid) {
+                    if (data.approved) {
+                        // User has been approved! Start the test
+                        document.getElementById('waiting-approval').classList.add('hidden');
+                        currentQuestionIndex = 0;
+                        await startTest();
+                        await notifyQuestionStart(questions[currentQuestionIndex].id);
+                    } else {
+                        // Still waiting for approval
+                        showError('waiting-error', 'Ви ще не підтверджені. Будь ласка, зачекайте.');
+                    }
+                } else {
+                    showError('waiting-error', data.message || 'Помилка перевірки статусу');
+                }
+            } catch (error) {
+                showError('waiting-error', 'Помилка: ' + error.message);
             }
         }
         

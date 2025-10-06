@@ -99,6 +99,7 @@ class OptionsConfig:
 class RegistrationConfig:
     """Registration configuration data class"""
     fields: List[str] = None
+    approve: bool = False
 
     def __post_init__(self):
         if self.fields is None:
@@ -442,7 +443,8 @@ class TestingServer:
         self.user_answers: Dict[str, List[Dict[str, Any]]] = {}  # user_id -> list of answers for stats calculation
         
         # Live stats WebSocket infrastructure
-        self.websocket_clients: List[web.WebSocketResponse] = []  # Connected WebSocket clients
+        self.websocket_clients: List[web.WebSocketResponse] = []  # Connected WebSocket clients (live stats)
+        self.admin_websocket_clients: List[web.WebSocketResponse] = []  # Connected admin WebSocket clients
         self.live_stats: Dict[str, Dict[int, str]] = {}  # user_id -> {question_id: state}
 
         # Preload templates
@@ -874,23 +876,35 @@ class TestingServer:
             await self.flush_responses_to_csv()
             await self.flush_users_to_csv()
     
-    async def broadcast_to_websockets(self, message: dict):
-        """Broadcast message to all connected WebSocket clients"""
-        if not self.websocket_clients:
-            return
-            
-        # Clean up closed connections
+    async def _broadcast_to_websocket_list(self, clients_list: List[web.WebSocketResponse], message: dict, client_type: str = "WebSocket"):
+        """Generic broadcast function for WebSocket clients"""
+        if not clients_list:
+            return []
+
+        # Clean up closed connections and broadcast
         active_clients = []
-        for ws in self.websocket_clients:
+        for ws in clients_list:
             if not ws.closed:
                 try:
                     await ws.send_str(json.dumps(message))
                     active_clients.append(ws)
                 except Exception as e:
-                    logger.warning(f"Failed to send message to WebSocket client: {e}")
-        
-        self.websocket_clients = active_clients
-    
+                    logger.warning(f"Failed to send message to {client_type} client: {e}")
+
+        return active_clients
+
+    async def broadcast_to_websockets(self, message: dict):
+        """Broadcast message to all connected WebSocket clients (live stats)"""
+        self.websocket_clients = await self._broadcast_to_websocket_list(
+            self.websocket_clients, message, "live stats WebSocket"
+        )
+
+    async def broadcast_to_admin_websockets(self, message: dict):
+        """Broadcast message to all connected admin WebSocket clients"""
+        self.admin_websocket_clients = await self._broadcast_to_websocket_list(
+            self.admin_websocket_clients, message, "admin WebSocket"
+        )
+
     def _validate_answer(self, selected_answer, question):
         """Validate answer for both single and multiple choice questions"""
         correct_answer = question['correct_answer']
@@ -969,11 +983,15 @@ class TestingServer:
         else:
             raise ValueError('Could not generate unique user ID')
 
+        # Check if approval is required
+        requires_approval = hasattr(self.config, 'registration') and self.config.registration.approve
+
         # Build user data with additional registration fields
         user_data = {
             'user_id': user_id,
             'username': username,
-            'registered_at': datetime.now().isoformat()
+            'registered_at': datetime.now().isoformat(),
+            'approved': not requires_approval  # Auto-approve if approval not required
         }
 
         # Add additional registration fields if configured
@@ -988,32 +1006,98 @@ class TestingServer:
                 user_data[field_name] = field_value
 
         self.users[user_id] = user_data
-        
-        # Start timing for first question
-        self.question_start_times[user_id] = datetime.now()
-        
-        # Initialize live stats: set first question to "think"
-        if len(self.questions) > 0:
-            self.update_live_stats(user_id, 1, "think")
-            
-            # Broadcast new user registration
-            await self.broadcast_to_websockets({
-                'type': 'user_registered',
-                'user_id': user_id,
-                'username': username,
-                'question_id': 1,
-                'state': 'think',
-                'time_taken': None,
-                'total_questions': len(self.questions)
+
+        # If approval not required, start timing and live stats immediately
+        if not requires_approval:
+            # Start timing for first question
+            self.question_start_times[user_id] = datetime.now()
+
+            # Initialize live stats: set first question to "think"
+            if len(self.questions) > 0:
+                self.update_live_stats(user_id, 1, "think")
+
+                # Broadcast new user registration to live stats
+                await self.broadcast_to_websockets({
+                    'type': 'user_registered',
+                    'user_id': user_id,
+                    'username': username,
+                    'question_id': 1,
+                    'state': 'think',
+                    'time_taken': None,
+                    'total_questions': len(self.questions)
+                })
+        else:
+            # Broadcast to admin WebSocket for approval
+            await self.broadcast_to_admin_websockets({
+                'type': 'new_registration',
+                'user_data': user_data
             })
-        
-        logger.info(f"Registered user: {username} with ID: {user_id}")
+
+        logger.info(f"Registered user: {username} with ID: {user_id}, requires_approval: {requires_approval}")
         return web.json_response({
             'username': username,
             'user_id': user_id,
-            'message': 'User registered successfully'
+            'message': 'User registered successfully',
+            'requires_approval': requires_approval,
+            'approved': user_data['approved']
         })
-            
+
+    async def update_registration(self, request):
+        """Update registration data for a user (only if not approved yet)"""
+        data = await request.json()
+        user_id = data.get('user_id')
+
+        if not user_id:
+            raise ValueError('User ID is required')
+
+        # Check if user exists
+        if user_id not in self.users:
+            return web.json_response({'error': 'User not found'}, status=404)
+
+        user_data = self.users[user_id]
+
+        # Check if user is already approved
+        if user_data.get('approved', False):
+            return web.json_response({
+                'error': 'Cannot update registration data after approval'
+            }, status=400)
+
+        # Update username if provided
+        username = data.get('username', '').strip()
+        if username:
+            # Check if new username already exists (exclude current user)
+            for existing_user_id, existing_user in self.users.items():
+                if existing_user_id != user_id and existing_user['username'] == username:
+                    raise ValueError('Ім\'я користувача вже існує')
+            user_data['username'] = username
+
+        # Update additional registration fields if configured
+        if hasattr(self.config, 'registration') and self.config.registration.fields:
+            for field_label in self.config.registration.fields:
+                # Convert field label to field name (lowercase, sanitized)
+                field_name = field_label.lower().replace(' ', '_')
+                # Get value from request data
+                field_value = data.get(field_name, '').strip()
+                if field_value:  # Only update if provided
+                    user_data[field_name] = field_value
+
+        # Update user data in memory
+        self.users[user_id] = user_data
+
+        # Broadcast update to admin WebSocket
+        await self.broadcast_to_admin_websockets({
+            'type': 'registration_updated',
+            'user_id': user_id,
+            'user_data': user_data
+        })
+
+        logger.info(f"Updated registration data for user: {user_id}")
+        return web.json_response({
+            'success': True,
+            'message': 'Registration data updated successfully',
+            'user_data': user_data
+        })
+
     async def submit_answer(self, request):
         """Submit test answer"""
         data = await request.json()
@@ -1209,19 +1293,36 @@ class TestingServer:
     async def verify_user_id(self, request):
         """Verify if user_id exists and return user data"""
         user_id = request.match_info['user_id']
-        
+
         # Find user by user_id
         if user_id not in self.users:
             return web.json_response({
                 'valid': False,
                 'message': 'User ID not found'
             })
-    
+
         user_data = self.users[user_id]
         username = user_data['username']
+        approved = user_data.get('approved', True)  # Default to True for backwards compatibility
+
+        # Check if approval is required and user is not yet approved
+        requires_approval = hasattr(self.config, 'registration') and self.config.registration.approve
+        if requires_approval and not approved:
+            # User waiting for approval
+            return web.json_response({
+                'valid': True,
+                'user_id': user_id,
+                'username': username,
+                'approved': False,
+                'requires_approval': True,
+                'user_data': user_data,
+                'message': 'User waiting for approval'
+            })
+
+        # User is approved (or approval not required), return test state
         # Get last answered question ID from progress tracking
         last_answered_question_id = self.user_progress.get(user_id, 0)
-        
+
         # Find the index of next question to answer
         next_question_index = 0
         if last_answered_question_id > 0:
@@ -1230,24 +1331,25 @@ class TestingServer:
                 if question['id'] == last_answered_question_id:
                     next_question_index = i + 1
                     break
-        
+
         # Ensure we don't go beyond available questions
         if next_question_index >= len(self.questions):
             next_question_index = len(self.questions)
-        
+
         # Check if test is completed
         test_completed = next_question_index >= len(self.questions)
-        
+
         response_data = {
             'valid': True,
             'user_id': user_id,
             'username': username,
+            'approved': approved,
             'next_question_index': next_question_index,
             'total_questions': len(self.questions),
             'last_answered_question_id': last_answered_question_id,
             'test_completed': test_completed
         }
-        
+
         if test_completed:
             # Get final results for completed test
             final_results = self.get_user_final_results(user_id)
@@ -1255,7 +1357,7 @@ class TestingServer:
             logger.info(f"User {user_id} verification: test completed, returning final results")
         else:
             logger.info(f"User {user_id} verification: last_answered={last_answered_question_id}, next_index={next_question_index}")
-            
+
         return web.json_response(response_data)
 
     
@@ -1295,7 +1397,65 @@ class TestingServer:
             'authenticated': True,
             'message': 'Admin authentication successful'
         })
-    
+
+    @admin_auth_required
+    async def admin_approve_user(self, request):
+        """Approve a user for testing (starts timing)"""
+        data = await request.json()
+        user_id = data.get('user_id')
+
+        if not user_id:
+            return web.json_response({'error': 'User ID is required'}, status=400)
+
+        # Check if user exists
+        if user_id not in self.users:
+            return web.json_response({'error': 'User not found'}, status=404)
+
+        user_data = self.users[user_id]
+
+        # Check if already approved
+        if user_data.get('approved', False):
+            return web.json_response({
+                'success': True,
+                'message': 'User already approved'
+            })
+
+        # Approve the user
+        user_data['approved'] = True
+        self.users[user_id] = user_data
+
+        # Start timing for first question
+        self.question_start_times[user_id] = datetime.now()
+
+        # Initialize live stats: set first question to "think"
+        if len(self.questions) > 0:
+            self.update_live_stats(user_id, 1, "think")
+
+            # Broadcast user approval to live stats WebSocket
+            await self.broadcast_to_websockets({
+                'type': 'user_registered',
+                'user_id': user_id,
+                'username': user_data['username'],
+                'question_id': 1,
+                'state': 'think',
+                'time_taken': None,
+                'total_questions': len(self.questions)
+            })
+
+        # Broadcast approval to admin WebSocket
+        await self.broadcast_to_admin_websockets({
+            'type': 'user_approved',
+            'user_id': user_id
+        })
+
+        logger.info(f"Approved user: {user_id}")
+        return web.json_response({
+            'success': True,
+            'message': 'User approved successfully',
+            'user_id': user_id
+        })
+
+
     @admin_auth_required
     async def admin_get_quiz(self, request):
         """Get quiz content for editing"""
@@ -1669,6 +1829,9 @@ class TestingServer:
                         errors.append("'registration.fields' must be a list")
                     elif not all(isinstance(field, str) for field in registration['fields']):
                         errors.append("'registration.fields' must contain only strings")
+                if 'approve' in registration:
+                    if not isinstance(registration['approve'], bool):
+                        errors.append("'registration.approve' must be a boolean")
 
         # Validate quizzes section (optional)
         if 'quizzes' in data:
@@ -2108,29 +2271,22 @@ class TestingServer:
             logger.error(f"Error serving live stats page: {e}")
             return web.Response(text='<h1>Live stats page not found</h1>', content_type='text/html', status=404)
     
-    async def websocket_live_stats(self, request):
-        """WebSocket endpoint for live stats updates"""
+    async def _handle_websocket_connection(self, request, client_list: List[web.WebSocketResponse],
+                                           initial_state_data: dict, client_type: str):
+        """Generic WebSocket connection handler"""
         ws = web.WebSocketResponse()
         await ws.prepare(request)
-        
+
         # Add to connected clients
-        self.websocket_clients.append(ws)
-        logger.info(f"New WebSocket client connected. Total clients: {len(self.websocket_clients)}")
-        
+        client_list.append(ws)
+        logger.info(f"New {client_type} client connected. Total clients: {len(client_list)}")
+
         # Send initial state
         try:
-            initial_data = {
-                'type': 'initial_state',
-                'live_stats': self.live_stats,
-                'users': {user_id: user_data['username'] for user_id, user_data in self.users.items()},
-                'questions': self.questions,
-                'total_questions': len(self.questions),
-                'current_quiz': os.path.basename(self.current_quiz_file) if self.current_quiz_file else None
-            }
-            await ws.send_str(json.dumps(initial_data))
+            await ws.send_str(json.dumps(initial_state_data))
         except Exception as e:
-            logger.error(f"Error sending initial state to WebSocket client: {e}")
-        
+            logger.error(f"Error sending initial state to {client_type} client: {e}")
+
         # Listen for messages (mainly for connection keep-alive)
         async for msg in ws:
             if msg.type == WSMsgType.TEXT:
@@ -2139,17 +2295,65 @@ class TestingServer:
                     if data.get('type') == 'ping':
                         await ws.send_str(json.dumps({'type': 'pong'}))
                 except Exception as e:
-                    logger.warning(f"Error processing WebSocket message: {e}")
+                    logger.warning(f"Error processing {client_type} message: {e}")
             elif msg.type == WSMsgType.ERROR:
-                logger.error(f'WebSocket error: {ws.exception()}')
+                logger.error(f'{client_type} error: {ws.exception()}')
                 break
-        
+
         # Remove from connected clients when connection closes
-        if ws in self.websocket_clients:
-            self.websocket_clients.remove(ws)
-        logger.info(f"WebSocket client disconnected. Total clients: {len(self.websocket_clients)}")
-        
+        if ws in client_list:
+            client_list.remove(ws)
+        logger.info(f"{client_type} client disconnected. Total clients: {len(client_list)}")
+
         return ws
+
+    async def websocket_live_stats(self, request):
+        """WebSocket endpoint for live stats updates"""
+        # Filter out unapproved users from live stats
+        approved_users = {
+            user_id: user_data['username']
+            for user_id, user_data in self.users.items()
+            if user_data.get('approved', True)  # Include if approved or no approval field (backward compatibility)
+        }
+
+        # Filter live stats to only include approved users
+        approved_live_stats = {
+            user_id: stats
+            for user_id, stats in self.live_stats.items()
+            if user_id in approved_users
+        }
+
+        initial_data = {
+            'type': 'initial_state',
+            'live_stats': approved_live_stats,
+            'users': approved_users,
+            'questions': self.questions,
+            'total_questions': len(self.questions),
+            'current_quiz': os.path.basename(self.current_quiz_file) if self.current_quiz_file else None
+        }
+        return await self._handle_websocket_connection(
+            request, self.websocket_clients, initial_data, "WebSocket"
+        )
+
+    async def websocket_admin(self, request):
+        """WebSocket endpoint for admin real-time notifications (registration approvals)"""
+        # Filter users waiting for approval
+        pending_users = {}
+        if hasattr(self.config, 'registration') and self.config.registration.approve:
+            pending_users = {
+                user_id: user_data
+                for user_id, user_data in self.users.items()
+                if not user_data.get('approved', True)
+            }
+
+        initial_data = {
+            'type': 'initial_state',
+            'pending_users': pending_users,
+            'requires_approval': hasattr(self.config, 'registration') and self.config.registration.approve
+        }
+        return await self._handle_websocket_connection(
+            request, self.admin_websocket_clients, initial_data, "admin WebSocket"
+        )
 
 async def create_app(config: WebQuizConfig):
     """Create and configure the application"""
@@ -2181,10 +2385,11 @@ async def create_app(config: WebQuizConfig):
     
     # Routes
     app.router.add_post('/api/register', server.register_user)
+    app.router.add_put('/api/update-registration', server.update_registration)
     app.router.add_post('/api/submit-answer', server.submit_answer)
     app.router.add_post('/api/question-start', server.question_start)
     app.router.add_get('/api/verify-user/{user_id}', server.verify_user_id)
-    
+
     # Test endpoint for manual CSV flush (only for testing)
     async def manual_flush(request):
         await server.flush_responses_to_csv()
@@ -2195,6 +2400,7 @@ async def create_app(config: WebQuizConfig):
     # Admin routes
     app.router.add_get('/admin/', server.serve_admin_page)
     app.router.add_post('/api/admin/auth', server.admin_auth_test)
+    app.router.add_put('/api/admin/approve-user', server.admin_approve_user)
     app.router.add_get('/api/admin/list-quizzes', server.admin_list_quizzes)
     app.router.add_post('/api/admin/switch-quiz', server.admin_switch_quiz)
     app.router.add_get('/api/admin/quiz/{filename}', server.admin_get_quiz)
@@ -2205,6 +2411,7 @@ async def create_app(config: WebQuizConfig):
     app.router.add_get('/api/admin/list-images', server.admin_list_images)
     app.router.add_post('/api/admin/download-quiz', server.admin_download_quiz)
     app.router.add_put('/api/admin/config', server.admin_update_config)
+    app.router.add_get('/ws/admin', server.websocket_admin)
 
     # File management routes (admin access)
     app.router.add_get('/files/', server.serve_files_page)
