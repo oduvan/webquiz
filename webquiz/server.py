@@ -789,15 +789,15 @@ class TestingServer:
             
             # Write headers if file doesn't exist
             if not file_exists:
-                csv_writer.writerow(['user_id', 'question_text', 'selected_answer_text', 'correct_answer_text', 'is_correct', 'time_taken_seconds'])
+                csv_writer.writerow(['user_id', 'question', 'selected_answer', 'correct_answer', 'is_correct', 'time_taken_seconds'])
 
             # Write all responses to buffer
             for response in self.user_responses:
                 csv_writer.writerow([
                     response['user_id'],
-                    response['question_text'],
-                    response['selected_answer_text'],
-                    response['correct_answer_text'],
+                    response['question'],
+                    response['selected_answer'],
+                    response['correct_answer'],
                     response['is_correct'],
                     response['time_taken_seconds']
                 ])
@@ -836,11 +836,10 @@ class TestingServer:
                 for field_label in self.config.registration.fields:
                     field_name = field_label.lower().replace(' ', '_')
                     headers.append(field_name)
-            headers.append('registered_at')
+            headers.extend(['registered_at', 'total_questions_asked', 'correct_answers'])
 
-            # Write headers if file doesn't exist
-            if not file_exists:
-                csv_writer.writerow(headers)
+            # Always write headers (we always overwrite the file)
+            csv_writer.writerow(headers)
 
             # Write all user data to buffer
             for user_id, user_data in self.users.items():
@@ -853,6 +852,13 @@ class TestingServer:
                         row.append(user_data.get(field_name, ''))
 
                 row.append(user_data.get('registered_at', ''))
+
+                # Calculate and add user statistics
+                user_answer_list = self.user_answers.get(user_id, [])
+                total_questions_asked = len(user_answer_list)
+                correct_answers = sum(answer['is_correct'] for answer in user_answer_list)
+                row.extend([total_questions_asked, correct_answers])
+
                 csv_writer.writerow(row)
 
             # Write buffer content to file
@@ -872,7 +878,7 @@ class TestingServer:
     async def periodic_flush(self):
         """Periodically flush responses and users to CSV"""
         while True:
-            await asyncio.sleep(30)  # Flush every 30 seconds
+            await asyncio.sleep(5)  # Flush every 30 seconds
             await self.flush_responses_to_csv()
             await self.flush_users_to_csv()
     
@@ -1131,9 +1137,9 @@ class TestingServer:
             'user_id': user_id,
             'username': username,
             'question_id': question_id,
-            'question_text': question.get('question', ''),  # Handle image-only questions
-            'selected_answer_text': self._format_answer_text(selected_answer, question['options']),
-            'correct_answer_text': self._format_answer_text(question['correct_answer'], question['options']),
+            'question': question.get('question', ''),  # Handle image-only questions
+            'selected_answer': self._format_answer_text(selected_answer, question['options']),
+            'correct_answer': self._format_answer_text(question['correct_answer'], question['options']),
             'is_correct': is_correct,
             'time_taken_seconds': time_taken,
             'timestamp': datetime.now().isoformat()

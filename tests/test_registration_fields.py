@@ -121,6 +121,8 @@ def test_user_csv_creation(temp_dir):
             assert 'grade' in headers
             assert 'school' in headers
             assert 'registered_at' in headers
+            assert 'total_questions_asked' in headers
+            assert 'correct_answers' in headers
 
 
 def test_user_csv_content(temp_dir):
@@ -155,6 +157,8 @@ def test_user_csv_content(temp_dir):
             assert rows[0]['user_id'] == user_id
             assert rows[0]['username'] == 'student5'
             assert rows[0]['grade'] == '9'
+            assert rows[0]['total_questions_asked'] == '0'
+            assert rows[0]['correct_answers'] == '0'
 
 
 def test_answers_csv_uses_user_id(temp_dir):
@@ -312,6 +316,77 @@ def test_registration_with_cyrillic_field_labels(temp_dir):
             user_row = [r for r in rows if r['user_id'] == user_id][0]
             assert user_row['клас'] == '8'
             assert user_row['школа'] == 'Гімназія №5'
+
+
+def test_user_csv_statistics(temp_dir):
+    """Test that user statistics (total questions asked and correct answers) are calculated correctly"""
+    # Create a custom quiz with 3 questions to test statistics
+    quizzes = {
+        'stats_quiz.yaml': {
+            'title': 'Statistics Test Quiz',
+            'questions': [
+                {
+                    'question': 'Question 1',
+                    'options': ['A', 'B', 'C'],
+                    'correct_answer': 0
+                },
+                {
+                    'question': 'Question 2',
+                    'options': ['A', 'B', 'C'],
+                    'correct_answer': 1
+                },
+                {
+                    'question': 'Question 3',
+                    'options': ['A', 'B', 'C'],
+                    'correct_answer': 2
+                }
+            ]
+        }
+    }
+
+    with custom_webquiz_server(quizzes=quizzes) as (proc, port):
+        base_url = f'http://localhost:{port}'
+
+        # Register a user
+        response = requests.post(f'{base_url}/api/register',
+                               json={'username': 'stats_user'})
+        assert response.status_code == 200
+        user_id = response.json()['user_id']
+
+        # Submit 3 answers: 2 correct, 1 incorrect
+        # Question 1 - Correct (correct_answer is 0, selecting 0)
+        response = requests.post(f'{base_url}/api/submit-answer',
+                               json={'user_id': user_id, 'question_id': 1, 'selected_answer': 0})
+        assert response.status_code == 200
+
+        # Question 2 - Incorrect (correct_answer is 1, selecting 0)
+        response = requests.post(f'{base_url}/api/submit-answer',
+                               json={'user_id': user_id, 'question_id': 2, 'selected_answer': 0})
+        assert response.status_code == 200
+
+        # Question 3 - Correct (correct_answer is 2, selecting 2)
+        response = requests.post(f'{base_url}/api/submit-answer',
+                               json={'user_id': user_id, 'question_id': 3, 'selected_answer': 2})
+        assert response.status_code == 200
+
+        # Manually trigger CSV flush
+        requests.post(f'{base_url}/api/test/flush')
+
+        # Read user CSV
+        import glob
+        user_csv_files = glob.glob(f'{temp_dir}/data_*/stats_quiz_*.users.csv')
+        assert len(user_csv_files) > 0
+
+        with open(user_csv_files[0], 'r') as f:
+            reader = csv.DictReader(f)
+            rows = list(reader)
+            assert len(rows) == 1
+
+            # Verify statistics: 3 questions asked, 2 correct answers
+            assert rows[0]['user_id'] == user_id
+            assert rows[0]['username'] == 'stats_user'
+            assert rows[0]['total_questions_asked'] == '3', f"Expected 3 questions, got {rows[0]['total_questions_asked']}"
+            assert rows[0]['correct_answers'] == '2', f"Expected 2 correct answers, got {rows[0]['correct_answers']}"
 
 
 if __name__ == '__main__':
