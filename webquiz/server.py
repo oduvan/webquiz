@@ -870,8 +870,6 @@ class TestingServer:
             async with aiofiles.open(self.user_csv_file, 'w') as f:
                 await f.write(csv_content)
 
-            action = "Created" if not file_exists else "Updated"
-            logger.info(f"{action} user CSV file with {total_users} users: {self.user_csv_file}")
         except Exception as e:
             logger.error(f"Error flushing users to CSV: {e}")
 
