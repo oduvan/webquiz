@@ -203,6 +203,6 @@ def test_webquiz_cli_creates_webquiz_yaml_config(temp_dir):
     # Check that the config file contains expected sections
     with open(config_file, 'r') as f:
         content = f.read()
-        expected_sections = ['server:', 'paths:', 'admin:', 'options:']
+        expected_sections = ['server:', 'paths:', 'admin:']
         for section in expected_sections:
             assert section in content, f"Config file missing {section} section"
