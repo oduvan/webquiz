@@ -121,11 +121,9 @@ webquiz/
         └── test.yml       # CI/CD pipeline
 
 # Generated at runtime (excluded from git):
-├── quizzes/               # Quiz files directory
-│   ├── default.yaml      # Default quiz (auto-created)
-│   └── *.yaml            # Additional quiz files
-└── static/                # Static files (auto-generated)
-    └── index.html        # Generated quiz interface
+└── quizzes/               # Quiz files directory
+    ├── default.yaml      # Default quiz (auto-created)
+    └── *.yaml            # Additional quiz files
 ```
 
 ## 🖥️ CLI Commands
