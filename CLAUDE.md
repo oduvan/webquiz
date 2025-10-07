@@ -136,7 +136,7 @@ python -m webquiz.cli
 - **Smart file naming**: CSV files prefixed with quiz names, unique suffixes prevent overwrites
 - **Dynamic quiz switching**: Complete server state reset when switching quizzes for isolation
 - **Auto-YAML creation**: Server creates default quiz files if directory is empty
-- **Periodic CSV flush**: Every 30 seconds using proper CSV module for escaping
+- **Periodic CSV flush**: Automatic periodic flush using proper CSV module for escaping
 - **Embedded questions data**: Questions injected directly into HTML template (no separate JSON file)
 - **In-memory storage**: Fast responses, CSV backup for persistence, resets on quiz switch
 - **Session persistence**: Cookie-based user_id storage for seamless user experience
@@ -152,7 +152,7 @@ python -m webquiz.cli
    - If `registration.approve: true`: timing delayed until admin approval
 3. Client stores user_id in cookies for session persistence
 4. User submits answers → server calculates time taken → validated against correct answers → stored in memory
-5. Periodic flush → responses written to CSV with quiz name prefix using proper CSV module
+5. Automatic periodic flush → responses written to CSV with quiz name prefix using proper CSV module
 6. Server automatically tracks timing for each question transition
 
 ### Admin Quiz Management Flow

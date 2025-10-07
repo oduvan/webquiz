@@ -148,49 +148,6 @@ def test_reject_invalid_port_type():
         assert 'integer' in str(data['errors']).lower()
 
 
-def test_reject_invalid_flush_interval_zero():
-    """Test rejecting flush_interval of 0."""
-    with custom_webquiz_server() as (proc, port):
-        headers = {'X-Master-Key': 'test123'}
-
-        config_content = """options:
-  flush_interval: 0
-"""
-
-        response = requests.put(
-            f'http://localhost:{port}/api/admin/config',
-            headers=headers,
-            json={'content': config_content}
-        )
-
-        assert response.status_code == 400
-        data = response.json()
-        assert 'validation failed' in data['error'].lower()
-        assert 'flush_interval' in str(data['errors']).lower()
-
-
-def test_reject_invalid_flush_interval_type():
-    """Test rejecting non-integer flush_interval."""
-    with custom_webquiz_server() as (proc, port):
-        headers = {'X-Master-Key': 'test123'}
-
-        config_content = """options:
-  flush_interval: "30"
-"""
-
-        response = requests.put(
-            f'http://localhost:{port}/api/admin/config',
-            headers=headers,
-            json={'content': config_content}
-        )
-
-        assert response.status_code == 400
-        data = response.json()
-        assert 'validation failed' in data['error'].lower()
-        assert 'flush_interval' in str(data['errors']).lower()
-        assert 'integer' in str(data['errors']).lower()
-
-
 def test_reject_server_section_as_list():
     """Test rejecting wrong type for server section (list instead of dict)."""
     with custom_webquiz_server() as (proc, port):

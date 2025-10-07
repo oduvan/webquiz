@@ -15,15 +15,13 @@ admin:
   master_key: a1        # Set to enable admin interface (e.g., "your-secret-key")
                           # Can also use WEBQUIZ_MASTER_KEY environment variable
 
-registration:
-  fields:                 # Additional registration fields (optional, supports Cyrillic)
-    - Grade               # Example: Grade
-    - School              # Example: School
-    # - Клас             # Example with Cyrillic
-    # - Школа            # Example with Cyrillic
-
-options:
-  flush_interval: 30      # Seconds between CSV response flushes
+# Optional: Registration configuration
+# Uncomment and configure to collect additional user information
+# registration:
+#   approve: false        # Set to true to require admin approval before users can start
+#   fields:               # Additional registration fields (supports Cyrillic)
+#     - Grade
+#     - School
 
 # Optional: Downloadable quizzes configuration
 # Uncomment and configure to enable quiz downloads in admin panel

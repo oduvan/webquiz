@@ -91,11 +91,6 @@ class AdminConfig:
             self.trusted_ips = ['127.0.0.1']
 
 @dataclass
-class OptionsConfig:
-    """Options configuration data class"""
-    flush_interval: int = 30
-
-@dataclass
 class RegistrationConfig:
     """Registration configuration data class"""
     fields: List[str] = None
@@ -127,7 +122,6 @@ class WebQuizConfig:
     server: ServerConfig = None
     paths: PathsConfig = None
     admin: AdminConfig = None
-    options: OptionsConfig = None
     registration: RegistrationConfig = None
     quizzes: QuizzesConfig = None
     config_path: Optional[str] = None  # Path to the config file that was loaded
@@ -139,8 +133,6 @@ class WebQuizConfig:
             self.paths = PathsConfig()
         if self.admin is None:
             self.admin = AdminConfig()
-        if self.options is None:
-            self.options = OptionsConfig()
         if self.registration is None:
             self.registration = RegistrationConfig()
         if self.quizzes is None:
@@ -164,7 +156,6 @@ def load_config_from_yaml(config_path: str) -> WebQuizConfig:
         server_config = ServerConfig(**(config_data.get('server', {})))
         paths_config = PathsConfig(**(config_data.get('paths', {})))
         admin_config = AdminConfig(**(config_data.get('admin', {})))
-        options_config = OptionsConfig(**(config_data.get('options', {})))
         registration_config = RegistrationConfig(**(config_data.get('registration', {})))
 
         # Parse downloadable quizzes configuration
@@ -183,7 +174,6 @@ def load_config_from_yaml(config_path: str) -> WebQuizConfig:
             server=server_config,
             paths=paths_config,
             admin=admin_config,
-            options=options_config,
             registration=registration_config,
             quizzes=quizzes_config
         )
@@ -255,9 +245,7 @@ def load_config_with_overrides(config_path: Optional[str] = None, **cli_override
                 setattr(config.paths, key, value)
             elif key in ['master_key']:
                 setattr(config.admin, key, value)
-            elif key in ['flush_interval']:
-                setattr(config.options, key, value)
-    
+
     # Environment variable override for master key
     env_master_key = os.environ.get('WEBQUIZ_MASTER_KEY')
     if env_master_key and not cli_overrides.get('master_key'):
@@ -1809,18 +1797,6 @@ class TestingServer:
                         errors.append("'admin.trusted_ips' must be a list")
                     elif not all(isinstance(ip, str) for ip in admin['trusted_ips']):
                         errors.append("'admin.trusted_ips' must contain only strings")
-
-        # Validate options section (optional)
-        if 'options' in data:
-            options = data['options']
-            if not isinstance(options, dict):
-                errors.append("'options' section must be a dictionary")
-            else:
-                if 'flush_interval' in options:
-                    if not isinstance(options['flush_interval'], int):
-                        errors.append("'options.flush_interval' must be an integer")
-                    elif options['flush_interval'] <= 0:
-                        errors.append("'options.flush_interval' must be greater than 0")
 
         # Validate registration section (optional)
         if 'registration' in data:
