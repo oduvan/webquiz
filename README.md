@@ -94,34 +94,38 @@ webquiz/
 │   ├── version_check.py   # Version update checking
 │   ├── server_config.yaml.example  # Configuration example
 │   └── templates/         # HTML templates
-│       ├── index.html          # Main quiz interface
-│       ├── admin.html          # Admin management panel
-│       ├── files.html          # File manager interface
-│       ├── live_stats.html     # Live statistics dashboard
-│       └── ...                 # Other templates
-├── tests/                  # Test suite (14 test files, 61+ tests)
-│   ├── conftest.py        # Test fixtures and configuration
-│   ├── test_cli_directory_creation.py
-│   ├── test_admin_api.py
-│   ├── test_config_management.py
-│   ├── test_registration_approval.py
-│   ├── test_index_generation.py
-│   ├── test_files_management.py
-│   └── ...                # Additional test files
-├── .github/
-│   └── workflows/
-│       └── test.yml       # CI/CD pipeline
-└── venv/                  # Virtual environment (excluded from git)
+│       ├── index.html                     # Main quiz interface
+│       ├── admin.html                     # Admin management panel
+│       ├── files.html                     # File manager interface
+│       ├── live_stats.html                # Live statistics dashboard
+│       ├── quiz_selection_required.html   # Quiz selection prompt
+│       └── template_error.html            # Error page template
+├── tests/                  # Test suite (14 test files)
+│   ├── conftest.py                      # Test fixtures and configuration
+│   ├── test_cli_directory_creation.py   # CLI and directory tests
+│   ├── test_admin_api.py                # Admin API tests
+│   ├── test_admin_quiz_management.py    # Quiz management tests
+│   ├── test_config_management.py        # Config editor tests
+│   ├── test_registration_approval.py    # Registration approval tests
+│   ├── test_registration_fields.py      # Registration fields tests
+│   ├── test_index_generation.py         # Template generation tests
+│   ├── test_files_management.py         # File manager tests
+│   ├── test_integration_multiple_choice.py  # Multiple choice integration tests
+│   ├── test_multiple_answers.py         # Multiple answer tests
+│   ├── test_show_right_answer.py        # Show answer tests
+│   ├── test_selenium_multiple_choice.py # Selenium multiple choice tests
+│   ├── test_selenium_registration_fields.py # Selenium registration tests
+│   └── test_user_journey_selenium.py    # Selenium user journey tests
+└── .github/
+    └── workflows/
+        └── test.yml       # CI/CD pipeline
 
 # Generated at runtime (excluded from git):
 ├── quizzes/               # Quiz files directory
 │   ├── default.yaml      # Default quiz (auto-created)
 │   └── *.yaml            # Additional quiz files
-├── static/                # Static files (auto-generated)
-│   └── index.html        # Generated quiz interface
-├── {quiz_name}_user_responses.csv  # User response data with quiz prefix
-├── server_{suffix}.log   # Server logs with unique suffix
-└── webquiz.pid           # Daemon process ID
+└── static/                # Static files (auto-generated)
+    └── index.html        # Generated quiz interface
 ```
 
 ## 🖥️ CLI Commands
@@ -318,9 +322,9 @@ User responses are automatically exported to CSV files with quiz-prefixed filena
 **Example:** `math_quiz_user_responses_0001.csv`
 
 ```csv
-user_id,username,question_text,selected_answer_text,correct_answer_text,is_correct,time_taken_seconds
-550e8400-e29b-41d4-a716-446655440000,john_doe,"What is 2 + 2?","4","4",True,3.45
-550e8400-e29b-41d4-a716-446655440000,john_doe,"What is 5 × 3?","15","15",True,2.87
+user_id,question,selected_answer,correct_answer,is_correct,time_taken_seconds
+123456,"What is 2 + 2?","4","4",True,3.45
+123456,"What is 5 × 3?","15","15",True,2.87
 ```
 
 CSV files are created with proper escaping and include all user response data. Files are flushed periodically (every 30 seconds) to ensure data persistence.
