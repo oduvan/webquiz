@@ -71,13 +71,58 @@ jobs:
     - name: Build package
       run: |
         poetry build
-        
+
+    - name: Install Pandoc and LaTeX
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y pandoc texlive-xetex texlive-fonts-recommended texlive-lang-cyrillic
+
+    - name: Generate Ukrainian PDF Documentation
+      run: |
+        cd docs/uk
+        cat $(ls *.md | sort) > ../combined_uk.md
+        cd ..
+        pandoc combined_uk.md \
+          -o webquiz-documentation-uk.pdf \
+          --pdf-engine=xelatex \
+          --toc \
+          --toc-depth=2 \
+          --number-sections \
+          -V geometry:margin=1in \
+          -V mainfont="DejaVu Sans" \
+          -V documentclass=report \
+          --resource-path=.:imgs \
+          --metadata title="WebQuiz Documentation (Ukrainian)" \
+          --metadata author="WebQuiz Team" \
+          --metadata date="$(date +%Y-%m-%d)"
+        mv webquiz-documentation-uk.pdf ../dist/
+
+    - name: Generate English PDF Documentation
+      run: |
+        cd docs/en
+        cat $(ls *.md | sort) > ../combined_en.md
+        cd ..
+        pandoc combined_en.md \
+          -o webquiz-documentation-en.pdf \
+          --pdf-engine=xelatex \
+          --toc \
+          --toc-depth=2 \
+          --number-sections \
+          -V geometry:margin=1in \
+          -V mainfont="DejaVu Sans" \
+          -V documentclass=report \
+          --resource-path=.:imgs \
+          --metadata title="WebQuiz Documentation (English)" \
+          --metadata author="WebQuiz Team" \
+          --metadata date="$(date +%Y-%m-%d)"
+        mv webquiz-documentation-en.pdf ../dist/
+
     - name: Publish to PyPI
       uses: pypa/gh-action-pypi-publish@release/v1
       with:
         password: ${{ secrets.PYPI_API_TOKEN }}
         packages-dir: dist/
-        
+
     - name: Create GitHub Release
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -89,6 +134,8 @@ jobs:
         This release includes:
         - 📦 Python wheel package (`webquiz-${{ github.event.inputs.version }}-py3-none-any.whl`)
         - 📋 Source distribution (`webquiz-${{ github.event.inputs.version }}.tar.gz`)
+        - 📖 Documentation in Ukrainian (`webquiz-documentation-uk.pdf`)
+        - 📖 Documentation in English (`webquiz-documentation-en.pdf`)
 
         ## Installation
         ```bash
@@ -101,8 +148,8 @@ jobs:
         ---
         *This release was automatically created by the release workflow.*
         EOF
-        
-        # Create release with built artifacts
+
+        # Create release with built artifacts (includes wheel, tar.gz, and PDFs)
         gh release create "v${{ github.event.inputs.version }}" \
           --title "Release v${{ github.event.inputs.version }}" \
           --notes-file release_notes.md \
