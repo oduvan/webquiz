@@ -17,7 +17,7 @@ A modern web-based quiz and testing system built with Python and aiohttp that al
 - **Data Export**: Automatic CSV export with quiz-prefixed filenames and unique suffixes
 - **Responsive UI**: Clean web interface with dark/light theme support
 - **Binary Distribution**: Standalone PyInstaller executable with auto-configuration
-- **Comprehensive Testing**: 61 tests covering all functionality with CI/CD pipeline
+- **Comprehensive Testing**: 210+ tests covering all functionality with CI/CD pipeline
 - **Flexible File Paths**: Configurable paths for quizzes, logs, CSV, and static files
 
 ## 🚀 Quick Start
@@ -245,16 +245,19 @@ pytest tests/test_registration_approval.py
 
 ### Test Coverage
 
-The project has **61+ tests** across **14 test files** covering:
+The project has **210+ tests** across **14 test files** covering:
 
-- **CLI and Directory Creation** (8 tests): Directory and file creation
-- **Admin API** (13 tests): Admin interface and authentication
-- **Config Management** (17 tests): Config editor and validation
-- **Registration Approval** (23 tests): Approval workflow and timing
-- **Index Generation**: Template generation tests
-- **Files Management**: File manager interface tests
-- **Integration Tests**: Multiple choice, registration fields, etc.
-- **Selenium Tests**: End-to-end browser testing
+- **CLI and Directory Creation** (7 tests): Directory and file creation
+- **Admin API** (14 tests): Admin interface and authentication
+- **Admin Quiz Management** (18 tests): Quiz switching and management
+- **Config Management** (16 tests): Config editor and validation
+- **Registration Approval** (20 tests): Approval workflow and timing
+- **Files Management** (32 tests): File manager interface
+- **Index Generation** (13 tests): Template generation tests
+- **Registration Fields** (12 tests): Custom registration fields
+- **Show Right Answer** (5 tests): Answer display functionality
+- **Integration Tests** (6 tests): Multiple choice, multiple answers
+- **Selenium Tests** (56 tests): End-to-end browser testing
 
 The test suite uses GitHub Actions CI/CD for automated testing on every commit.
 
