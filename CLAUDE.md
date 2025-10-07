@@ -202,7 +202,15 @@ python -m webquiz.cli
 - Username must be unique across all users (per quiz session)
 - Questions use 0-indexed correct_answer field
 - Server validates all answers server-side with automatic timing
-- **CSV headers**: user_id,username,question_text,selected_answer_text,correct_answer_text,is_correct,time_taken_seconds
+- **CSV files**: Two CSV files are generated per quiz session:
+  - **User responses CSV** (`{quiz_name}_user_responses.csv`):
+    - Headers: `user_id,question,selected_answer,correct_answer,is_correct,time_taken_seconds`
+    - Contains individual answer submissions
+  - **Users CSV** (`{quiz_name}_user_responses.users.csv`):
+    - Headers: `user_id,username,[custom_fields...],registered_at,total_questions_asked,correct_answers`
+    - Contains user registration data and statistics
+    - `total_questions_asked`: Number of questions the user has answered
+    - `correct_answers`: Number of correct answers by the user
 - **CSV naming**: `{quiz_name}_user_responses.csv` with unique suffixes (e.g., `math_quiz_user_responses_0001.csv`)
 - **Admin access**: Master key required for admin endpoints, can be set via CLI or environment variable
 - **Config editor**: Web-based YAML editor with validation in `/files/` (Config tab), changes require server restart
