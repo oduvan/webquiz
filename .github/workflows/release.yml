@@ -95,7 +95,6 @@ jobs:
           --metadata title="WebQuiz Documentation (Ukrainian)" \
           --metadata author="WebQuiz Team" \
           --metadata date="$(date +%Y-%m-%d)"
-        mv webquiz-documentation-uk.pdf ../dist/
 
     - name: Generate English PDF Documentation
       run: |
@@ -115,7 +114,6 @@ jobs:
           --metadata title="WebQuiz Documentation (English)" \
           --metadata author="WebQuiz Team" \
           --metadata date="$(date +%Y-%m-%d)"
-        mv webquiz-documentation-en.pdf ../dist/
 
     - name: Publish to PyPI
       uses: pypa/gh-action-pypi-publish@release/v1
@@ -154,7 +152,9 @@ jobs:
           --title "Release v${{ github.event.inputs.version }}" \
           --notes-file release_notes.md \
           --target ${{ github.ref_name }} \
-          dist/*
+          dist/* \
+          docs/webquiz-documentation-uk.pdf \
+          docs/webquiz-documentation-en.pdf
 
     - name: Update webquiz-ansible repository
       env:
