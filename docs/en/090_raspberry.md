@@ -5,7 +5,7 @@ As a result, you will have a device that automatically launches a local testing 
 
 ---
 
-## 1. Downloading the Ready-Made Image
+## Downloading the Ready-Made Image
 
 [Download **Raspberry Pi Image**](https://drive.google.com/file/d/1WGOqSV0EW4xdvod2N4VoU_q6p2plXO9z/view?usp=sharing).
 Use the standard **Raspberry Pi Imager** program or any other image writer to write it to an SD card.
@@ -19,7 +19,7 @@ After writing, insert the SD card into your Raspberry Pi and start the device.
 
 ---
 
-## 2. First Boot
+## First Boot
 
 The first boot of Raspberry Pi is intended for **initial SD card partitioning**.
 The system will automatically prepare the file structure and perform basic setup actions.
@@ -28,7 +28,7 @@ After this process completes, you can shut down the Raspberry Pi, remove the SD 
 
 ---
 
-## 3. SD Card Partitioning
+## SD Card Partitioning
 
 After the first boot, you need to **split the SD card into two areas**:
 
@@ -45,7 +45,7 @@ You can copy, edit, or delete files directly.
 
 ---
 
-## 4. Recommended Partitioning Software
+## Recommended Partitioning Software
 
 You can use the following programs to create and edit partitions:
 
@@ -66,7 +66,7 @@ Make sure the new partition is created in **exFAT** format and the system part r
 
 ---
 
-## 5. Second Boot of Raspberry Pi
+## Second Boot of Raspberry Pi
 
 After partitioning, insert the SD card back into the Raspberry Pi and start the device.
 **The second boot** may take up to **30 minutes** — during this time the system automatically:
@@ -84,12 +84,12 @@ After partitioning, insert the SD card back into the Raspberry Pi and start the 
 
 ---
 
-## 6. Wi-Fi Configuration
+## Wi-Fi Configuration
 
 After the second boot, a **`wifi.conf.example`** file will appear in the **`data`** partition, which serves as a template for creating your own **`wifi.conf`** file.
 The system uses **`wifi.conf`** to connect to Wi-Fi or create its own access point (*Hotspot*).
 
-### 6.1 `wifi.conf` File
+### `wifi.conf` File
 
 To activate Wi-Fi or create an access point, create a file in the `data` partition:
 
@@ -101,7 +101,7 @@ Depending on your needs, it can have one of the configurations shown below.
 
 ---
 
-### 6.2 Connecting to an Existing Wi-Fi Network
+### Connecting to an Existing Wi-Fi Network
 
 ```
 SSID="tp-fregat2"
@@ -112,7 +112,7 @@ In this case, Raspberry Pi will connect to an existing Wi-Fi network.
 
 ---
 
-### 6.3 Creating Your Own Access Point (Hotspot)
+### Creating Your Own Access Point (Hotspot)
 
 ```
 HOTSPOT=1
@@ -132,7 +132,7 @@ IP address `10.42.0.1` is reserved for Raspberry Pi itself — the WebQuiz serve
 
 ---
 
-### 6.4 Example with Fixed IP Address for Home Network
+### Example with Fixed IP Address for Home Network
 
 ```
 SSID="my_home_wifi"
@@ -149,7 +149,7 @@ http://192.168.0.150:8080
 
 ---
 
-## 7. Behavior in Hotspot Mode
+## Behavior in Hotspot Mode
 
 When Raspberry Pi operates in access point mode:
 - When a user connects to the Wi-Fi network, a browser page automatically opens with a **"Start Test"** button.
@@ -158,7 +158,7 @@ When Raspberry Pi operates in access point mode:
 
 ---
 
-## 8. Additional Raspberry Pi Features
+## Additional Raspberry Pi Features
 
 WebQuiz on Raspberry Pi also includes a **built-in file server**.
 This server allows hosting educational materials that can be downloaded from the same page where tests are conducted.
@@ -170,7 +170,7 @@ After that, all students who joined the network will be able to:
 
 ---
 
-## 9. Finishing Setup
+## Finishing Setup
 
 After creating or modifying the `wifi.conf` file, restart Raspberry Pi.
 After booting, the system will automatically activate the connection and start the **WebQuiz** server.
@@ -183,7 +183,7 @@ or at the IP address specified in the configuration file.
 
 ---
 
-## 10. Tips and Notes
+## Tips and Notes
 
 - The **`data`** partition is used for all created tests, logs, results, and Wi-Fi configurations.
 - If you need to reinstall the system, you can simply rewrite the image **without deleting the `data` partition** — all files will remain.

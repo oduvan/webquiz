@@ -5,7 +5,7 @@ Access to the panel opens automatically if you connect from a local address (`12
 
 ---
 
-## 1. Main Admin Panel
+## Main Admin Panel
 
 ![WebQuiz Admin Panel](../imgs/admin_advanced.png)
 
@@ -40,7 +40,7 @@ The main administrative panel page contains essential tools for managing quizzes
 
 ---
 
-## 2. File Manager
+## File Manager
 
 ![WebQuiz File Manager](../imgs/file_manager.png)
 
@@ -63,7 +63,7 @@ If you're connected from a local address or "trusted IP", the system automatical
 
 ---
 
-## 3. Quiz Editor
+## Quiz Editor
 
 ![Quiz Editor in Wizard Mode](../imgs/edit_quiz.png)
 
@@ -93,7 +93,7 @@ Available in two modes: **Wizard** (visual editor) and **Text** (working directl
 
 ---
 
-## 4. Quick Access
+## Quick Access
 
 At the bottom of each admin interface page, there are convenient links:
 - **← Back to Quiz** — return to the main quiz page.

@@ -1,7 +1,7 @@
 # Server Configuration File
 
 
-## 1. Section `server`
+## Section `server`
 
 ```
 server:
@@ -18,7 +18,7 @@ server:
 
 ---
 
-## 2. Section `paths`
+## Section `paths`
 
 ```
 paths:
@@ -54,7 +54,7 @@ The `paths` section defines the location of service folders. If the specified di
 
 ---
 
-## 3. Section `admin`
+## Section `admin`
 
 ```
 admin:
@@ -67,7 +67,7 @@ admin:
 
 ---
 
-## 4. Section `registration` (optional)
+## Section `registration` (optional)
 
 ```
 registration:
@@ -96,7 +96,7 @@ This section defines how users register before taking quizzes.
 
 ---
 
-## 5. Section `quizzes` (optional)
+## Section `quizzes` (optional)
 
 ```
 quizzes:

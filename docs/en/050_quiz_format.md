@@ -22,7 +22,7 @@ questions:
 
 ---
 
-## 1. Main Test Parameters
+## Main Test Parameters
 
 ### `title` (required)
 
@@ -57,7 +57,7 @@ show_right_answer: true
 
 ---
 
-## 2. `questions` Section
+## `questions` Section
 
 The `questions` section contains a list of test questions.
 Each question is a separate list item with its own parameters.
@@ -176,7 +176,7 @@ You can combine an image in the question with text answer options:
 
 ---
 
-## 3. Complete Test File Example
+## Complete Test File Example
 
 Below is an example of a complete test file with different types of questions:
 
@@ -224,7 +224,7 @@ questions:
 
 ---
 
-## 4. Rules and Recommendations
+## Rules and Recommendations
 
 ### Index Numbering
 
@@ -270,7 +270,7 @@ If you're editing files manually and the test doesn't load after editing, check:
 
 ---
 
-## 5. Creating a New Test
+## Creating a New Test
 
 ### Through Admin Interface (Recommended)
 
@@ -292,7 +292,7 @@ The new test will appear in the list of available tests in the **Administration*
 
 ---
 
-## 6. Editing Existing Tests
+## Editing Existing Tests
 
 ### Through Admin Interface (Recommended)
 
@@ -313,7 +313,7 @@ The new test will appear in the list of available tests in the **Administration*
 
 ---
 
-## 7. Common Errors
+## Common Errors
 
 ### Incorrect Indentation
 
@@ -373,7 +373,7 @@ question: "What is 2:1?"
 
 ---
 
-## 8. Additional Features
+## Additional Features
 
 ### Downloading Tests Through Admin Interface
 
@@ -402,7 +402,7 @@ When changing tests:
 
 ---
 
-## 9. Real Test Examples
+## Real Test Examples
 
 ### Math Test
 
@@ -467,7 +467,7 @@ questions:
 
 ---
 
-## 10. Summary
+## Summary
 
 The YAML format for tests in **WebQuiz** allows:
 
