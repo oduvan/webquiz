@@ -229,6 +229,11 @@ jobs:
         ### Option 1: Pre-built Binary (Recommended for End Users)
         Download the zipped binary for your platform from the assets below:
 
+        **⚠️ Windows Defender Warning**: Windows may flag the executable as a threat (false positive). This is common with PyInstaller binaries. The executable is safe - it's open source and built by GitHub Actions. You can:
+        - Add an exclusion in Windows Security for the webquiz executable
+        - Verify the executable on [VirusTotal](https://www.virustotal.com/)
+        - Install via `pip install webquiz` instead (requires Python)
+
         **Linux:**
         ```bash
         wget https://github.com/oduvan/webquiz/releases/download/v${{ github.event.inputs.version }}/webquiz-linux.zip
