@@ -36,14 +36,14 @@ def main():
     # Run PyInstaller
     try:
         result = subprocess.run(cmd, cwd=project_root, check=True)
-        print("\n✅ Build completed successfully!")
-        print(f"📁 Binary location: {project_root}/dist/webquiz")
-        print("\n🚀 To run the binary:")
+        print("\n[SUCCESS] Build completed successfully!")
+        print(f"[INFO] Binary location: {project_root}/dist/webquiz")
+        print("\n[INFO] To run the binary:")
         print("   ./dist/webquiz")
         print("   ./dist/webquiz --help")
         print("   ./dist/webquiz --master-key secret123")
     except subprocess.CalledProcessError as e:
-        print(f"❌ Build failed with exit code {e.returncode}")
+        print(f"[ERROR] Build failed with exit code {e.returncode}")
         sys.exit(1)
 
 if __name__ == "__main__":
