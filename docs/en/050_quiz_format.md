@@ -10,7 +10,7 @@ You can create your own tests by placing them in the **`quizzes/`** folder.
 
 The basic structure of a test file looks like this:
 
-$$$
+```
 title: "Test Title"
 description: "Test description (optional)"
 show_right_answer: false
@@ -18,7 +18,7 @@ questions:
   - question: "Question text"
     options: ["Option 1", "Option 2", "Option 3"]
     correct_answer: 0
-$$$
+```
 
 ---
 
@@ -28,9 +28,9 @@ $$$
 
 The test title displayed in the web interface and admin panel.
 
-$$$
+```
 title: "Math Test"
-$$$
+```
 
 ---
 
@@ -38,9 +38,9 @@ $$$
 
 A short description of the test. May contain information about the topic, difficulty, or other details.
 
-$$$
+```
 description: "Basic arithmetic operations for 5th grade students"
-$$$
+```
 
 ---
 
@@ -51,9 +51,9 @@ Determines whether to show the user the correct answer after submitting their ch
 - `true` — after answering, the user sees which answer was correct
 - `false` (default) — the user sees only correct/incorrect indicator (green/red color)
 
-$$$
+```
 show_right_answer: true
-$$$
+```
 
 ---
 
@@ -68,11 +68,11 @@ Each question is a separate list item with its own parameters.
 
 The simplest form of question with text, answer options, and the correct answer index:
 
-$$$
+```
 - question: "What is 2 + 2?"
   options: ["3", "4", "5", "6"]
   correct_answer: 1
-$$$
+```
 
 - **question** — question text
 - **options** — list of possible answers (array of strings)
@@ -87,11 +87,11 @@ In this example, the correct answer is `"4"` (index 1).
 WebQuiz supports questions with multiple correct answers.
 In this case, the user must select **all correct options**.
 
-$$$
+```
 - question: "Which of these are programming languages?"
   options: ["Python", "HTML", "JavaScript", "CSS"]
   correct_answer: [0, 2]
-$$$
+```
 
 In this example, the correct answers are `"Python"` (index 0) and `"JavaScript"` (index 2).
 
@@ -103,12 +103,12 @@ In this example, the correct answers are `"Python"` (index 0) and `"JavaScript"`
 
 If you want the question to be considered correct when selecting a **minimum number** of all correct answers, use the **`min_correct`** parameter:
 
-$$$
+```
 - question: "Select at least 2 primary colors:"
   options: ["Red", "Green", "Blue", "Yellow"]
   correct_answer: [0, 2, 3]
   min_correct: 2
-$$$
+```
 
 In this example:
 - Correct answers: `"Red"` (0), `"Blue"` (2), `"Yellow"` (3)
@@ -122,12 +122,12 @@ In this example:
 You can add an image to a question using the **`image`** parameter.
 Images should be stored in the **`quizzes/imgs/`** folder.
 
-$$$
+```
 - question: "What is the capital of Ukraine?"
   image: "/imgs/ukraine_map.png"
   options: ["Kyiv", "Lviv", "Odesa", "Kharkiv"]
   correct_answer: 0
-$$$
+```
 
 The image path is specified relative to the web root (`/imgs/`).
 
@@ -137,11 +137,11 @@ The image path is specified relative to the web root (`/imgs/`).
 
 If a question consists only of an image (e.g., "What is shown in the picture?"), you can **omit the `question` field**:
 
-$$$
+```
 - image: "/imgs/coordinate_system.png"
   options: ["MGRS", "UTM", "UCS-2000", "WGS84"]
   correct_answer: 2
-$$$
+```
 
 In this case, the user will see only the image and answer options.
 
@@ -152,14 +152,14 @@ In this case, the user will see only the image and answer options.
 Answer options can also be images.
 To do this, instead of text in the `options` list, specify paths to images:
 
-$$$
+```
 - question: "Which symbol indicates the correct answer?"
   options:
     - "/imgs/checkmark.png"
     - "/imgs/cross.png"
     - "/imgs/question.png"
   correct_answer: 0
-$$$
+```
 
 ---
 
@@ -167,12 +167,12 @@ $$$
 
 You can combine an image in the question with text answer options:
 
-$$$
+```
 - question: "What coordinate system is shown in the picture?"
   image: "/imgs/coordinate_grid.png"
   options: ["Cartesian", "Polar", "Cylindrical", "Spherical"]
   correct_answer: 1
-$$$
+```
 
 ---
 
@@ -180,7 +180,7 @@ $$$
 
 Below is an example of a complete test file with different types of questions:
 
-$$$
+```
 title: "Comprehensive Test with Various Question Types"
 description: "Example test demonstrating all formatting capabilities"
 show_right_answer: true
@@ -220,7 +220,7 @@ questions:
       - "/imgs/flag_ukraine.png"
       - "/imgs/flag_russia.png"
     correct_answer: 1
-$$$
+```
 
 ---
 
@@ -320,20 +320,20 @@ The new test will appear in the list of available tests in the **Administration*
 YAML is sensitive to indentation. All elements at the same level must have the same indentation.
 
 **Incorrect:**
-$$$
+```
 questions:
 - question: "Text"
    options: ["A", "B"]
   correct_answer: 0
-$$$
+```
 
 **Correct:**
-$$$
+```
 questions:
   - question: "Text"
     options: ["A", "B"]
     correct_answer: 0
-$$$
+```
 
 ---
 
@@ -342,16 +342,16 @@ $$$
 If `correct_answer` specifies an index that doesn't exist in `options`, the test won't load.
 
 **Incorrect:**
-$$$
+```
 options: ["A", "B", "C"]
 correct_answer: 3  # Index 3 doesn't exist (only 0, 1, 2)
-$$$
+```
 
 **Correct:**
-$$$
+```
 options: ["A", "B", "C"]
 correct_answer: 2  # Index 2 = option "C"
-$$$
+```
 
 ---
 
@@ -360,14 +360,14 @@ $$$
 If question or option text contains special characters (`:`, `#`, `{`, `}`), it must be enclosed in quotes.
 
 **Incorrect:**
-$$$
+```
 question: What is 2:1?
-$$$
+```
 
 **Correct:**
-$$$
+```
 question: "What is 2:1?"
-$$$
+```
 
 > 💡 **Tip:** The admin interface will automatically detect these errors and show them before saving the file.
 
@@ -381,12 +381,12 @@ If the `config.yaml` configuration file has the **`quizzes`** section filled in,
 
 Example section in `config.yaml`:
 
-$$$
+```
 quizzes:
   - name: "Geography Test"
     download_path: "https://example.com/tests/geography.zip"
     folder: "geography/"
-$$$
+```
 
 After downloading, the archive is automatically unpacked into the specified folder inside `quizzes/`.
 
@@ -406,7 +406,7 @@ When changing tests:
 
 ### Math Test
 
-$$$
+```
 title: "Basic Arithmetic"
 description: "Test on arithmetic operations knowledge"
 
@@ -422,13 +422,13 @@ questions:
   - question: "What is 20 ÷ 4?"
     options: ["4", "5", "6", "8"]
     correct_answer: 1
-$$$
+```
 
 ---
 
 ### Geography Test with Images
 
-$$$
+```
 title: "Countries and Flags"
 description: "Recognizing flags of world countries"
 
@@ -444,13 +444,13 @@ questions:
   - question: "What is the capital of Germany?"
     options: ["Munich", "Berlin", "Frankfurt", "Hamburg"]
     correct_answer: 1
-$$$
+```
 
 ---
 
 ### Programming Test with Multiple Choice
 
-$$$
+```
 title: "Programming Basics"
 show_right_answer: true
 
@@ -463,7 +463,7 @@ questions:
     options: ["Array", "Tree", "List", "Graph", "Stack"]
     correct_answer: [0, 2, 4]
     min_correct: 2
-$$$
+```
 
 ---
 

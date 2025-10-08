@@ -93,9 +93,9 @@ The system uses **`wifi.conf`** to connect to Wi-Fi or create its own access poi
 
 To activate Wi-Fi or create an access point, create a file in the `data` partition:
 
-$$$
+```
 wifi.conf
-$$$
+```
 
 Depending on your needs, it can have one of the configurations shown below.
 
@@ -103,10 +103,10 @@ Depending on your needs, it can have one of the configurations shown below.
 
 ### 6.2 Connecting to an Existing Wi-Fi Network
 
-$$$
+```
 SSID="tp-fregat2"
 PASSWORD="0675225288"
-$$$
+```
 
 In this case, Raspberry Pi will connect to an existing Wi-Fi network.
 
@@ -114,12 +114,12 @@ In this case, Raspberry Pi will connect to an existing Wi-Fi network.
 
 ### 6.3 Creating Your Own Access Point (Hotspot)
 
-$$$
+```
 HOTSPOT=1
 SSID="dov"
 PASSWORD="11223344"
 IPADDR="10.42.0.1/24"
-$$$
+```
 
 In this mode, Raspberry Pi creates its own Wi-Fi network named `dov` with password `11223344`.
 IP address `10.42.0.1` is reserved for Raspberry Pi itself — the WebQuiz server will be accessible in the browser at this address.
@@ -134,18 +134,18 @@ IP address `10.42.0.1` is reserved for Raspberry Pi itself — the WebQuiz serve
 
 ### 6.4 Example with Fixed IP Address for Home Network
 
-$$$
+```
 SSID="my_home_wifi"
 PASSWORD="12345678"
 IPADDR="192.168.0.150/24"
-$$$
+```
 
 In this case, Raspberry Pi will connect to an existing Wi-Fi network and automatically assign IP address `192.168.0.150`.
 The WebQuiz server will be accessible at:
 
-$$$
+```
 http://192.168.0.150:8080
-$$$
+```
 
 ---
 
@@ -176,9 +176,9 @@ After creating or modifying the `wifi.conf` file, restart Raspberry Pi.
 After booting, the system will automatically activate the connection and start the **WebQuiz** server.
 
 You can connect to it through a browser at:
-$$$
+```
 http://raspberrypi.local:8080
-$$$
+```
 or at the IP address specified in the configuration file.
 
 ---
