@@ -17,9 +17,12 @@ jobs:
           - os: ubuntu-latest
             binary_name: webquiz-linux
             artifact_name: webquiz-linux
-          - os: macos-latest
-            binary_name: webquiz-macos
-            artifact_name: webquiz-macos
+          - os: macos-13
+            binary_name: webquiz-macos-intel
+            artifact_name: webquiz-macos-intel
+          - os: macos-14
+            binary_name: webquiz-macos-apple-silicon
+            artifact_name: webquiz-macos-apple-silicon
           - os: windows-latest
             binary_name: webquiz-windows.exe
             artifact_name: webquiz-windows.exe
@@ -158,6 +161,7 @@ jobs:
           -V documentclass=report \
           --resource-path=.:imgs \
           --metadata title="WebQuiz Documentation (Ukrainian)" \
+          --metadata subtitle="Version ${{ github.event.inputs.version }}" \
           --metadata author="WebQuiz Team" \
           --metadata date="$(date +%Y-%m-%d)"
 
@@ -177,6 +181,7 @@ jobs:
           -V documentclass=report \
           --resource-path=.:imgs \
           --metadata title="WebQuiz Documentation (English)" \
+          --metadata subtitle="Version ${{ github.event.inputs.version }}" \
           --metadata author="WebQuiz Team" \
           --metadata date="$(date +%Y-%m-%d)"
 
@@ -213,7 +218,8 @@ jobs:
 
         ### 🖥️ Pre-built Binaries
         - **Linux**: `webquiz-linux` / `webquiz-linux.zip` (x86_64, no Python required)
-        - **macOS**: `webquiz-macos` / `webquiz-macos.zip` (Intel/Apple Silicon, no Python required)
+        - **macOS Intel**: `webquiz-macos-intel` / `webquiz-macos-intel.zip` (x86_64, no Python required)
+        - **macOS Apple Silicon**: `webquiz-macos-apple-silicon` / `webquiz-macos-apple-silicon.zip` (ARM64, no Python required)
         - **Windows**: `webquiz-windows.exe` / `webquiz-windows.exe.zip` (x86_64, no Python required)
 
         ### 📖 Documentation
@@ -239,18 +245,32 @@ jobs:
         ./webquiz-linux --help
         ```
 
-        **macOS:**
+        **macOS Intel (x86_64):**
         ```bash
         # Option A: Direct download
-        wget https://github.com/oduvan/webquiz/releases/download/v${{ github.event.inputs.version }}/webquiz-macos
-        chmod +x webquiz-macos
-        ./webquiz-macos --help
+        wget https://github.com/oduvan/webquiz/releases/download/v${{ github.event.inputs.version }}/webquiz-macos-intel
+        chmod +x webquiz-macos-intel
+        ./webquiz-macos-intel --help
 
         # Option B: Download zip
-        wget https://github.com/oduvan/webquiz/releases/download/v${{ github.event.inputs.version }}/webquiz-macos.zip
-        unzip webquiz-macos.zip
-        chmod +x webquiz-macos
-        ./webquiz-macos --help
+        wget https://github.com/oduvan/webquiz/releases/download/v${{ github.event.inputs.version }}/webquiz-macos-intel.zip
+        unzip webquiz-macos-intel.zip
+        chmod +x webquiz-macos-intel
+        ./webquiz-macos-intel --help
+        ```
+
+        **macOS Apple Silicon (ARM64/M1/M2/M3):**
+        ```bash
+        # Option A: Direct download
+        wget https://github.com/oduvan/webquiz/releases/download/v${{ github.event.inputs.version }}/webquiz-macos-apple-silicon
+        chmod +x webquiz-macos-apple-silicon
+        ./webquiz-macos-apple-silicon --help
+
+        # Option B: Download zip
+        wget https://github.com/oduvan/webquiz/releases/download/v${{ github.event.inputs.version }}/webquiz-macos-apple-silicon.zip
+        unzip webquiz-macos-apple-silicon.zip
+        chmod +x webquiz-macos-apple-silicon
+        ./webquiz-macos-apple-silicon --help
         ```
 
         **Windows:**
@@ -282,8 +302,10 @@ jobs:
           docs/webquiz-documentation-en.pdf \
           binaries/webquiz-linux/webquiz-linux \
           binaries/webquiz-linux/webquiz-linux.zip \
-          binaries/webquiz-macos/webquiz-macos \
-          binaries/webquiz-macos/webquiz-macos.zip \
+          binaries/webquiz-macos-intel/webquiz-macos-intel \
+          binaries/webquiz-macos-intel/webquiz-macos-intel.zip \
+          binaries/webquiz-macos-apple-silicon/webquiz-macos-apple-silicon \
+          binaries/webquiz-macos-apple-silicon/webquiz-macos-apple-silicon.zip \
           binaries/webquiz-windows.exe/webquiz-windows.exe \
           binaries/webquiz-windows.exe/webquiz-windows.exe.zip
 
