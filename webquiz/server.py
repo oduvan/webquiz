@@ -371,14 +371,15 @@ def get_wifi_name():
 def admin_auth_required(func):
     """Decorator to require master key authentication for admin endpoints"""
     async def wrapper(self, request):
-        # Check if master key is provided
-        if not self.master_key:
-            return web.json_response({'error': 'Admin functionality disabled - no master key set'}, status=403)
         
         # Get client IP and check if it's in trusted list (bypass authentication)
         client_ip = get_client_ip(request)
         if hasattr(self, 'admin_config') and client_ip in self.admin_config.trusted_ips:
             return await func(self, request)
+        
+        # Check if master key is provided
+        if not self.master_key:
+            return web.json_response({'error': 'Admin functionality disabled - no master key set'}, status=403)
         
         # Get master key from request (header or body)
         provided_key = request.headers.get('X-Master-Key')
@@ -711,14 +712,14 @@ class TestingServer:
             template_content = self.templates.get('index.html', '')
 
             # Generate registration fields HTML as a table (always include username)
-            registration_fields_html = '<table style="margin: 10px auto; border-collapse: collapse;">'
+            registration_fields_html = '<table style="margin: 10px auto; border-collapse: collapse; max-width: 500px; width: 100%;">'
 
             # Add username field as first row
             registration_fields_html += '''
                 <tr>
                     <td style="padding: 5px 10px; text-align: right; font-weight: bold;">Ім'я користувача:</td>
                     <td style="padding: 5px 10px;">
-                        <input type="text" id="username" style="padding: 8px; width: 250px; box-sizing: border-box;">
+                        <input type="text" id="username" style="padding: 8px; width: 100%; max-width: 250px; box-sizing: border-box;">
                     </td>
                 </tr>'''
 
@@ -730,7 +731,7 @@ class TestingServer:
                 <tr>
                     <td style="padding: 5px 10px; text-align: right; font-weight: bold;">{field_label}:</td>
                     <td style="padding: 5px 10px;">
-                        <input type="text" class="registration-field" data-field-name="{field_name}" style="padding: 8px; width: 250px; box-sizing: border-box;">
+                        <input type="text" class="registration-field" data-field-name="{field_name}" style="padding: 8px; width: 100%; max-width: 250px; box-sizing: border-box;">
                     </td>
                 </tr>'''
 

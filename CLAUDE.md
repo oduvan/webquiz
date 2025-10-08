@@ -17,6 +17,12 @@ This file contains project context and memory for Claude Code sessions.
    - Unit tests for internal logic
    - Update test counts in CLAUDE.md
    - Follow existing test patterns in `tests/` directory
+5. **Mobile Support** - All UI changes MUST be mobile-responsive:
+   - Test on mobile viewport (max-width: 768px)
+   - Input fields must not overflow screen
+   - Tables should stack vertically on mobile
+   - Use responsive width: `width: 100%; max-width: [desktop-size]`
+   - Add mobile-specific CSS in @media queries
 
 **Testing Philosophy:**
 - Write tests FIRST or immediately after implementing features
@@ -25,6 +31,7 @@ This file contains project context and memory for Claude Code sessions.
 - All tests must pass before considering work complete
 
 **Documentation is not optional** - It's a core part of every feature implementation.
+**Mobile support is not optional** - All UI elements must be responsive and mobile-friendly.
 
 ---
 
@@ -33,6 +40,7 @@ WebQuiz - A modern web-based quiz and testing system built with Python and aioht
 
 **Key Features:**
 - User registration with unique usernames and UUID-based user IDs
+- **Mobile-responsive UI**: All forms and interfaces adapt to mobile screens (≤768px) with proper input sizing and table stacking
 - **Registration approval workflow**: Optional admin approval for new registrations with real-time notifications
 - **Multi-quiz system**: Questions loaded from `quizzes/` directory with multiple YAML files
 - **Admin interface**: Web-based admin panel with master key authentication for quiz management
@@ -55,7 +63,10 @@ WebQuiz - A modern web-based quiz and testing system built with Python and aioht
 ## Architecture
 - **Backend**: Python aiohttp server with middleware-based error handling, admin authentication, and WebSocket support
 - **Frontend**: Vanilla HTML/JS single-page application with embedded questions data + admin interface + live stats dashboard
-- **Data Storage**: 
+  - **Mobile-responsive CSS**: @media queries for viewport ≤768px with fluid layouts, input field adaptations, and table stacking
+  - **Registration forms**: Responsive width (`width: 100%; max-width: 250px`) with proper box-sizing for mobile devices
+  - **Waiting approval forms**: Dynamic JavaScript-generated forms with mobile-responsive styles
+- **Data Storage**:
   - **Questions**: Multiple YAML files in `quizzes/` directory with correct answers (auto-created with defaults)
   - **User responses**: In-memory → CSV files with quiz name prefixes (proper CSV module usage)
   - **Users**: In-memory dictionary (user_id as key, contains username) - resets on quiz switch
@@ -167,6 +178,10 @@ python -m webquiz.cli
 - **In-memory storage**: Fast responses, CSV backup for persistence, resets on quiz switch
 - **Session persistence**: Cookie-based user_id storage for seamless user experience
 - **Real-time monitoring**: WebSocket-based live statistics with automatic client cleanup and broadcasting
+- **Mobile-first responsive design**: All UI elements use responsive widths with @media queries for ≤768px screens
+  - Input fields: `width: 100%; max-width: [desktop-size]` pattern
+  - Tables: Stack vertically on mobile with `display: block` for td elements
+  - Registration forms: Server-generated HTML includes responsive styles, JavaScript forms match
 - **Comprehensive testing**: Integration tests for API + unit tests for internal logic
 
 ## Data Flow
@@ -248,6 +263,12 @@ python -m webquiz.cli
   - Admin receives real-time WebSocket notifications
   - Manual "Check" button for students to check approval status
   - Default: `approve: false` (auto-approve, existing behavior)
+- **Mobile responsiveness**:
+  - All forms and inputs are mobile-responsive (tested at ≤768px viewport)
+  - Registration form fields use `width: 100%; max-width: 250px` pattern
+  - Waiting approval form dynamically generated with same responsive styles
+  - Tables stack vertically on mobile using `display: block` for cells
+  - All new UI features MUST include mobile support from the start
 - **Quiz isolation**: Switching quizzes resets all server state for complete isolation
 - **File safety**: Unique suffixes prevent overwriting existing log/CSV files
 - Middleware handles JSON parsing errors and validation

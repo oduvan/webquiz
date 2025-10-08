@@ -354,12 +354,44 @@
                 display: block;
                 white-space: nowrap;
             }
-            
+
             /* Mobile responsive input */
             #username {
                 width: 100% !important;
                 max-width: 100% !important;
                 box-sizing: border-box !important;
+            }
+
+            /* Mobile responsive registration fields */
+            .registration-field {
+                width: 100% !important;
+                max-width: 100% !important;
+                box-sizing: border-box !important;
+            }
+
+            /* Mobile responsive waiting approval fields */
+            .waiting-field, #waiting-username {
+                width: 100% !important;
+                max-width: 100% !important;
+                box-sizing: border-box !important;
+            }
+
+            /* Make registration tables responsive on mobile */
+            #registration table, #waiting-registration-fields table {
+                width: 100% !important;
+                max-width: 100% !important;
+            }
+
+            #registration table td, #waiting-registration-fields table td {
+                display: block !important;
+                width: 100% !important;
+                text-align: left !important;
+                padding: 5px 0 !important;
+            }
+
+            #registration table td:first-child, #waiting-registration-fields table td:first-child {
+                font-weight: bold;
+                margin-top: 10px;
             }
             
             /* Mobile spacing between top controls and H1 */
@@ -743,8 +775,8 @@
             const waitingFieldsContainer = document.getElementById('waiting-registration-fields');
 
             // Create a table similar to registration form
-            let fieldsHTML = '<table style="margin: 20px auto; max-width: 500px;">';
-            fieldsHTML += `<tr><td style="padding: 8px; text-align: right; width: 200px;">Ім'я користувача:</td><td style="padding: 8px;"><input type="text" id="waiting-username" value="${registrationData.username || ''}" style="width: 250px; padding: 8px; border: 1px solid var(--border-color); border-radius: 5px;" /></td></tr>`;
+            let fieldsHTML = '<table style="margin: 20px auto; max-width: 500px; width: 100%;">';
+            fieldsHTML += `<tr><td style="padding: 8px; text-align: right; width: 200px;">Ім'я користувача:</td><td style="padding: 8px;"><input type="text" id="waiting-username" value="${registrationData.username || ''}" style="width: 100%; max-width: 250px; padding: 8px; border: 1px solid var(--border-color); border-radius: 5px; box-sizing: border-box;" /></td></tr>`;
 
             // Add additional registration fields if they exist
             const additionalFields = document.querySelectorAll('.registration-field');
@@ -754,7 +786,7 @@
                 const fieldLabel = fieldRow ? fieldRow.querySelector('td:first-child')?.textContent.trim() : fieldName;
                 const fieldValue = registrationData[fieldName] || '';
 
-                fieldsHTML += `<tr><td style="padding: 8px; text-align: right;">${fieldLabel}</td><td style="padding: 8px;"><input type="text" class="waiting-field" data-field-name="${fieldName}" value="${fieldValue}" style="width: 250px; padding: 8px; border: 1px solid var(--border-color); border-radius: 5px;" /></td></tr>`;
+                fieldsHTML += `<tr><td style="padding: 8px; text-align: right;">${fieldLabel}</td><td style="padding: 8px;"><input type="text" class="waiting-field" data-field-name="${fieldName}" value="${fieldValue}" style="width: 100%; max-width: 250px; padding: 8px; border: 1px solid var(--border-color); border-radius: 5px; box-sizing: border-box;" /></td></tr>`;
             }
             fieldsHTML += '</table>';
 
