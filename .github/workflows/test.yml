@@ -45,6 +45,7 @@ jobs:
         poetry run python -m pytest tests/ -v --tb=short
       env:
         SKIP_SELENIUM: ${{ matrix.python-version != '3.9' }}
+        PYTEST_XDIST_WORKER: gw${{ strategy.job-index }}
 
     - name: Run tests with coverage
       if: matrix.python-version == '3.9'
