@@ -9,12 +9,65 @@ on:
         type: string
 
 jobs:
+  build-binaries:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu-latest
+            binary_name: webquiz-linux
+            artifact_name: webquiz-linux
+          - os: macos-latest
+            binary_name: webquiz-macos
+            artifact_name: webquiz-macos
+          - os: windows-latest
+            binary_name: webquiz-windows.exe
+            artifact_name: webquiz-windows.exe
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+
+    - name: Install Poetry
+      uses: snok/install-poetry@v1
+      with:
+        version: latest
+        virtualenvs-create: true
+        virtualenvs-in-project: true
+
+    - name: Install dependencies
+      run: poetry install --no-interaction
+
+    - name: Build binary
+      run: poetry run build_binary
+
+    - name: Rename binary (Linux/macOS)
+      if: runner.os != 'Windows'
+      run: mv dist/webquiz dist/${{ matrix.binary_name }}
+
+    - name: Rename binary (Windows)
+      if: runner.os == 'Windows'
+      run: move dist\webquiz.exe dist\${{ matrix.binary_name }}
+
+    - name: Upload binary artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: ${{ matrix.artifact_name }}
+        path: dist/${{ matrix.binary_name }}
+        retention-days: 1
+
   release:
+    needs: build-binaries
     runs-on: ubuntu-latest
-    
+
     permissions:
       contents: write
-    
+
     steps:
     - name: Validate version format
       run: |
@@ -121,6 +174,17 @@ jobs:
         password: ${{ secrets.PYPI_API_TOKEN }}
         packages-dir: dist/
 
+    - name: Download binary artifacts
+      uses: actions/download-artifact@v4
+      with:
+        path: binaries/
+
+    - name: List downloaded binaries
+      run: |
+        echo "📦 Downloaded binaries:"
+        ls -lah binaries/
+        find binaries/ -type f
+
     - name: Create GitHub Release
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -130,12 +194,34 @@ jobs:
         🚀 **WebQuiz v${{ github.event.inputs.version }}**
 
         This release includes:
-        - 📦 Python wheel package (`webquiz-${{ github.event.inputs.version }}-py3-none-any.whl`)
-        - 📋 Source distribution (`webquiz-${{ github.event.inputs.version }}.tar.gz`)
-        - 📖 Documentation in Ukrainian (`webquiz-documentation-uk.pdf`)
-        - 📖 Documentation in English (`webquiz-documentation-en.pdf`)
+
+        ### 📦 Python Packages
+        - Python wheel package (`webquiz-${{ github.event.inputs.version }}-py3-none-any.whl`)
+        - Source distribution (`webquiz-${{ github.event.inputs.version }}.tar.gz`)
+
+        ### 🖥️ Pre-built Binaries
+        - **Linux**: `webquiz-linux` (x86_64, no Python required)
+        - **macOS**: `webquiz-macos` (Intel/Apple Silicon, no Python required)
+        - **Windows**: `webquiz-windows.exe` (x86_64, no Python required)
+
+        ### 📖 Documentation
+        - Ukrainian: `webquiz-documentation-uk.pdf`
+        - English: `webquiz-documentation-en.pdf`
 
         ## Installation
+
+        ### Option 1: Pre-built Binary (Recommended for End Users)
+        Download the binary for your platform from the assets below and run it directly:
+        ```bash
+        # Linux/macOS: Make executable and run
+        chmod +x webquiz-linux  # or webquiz-macos
+        ./webquiz-linux --help
+
+        # Windows: Run directly
+        webquiz-windows.exe --help
+        ```
+
+        ### Option 2: Python Package (For Developers)
         ```bash
         pip install webquiz==${{ github.event.inputs.version }}
         ```
@@ -147,14 +233,17 @@ jobs:
         *This release was automatically created by the release workflow.*
         EOF
 
-        # Create release with built artifacts (includes wheel, tar.gz, and PDFs)
+        # Create release with built artifacts (includes wheel, tar.gz, PDFs, and binaries)
         gh release create "v${{ github.event.inputs.version }}" \
           --title "Release v${{ github.event.inputs.version }}" \
           --notes-file release_notes.md \
           --target ${{ github.ref_name }} \
           dist/* \
           docs/webquiz-documentation-uk.pdf \
-          docs/webquiz-documentation-en.pdf
+          docs/webquiz-documentation-en.pdf \
+          binaries/webquiz-linux/webquiz-linux \
+          binaries/webquiz-macos/webquiz-macos \
+          binaries/webquiz-windows.exe/webquiz-windows.exe
 
     - name: Update webquiz-ansible repository
       env:

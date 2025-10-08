@@ -57,7 +57,10 @@ WebQuiz - A modern web-based quiz and testing system built with Python and aioht
 - **Live statistics monitoring**: Real-time WebSocket-powered dashboard showing user progress with timing information
 - **Admin approval dashboard**: Real-time pending approvals with WebSocket updates
 - Configurable file paths for quizzes, logs, CSV output, and static files
-- **Binary distribution with PyInstaller 6.15**: Creates standalone executable with automatic executable directory defaults
+- **Multi-platform binary distribution**: Automated builds for Linux, macOS, and Windows via GitHub Actions
+  - PyInstaller 6.15 creates standalone executables with no Python dependency
+  - Automatic executable directory defaults for portable operation
+  - Binaries automatically attached to GitHub releases
 - Comprehensive test suite (integration + unit tests)
 
 ## Architecture
@@ -107,6 +110,7 @@ WebQuiz - A modern web-based quiz and testing system built with Python and aioht
 - `venv/` - Python virtual environment
 - `.gitignore` - Git ignore file (excludes generated files, logs, virtual env)
 - `.github/workflows/test.yml` - GitHub Actions CI/CD pipeline for automated testing
+- `.github/workflows/release.yml` - GitHub Actions release workflow with multi-platform binary builds
 
 ## API Endpoints
 
@@ -132,6 +136,28 @@ WebQuiz - A modern web-based quiz and testing system built with Python and aioht
 - **`WebSocket /ws/admin`** - Real-time WebSocket for admin approval notifications (new registrations, updates, approvals)
 
 ## Commands
+
+### Installation Options
+
+#### Option 1: Pre-built Binaries (No Python Required)
+Download platform-specific binaries from [GitHub Releases](https://github.com/oduvan/webquiz/releases):
+```bash
+# Linux
+wget https://github.com/oduvan/webquiz/releases/latest/download/webquiz-linux
+chmod +x webquiz-linux
+./webquiz-linux --help
+
+# macOS
+wget https://github.com/oduvan/webquiz/releases/latest/download/webquiz-macos
+chmod +x webquiz-macos
+./webquiz-macos --help
+
+# Windows
+# Download webquiz-windows.exe from releases page and run:
+webquiz-windows.exe --help
+```
+
+#### Option 2: Python Package Installation
 ```bash
 # Setup with Poetry (recommended)
 poetry install
@@ -140,7 +166,10 @@ poetry install
 python3 -m venv venv
 source venv/bin/activate
 pip install -r requirements.txt
+```
 
+### Running the Server
+```bash
 # Run server
 webquiz                              # Foreground mode
 webquiz --master-key secret123       # Enable admin interface with master key
@@ -152,8 +181,11 @@ WEBQUIZ_MASTER_KEY=secret webquiz    # Set master key via environment variable
 webquiz -d                           # Daemon mode
 webquiz --stop                       # Stop daemon
 webquiz --status                     # Check status
+```
 
-# Build binary
+### Development Commands
+```bash
+# Build binary locally (creates binary for current OS only)
 poetry run build_binary              # Create standalone executable with PyInstaller
 
 # Run tests (ALWAYS use venv!)
@@ -162,6 +194,7 @@ source venv/bin/activate && python -m pytest tests/ -v -n 4     # Run tests in p
 
 # Alternative (without Poetry installation)
 python -m webquiz.cli
+```
 
 ## Technical Decisions
 - **Middleware over try-catch**: Used aiohttp middleware for cleaner error handling
@@ -182,6 +215,11 @@ python -m webquiz.cli
   - Input fields: `width: 100%; max-width: [desktop-size]` pattern
   - Tables: Stack vertically on mobile with `display: block` for td elements
   - Registration forms: Server-generated HTML includes responsive styles, JavaScript forms match
+- **Multi-platform binary distribution**: GitHub Actions workflow builds binaries for all major platforms
+  - Matrix strategy builds on ubuntu-latest, macos-latest, and windows-latest simultaneously
+  - PyInstaller creates self-contained executables with embedded templates and dependencies
+  - Artifacts uploaded and automatically attached to GitHub releases
+  - Local `poetry run build_binary` creates binary for current OS only (PyInstaller limitation)
 - **Comprehensive testing**: Integration tests for API + unit tests for internal logic
 
 ## Data Flow
@@ -275,3 +313,41 @@ python -m webquiz.cli
 - HTTP exceptions used for proper status codes (404, 400, 500)
 - Generated files (logs, CSV, client JSON, YAML) are git-ignored
 - Server automatically creates missing quiz files with sample questions
+
+## Release Process
+
+The release workflow (`.github/workflows/release.yml`) is triggered manually via workflow_dispatch and performs the following:
+
+1. **Multi-Platform Binary Build** (`build-binaries` job):
+   - Runs in parallel on Linux, macOS, and Windows runners
+   - Each platform builds a standalone binary using PyInstaller
+   - Binaries are renamed with platform suffix (webquiz-linux, webquiz-macos, webquiz-windows.exe)
+   - Uploaded as artifacts for the release job
+
+2. **Release Job** (runs after binaries are built):
+   - Validates version format (X, X.Y, or X.Y.Z)
+   - Updates version in `pyproject.toml` and `webquiz/__init__.py`
+   - Installs dependencies and builds Python packages (wheel + tar.gz)
+   - Generates PDF documentation in Ukrainian and English using Pandoc
+   - Publishes to PyPI
+   - Downloads all binary artifacts from build job
+   - Creates GitHub release with all assets:
+     - Python wheel and source distribution
+     - Linux, macOS, and Windows binaries
+     - Ukrainian and English PDF documentation
+   - Updates webquiz-ansible repository with new version
+
+**Release Assets Available:**
+- `webquiz-{version}-py3-none-any.whl` - Python wheel
+- `webquiz-{version}.tar.gz` - Source distribution
+- `webquiz-linux` - Linux x86_64 binary (no Python required)
+- `webquiz-macos` - macOS Intel/Apple Silicon binary (no Python required)
+- `webquiz-windows.exe` - Windows x86_64 binary (no Python required)
+- `webquiz-documentation-uk.pdf` - Ukrainian documentation
+- `webquiz-documentation-en.pdf` - English documentation
+
+**To trigger a release:**
+1. Go to GitHub Actions → Release and Deploy to PyPI
+2. Click "Run workflow"
+3. Enter version number (e.g., 1.3.6)
+4. Workflow will automatically build, test, and publish everything
