@@ -2,6 +2,32 @@
 
 This file contains project context and memory for Claude Code sessions.
 
+## ⚠️ CRITICAL: Documentation and Testing Requirements
+
+**EVERY code change MUST include:**
+
+1. **Update CLAUDE.md** - This file must reflect all architectural changes, new features, API endpoints, data flows, and technical decisions
+2. **Update README.md** - User-facing documentation must be updated with new features, installation steps, or usage changes
+3. **Update docs/** - Both Ukrainian (`docs/uk/`) and English (`docs/en/`) documentation must be updated:
+   - Add new sections for new features
+   - Update existing sections for modified functionality
+   - Keep both language versions synchronized
+4. **Create new tests** - All new functionality MUST have automated tests:
+   - Integration tests for API endpoints
+   - Unit tests for internal logic
+   - Update test counts in CLAUDE.md
+   - Follow existing test patterns in `tests/` directory
+
+**Testing Philosophy:**
+- Write tests FIRST or immediately after implementing features
+- NEVER rely on manual testing alone
+- Tests should be comprehensive and cover edge cases
+- All tests must pass before considering work complete
+
+**Documentation is not optional** - It's a core part of every feature implementation.
+
+---
+
 ## Project Overview
 WebQuiz - A modern web-based quiz and testing system built with Python and aiohttp that allows users to take multiple-choice tests with real-time answer submission and statistics tracking. Features multi-quiz management with admin controls.
 
