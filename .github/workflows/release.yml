@@ -52,11 +52,25 @@ jobs:
       if: runner.os == 'Windows'
       run: move dist\webquiz.exe dist\${{ matrix.binary_name }}
 
+    - name: Create zip archive (Linux/macOS)
+      if: runner.os != 'Windows'
+      run: |
+        cd dist
+        zip ${{ matrix.binary_name }}.zip ${{ matrix.binary_name }}
+
+    - name: Create zip archive (Windows)
+      if: runner.os == 'Windows'
+      run: |
+        cd dist
+        Compress-Archive -Path ${{ matrix.binary_name }} -DestinationPath ${{ matrix.binary_name }}.zip
+
     - name: Upload binary artifact
       uses: actions/upload-artifact@v4
       with:
         name: ${{ matrix.artifact_name }}
-        path: dist/${{ matrix.binary_name }}
+        path: |
+          dist/${{ matrix.binary_name }}
+          dist/${{ matrix.binary_name }}.zip
         retention-days: 1
 
   release:
@@ -198,9 +212,9 @@ jobs:
         - Source distribution (`webquiz-${{ github.event.inputs.version }}.tar.gz`)
 
         ### 🖥️ Pre-built Binaries
-        - **Linux**: `webquiz-linux` (x86_64, no Python required)
-        - **macOS**: `webquiz-macos` (Intel/Apple Silicon, no Python required)
-        - **Windows**: `webquiz-windows.exe` (x86_64, no Python required)
+        - **Linux**: `webquiz-linux` / `webquiz-linux.zip` (x86_64, no Python required)
+        - **macOS**: `webquiz-macos` / `webquiz-macos.zip` (Intel/Apple Silicon, no Python required)
+        - **Windows**: `webquiz-windows.exe` / `webquiz-windows.exe.zip` (x86_64, no Python required)
 
         ### 📖 Documentation
         - Ukrainian: `webquiz-documentation-uk.pdf`
@@ -209,13 +223,40 @@ jobs:
         ## Installation
 
         ### Option 1: Pre-built Binary (Recommended for End Users)
-        Download the binary for your platform from the assets below and run it directly:
+        Download the binary or zipped binary for your platform from the assets below:
+
+        **Linux:**
         ```bash
-        # Linux/macOS: Make executable and run
-        chmod +x webquiz-linux  # or webquiz-macos
+        # Option A: Direct download
+        wget https://github.com/oduvan/webquiz/releases/download/v${{ github.event.inputs.version }}/webquiz-linux
+        chmod +x webquiz-linux
         ./webquiz-linux --help
 
-        # Windows: Run directly
+        # Option B: Download zip
+        wget https://github.com/oduvan/webquiz/releases/download/v${{ github.event.inputs.version }}/webquiz-linux.zip
+        unzip webquiz-linux.zip
+        chmod +x webquiz-linux
+        ./webquiz-linux --help
+        ```
+
+        **macOS:**
+        ```bash
+        # Option A: Direct download
+        wget https://github.com/oduvan/webquiz/releases/download/v${{ github.event.inputs.version }}/webquiz-macos
+        chmod +x webquiz-macos
+        ./webquiz-macos --help
+
+        # Option B: Download zip
+        wget https://github.com/oduvan/webquiz/releases/download/v${{ github.event.inputs.version }}/webquiz-macos.zip
+        unzip webquiz-macos.zip
+        chmod +x webquiz-macos
+        ./webquiz-macos --help
+        ```
+
+        **Windows:**
+        ```powershell
+        # Download webquiz-windows.exe or webquiz-windows.exe.zip from assets
+        # If using zip, extract first, then run:
         webquiz-windows.exe --help
         ```
 
@@ -231,7 +272,7 @@ jobs:
         *This release was automatically created by the release workflow.*
         EOF
 
-        # Create release with built artifacts (includes wheel, tar.gz, PDFs, and binaries)
+        # Create release with built artifacts (includes wheel, tar.gz, PDFs, binaries, and zipped binaries)
         gh release create "v${{ github.event.inputs.version }}" \
           --title "Release v${{ github.event.inputs.version }}" \
           --notes-file release_notes.md \
@@ -240,8 +281,11 @@ jobs:
           docs/webquiz-documentation-uk.pdf \
           docs/webquiz-documentation-en.pdf \
           binaries/webquiz-linux/webquiz-linux \
+          binaries/webquiz-linux/webquiz-linux.zip \
           binaries/webquiz-macos/webquiz-macos \
-          binaries/webquiz-windows.exe/webquiz-windows.exe
+          binaries/webquiz-macos/webquiz-macos.zip \
+          binaries/webquiz-windows.exe/webquiz-windows.exe \
+          binaries/webquiz-windows.exe/webquiz-windows.exe.zip
 
     - name: Update webquiz-ansible repository
       env:
