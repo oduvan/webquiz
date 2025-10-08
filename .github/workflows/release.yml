@@ -71,9 +71,7 @@ jobs:
       uses: actions/upload-artifact@v4
       with:
         name: ${{ matrix.artifact_name }}
-        path: |
-          dist/${{ matrix.binary_name }}
-          dist/${{ matrix.binary_name }}.zip
+        path: dist/${{ matrix.binary_name }}.zip
         retention-days: 1
 
   release:
@@ -216,11 +214,11 @@ jobs:
         - Python wheel package (`webquiz-${{ github.event.inputs.version }}-py3-none-any.whl`)
         - Source distribution (`webquiz-${{ github.event.inputs.version }}.tar.gz`)
 
-        ### 🖥️ Pre-built Binaries
-        - **Linux**: `webquiz-linux` / `webquiz-linux.zip` (x86_64, no Python required)
-        - **macOS Intel**: `webquiz-macos-intel` / `webquiz-macos-intel.zip` (x86_64, no Python required)
-        - **macOS Apple Silicon**: `webquiz-macos-apple-silicon` / `webquiz-macos-apple-silicon.zip` (ARM64, no Python required)
-        - **Windows**: `webquiz-windows.exe` / `webquiz-windows.exe.zip` (x86_64, no Python required)
+        ### 🖥️ Pre-built Binaries (Zipped)
+        - **Linux**: `webquiz-linux.zip` (x86_64, no Python required)
+        - **macOS Intel**: `webquiz-macos-intel.zip` (x86_64, no Python required)
+        - **macOS Apple Silicon**: `webquiz-macos-apple-silicon.zip` (ARM64/M1/M2/M3, no Python required)
+        - **Windows**: `webquiz-windows.exe.zip` (x86_64, no Python required)
 
         ### 📖 Documentation
         - Ukrainian: `webquiz-documentation-uk.pdf`
@@ -229,16 +227,10 @@ jobs:
         ## Installation
 
         ### Option 1: Pre-built Binary (Recommended for End Users)
-        Download the binary or zipped binary for your platform from the assets below:
+        Download the zipped binary for your platform from the assets below:
 
         **Linux:**
         ```bash
-        # Option A: Direct download
-        wget https://github.com/oduvan/webquiz/releases/download/v${{ github.event.inputs.version }}/webquiz-linux
-        chmod +x webquiz-linux
-        ./webquiz-linux --help
-
-        # Option B: Download zip
         wget https://github.com/oduvan/webquiz/releases/download/v${{ github.event.inputs.version }}/webquiz-linux.zip
         unzip webquiz-linux.zip
         chmod +x webquiz-linux
@@ -247,12 +239,6 @@ jobs:
 
         **macOS Intel (x86_64):**
         ```bash
-        # Option A: Direct download
-        wget https://github.com/oduvan/webquiz/releases/download/v${{ github.event.inputs.version }}/webquiz-macos-intel
-        chmod +x webquiz-macos-intel
-        ./webquiz-macos-intel --help
-
-        # Option B: Download zip
         wget https://github.com/oduvan/webquiz/releases/download/v${{ github.event.inputs.version }}/webquiz-macos-intel.zip
         unzip webquiz-macos-intel.zip
         chmod +x webquiz-macos-intel
@@ -261,12 +247,6 @@ jobs:
 
         **macOS Apple Silicon (ARM64/M1/M2/M3):**
         ```bash
-        # Option A: Direct download
-        wget https://github.com/oduvan/webquiz/releases/download/v${{ github.event.inputs.version }}/webquiz-macos-apple-silicon
-        chmod +x webquiz-macos-apple-silicon
-        ./webquiz-macos-apple-silicon --help
-
-        # Option B: Download zip
         wget https://github.com/oduvan/webquiz/releases/download/v${{ github.event.inputs.version }}/webquiz-macos-apple-silicon.zip
         unzip webquiz-macos-apple-silicon.zip
         chmod +x webquiz-macos-apple-silicon
@@ -275,8 +255,7 @@ jobs:
 
         **Windows:**
         ```powershell
-        # Download webquiz-windows.exe or webquiz-windows.exe.zip from assets
-        # If using zip, extract first, then run:
+        # Download webquiz-windows.exe.zip from assets, extract, then run:
         webquiz-windows.exe --help
         ```
 
@@ -292,7 +271,7 @@ jobs:
         *This release was automatically created by the release workflow.*
         EOF
 
-        # Create release with built artifacts (includes wheel, tar.gz, PDFs, binaries, and zipped binaries)
+        # Create release with built artifacts (includes wheel, tar.gz, PDFs, and zipped binaries)
         gh release create "v${{ github.event.inputs.version }}" \
           --title "Release v${{ github.event.inputs.version }}" \
           --notes-file release_notes.md \
@@ -300,13 +279,9 @@ jobs:
           dist/* \
           docs/webquiz-documentation-uk.pdf \
           docs/webquiz-documentation-en.pdf \
-          binaries/webquiz-linux/webquiz-linux \
           binaries/webquiz-linux/webquiz-linux.zip \
-          binaries/webquiz-macos-intel/webquiz-macos-intel \
           binaries/webquiz-macos-intel/webquiz-macos-intel.zip \
-          binaries/webquiz-macos-apple-silicon/webquiz-macos-apple-silicon \
           binaries/webquiz-macos-apple-silicon/webquiz-macos-apple-silicon.zip \
-          binaries/webquiz-windows.exe/webquiz-windows.exe \
           binaries/webquiz-windows.exe/webquiz-windows.exe.zip
 
     - name: Update webquiz-ansible repository

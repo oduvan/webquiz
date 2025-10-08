@@ -61,7 +61,7 @@ WebQuiz - A modern web-based quiz and testing system built with Python and aioht
   - PyInstaller 6.15 creates standalone executables with no Python dependency
   - Separate macOS binaries for Intel (x86_64) and Apple Silicon (ARM64) architectures
   - Automatic executable directory defaults for portable operation
-  - Binaries automatically attached to GitHub releases (raw + zipped)
+  - Binaries automatically attached to GitHub releases as zipped archives
 - Comprehensive test suite (integration + unit tests)
 
 ## Architecture
@@ -143,25 +143,28 @@ WebQuiz - A modern web-based quiz and testing system built with Python and aioht
 ### Installation Options
 
 #### Option 1: Pre-built Binaries (No Python Required)
-Download platform-specific binaries from [GitHub Releases](https://github.com/oduvan/webquiz/releases):
+Download platform-specific zipped binaries from [GitHub Releases](https://github.com/oduvan/webquiz/releases):
 ```bash
 # Linux
-wget https://github.com/oduvan/webquiz/releases/latest/download/webquiz-linux
+wget https://github.com/oduvan/webquiz/releases/latest/download/webquiz-linux.zip
+unzip webquiz-linux.zip
 chmod +x webquiz-linux
 ./webquiz-linux --help
 
 # macOS Intel (x86_64)
-wget https://github.com/oduvan/webquiz/releases/latest/download/webquiz-macos-intel
+wget https://github.com/oduvan/webquiz/releases/latest/download/webquiz-macos-intel.zip
+unzip webquiz-macos-intel.zip
 chmod +x webquiz-macos-intel
 ./webquiz-macos-intel --help
 
 # macOS Apple Silicon (ARM64/M1/M2/M3)
-wget https://github.com/oduvan/webquiz/releases/latest/download/webquiz-macos-apple-silicon
+wget https://github.com/oduvan/webquiz/releases/latest/download/webquiz-macos-apple-silicon.zip
+unzip webquiz-macos-apple-silicon.zip
 chmod +x webquiz-macos-apple-silicon
 ./webquiz-macos-apple-silicon --help
 
 # Windows
-# Download webquiz-windows.exe from releases page and run:
+# Download webquiz-windows.exe.zip from releases page, extract, then run:
 webquiz-windows.exe --help
 ```
 
@@ -227,8 +230,8 @@ python -m webquiz.cli
   - Matrix strategy builds on ubuntu-latest, macos-13 (Intel), macos-14 (Apple Silicon), and windows-latest simultaneously
   - macOS requires separate builds for Intel (x86_64) and Apple Silicon (ARM64) architectures due to PyInstaller limitations
   - PyInstaller creates self-contained executables with embedded templates and dependencies
-  - Each binary is zipped for easier distribution and download
-  - Artifacts uploaded and automatically attached to GitHub releases (12 total assets: 2 Python packages + 4 raw binaries + 4 zipped binaries + 2 PDF docs)
+  - All binaries are zipped for easier distribution and download
+  - Only zipped binaries are attached to GitHub releases (8 total assets: 2 Python packages + 4 zipped binaries + 2 PDF docs)
   - Local `poetry run build_binary` creates binary for current OS/architecture only (PyInstaller limitation)
 - **Comprehensive testing**: Integration tests for API + unit tests for internal logic
 
@@ -347,23 +350,19 @@ The release workflow (`.github/workflows/release.yml`) is triggered manually via
    - Downloads all binary artifacts from build job
    - Creates GitHub release with all assets:
      - Python wheel and source distribution
-     - Linux, macOS (Intel + Apple Silicon), and Windows binaries (raw + zipped)
-     - Ukrainian and English PDF documentation
+     - Linux, macOS (Intel + Apple Silicon), and Windows binaries (zipped only)
+     - Ukrainian and English PDF documentation (with version on title page)
    - Updates webquiz-ansible repository with new version
 
-**Release Assets Available:**
+**Release Assets Available (8 total):**
 - `webquiz-{version}-py3-none-any.whl` - Python wheel
 - `webquiz-{version}.tar.gz` - Source distribution
-- `webquiz-linux` - Linux x86_64 binary (no Python required)
-- `webquiz-linux.zip` - Linux binary (zipped)
-- `webquiz-macos-intel` - macOS Intel (x86_64) binary (no Python required)
-- `webquiz-macos-intel.zip` - macOS Intel binary (zipped)
-- `webquiz-macos-apple-silicon` - macOS Apple Silicon (ARM64) binary (no Python required)
-- `webquiz-macos-apple-silicon.zip` - macOS Apple Silicon binary (zipped)
-- `webquiz-windows.exe` - Windows x86_64 binary (no Python required)
-- `webquiz-windows.exe.zip` - Windows binary (zipped)
-- `webquiz-documentation-uk.pdf` - Ukrainian documentation
-- `webquiz-documentation-en.pdf` - English documentation
+- `webquiz-linux.zip` - Linux x86_64 binary (zipped, no Python required)
+- `webquiz-macos-intel.zip` - macOS Intel (x86_64) binary (zipped, no Python required)
+- `webquiz-macos-apple-silicon.zip` - macOS Apple Silicon (ARM64) binary (zipped, no Python required)
+- `webquiz-windows.exe.zip` - Windows x86_64 binary (zipped, no Python required)
+- `webquiz-documentation-uk.pdf` - Ukrainian documentation with version on title page
+- `webquiz-documentation-en.pdf` - English documentation with version on title page
 
 **To trigger a release:**
 1. Go to GitHub Actions → Release and Deploy to PyPI
