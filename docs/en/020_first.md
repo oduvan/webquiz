@@ -22,6 +22,40 @@ The easiest way to start using **WebQuiz** is by running the prebuilt binary fil
      ```
      ./webquiz
      ```
+
+### Important for macOS Users
+
+On first launch on macOS, you'll see a security warning because the binary is not signed by Apple:
+
+![First launch warning](../imgs/mac_first_launch.png)
+
+To allow the application to run:
+
+1. Click **Done** in the warning dialog
+2. Open **System Settings** → **Privacy & Security**
+3. Scroll to the **Security** section and click **Open Anyway**:
+
+![Open Anyway](../imgs/mac_open_anyway.png)
+
+4. Confirm by clicking **Open Anyway** in the dialog:
+
+![Confirmation dialog](../imgs/mac_open_anyway_2.png)
+
+WebQuiz will now launch normally. This is a one-time procedure — subsequent launches won't require confirmation.
+
+### Important for Windows Users
+
+Windows Defender or other antivirus software may flag the binary file as a potential threat. **This is normal behavior for applications created with PyInstaller** — it's a well-known false-positive issue ([details on GitHub](https://github.com/pyinstaller/pyinstaller/issues/6754)).
+
+This is **not a virus**. WebQuiz is safe, open-source software. You can:
+- Review the source code on [GitHub](https://github.com/oduvan/webquiz)
+- Add the file to Windows Defender exclusions
+- Use the alternative Python installation method (`pip install webquiz`)
+
+If you see a warning, allow the application to run or add it to your antivirus's trusted applications list.
+
+---
+
 5. After launching, the admin panel page will open in your terminal at [http://localhost:8080/admin/](http://localhost:8080/admin/):
 
 ![First admin panel launch](../imgs/first_admin.png)
