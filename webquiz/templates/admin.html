@@ -732,6 +732,21 @@
         let selectedQuiz = '';
         let currentQuiz = '';
 
+        // HTML escape function to prevent quote truncation in form inputs
+        function escapeHtml(text) {
+            if (text === null || text === undefined) {
+                return '';
+            }
+            const map = {
+                '&': '&amp;',
+                '<': '&lt;',
+                '>': '&gt;',
+                '"': '&quot;',
+                "'": '&#39;'
+            };
+            return String(text).replace(/[&<>"']/g, m => map[m]);
+        }
+
         async function authenticate() {
             const masterKey = document.getElementById('master-key').value.trim();
             if (!masterKey) {
@@ -1389,7 +1404,7 @@
                         optionsHtml += `
                             <div class="option-item">
                                 <input type="${inputType}" name="${inputName}" value="${index}" ${isCorrect ? 'checked' : ''}>
-                                <input type="text" class="option-text" value="${option}" placeholder="Варіант ${index + 1}">
+                                <input type="text" class="option-text" value="${escapeHtml(option)}" placeholder="Варіант ${index + 1}">
                                 <button type="button" onclick="openImagePicker('option-text', ${questionCounter}, ${index})" style="padding: 2px 5px; font-size: 12px;" title="Select image">📷</button>
                                 <button type="button" onclick="removeOption(this)">×</button>
                             </div>
@@ -1410,12 +1425,12 @@
                         </div>
                         <div class="form-group">
                             <label>Текст Питання (необов'язково, якщо є зображення):</label>
-                            <input type="text" class="question-text" value="${question.question || ''}" placeholder="Введіть текст питання" style="width: 100%;">
+                            <input type="text" class="question-text" value="${escapeHtml(question.question || '')}" placeholder="Введіть текст питання" style="width: 100%;">
                         </div>
                         <div class="form-group">
                             <label>Зображення Питання (необов'язково, якщо є текст):</label>
                             <div style="display: flex; align-items: center; gap: 5px;">
-                                <input type="text" class="question-image" value="${question.image || ''}" placeholder="напр., /imgs/diagram.png" style="width: 100%;">
+                                <input type="text" class="question-image" value="${escapeHtml(question.image || '')}" placeholder="напр., /imgs/diagram.png" style="width: 100%;">
                                 <button type="button" onclick="openImagePicker('question-image', ${questionCounter})" style="padding: 5px 8px; font-size: 16px;" title="Select image">📷</button>
                             </div>
                             <small style="color: var(--text-muted);">Введіть шлях, що починається з /imgs/ для зображень. Має бути наданий текст питання АБО зображення.</small>
