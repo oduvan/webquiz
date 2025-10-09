@@ -499,7 +499,7 @@ def test_missed_correct_answer_highlighted(browser):
 
 @skip_if_selenium_disabled
 def test_no_feedback_when_show_right_answer_false(browser):
-    """No visual feedback when show_right_answer=false."""
+    """No visual feedback when show_right_answer=false, auto-advances to results."""
     quiz_data = {
         "default.yaml": {
             "title": "No Feedback Test",
@@ -516,14 +516,13 @@ def test_no_feedback_when_show_right_answer_false(browser):
         options[2].click()  # Wrong
 
         browser.find_element(By.ID, "submit-answer-btn").click()
-        wait_for_clickable(browser, By.ID, "continue-btn")
 
-        options = find_options(browser)
-        # No feedback classes should be present
-        for option in options:
-            classes = option.get_attribute("class")
-            assert "feedback-correct" not in classes
-            assert "feedback-incorrect" not in classes
+        # With show_right_answer: false, quiz should auto-advance to results (no continue button)
+        # Wait for results page to appear
+        wait_for_element(browser, By.ID, "results", timeout=3)
+
+        # Verify we reached results
+        assert "Результат" in browser.page_source or "Result" in browser.page_source
 
 
 @skip_if_selenium_disabled
@@ -933,6 +932,12 @@ def test_results_show_multiple_answers_with_pipe(browser):
 
         # Check results
         wait_for_element(browser, By.ID, "results-content")
+
+        # Wait for results content to be populated (not just for element to exist)
+        WebDriverWait(browser, 5).until(
+            lambda d: len(d.find_element(By.ID, "results-content").text.strip()) > 0,
+            message="Results content should be populated",
+        )
 
         # Results should show answers with | separator
         results_content = browser.execute_script("return document.getElementById('results-content').innerHTML;")
