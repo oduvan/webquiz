@@ -149,7 +149,7 @@ def custom_webquiz_server(config=None, quizzes=None):
         yield proc, port
 
     finally:
-        # Cleanup
+        # Cleanup server process
         if proc.poll() is None:  # Process is still running
             proc.terminate()
             try:
@@ -157,3 +157,18 @@ def custom_webquiz_server(config=None, quizzes=None):
             except subprocess.TimeoutExpired:
                 proc.kill()
                 proc.wait()
+
+        # Cleanup directories and config file to prevent data contamination between tests
+        try:
+            for directory in [quizzes_dir,
+                            final_config['paths']['logs_dir'],
+                            final_config['paths']['csv_dir'],
+                            final_config['paths']['static_dir']]:
+                if os.path.exists(directory):
+                    shutil.rmtree(directory)
+
+            if os.path.exists(config_filename):
+                os.remove(config_filename)
+        except Exception as e:
+            # Log cleanup errors but don't fail the test
+            print(f"Warning: Cleanup error: {e}")
