@@ -1,17 +1,17 @@
-# WebQuiz Administrative Interface
+## WebQuiz Administrative Interface
 
 The **WebQuiz** administrative interface allows you to manage quizzes, view results, approve user requests, and work with files directly through the browser.
 Access to the panel opens automatically if you connect from a local address (`127.0.0.1` or `localhost`), or using a **Master Key** if connecting from another device on the network.
 
 ---
 
-## Main Admin Panel
+### Main Admin Panel
 
 ![WebQuiz Admin Panel](../imgs/admin_advanced.png)
 
 The main administrative panel page contains essential tools for managing quizzes, approving users, and downloading additional question sets.
 
-### Main Panel Elements
+#### Main Panel Elements
 
 - **Available Quiz Files**
   The top of the page displays a list of all quizzes available in the `quizzes` folder.
@@ -40,14 +40,14 @@ The main administrative panel page contains essential tools for managing quizzes
 
 ---
 
-## File Manager
+### File Manager
 
 ![WebQuiz File Manager](../imgs/file_manager.png)
 
 The File Manager is accessed via the **File Manager** link at the bottom of the admin panel.
 It allows you to quickly view, download, and diagnose files created by the server.
 
-### Main Tabs
+#### Main Tabs
 
 - **CSV Files** — list of quiz result files.
   Each item shows the file name, size, and last modification date.
@@ -63,14 +63,14 @@ If you're connected from a local address or "trusted IP", the system automatical
 
 ---
 
-## Quiz Editor
+### Quiz Editor
 
 ![Quiz Editor in Wizard Mode](../imgs/edit_quiz.png)
 
 The Quiz Editor allows you to create or modify questions in the selected quiz.
 Available in two modes: **Wizard** (visual editor) and **Text** (working directly with YAML code).
 
-### Main Editor Features
+#### Main Editor Features
 
 - **Quiz Name**
   Can be set in the "Quiz Name (optional)" field. If not specified, the system uses the standard file name.
@@ -93,7 +93,7 @@ Available in two modes: **Wizard** (visual editor) and **Text** (working directl
 
 ---
 
-## Quick Access
+### Quick Access
 
 At the bottom of each admin interface page, there are convenient links:
 - **← Back to Quiz** — return to the main quiz page.

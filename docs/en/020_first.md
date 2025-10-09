@@ -1,11 +1,11 @@
-# First Run
+## First Run
 
 This section will help you quickly launch **WebQuiz** in a local network.
 The system is designed to work **inside your own network**, so you should not open its port to the public internet. This ensures that quiz results remain private and accessible only to users connected to your local environment.
 
 ---
 
-## Download and Launch
+### Download and Launch
 
 The easiest way to start using **WebQuiz** is by running the prebuilt binary file.
 
@@ -23,7 +23,7 @@ The easiest way to start using **WebQuiz** is by running the prebuilt binary fil
      ./webquiz
      ```
 
-### Important for macOS Users
+#### Important for macOS Users
 
 On first launch on macOS, you'll see a security warning because the binary is not signed by Apple:
 
@@ -43,7 +43,7 @@ To allow the application to run:
 
 WebQuiz will now launch normally. This is a one-time procedure — subsequent launches won't require confirmation.
 
-### Important for Windows Users
+#### Important for Windows Users
 
 Windows Defender or other antivirus software may flag the binary file as a potential threat. **This is normal behavior for applications created with PyInstaller** — it's a well-known false-positive issue ([details on GitHub](https://github.com/pyinstaller/pyinstaller/issues/6754)).
 
@@ -62,7 +62,7 @@ If you see a warning, allow the application to run or add it to your antivirus's
 
 ---
 
-## Files and Folders Created
+### Files and Folders Created
 
 After the first launch, WebQuiz will automatically create several service files and folders in the same directory as the executable.
 They are used to store configuration, results, and diagnostic information.
@@ -77,7 +77,7 @@ They are used to store configuration, results, and diagnostic information.
 
 ---
 
-## The First Quiz
+### The First Quiz
 
 Right after the first run, WebQuiz automatically creates a simple example quiz.
 This allows you to immediately test the system without any additional configuration.
@@ -96,7 +96,7 @@ To take the quiz:
 
 ---
 
-## Alternative Launch and Configuration Methods
+### Alternative Launch and Configuration Methods
 
 If you want to configure WebQuiz more flexibly or integrate it into your own scripts, additional launch methods are available:
 

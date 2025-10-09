@@ -1,6 +1,6 @@
-# WebQuiz — a local network testing system
+## WebQuiz — a local network testing system
 
-## Introduction
+### Introduction
 
 **WebQuiz** is a lightweight and easy-to-use system for creating and running quizzes or tests within a **local network**.
 It is designed for teachers, trainers, and educators who want to conduct quick and secure testing sessions **without an internet connection**.
@@ -10,7 +10,7 @@ This way, you can be confident that participants’ results will not be shared o
 
 ---
 
-## Key Features
+### Key Features
 
 - 🧩 **Create quizzes in YAML format** — questions and answer options are stored in a simple text file that can be easily edited manually.
 - ⚙️ **Flexible testing configuration** — define which registration fields are required and whether manual approval is needed before the test begins.
@@ -20,7 +20,7 @@ This way, you can be confident that participants’ results will not be shared o
 
 ---
 
-## Who This Document Is For
+### Who This Document Is For
 
 This documentation is intended for **teachers, instructors, and organizers** who:
 

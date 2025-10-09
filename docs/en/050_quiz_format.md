@@ -1,4 +1,4 @@
-# Quiz File Format (quiz.yaml)
+## Quiz File Format (quiz.yaml)
 
 Tests in **WebQuiz** are stored in YAML format.
 Each file contains a title, description (optional), and a list of questions.
@@ -6,7 +6,7 @@ You can create your own tests by placing them in the **`quizzes/`** folder.
 
 ---
 
-## File Structure
+### File Structure
 
 The basic structure of a test file looks like this:
 
@@ -22,9 +22,9 @@ questions:
 
 ---
 
-## Main Test Parameters
+### Main Test Parameters
 
-### `title` (required)
+#### `title` (required)
 
 The test title displayed in the web interface and admin panel.
 
@@ -34,7 +34,7 @@ title: "Math Test"
 
 ---
 
-### `description` (optional)
+#### `description` (optional)
 
 A short description of the test. May contain information about the topic, difficulty, or other details.
 
@@ -44,7 +44,7 @@ description: "Basic arithmetic operations for 5th grade students"
 
 ---
 
-### `show_right_answer` (optional)
+#### `show_right_answer` (optional)
 
 Determines whether to show the user the correct answer after submitting their choice, as well as the behavior for progressing to the next question.
 
@@ -59,14 +59,14 @@ show_right_answer: false  # Automatic progression to the next question
 
 ---
 
-## `questions` Section
+### `questions` Section
 
 The `questions` section contains a list of test questions.
 Each question is a separate list item with its own parameters.
 
 ---
 
-### Basic Single-Choice Question
+#### Basic Single-Choice Question
 
 The simplest form of question with text, answer options, and the correct answer index:
 
@@ -84,7 +84,7 @@ In this example, the correct answer is `"4"` (index 1).
 
 ---
 
-### Multiple Correct Answers Question
+#### Multiple Correct Answers Question
 
 WebQuiz supports questions with multiple correct answers.
 In this case, the user must select **all correct options**.
@@ -101,7 +101,7 @@ In this example, the correct answers are `"Python"` (index 0) and `"JavaScript"`
 
 ---
 
-### Question with Minimum Number of Correct Answers
+#### Question with Minimum Number of Correct Answers
 
 If you want the question to be considered correct when selecting a **minimum number** of all correct answers, use the **`min_correct`** parameter:
 
@@ -119,7 +119,7 @@ In this example:
 
 ---
 
-### Question with Image
+#### Question with Image
 
 You can add an image to a question using the **`image`** parameter.
 Images should be stored in the **`quizzes/imgs/`** folder.
@@ -135,7 +135,7 @@ The image path is specified relative to the web root (`/imgs/`).
 
 ---
 
-### Image-Only Question (Without Text)
+#### Image-Only Question (Without Text)
 
 If a question consists only of an image (e.g., "What is shown in the picture?"), you can **omit the `question` field**:
 
@@ -149,7 +149,7 @@ In this case, the user will see only the image and answer options.
 
 ---
 
-### Question with Image-Based Answer Options
+#### Question with Image-Based Answer Options
 
 Answer options can also be images.
 To do this, instead of text in the `options` list, specify paths to images:
@@ -165,7 +165,7 @@ To do this, instead of text in the `options` list, specify paths to images:
 
 ---
 
-### Combined Question: Image + Text Options
+#### Combined Question: Image + Text Options
 
 You can combine an image in the question with text answer options:
 
@@ -178,7 +178,7 @@ You can combine an image in the question with text answer options:
 
 ---
 
-## Complete Test File Example
+### Complete Test File Example
 
 Below is an example of a complete test file with different types of questions:
 
@@ -226,9 +226,9 @@ questions:
 
 ---
 
-## Rules and Recommendations
+### Rules and Recommendations
 
-### Index Numbering
+#### Index Numbering
 
 Indexes in `correct_answer` always start from **0**.
 
@@ -241,7 +241,7 @@ Indexes in `correct_answer` always start from **0**.
 
 ---
 
-### Saving Images
+#### Saving Images
 
 All images should be stored in the **`quizzes/imgs/`** folder.
 Image paths in the test file are specified as `/imgs/filename.png`.
@@ -254,13 +254,13 @@ Supported formats:
 
 ---
 
-### File Encoding
+#### File Encoding
 
 Test files should be saved in **UTF-8** encoding to correctly display text in Ukrainian, Russian, and other languages with Cyrillic characters.
 
 ---
 
-### Syntax Validation
+#### Syntax Validation
 
 **Recommended method:** Use the **administrator web interface** to create and edit tests.
 The admin panel automatically validates YAML syntax before saving the file and shows errors if any exist.
@@ -272,9 +272,9 @@ If you're editing files manually and the test doesn't load after editing, check:
 
 ---
 
-## Creating a New Test
+### Creating a New Test
 
-### Through Admin Interface (Recommended)
+#### Through Admin Interface (Recommended)
 
 1. Open the admin panel at `http://localhost:8080/admin/`
 2. Enter the master key for access
@@ -282,7 +282,7 @@ If you're editing files manually and the test doesn't load after editing, check:
 4. The editor will automatically validate syntax before saving
 5. If there are errors in the file, you'll see messages about them
 
-### Manually Through File System
+#### Manually Through File System
 
 1. Open the **`quizzes/`** folder in your WebQuiz working directory.
 2. Create a new file with `.yaml` extension, for example `my_test.yaml`.
@@ -294,9 +294,9 @@ The new test will appear in the list of available tests in the **Administration*
 
 ---
 
-## Editing Existing Tests
+### Editing Existing Tests
 
-### Through Admin Interface (Recommended)
+#### Through Admin Interface (Recommended)
 
 1. Open the admin panel
 2. Select a test to edit
@@ -304,7 +304,7 @@ The new test will appear in the list of available tests in the **Administration*
 4. Click "Save" — validation will happen automatically
 5. If there are errors, they will be displayed on screen
 
-### Manually Through File System
+#### Manually Through File System
 
 1. Open the corresponding `.yaml` file in the **`quizzes/`** folder in a text editor.
 2. Make the necessary changes.
@@ -315,9 +315,9 @@ The new test will appear in the list of available tests in the **Administration*
 
 ---
 
-## Common Errors
+### Common Errors
 
-### Incorrect Indentation
+#### Incorrect Indentation
 
 YAML is sensitive to indentation. All elements at the same level must have the same indentation.
 
@@ -339,7 +339,7 @@ questions:
 
 ---
 
-### Index Mismatch
+#### Index Mismatch
 
 If `correct_answer` specifies an index that doesn't exist in `options`, the test won't load.
 
@@ -357,7 +357,7 @@ correct_answer: 2  # Index 2 = option "C"
 
 ---
 
-### Missing Quotes in Text with Special Characters
+#### Missing Quotes in Text with Special Characters
 
 If question or option text contains special characters (`:`, `#`, `{`, `}`), it must be enclosed in quotes.
 
@@ -375,9 +375,9 @@ question: "What is 2:1?"
 
 ---
 
-## Additional Features
+### Additional Features
 
-### Downloading Tests Through Admin Interface
+#### Downloading Tests Through Admin Interface
 
 If the `config.yaml` configuration file has the **`quizzes`** section filled in, the administrator can download tests directly from the web interface.
 
@@ -394,7 +394,7 @@ After downloading, the archive is automatically unpacked into the specified fold
 
 ---
 
-### Switching Between Tests
+#### Switching Between Tests
 
 The administrator can switch the active test at any time through the **Administration** panel.
 When changing tests:
@@ -404,9 +404,9 @@ When changing tests:
 
 ---
 
-## Real Test Examples
+### Real Test Examples
 
-### Math Test
+#### Math Test
 
 ```
 title: "Basic Arithmetic"
@@ -428,7 +428,7 @@ questions:
 
 ---
 
-### Geography Test with Images
+#### Geography Test with Images
 
 ```
 title: "Countries and Flags"
@@ -450,7 +450,7 @@ questions:
 
 ---
 
-### Programming Test with Multiple Choice
+#### Programming Test with Multiple Choice
 
 ```
 title: "Programming Basics"
@@ -469,7 +469,7 @@ questions:
 
 ---
 
-## Summary
+### Summary
 
 The YAML format for tests in **WebQuiz** allows:
 
