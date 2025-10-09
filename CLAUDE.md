@@ -287,6 +287,7 @@ python -m webquiz.cli
 - **Total: 61 tests** with GitHub Actions CI/CD pipeline
 - **Parallel Testing**: Tests use predefined ports (8080-8087) with worker-based allocation to prevent conflicts
 - **Fast Server Startup**: Port availability checking instead of HTTP requests for efficient fixture startup
+- **Test Isolation**: `custom_webquiz_server` fixture automatically cleans up directories and config files after each test to prevent data contamination between sequential test runs
 - **Testing Philosophy**: Create new automated tests for newly implemented functionality instead of manual testing
 - **Test Organization**: Fixtures separated into `conftest.py` for reusability across test modules
 
