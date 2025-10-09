@@ -649,26 +649,8 @@ def test_show_right_answer_false_visual_feedback(temp_dir, browser):
         submit_button = browser.find_element(By.ID, "submit-answer-btn")
         submit_button.click()
 
-        # Wait for feedback
-        wait_for_clickable(browser, By.ID, "continue-btn")
-
-        # With show_right_answer: false, NO visual feedback should be shown at all
-        assert "feedback-incorrect" not in wrong_option.get_attribute(
-            "class"
-        ), "Wrong answer should NOT be highlighted when show_right_answer is false"
-        assert "feedback-correct" not in correct_option.get_attribute(
-            "class"
-        ), "Correct answer should NOT be highlighted when show_right_answer is false"
-
-        # Options should still be disabled after submission
-        assert "disabled" in wrong_option.get_attribute("class"), "Options should be disabled after submission"
-
-        # Continue to results
-        continue_button = browser.find_element(By.ID, "continue-btn")
-        continue_button.click()
-
-        # Wait for results
-        wait_for_element(browser, By.ID, "results")
+        # With show_right_answer: false, quiz should auto-advance to results (no continue button)
+        wait_for_element(browser, By.ID, "results", timeout=3)
 
         # Debug: Check the showRightAnswer variable value and results HTML
         show_right_answer_value = browser.execute_script("return showRightAnswer;")
@@ -719,23 +701,8 @@ def test_show_right_answer_false_correct_answer_visual_feedback(temp_dir, browse
         submit_button = browser.find_element(By.ID, "submit-answer-btn")
         submit_button.click()
 
-        # Wait for feedback
-        wait_for_clickable(browser, By.ID, "continue-btn")
-
-        # With show_right_answer: false, NO visual feedback should be shown even for correct answers
-        assert "feedback-correct" not in correct_option.get_attribute(
-            "class"
-        ), "No feedback should be shown when show_right_answer is false"
-
-        # Options should still be disabled after submission
-        assert "disabled" in correct_option.get_attribute("class"), "Options should be disabled after submission"
-
-        # Continue to results
-        continue_button = browser.find_element(By.ID, "continue-btn")
-        continue_button.click()
-
-        # Wait for results
-        wait_for_element(browser, By.ID, "results")
+        # With show_right_answer: false, quiz should auto-advance to results (no continue button)
+        wait_for_element(browser, By.ID, "results", timeout=3)
 
         # Results should show perfect score but no correct answer hints
         assert "1/1" in browser.page_source or "100%" in browser.page_source, "Results should show perfect score"
@@ -775,60 +742,28 @@ def test_show_right_answer_multi_question_journey(temp_dir, browser):
         correct_option_1.click()
         browser.find_element(By.ID, "submit-answer-btn").click()
 
-        # Should show NO feedback at all when show_right_answer is false
-        wait_for_clickable(browser, By.ID, "continue-btn")
-        assert "feedback-correct" not in correct_option_1.get_attribute(
-            "class"
-        ), "No feedback should be shown when show_right_answer is false"
-
-        # Continue to next question
-        browser.find_element(By.ID, "continue-btn").click()
+        # With show_right_answer: false, should auto-advance to Question 2 (no continue button)
+        wait_for_element(browser, By.CSS_SELECTOR, ".question-text", timeout=3)
+        question_text = browser.find_element(By.CSS_SELECTOR, ".question-text")
+        assert "What is 2 * 3?" in question_text.text, "Should auto-advance to Question 2"
 
         # Question 2: Answer INCORRECTLY
-        wait_for_element(browser, By.CSS_SELECTOR, ".question-text")
-        question_text = browser.find_element(By.CSS_SELECTOR, ".question-text")
-        assert "What is 2 * 3?" in question_text.text
         wrong_option_2 = find_option_by_text(browser, "4")  # Wrong: should be 6
-        correct_option_2 = find_option_by_text(browser, "6")  # Correct answer
-
         wrong_option_2.click()
         browser.find_element(By.ID, "submit-answer-btn").click()
 
-        # Should show NO feedback on any option when show_right_answer is false
-        wait_for_clickable(browser, By.ID, "continue-btn")
-        assert "feedback-incorrect" not in wrong_option_2.get_attribute(
-            "class"
-        ), "No feedback should be shown when show_right_answer is false"
-        assert "feedback-correct" not in correct_option_2.get_attribute(
-            "class"
-        ), "No feedback should be shown when show_right_answer is false"
-
-        # Continue to next question
-        browser.find_element(By.ID, "continue-btn").click()
+        # Should auto-advance to Question 3
+        wait_for_element(browser, By.CSS_SELECTOR, ".question-text", timeout=3)
+        time.sleep(0.2)  # Small delay to ensure DOM is updated
+        question_text = browser.find_element(By.CSS_SELECTOR, ".question-text")
+        assert "What is 10 / 2?" in question_text.text, "Should auto-advance to Question 3"
 
         # Question 3: Answer INCORRECTLY
-        wait_for_element(browser, By.CSS_SELECTOR, ".question-text")
-        question_text = browser.find_element(By.CSS_SELECTOR, ".question-text")
-        assert "What is 10 / 2?" in question_text.text
         wrong_option_3 = find_option_by_text(browser, "3")  # Wrong: should be 5
-        correct_option_3 = find_option_by_text(browser, "5")  # Correct answer
-
         wrong_option_3.click()
         browser.find_element(By.ID, "submit-answer-btn").click()
 
-        # Should show NO feedback on any option when show_right_answer is false
-        wait_for_clickable(browser, By.ID, "continue-btn")
-        assert "feedback-incorrect" not in wrong_option_3.get_attribute(
-            "class"
-        ), "No feedback should be shown when show_right_answer is false"
-        assert "feedback-correct" not in correct_option_3.get_attribute(
-            "class"
-        ), "No feedback should be shown when show_right_answer is false"
-
-        # Continue to results
-        browser.find_element(By.ID, "continue-btn").click()
-
-        # Wait for results
+        # Should auto-advance to results
         WebDriverWait(browser, 10).until(EC.visibility_of_element_located((By.ID, "results")))
 
         # Should show 1/3 (33%) but NO correct answer hints anywhere
