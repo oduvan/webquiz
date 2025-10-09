@@ -157,6 +157,7 @@ jobs:
           -V geometry:margin=1in \
           -V mainfont="DejaVu Sans" \
           -V documentclass=report \
+          -V header-includes='\usepackage{float} \floatplacement{figure}{H}' \
           --resource-path=.:imgs \
           --metadata title="WebQuiz Documentation (Ukrainian)" \
           --metadata subtitle="Version ${{ github.event.inputs.version }}" \
@@ -177,6 +178,7 @@ jobs:
           -V geometry:margin=1in \
           -V mainfont="DejaVu Sans" \
           -V documentclass=report \
+          -V header-includes='\usepackage{float} \floatplacement{figure}{H}' \
           --resource-path=.:imgs \
           --metadata title="WebQuiz Documentation (English)" \
           --metadata subtitle="Version ${{ github.event.inputs.version }}" \
