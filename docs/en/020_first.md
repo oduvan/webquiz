@@ -1,6 +1,6 @@
 # First Run
 
-This section will help you quickly launch **WebQuiz** in a local network.  
+This section will help you quickly launch **WebQuiz** in a local network.
 The system is designed to work **inside your own network**, so you should not open its port to the public internet. This ensures that quiz results remain private and accessible only to users connected to your local environment.
 
 ---
@@ -9,11 +9,11 @@ The system is designed to work **inside your own network**, so you should not op
 
 The easiest way to start using **WebQuiz** is by running the prebuilt binary file.
 
-1. Go to the [Releases](https://github.com/oduvan/webquiz/releases) page on the project’s GitHub repository.  
-2. Download the binary file that matches your operating system (Windows, macOS, or Linux).  
-3. If the file comes as an archive, extract it into any folder you prefer.  
+1. Go to the [Releases](https://github.com/oduvan/webquiz/releases) page on the project’s GitHub repository.
+2. Download the binary file that matches your operating system (Windows, macOS, or Linux).
+3. If the file comes as an archive, extract it into any folder you prefer.
 4. Run the file:
-   - **Windows:** double-click `webquiz.exe` or run it from the command line.  
+   - **Windows:** double-click `webquiz.exe` or run it from the command line.
    - **macOS / Linux:** first grant execution permission:
      ```
      chmod +x webquiz
@@ -64,7 +64,7 @@ If you see a warning, allow the application to run or add it to your antivirus's
 
 ## Files and Folders Created
 
-After the first launch, WebQuiz will automatically create several service files and folders in the same directory as the executable.  
+After the first launch, WebQuiz will automatically create several service files and folders in the same directory as the executable.
 They are used to store configuration, results, and diagnostic information.
 
 | File / Folder | Purpose |

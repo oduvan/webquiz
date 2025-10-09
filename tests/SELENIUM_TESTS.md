@@ -20,7 +20,7 @@ This directory contains comprehensive end-to-end tests using Selenium WebDriver 
 
 ### Show Right Answer Configuration (4 tests)
 - ✅ `test_show_right_answer_true_visual_feedback()` - Correct answer highlighting when enabled
-- ✅ `test_show_right_answer_false_visual_feedback()` - Correct answer hiding when disabled  
+- ✅ `test_show_right_answer_false_visual_feedback()` - Correct answer hiding when disabled
 - ✅ `test_show_right_answer_false_correct_answer_visual_feedback()` - User correct answer feedback when showing disabled
 - ✅ `test_show_right_answer_multi_question_journey()` - Complete quiz with mixed answers and hidden correct answers
 

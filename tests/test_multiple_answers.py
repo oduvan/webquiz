@@ -1,6 +1,7 @@
 """
 Test suite for multiple correct answers functionality
 """
+
 import pytest
 import json
 from unittest.mock import patch, MagicMock
@@ -18,25 +19,20 @@ class TestMultipleAnswersValidation:
 
         # Test questions with various configurations
         self.server.questions = [
+            {"id": 1, "question": "Single answer question", "options": ["A", "B", "C", "D"], "correct_answer": 1},
             {
-                'id': 1,
-                'question': 'Single answer question',
-                'options': ['A', 'B', 'C', 'D'],
-                'correct_answer': 1
+                "id": 2,
+                "question": "Multiple answers - all required",
+                "options": ["Python", "HTML", "JavaScript", "CSS"],
+                "correct_answer": [0, 2],
             },
             {
-                'id': 2,
-                'question': 'Multiple answers - all required',
-                'options': ['Python', 'HTML', 'JavaScript', 'CSS'],
-                'correct_answer': [0, 2]
+                "id": 3,
+                "question": "Multiple answers - minimum required",
+                "options": ["Red", "Green", "Blue", "Yellow"],
+                "correct_answer": [0, 2, 3],
+                "min_correct": 2,
             },
-            {
-                'id': 3,
-                'question': 'Multiple answers - minimum required',
-                'options': ['Red', 'Green', 'Blue', 'Yellow'],
-                'correct_answer': [0, 2, 3],
-                'min_correct': 2
-            }
         ]
 
     def test_single_answer_validation(self):
@@ -111,14 +107,14 @@ class TestMultipleAnswersValidation:
         question = self.server.questions[1]
 
         # Single answer formatting
-        assert self.server._format_answer_text(1, ['A', 'B', 'C']) == 'B'
+        assert self.server._format_answer_text(1, ["A", "B", "C"]) == "B"
 
         # Multiple answers formatting (should be sorted)
-        assert self.server._format_answer_text([2, 0], ['A', 'B', 'C', 'D']) == 'A|C'
-        assert self.server._format_answer_text([1, 3, 0], ['A', 'B', 'C', 'D']) == 'A|B|D'
+        assert self.server._format_answer_text([2, 0], ["A", "B", "C", "D"]) == "A|C"
+        assert self.server._format_answer_text([1, 3, 0], ["A", "B", "C", "D"]) == "A|B|D"
 
         # Empty or invalid inputs
-        assert self.server._format_answer_text([], ['A', 'B']) == ''
+        assert self.server._format_answer_text([], ["A", "B"]) == ""
 
 
 class TestMultipleAnswersAPI:
@@ -131,27 +127,20 @@ class TestMultipleAnswersAPI:
 
         # Setup test questions
         server.questions = [
-            {
-                'id': 1,
-                'question': 'Multiple choice test',
-                'options': ['A', 'B', 'C', 'D'],
-                'correct_answer': [0, 2]
-            }
+            {"id": 1, "question": "Multiple choice test", "options": ["A", "B", "C", "D"], "correct_answer": [0, 2]}
         ]
 
         # Mock user and timing
-        user_id = 'test-user'
-        server.users[user_id] = {'username': 'testuser'}
+        user_id = "test-user"
+        server.users[user_id] = {"username": "testuser"}
         server.question_start_times[user_id] = datetime.now() - timedelta(seconds=5)
 
         # Mock request
         mock_request = MagicMock()
+
         async def mock_json():
-            return {
-                'user_id': user_id,
-                'question_id': 1,
-                'selected_answer': [0, 2]  # Correct multiple answers
-            }
+            return {"user_id": user_id, "question_id": 1, "selected_answer": [0, 2]}  # Correct multiple answers
+
         mock_request.json = mock_json
 
         response = await server.submit_answer(mock_request)
@@ -166,27 +155,20 @@ class TestMultipleAnswersAPI:
 
         # Setup traditional single answer question
         server.questions = [
-            {
-                'id': 1,
-                'question': 'Traditional single answer',
-                'options': ['A', 'B', 'C', 'D'],
-                'correct_answer': 2
-            }
+            {"id": 1, "question": "Traditional single answer", "options": ["A", "B", "C", "D"], "correct_answer": 2}
         ]
 
         # Mock user and timing
-        user_id = 'test-user'
-        server.users[user_id] = {'username': 'testuser'}
+        user_id = "test-user"
+        server.users[user_id] = {"username": "testuser"}
         server.question_start_times[user_id] = datetime.now() - timedelta(seconds=3)
 
         # Mock request with single answer
         mock_request = MagicMock()
+
         async def mock_json():
-            return {
-                'user_id': user_id,
-                'question_id': 1,
-                'selected_answer': 2  # Single answer format
-            }
+            return {"user_id": user_id, "question_id": 1, "selected_answer": 2}  # Single answer format
+
         mock_request.json = mock_json
 
         response = await server.submit_answer(mock_request)
@@ -205,19 +187,11 @@ class TestQuizValidation:
     def test_valid_multiple_answer_quiz(self):
         """Test validation of valid multiple answer quiz"""
         quiz_data = {
-            'title': 'Test Quiz',
-            'questions': [
-                {
-                    'question': 'Multiple choice question',
-                    'options': ['A', 'B', 'C', 'D'],
-                    'correct_answer': [0, 2]
-                },
-                {
-                    'question': 'Single choice question',
-                    'options': ['Yes', 'No'],
-                    'correct_answer': 1
-                }
-            ]
+            "title": "Test Quiz",
+            "questions": [
+                {"question": "Multiple choice question", "options": ["A", "B", "C", "D"], "correct_answer": [0, 2]},
+                {"question": "Single choice question", "options": ["Yes", "No"], "correct_answer": 1},
+            ],
         }
 
         errors = []
@@ -227,30 +201,22 @@ class TestQuizValidation:
     def test_invalid_multiple_answer_quiz(self):
         """Test validation catches invalid multiple answer configurations"""
         # Empty correct_answer array
-        quiz_data = {
-            'questions': [
-                {
-                    'question': 'Invalid question',
-                    'options': ['A', 'B', 'C'],
-                    'correct_answer': []
-                }
-            ]
-        }
+        quiz_data = {"questions": [{"question": "Invalid question", "options": ["A", "B", "C"], "correct_answer": []}]}
 
         errors = []
         assert self.server._validate_quiz_data(quiz_data, errors) == False
-        assert any('correct_answer array cannot be empty' in error for error in errors)
+        assert any("correct_answer array cannot be empty" in error for error in errors)
 
     def test_min_correct_validation(self):
         """Test validation of min_correct field"""
         # Valid min_correct
         quiz_data = {
-            'questions': [
+            "questions": [
                 {
-                    'question': 'Test question',
-                    'options': ['A', 'B', 'C', 'D'],
-                    'correct_answer': [0, 1, 2],
-                    'min_correct': 2
+                    "question": "Test question",
+                    "options": ["A", "B", "C", "D"],
+                    "correct_answer": [0, 1, 2],
+                    "min_correct": 2,
                 }
             ]
         }
@@ -260,28 +226,28 @@ class TestQuizValidation:
         assert len(errors) == 0
 
         # Invalid min_correct (exceeds correct answers)
-        quiz_data['questions'][0]['min_correct'] = 5
+        quiz_data["questions"][0]["min_correct"] = 5
         errors = []
         assert self.server._validate_quiz_data(quiz_data, errors) == False
-        assert any('min_correct cannot exceed number of correct answers' in error for error in errors)
+        assert any("min_correct cannot exceed number of correct answers" in error for error in errors)
 
     def test_min_correct_single_answer_error(self):
         """Test that min_correct is rejected for single answer questions"""
         quiz_data = {
-            'questions': [
+            "questions": [
                 {
-                    'question': 'Single answer with min_correct',
-                    'options': ['A', 'B', 'C'],
-                    'correct_answer': 1,
-                    'min_correct': 1
+                    "question": "Single answer with min_correct",
+                    "options": ["A", "B", "C"],
+                    "correct_answer": 1,
+                    "min_correct": 1,
                 }
             ]
         }
 
         errors = []
         assert self.server._validate_quiz_data(quiz_data, errors) == False
-        assert any('min_correct is only valid for multiple answer questions' in error for error in errors)
+        assert any("min_correct is only valid for multiple answer questions" in error for error in errors)
 
 
-if __name__ == '__main__':
-    pytest.main([__file__, '-v'])
+if __name__ == "__main__":
+    pytest.main([__file__, "-v"])

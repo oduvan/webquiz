@@ -324,7 +324,7 @@
         .btn-danger:hover {
             background: var(--danger-red-hover);
         }
-        
+
         .downloadable-quiz-item {
             display: flex;
             justify-content: space-between;
@@ -335,22 +335,22 @@
             margin-bottom: 10px;
             background: var(--white);
         }
-        
+
         .downloadable-quiz-info {
             flex: 1;
         }
-        
+
         .downloadable-quiz-name {
             font-weight: bold;
             margin-bottom: 5px;
         }
-        
+
         .downloadable-quiz-url {
             font-size: 0.9em;
             color: var(--text-muted);
             word-break: break-all;
         }
-        
+
         .download-btn {
             background: var(--success-green);
             color: var(--white);
@@ -360,11 +360,11 @@
             cursor: pointer;
             font-size: 0.9em;
         }
-        
+
         .download-btn:hover {
             background: var(--success-green-hover);
         }
-        
+
         .download-btn:disabled {
             background: var(--muted-gray);
             cursor: not-allowed;
@@ -577,7 +577,7 @@
 <body>
     <div class="container">
         <h1>🔧 Панель Адміністратора WebQuiz</h1>
-        
+
         <!-- Authentication Section -->
         <div id="auth-section">
             <div class="form-group">
@@ -718,7 +718,7 @@
                 <h2>📷 Вибрати Зображення</h2>
                 <span class="close" onclick="closeImagePicker()">&times;</span>
             </div>
-            
+
             <div id="image-picker-content">
                 <div id="image-grid" class="image-grid">
                     Завантаження зображень...
@@ -791,7 +791,7 @@
 
         function displayQuizzes(quizzes) {
             const quizList = document.getElementById('quiz-list');
-            
+
             if (quizzes.length === 0) {
                 quizList.innerHTML = '<div style="text-align: center; color: var(--text-muted);">Файли quiz не знайдені</div>';
                 return;
@@ -809,20 +809,20 @@
 
         function selectQuiz(quizName) {
             selectedQuiz = quizName;
-            
+
             // Update UI
             document.querySelectorAll('.quiz-item').forEach(item => {
                 item.classList.remove('selected');
             });
-            
+
             event.target.classList.add('selected');
-            
+
             // Enable switch button if different from current
             const switchBtn = document.getElementById('switch-btn');
             const editBtn = document.getElementById('edit-btn');
             const duplicateBtn = document.getElementById('duplicate-btn');
             const deleteBtn = document.getElementById('delete-btn');
-            
+
             if (selectedQuiz !== currentQuiz) {
                 switchBtn.disabled = false;
                 switchBtn.textContent = 'Переключитися на Вибраний Quiz';
@@ -830,7 +830,7 @@
                 switchBtn.disabled = false;
                 switchBtn.textContent = 'Перезапустити Поточний Quiz';
             }
-            
+
             // Enable edit and duplicate buttons (current quiz can be edited now)
             editBtn.disabled = false;
             duplicateBtn.disabled = false;
@@ -867,10 +867,10 @@
                     const action = isRestart ? 'restarted' : 'switched to';
                     showMessage(`Successfully ${action} "${selectedQuiz}". CSV file: ${data.csv_file}`, 'success');
                     currentQuiz = selectedQuiz;
-                    
+
                     // Refresh the quiz list to update current indicators
                     await loadQuizzes();
-                    
+
                     // Reset selection
                     selectedQuiz = '';
                     switchBtn.textContent = 'Переключитися на Вибраний Quiz';
@@ -896,9 +896,9 @@
             const messageDiv = document.createElement('div');
             messageDiv.className = `message ${type}`;
             messageDiv.textContent = text;
-            
+
             messageArea.appendChild(messageDiv);
-            
+
             // Auto-remove after 5 seconds
             setTimeout(() => {
                 if (messageDiv.parentNode) {
@@ -1064,15 +1064,15 @@
 
         function switchEditorMode(mode) {
             editorMode = mode;
-            
+
             // Update buttons
             document.getElementById('wizard-mode-btn').classList.toggle('active', mode === 'wizard');
             document.getElementById('text-mode-btn').classList.toggle('active', mode === 'text');
-            
+
             // Show/hide forms
             document.getElementById('wizard-form').classList.toggle('active', mode === 'wizard');
             document.getElementById('text-form').classList.toggle('active', mode === 'text');
-            
+
             // Sync data between modes
             if (mode === 'text') {
                 syncWizardToText();
@@ -1084,20 +1084,20 @@
         function resetQuizEditor() {
             editorMode = 'wizard';
             questionCounter = 1;
-            
+
             // Reset mode buttons
             document.getElementById('wizard-mode-btn').classList.add('active');
             document.getElementById('text-mode-btn').classList.remove('active');
-            
+
             // Reset forms
             document.getElementById('wizard-form').classList.add('active');
             document.getElementById('text-form').classList.remove('active');
-            
+
             // Clear content
             document.getElementById('questions-container').innerHTML = '';
             document.getElementById('quiz-content').value = '';
             document.getElementById('validation-results').innerHTML = '';
-            
+
             // Add initial question if in wizard mode
             addQuestion();
         }
@@ -1107,7 +1107,7 @@
             const questionDiv = document.createElement('div');
             questionDiv.className = 'question-item';
             questionDiv.dataset.questionId = questionCounter;
-            
+
             questionDiv.innerHTML = `
                 <div class="question-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; padding: 10px; background: var(--question-bg); border-radius: 5px;">
                     <span style="font-weight: bold;">Question ${questionCounter}</span>
@@ -1161,7 +1161,7 @@
                     <small style="color: var(--text-muted); display: block;">Залиште порожнім, щоб вимагати всі правильні відповіді</small>
                 </div>
             `;
-            
+
             container.appendChild(questionDiv);
             questionCounter++;
             updateQuestionNumbers();
@@ -1204,12 +1204,12 @@
                         block: 'center',
                         inline: 'nearest'
                     });
-                    
+
                     // Add a brief highlight animation
                     questionDiv.style.transition = 'background-color 0.3s ease';
                     const originalBg = getComputedStyle(questionDiv).backgroundColor;
                     questionDiv.style.backgroundColor = 'var(--option-selected)';
-                    
+
                     setTimeout(() => {
                         questionDiv.style.backgroundColor = originalBg;
                         setTimeout(() => {
@@ -1223,7 +1223,7 @@
         function updateQuestionNumbers() {
             const container = document.getElementById('questions-container');
             const questions = container.children;
-            
+
             // Store checked states before updating names
             const checkedStates = [];
             for (let i = 0; i < questions.length; i++) {
@@ -1237,18 +1237,18 @@
                 });
                 checkedStates[i] = checkedIndex;
             }
-            
+
             // Update numbers and radio button names
             for (let i = 0; i < questions.length; i++) {
                 const questionDiv = questions[i];
                 const questionNumber = i + 1;
-                
+
                 // Update the visual question number in header
                 const headerSpan = questionDiv.querySelector('.question-header span');
                 if (headerSpan) {
                     headerSpan.textContent = `Питання ${questionNumber}`;
                 }
-                
+
                 // Update radio button names to ensure correct grouping
                 const radioButtons = questionDiv.querySelectorAll('input[type="radio"]');
                 radioButtons.forEach((radio, index) => {
@@ -1257,7 +1257,7 @@
                     radio.checked = (index === checkedStates[i]);
                 });
             }
-            
+
             // Update button visibility
             updateMoveButtonVisibility();
         }
@@ -1347,10 +1347,10 @@
         function removeOption(button) {
             const optionDiv = button.parentElement;
             const optionsContainer = optionDiv.parentElement;
-            
+
             if (optionsContainer.children.length > 2) {
                 optionDiv.remove();
-                
+
                 // Re-index radio buttons and update values
                 Array.from(optionsContainer.children).forEach((option, index) => {
                     const radio = option.querySelector('input[type="radio"]');
@@ -1365,19 +1365,19 @@
             const container = document.getElementById('questions-container');
             container.innerHTML = '';
             questionCounter = 1;
-            
+
             // Populate title field
             document.getElementById('quiz-title').value = quizData.title || '';
-            
+
             // Populate show_right_answer field
             document.getElementById('show-right-answer').checked = quizData.show_right_answer !== false;
-            
+
             if (quizData.questions) {
                 quizData.questions.forEach(question => {
                     const questionDiv = document.createElement('div');
                     questionDiv.className = 'question-item';
                     questionDiv.dataset.questionId = questionCounter;
-                    
+
                     const isMultipleChoice = Array.isArray(question.correct_answer);
                     const correctAnswers = isMultipleChoice ? question.correct_answer : [question.correct_answer];
                     const inputType = isMultipleChoice ? 'checkbox' : 'radio';
@@ -1395,7 +1395,7 @@
                             </div>
                         `;
                     });
-                    
+
                     const minCorrectValue = question.min_correct || '';
                     const minCorrectDisplay = isMultipleChoice ? 'block' : 'none';
 
@@ -1441,7 +1441,7 @@
                             <small style="color: var(--text-muted); display: block;">Залиште порожнім, щоб вимагати всі правильні відповіді</small>
                         </div>
                     `;
-                    
+
                     container.appendChild(questionDiv);
                     questionCounter++;
                 });
@@ -1541,30 +1541,30 @@
                     questions.push(questionData);
                 }
             });
-            
+
             const quizData = { questions };
-            
+
             // Include title if provided
             const quizTitle = document.getElementById('quiz-title').value.trim();
             if (quizTitle) {
                 quizData.title = quizTitle;
             }
-            
+
             // Include show_right_answer setting
             quizData.show_right_answer = document.getElementById('show-right-answer').checked;
-            
+
             return quizData;
         }
 
         async function validateQuizContent() {
             const content = document.getElementById('quiz-content').value.trim();
             const resultsDiv = document.getElementById('validation-results');
-            
+
             if (!content) {
                 resultsDiv.innerHTML = '<div class="validation-errors">Контент порожній</div>';
                 return;
             }
-            
+
             try {
                 const response = await fetch('/api/admin/validate-quiz', {
                     method: 'POST',
@@ -1574,9 +1574,9 @@
                     },
                     body: JSON.stringify({ content })
                 });
-                
+
                 const data = await response.json();
-                
+
                 if (response.ok) {
                     if (data.valid) {
                         resultsDiv.innerHTML = `<div class="success">✅ Valid YAML! Found ${data.question_count} questions.</div>`;
@@ -1593,14 +1593,14 @@
 
         async function saveQuiz() {
             const filename = document.getElementById('quiz-filename').value.trim();
-            
+
             if (!filename) {
                 showMessage('Будь ласка, введіть ім’я файлу', 'error');
                 return;
             }
-            
+
             let quizData, content;
-            
+
             if (editorMode === 'wizard') {
                 quizData = getWizardData();
                 if (!quizData.questions || quizData.questions.length === 0) {
@@ -1614,11 +1614,11 @@
                     return;
                 }
             }
-            
+
             try {
                 const url = isEditMode ? `/api/admin/quiz/${editingQuizName}` : '/api/admin/create-quiz';
                 const method = isEditMode ? 'PUT' : 'POST';
-                
+
                 const response = await fetch(url, {
                     method,
                     headers: {
@@ -1632,9 +1632,9 @@
                         content: editorMode === 'text' ? content : undefined
                     })
                 });
-                
+
                 const data = await response.json();
-                
+
                 if (response.ok) {
                     showMessage(data.message, 'success');
                     closeQuizEditor();
@@ -1654,10 +1654,10 @@
                 document.getElementById('url-list').innerHTML = '<div class="url-item">Network detection failed</div>';
                 return;
             }
-            
+
             // Generate URL list from server data
             let urlHtml = '';
-            
+
             if (NETWORK_INFO.urls && NETWORK_INFO.urls.length > 0) {
                 NETWORK_INFO.urls.forEach(url => {
                     urlHtml += `
@@ -1676,7 +1676,7 @@
                     </div>
                 `;
             }
-            
+
             document.getElementById('url-list').innerHTML = urlHtml;
         }
 
@@ -1687,16 +1687,16 @@
             try {
                 // Store the target information
                 currentImageTarget = { fieldType, questionId, optionIndex };
-                
+
                 // Load images from server
                 const response = await fetch('/api/admin/list-images', {
                     headers: {
                         'X-Master-Key': currentMasterKey
                     }
                 });
-                
+
                 const data = await response.json();
-                
+
                 if (response.ok) {
                     displayImageGrid(data.images);
                     document.getElementById('image-picker-modal').style.display = 'block';
@@ -1710,7 +1710,7 @@
 
         function displayImageGrid(images) {
             const gridContainer = document.getElementById('image-grid');
-            
+
             if (!images || images.length === 0) {
                 gridContainer.innerHTML = `
                     <div style="text-align: center; padding: 40px; color: var(--text-muted);">
@@ -1720,7 +1720,7 @@
                 `;
                 return;
             }
-            
+
             let gridHtml = '';
             images.forEach(image => {
                 gridHtml += `
@@ -1730,7 +1730,7 @@
                     </div>
                 `;
             });
-            
+
             gridContainer.innerHTML = gridHtml;
         }
 
@@ -1739,10 +1739,10 @@
                 showMessage('Поле не вибрано', 'error');
                 return;
             }
-            
+
             // Find the target input field based on stored information
             let targetInput = null;
-            
+
             if (currentImageTarget.fieldType === 'question-image') {
                 // Find question image field by question ID
                 const questionDiv = document.querySelector(`[data-question-id="${currentImageTarget.questionId}"]`);
@@ -1759,7 +1759,7 @@
                     }
                 }
             }
-            
+
             if (targetInput) {
                 targetInput.value = imagePath;
                 closeImagePicker();
@@ -1779,9 +1779,9 @@
             if (typeof DOWNLOADABLE_QUIZZES !== 'undefined' && DOWNLOADABLE_QUIZZES.length > 0) {
                 const section = document.getElementById('downloadable-quizzes-section');
                 const quizList = document.getElementById('downloadable-quiz-list');
-                
+
                 section.classList.remove('hidden');
-                
+
                 let html = '';
                 DOWNLOADABLE_QUIZZES.forEach((quiz, index) => {
                     html += `
@@ -1804,7 +1804,7 @@
         async function downloadQuiz(quizIndex) {
             const quiz = DOWNLOADABLE_QUIZZES[quizIndex];
             const button = document.getElementById(`download-btn-${quizIndex}`);
-            
+
             // Show confirmation
             const confirmed = confirm(`Завантажити quiz "${quiz.name}"?\n\nЦе завантажить та розпакує файли з:\n${quiz.download_path}\n\nФайли будуть перезаписані в директорії quizzes.`);
             if (!confirmed) {
@@ -1830,7 +1830,7 @@
                 });
 
                 const data = await response.json();
-                
+
                 if (response.ok) {
                     showMessage(`✅ ${data.message} (Витягнуто файлів: ${data.extracted_files})`, 'success');
                     // Refresh quiz list to show newly downloaded quizzes

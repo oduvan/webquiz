@@ -33,11 +33,11 @@ def is_daemon_running():
     pid_file = get_pid_file_path()
     if not pid_file.exists():
         return False
-    
+
     try:
-        with open(pid_file, 'r') as f:
+        with open(pid_file, "r") as f:
             pid = int(f.read().strip())
-        
+
         # Check if process is still running
         os.kill(pid, 0)  # This will raise OSError if process doesn't exist
         return True
@@ -53,9 +53,9 @@ def start_daemon():
     if is_daemon_running():
         print("❌ Daemon is already running")
         return 1
-    
+
     print("🚀 Starting webquiz daemon...")
-    
+
     # Fork the process
     try:
         pid = os.fork()
@@ -75,41 +75,42 @@ def start_daemon():
         else:
             # Child process - become daemon
             os.setsid()  # Create new session
-            
+
             # Fork again to ensure we're not session leader
             pid = os.fork()
             if pid > 0:
                 os._exit(0)
-            
+
             # Write PID file
-            with open(get_pid_file_path(), 'w') as f:
+            with open(get_pid_file_path(), "w") as f:
                 f.write(str(os.getpid()))
-            
+
             # Redirect standard file descriptors
-            with open('/dev/null', 'r') as f:
+            with open("/dev/null", "r") as f:
                 os.dup2(f.fileno(), sys.stdin.fileno())
-            
+
             # Keep stdout/stderr for now (they'll go to server.log anyway)
-            
+
             # Change working directory to avoid holding locks
-            os.chdir('/')
-            
+            os.chdir("/")
+
             # Set signal handlers for graceful shutdown
             def signal_handler(signum, frame):
                 pid_file = get_pid_file_path()
                 if pid_file.exists():
                     pid_file.unlink()
                 sys.exit(0)
-            
+
             signal.signal(signal.SIGTERM, signal_handler)
             signal.signal(signal.SIGINT, signal_handler)
-            
+
             # Start the server
             try:
                 # Get config from global variable set in main()
-                config = getattr(start_daemon, '_config', None)
+                config = getattr(start_daemon, "_config", None)
                 if config is None:
                     from .server import WebQuizConfig
+
                     config = WebQuizConfig()
                 run_server(config)
             except Exception as e:
@@ -118,7 +119,7 @@ def start_daemon():
                 if pid_file.exists():
                     pid_file.unlink()
                 sys.exit(1)
-    
+
     except OSError as e:
         print(f"❌ Fork failed: {e}")
         return 1
@@ -129,29 +130,29 @@ def stop_daemon():
     if not is_daemon_running():
         print("❌ No daemon is running")
         return 1
-    
+
     pid_file = get_pid_file_path()
     try:
-        with open(pid_file, 'r') as f:
+        with open(pid_file, "r") as f:
             pid = int(f.read().strip())
-        
+
         print(f"⏹️  Stopping daemon (PID: {pid})...")
         os.kill(pid, signal.SIGTERM)
-        
+
         # Wait for process to stop
         for _ in range(10):  # Wait up to 10 seconds
             time.sleep(1)
             if not is_daemon_running():
                 print("✅ Daemon stopped successfully")
                 return 0
-        
+
         # Force kill if still running
         print("⚠️  Force killing daemon...")
         os.kill(pid, signal.SIGKILL)
         pid_file.unlink()
         print("✅ Daemon force stopped")
         return 0
-        
+
     except (OSError, ValueError, FileNotFoundError) as e:
         print(f"❌ Error stopping daemon: {e}")
         return 1
@@ -169,26 +170,26 @@ def run_server(config):
     if config.admin.master_key:
         print(f"🔧 Admin panel: http://{config.server.host}:{config.server.port}/admin")
     print("⏹️  Press Ctrl+C to stop")
-    
+
     async def start_server():
         app = await create_app(config)
         runner = web.AppRunner(app)
         await runner.setup()
-        
+
         site = web.TCPSite(runner, config.server.host, config.server.port)
         await site.start()
-        
+
         print("✅ Server started successfully")
-        
+
         # Open browser for admin interface if running as binary
-        if os.environ.get('WEBQUIZ_IS_BINARY') == '1':
+        if os.environ.get("WEBQUIZ_IS_BINARY") == "1":
             admin_url = f"http://127.0.0.1:{config.server.port}/admin/"
             print(f"🌐 Opening admin interface: {admin_url}")
             try:
                 webbrowser.open(admin_url)
             except Exception as e:
                 print(f"⚠️  Could not open browser: {e}")
-        
+
         try:
             # Keep the server running
             while True:
@@ -197,7 +198,7 @@ def run_server(config):
             print("\n⏹️  Shutting down server...")
         finally:
             await runner.cleanup()
-    
+
     try:
         asyncio.run(start_server())
     except KeyboardInterrupt:
@@ -205,15 +206,15 @@ def run_server(config):
     except Exception as e:
         print(f"❌ Error: {e}")
         return 1
-    
+
     return 0
 
 
 def main():
     """Main CLI entry point."""
     parser = argparse.ArgumentParser(
-        prog='webquiz',
-        description='WebQuiz - A modern web-based quiz and testing platform',
+        prog="webquiz",
+        description="WebQuiz - A modern web-based quiz and testing platform",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
@@ -237,65 +238,31 @@ User responses saved to data/{quiz_name}_user_responses_{suffix}.csv
 Server logs written to logs/server_{suffix}.log
 Static files served from static/ directory
 CLI parameters always override config file values
-        """
+        """,
     )
-    
-    parser.add_argument(
-        '-d', '--daemon',
-        action='store_true',
-        help='Run server as daemon in background'
-    )
-    
-    parser.add_argument(
-        '--stop',
-        action='store_true',
-        help='Stop daemon server'
-    )
-    
-    parser.add_argument(
-        '--status',
-        action='store_true',
-        help='Check daemon status'
-    )
-    
-    parser.add_argument(
-        '--config',
-        help='Path to YAML configuration file'
-    )
-    
-    parser.add_argument(
-        '--quizzes-dir',
-        help='Path to quizzes directory (default: quizzes)'
-    )
-    
-    parser.add_argument(
-        '--master-key',
-        help='Master key for admin access (can also use WEBQUIZ_MASTER_KEY env var)'
-    )
-    
-    parser.add_argument(
-        '--logs-dir',
-        help='Directory for log files (default: logs/)'
-    )
-    
-    parser.add_argument(
-        '--csv-dir',
-        help='Directory for CSV response files (default: data/)'
-    )
-    
-    parser.add_argument(
-        '--static',
-        help='Path to static files directory (default: static)'
-    )
-    
-    parser.add_argument(
-        '--version',
-        action='version',
-        version=f'%(prog)s 1.0.0'
-    )
-    
+
+    parser.add_argument("-d", "--daemon", action="store_true", help="Run server as daemon in background")
+
+    parser.add_argument("--stop", action="store_true", help="Stop daemon server")
+
+    parser.add_argument("--status", action="store_true", help="Check daemon status")
+
+    parser.add_argument("--config", help="Path to YAML configuration file")
+
+    parser.add_argument("--quizzes-dir", help="Path to quizzes directory (default: quizzes)")
+
+    parser.add_argument("--master-key", help="Master key for admin access (can also use WEBQUIZ_MASTER_KEY env var)")
+
+    parser.add_argument("--logs-dir", help="Directory for log files (default: logs/)")
+
+    parser.add_argument("--csv-dir", help="Directory for CSV response files (default: data/)")
+
+    parser.add_argument("--static", help="Path to static files directory (default: static)")
+
+    parser.add_argument("--version", action="version", version=f"%(prog)s 1.0.0")
+
     args = parser.parse_args()
-    
+
     # Load configuration with CLI overrides
     config = load_config_with_overrides(
         config_path=args.config,
@@ -303,18 +270,18 @@ CLI parameters always override config file values
         master_key=args.master_key,
         logs_dir=args.logs_dir,
         csv_dir=args.csv_dir,
-        static_dir=args.static
+        static_dir=args.static,
     )
-    
+
     # Handle daemon stop
     if args.stop:
         return stop_daemon()
-    
+
     # Handle status check
     if args.status:
         if is_daemon_running():
             pid_file = get_pid_file_path()
-            with open(pid_file, 'r') as f:
+            with open(pid_file, "r") as f:
                 pid = f.read().strip()
             print(f"✅ Daemon is running (PID: {pid})")
             print(f"🌐 Server: http://0.0.0.0:8080 (accessible on network)")
@@ -322,16 +289,16 @@ CLI parameters always override config file values
         else:
             print("❌ Daemon is not running")
             return 1
-    
+
     # Handle daemon start
     if args.daemon:
         # Store config for daemon process
         start_daemon._config = config
         return start_daemon()
-    
+
     # Default: run server in foreground
     return run_server(config)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     sys.exit(main())

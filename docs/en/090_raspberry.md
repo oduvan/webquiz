@@ -189,4 +189,3 @@ or at the IP address specified in the configuration file.
 - If you need to reinstall the system, you can simply rewrite the image **without deleting the `data` partition** — all files will remain.
 - To change Wi-Fi settings, just edit `wifi.conf` and restart the device.
 - If the device doesn't connect to Wi-Fi, check that the SSID and password are correct, or try Hotspot mode.
-

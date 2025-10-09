@@ -21,7 +21,7 @@
             --progress-bg: #f0f0f0;
             --shadow: rgba(0,0,0,0.1);
         }
-        
+
         [data-theme="dark"] {
             --bg-color: #1a1a1a;
             --container-bg: #2d2d2d;
@@ -38,7 +38,7 @@
             --progress-bg: #444;
             --shadow: rgba(0,0,0,0.3);
         }
-        
+
         body {
             font-family: Arial, sans-serif;
             max-width: 800px;
@@ -118,7 +118,7 @@
             color: #155724 !important;
             position: relative;
         }
-        
+
         .option.feedback-correct::after {
             content: '✓ Правильна відповідь';
             position: absolute;
@@ -141,7 +141,7 @@
             color: #721c24 !important;
             position: relative;
         }
-        
+
         .option.feedback-incorrect::after {
             content: '✗ Ваша відповідь';
             position: absolute;
@@ -345,7 +345,7 @@
         .results-table tr:hover {
             background-color: var(--option-hover);
         }
-        
+
         /* Mobile responsive table */
         @media screen and (max-width: 768px) {
             .results-table {
@@ -393,15 +393,15 @@
                 font-weight: bold;
                 margin-top: 10px;
             }
-            
+
             /* Mobile spacing between top controls and H1 */
             h1 {
                 margin-top: 60px !important;
             }
-            .results-table thead, 
-            .results-table tbody, 
-            .results-table th, 
-            .results-table td, 
+            .results-table thead,
+            .results-table tbody,
+            .results-table th,
+            .results-table td,
             .results-table tr {
                 display: block;
             }
@@ -487,13 +487,13 @@
             <button class="theme-toggle" onclick="toggleTheme()" title="Перемкнути тему">🌙</button>
         </div>
         <h1>{{QUIZ_TITLE}}</h1>
-        
+
         <!-- Loading State -->
         <div id="loading" class="section">
             <h2>Завантаження...</h2>
             <p>Перевірка ваших даних...</p>
         </div>
-        
+
         <!-- Registration Form -->
         <div id="registration" class="section hidden">
             <h2>Зареєструйтеся для початку тесту</h2>
@@ -532,7 +532,7 @@
                 <button id="continue-btn" onclick="continueToNextQuestion()" class="hidden">Продовжити</button>
             </div>
         </div>
-        
+
         <!-- Results Section -->
         <div id="results" class="section hidden">
             <div id="results-content"></div>
@@ -595,11 +595,11 @@
                 document.querySelector('.theme-toggle').textContent = '☀️';
             }
         }
-        
+
         function toggleTheme() {
             const currentTheme = document.body.getAttribute('data-theme');
             const toggleButton = document.querySelector('.theme-toggle');
-            
+
             if (currentTheme === 'dark') {
                 document.body.removeAttribute('data-theme');
                 toggleButton.textContent = '🌙';
@@ -610,24 +610,24 @@
                 localStorage.setItem('theme', 'dark');
             }
         }
-        
+
         // Username display management
         function showUsername(username) {
             document.getElementById('username-display').textContent = username;
             document.getElementById('user-info').classList.add('visible');
         }
-        
+
         function hideUsername() {
             document.getElementById('user-info').classList.remove('visible');
         }
-        
+
         // Cookie management
         function setCookie(name, value, days = 30) {
             const expires = new Date();
             expires.setTime(expires.getTime() + (days * 24 * 60 * 60 * 1000));
             document.cookie = `${name}=${value};expires=${expires.toUTCString()};path=/`;
         }
-        
+
         function getCookie(name) {
             const nameEQ = name + "=";
             const ca = document.cookie.split(';');
@@ -638,11 +638,11 @@
             }
             return null;
         }
-        
+
         // Initialize theme and check for stored user ID on page load
         initializeTheme();
         checkStoredUserId();
-        
+
         async function checkStoredUserId() {
             const storedUserId = getCookie('user_id');
 
@@ -690,19 +690,19 @@
                 hideLoadingShowRegistration();
             }
         }
-        
+
         function hideLoadingShowRegistration() {
             document.getElementById('loading').classList.add('hidden');
             document.getElementById('registration').classList.remove('hidden');
         }
-        
+
         async function hideLoadingShowTest() {
             document.getElementById('loading').classList.add('hidden');
             await startTest();
         }
-        
-        
-        
+
+
+
         async function registerUser() {
             const username = document.getElementById('username').value.trim();
             if (!username) {
@@ -741,7 +741,7 @@
                     },
                     body: JSON.stringify(registrationData)
                 });
-                
+
                 const data = await response.json();
                 if (response.ok) {
                     currentUsername = data.username;
@@ -881,31 +881,31 @@
                 showError('waiting-error', 'Помилка: ' + error.message);
             }
         }
-        
-        
+
+
         async function startTest() {
             selectedAnswer = null;
             testResults = [];
             document.getElementById('test-section').classList.remove('hidden');
             await showCurrentQuestion();
         }
-        
+
         async function showCurrentQuestion() {
             if (currentQuestionIndex >= questions.length) {
                 // Test completed - fetch final results from server to ensure consistency
                 await fetchAndShowFinalResults();
                 return;
             }
-            
+
             const question = questions[currentQuestionIndex];
             selectedAnswer = null;
             selectedAnswers = [];
-            
+
             // Update progress
             const progress = ((currentQuestionIndex + 1) / questions.length) * 100;
             document.getElementById('progress-fill').style.width = progress + '%';
             document.getElementById('progress-text').textContent = `Питання ${currentQuestionIndex + 1} з ${questions.length}`;
-            
+
             // Show current question
             const container = document.getElementById('current-question-container');
             container.innerHTML = `
@@ -936,7 +936,7 @@
                     </div>
                 </div>
             `;
-            
+
             // Reset button states
             const submitBtn = document.getElementById('submit-answer-btn');
             const continueBtn = document.getElementById('continue-btn');
@@ -945,7 +945,7 @@
             submitBtn.disabled = true;
             continueBtn.classList.add('hidden');
         }
-        
+
         function selectCurrentAnswer(optionIndex) {
             // Don't allow selection if already submitted
             if (document.querySelector('.option.disabled')) {
@@ -989,7 +989,7 @@
                 }
             }
         }
-        
+
         async function submitCurrentAnswer() {
             const question = questions[currentQuestionIndex];
 
@@ -1053,10 +1053,10 @@
                     timeTaken: data.time_taken || 0,
                     isMultipleChoice: question.is_multiple_choice
                 });
-                
+
                 // Show feedback on selected answer
                 showAnswerFeedback(data.is_correct, data.correct_answer);
-                
+
             } catch (error) {
                 showError('test-error', 'Помилка відправки відповіді: ' + error.message);
             }
@@ -1153,13 +1153,13 @@
 
             await showCurrentQuestion();
         }
-        
+
         async function fetchAndShowFinalResults() {
             try {
                 // Fetch final results from server to ensure consistency with page reload
                 const response = await fetch(`/api/verify-user/${currentUserId}`);
                 const data = await response.json();
-                
+
                 if (response.ok && data.valid && data.test_completed && data.final_results) {
                     // Use the same function as page reload to ensure identical display
                     showCompletedTestResults(data.final_results);
@@ -1173,7 +1173,7 @@
                 showFinalResults();
             }
         }
-        
+
         function formatQuestionForDisplay(questionText, questionImage) {
             if (questionImage && questionImage.startsWith('/')) {
                 // Display image with optional text
@@ -1221,16 +1221,16 @@
 
         function showFinalResults() {
             document.getElementById('test-section').classList.add('hidden');
-            
+
             const container = document.getElementById('results-content');
             container.innerHTML = '';
-            
+
             const correctCount = testResults.filter(r => r.isCorrect === true).length;  // Only count explicitly true values
             const totalCount = testResults.length;
             const percentage = Math.round((correctCount / totalCount) * 100);
             const totalTime = testResults.reduce((sum, r) => sum + r.timeTaken, 0);
             const avgTime = totalTime / totalCount;
-            
+
             // Build table with results using CSS classes
             let tableContent = `
                 <p><strong>Результат:</strong> ${correctCount}/${totalCount} (${percentage}%)</p>
@@ -1244,7 +1244,7 @@
                     </thead>
                     <tbody>
             `;
-            
+
             testResults.forEach((result, index) => {
                 // Note: testResults uses different property names than server data
                 const correctAnswer = (questions[index] && questions[index].correct_answer !== undefined) ? questions[index].options[questions[index].correct_answer] : null;
@@ -1263,29 +1263,29 @@
                     </tr>
                 `;
             });
-            
+
             tableContent += `
                     </tbody>
                 </table>
             `;
-            
+
             container.innerHTML = tableContent;
-            
+
             document.getElementById('test-section').classList.add('hidden');
             document.getElementById('results').classList.remove('hidden');
         }
-        
+
         function showCompletedTestResults(finalResults) {
             document.getElementById('loading').classList.add('hidden');
             document.getElementById('test-section').classList.add('hidden');
-            
+
             const container = document.getElementById('results-content');
             container.innerHTML = '';
-            
+
             const correctCount = finalResults.correct_count;
             const totalCount = finalResults.total_count;
             const percentage = finalResults.percentage;
-            
+
             container.innerHTML = `
                 <p><strong>Результат:</strong> ${correctCount}/${totalCount} (${percentage}%)</p>
                 <table class="results-table">
@@ -1314,11 +1314,11 @@
                     </tbody>
                 </table>
             `;
-            
+
             document.getElementById('results').classList.remove('hidden');
         }
     </script>
-    
+
     <div style="text-align: center; margin-top: 40px; padding: 20px; border-top: 1px solid var(--border-color); color: var(--text-color); font-size: 12px; opacity: 0.7;">
         WebQuiz v{{WEBQUIZ_VERSION}}
     </div>

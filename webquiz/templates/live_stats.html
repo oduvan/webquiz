@@ -275,27 +275,27 @@
             body {
                 padding: 10px;
             }
-            
+
             .stats-table th,
             .stats-table td {
                 padding: 8px 4px;
             }
-            
+
             .username-header,
             .username-cell {
                 width: 100px;
             }
-            
+
             .state-cell {
                 width: 60px;
                 height: 40px;
                 font-size: 12px;
             }
-            
+
             .state-icon {
                 font-size: 14px;
             }
-            
+
             .time-display {
                 font-size: 8px;
             }
@@ -352,7 +352,7 @@
                 this.reconnectAttempts = 0;
                 this.maxReconnectAttempts = 5;
                 this.reconnectDelay = 1000;
-                
+
                 this.statusElement = document.getElementById('connectionStatus');
                 this.quizInfoElement = document.getElementById('quizInfo');
                 this.currentQuizElement = document.getElementById('currentQuiz');
@@ -360,25 +360,25 @@
                 this.activeUsersElement = document.getElementById('activeUsers');
                 this.tableHeaderElement = document.getElementById('tableHeader');
                 this.tableBodyElement = document.getElementById('tableBody');
-                
+
                 this.connect();
             }
 
             connect() {
                 const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
                 const wsUrl = `${protocol}//${window.location.host}/ws/live-stats`;
-                
+
                 this.hideStatus();
-                
+
                 try {
                     this.ws = new WebSocket(wsUrl);
-                    
+
                     this.ws.onopen = () => {
                         this.hideStatus();
                         this.reconnectAttempts = 0;
                         console.log('WebSocket connected');
                     };
-                    
+
                     this.ws.onmessage = (event) => {
                         try {
                             const data = JSON.parse(event.data);
@@ -387,18 +387,18 @@
                             console.error('Error parsing WebSocket message:', error);
                         }
                     };
-                    
+
                     this.ws.onclose = () => {
                         this.updateStatus('disconnected', '🔴 Disconnected from server');
                         console.log('WebSocket disconnected');
                         this.scheduleReconnect();
                     };
-                    
+
                     this.ws.onerror = (error) => {
                         console.error('WebSocket error:', error);
                         this.updateStatus('disconnected', '🔴 Connection error');
                     };
-                    
+
                 } catch (error) {
                     console.error('Error creating WebSocket:', error);
                     this.updateStatus('disconnected', '🔴 Failed to connect');
@@ -410,9 +410,9 @@
                 if (this.reconnectAttempts < this.maxReconnectAttempts) {
                     this.reconnectAttempts++;
                     const delay = this.reconnectDelay * Math.pow(2, this.reconnectAttempts - 1);
-                    
+
                     this.updateStatus('connecting', `🔄 Reconnecting in ${delay/1000}s... (${this.reconnectAttempts}/${this.maxReconnectAttempts})`);
-                    
+
                     setTimeout(() => {
                         this.connect();
                     }, delay);
@@ -459,10 +459,10 @@
                 this.questions = data.questions || [];
                 this.totalQuestions = data.total_questions || 0;
                 this.currentQuiz = data.current_quiz || 'No quiz selected';
-                
+
                 // Calculate statistics client-side
                 this.calculateStatistics();
-                
+
                 this.updateQuizInfo();
                 this.buildTable();
             }
@@ -498,10 +498,10 @@
                     state: data.state,
                     time_taken: data.time_taken
                 };
-                
+
                 // Calculate statistics client-side
                 this.calculateStatistics();
-                
+
                 this.updateQuizInfo();
                 this.buildTable();
             }
@@ -514,10 +514,10 @@
                     state: data.state,
                     time_taken: data.time_taken
                 };
-                
+
                 // Calculate statistics client-side
                 this.calculateStatistics();
-                
+
                 // Always rebuild table to update headers with new statistics
                 this.buildTable();
             }
@@ -528,10 +528,10 @@
                 this.questions = data.questions || [];
                 this.totalQuestions = data.total_questions || 0;
                 this.currentQuiz = data.current_quiz || 'No quiz selected';
-                
+
                 // Calculate statistics client-side
                 this.calculateStatistics();
-                
+
                 this.updateQuizInfo();
                 this.buildTable();
             }
@@ -542,7 +542,7 @@
                 for (const userId in this.liveStats) {
                     let correctCount = 0;
                     let totalAnswered = 0;
-                    
+
                     for (const questionId in this.liveStats[userId]) {
                         const state = this.liveStats[userId][questionId].state;
                         if (state === 'ok' || state === 'fail') {
@@ -552,13 +552,13 @@
                             }
                         }
                     }
-                    
+
                     this.userStatistics[userId] = {
                         correct_count: correctCount,
                         total_answered: totalAnswered
                     };
                 }
-                
+
                 // Calculate question statistics
                 this.questionStatistics = {};
                 for (let i = 1; i <= this.questions.length; i++) {
@@ -567,7 +567,7 @@
                         total_attempts: 0
                     };
                 }
-                
+
                 for (const userId in this.liveStats) {
                     for (const questionId in this.liveStats[userId]) {
                         const state = this.liveStats[userId][questionId].state;
@@ -595,11 +595,11 @@
                 for (let i = 0; i < this.questions.length; i++) {
                     const question = this.questions[i];
                     const questionId = i + 1;
-                    
+
                     // Get question statistics
                     const questionStats = this.questionStatistics[questionId] || { correct_count: 0, total_attempts: 0 };
                     const statsText = `${questionStats.correct_count}/${questionStats.total_attempts}`;
-                    
+
                     if (question.image && !question.question) {
                         // Image-only question: show filename and small image
                         const imagePath = question.image;
@@ -640,11 +640,11 @@
                 let bodyHtml = '';
                 userIds.forEach(userId => {
                     const username = this.users[userId];
-                    
+
                     // Get user statistics
                     const userStats = this.userStatistics[userId] || { correct_count: 0, total_answered: 0 };
                     const userStatsText = `${userStats.correct_count}/${userStats.total_answered}`;
-                    
+
                     bodyHtml += `<tr id="user-${userId}">`;
                     bodyHtml += `<td class="username-cell">
                         <div class="username-content">
@@ -652,17 +652,17 @@
                             <span class="user-stats">${userStatsText}</span>
                         </div>
                     </td>`;
-                    
+
                     for (let questionId = 1; questionId <= this.questions.length; questionId++) {
-                        const cellData = this.liveStats[userId] && this.liveStats[userId][questionId] 
-                            ? this.liveStats[userId][questionId] 
+                        const cellData = this.liveStats[userId] && this.liveStats[userId][questionId]
+                            ? this.liveStats[userId][questionId]
                             : { state: 'empty', time_taken: null };
-                        
+
                         const state = cellData.state || 'empty';
                         const timeTaken = cellData.time_taken;
                         const stateIcon = this.getStateIcon(state);
                         const timeDisplay = this.formatTime(timeTaken);
-                        
+
                         bodyHtml += `<td class="state-cell state-${state}" id="cell-${userId}-${questionId}">
                             <div class="cell-content">
                                 <div class="state-icon">${stateIcon}</div>
@@ -670,7 +670,7 @@
                             </div>
                         </td>`;
                     }
-                    
+
                     bodyHtml += '</tr>';
                 });
 
@@ -683,7 +683,7 @@
                     cellElement.className = `state-cell state-${state}`;
                     const stateIcon = this.getStateIcon(state);
                     const timeDisplay = this.formatTime(timeTaken);
-                    
+
                     cellElement.innerHTML = `
                         <div class="cell-content">
                             <div class="state-icon">${stateIcon}</div>
@@ -697,7 +697,7 @@
                 if (seconds === null || seconds === undefined) {
                     return null;
                 }
-                
+
                 if (seconds < 60) {
                     return `${Math.round(seconds)}s`;
                 } else {

@@ -90,7 +90,7 @@ WebQuiz - A modern web-based quiz and testing system built with Python and aioht
 - **`quizzes/` directory** - Contains multiple YAML quiz files:
   - `default.yaml` - Default questions (auto-created if missing)
   - `math_quiz.yaml` - Mathematics questions
-  - `geography_quiz.yaml` - Geography questions  
+  - `geography_quiz.yaml` - Geography questions
   - _(additional quiz files as needed)_
 - `webquiz/templates/index.html` - Main quiz interface template
 - **`webquiz/templates/admin.html`** - Admin interface template for quiz management

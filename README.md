@@ -81,7 +81,7 @@ The server will automatically create necessary directories and files on first ru
 ```
 webquiz/
 ├── pyproject.toml           # Poetry configuration and dependencies
-├── requirements.txt         # Legacy pip dependencies  
+├── requirements.txt         # Legacy pip dependencies
 ├── .gitignore              # Git ignore rules
 ├── CLAUDE.md               # Project documentation
 ├── README.md               # This file
@@ -211,7 +211,7 @@ The action will automatically:
 
 Each release automatically includes:
 - 📦 **Python wheel package** (`.whl` file)
-- 📋 **Source distribution** (`.tar.gz` file)  
+- 📋 **Source distribution** (`.tar.gz` file)
 - 📝 **Formatted release notes** with installation instructions
 - 🔗 **Links to commit history** for detailed changelog
 - 📋 **Installation commands** for the specific version
@@ -281,7 +281,7 @@ questions:
       - "5"
       - "6"
     correct_answer: 1  # 0-indexed (option "4")
-  
+
   - question: "What is 5 × 3?"
     options:
       - "10"
@@ -398,7 +398,7 @@ The binary includes all templates and configuration examples, with automatic dir
 - **Multi-quiz system**: Questions loaded from `quizzes/` directory with YAML files
 - **Master key authentication**: Admin endpoints protected with decorator-based authentication
 - **Server-side timing**: All timing calculated server-side for accuracy
-- **UUID-based sessions**: Secure user identification without passwords  
+- **UUID-based sessions**: Secure user identification without passwords
 - **Middleware error handling**: Clean error management with proper HTTP status codes
 - **CSV module usage**: Proper escaping for data with commas/quotes
 - **Smart file naming**: CSV files prefixed with quiz names, unique suffixes prevent overwrites

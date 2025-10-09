@@ -8,7 +8,7 @@ server:
 paths:
   quizzes_dir: "quizzes"  # Directory containing quiz YAML files
   logs_dir: "logs"        # Directory for server log files (auto-created)
-  csv_dir: "data"         # Directory for CSV response files (auto-created)  
+  csv_dir: "data"         # Directory for CSV response files (auto-created)
   static_dir: "static"    # Directory for static web files (auto-created)
 
 admin:

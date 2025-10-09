@@ -26,6 +26,7 @@ share/python-wheels/
 .installed.cfg
 *.egg
 MANIFEST
+con.yaml
 
 # PyInstaller
 #  Usually these files are written by a python script from a template
@@ -162,4 +163,3 @@ custom_config_*.yaml
 .Trashes
 ehthumbs.db
 Thumbs.db
-

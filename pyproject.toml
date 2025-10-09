@@ -47,6 +47,8 @@ pyinstaller = {version = "^6.15", python = ">=3.9,<3.15"}
 selenium = "^4.24.0"
 webdriver-manager = "^4.0.0"
 pytest-html = "^4.1.0"
+black = "^24.0.0"
+pre-commit = "^3.0.0"
 
 [tool.poetry.scripts]
 webquiz = "webquiz.cli:main"
@@ -66,3 +68,22 @@ asyncio_mode = "auto"
 
 [tool.poetry.urls]
 "Bug Tracker" = "https://github.com/oduvan/webquiz/issues"
+
+[tool.black]
+line-length = 120
+target-version = ['py39', 'py310', 'py311', 'py312']
+include = '\.pyi?$'
+extend-exclude = '''
+/(
+  # directories
+  \.eggs
+  | \.git
+  | \.hg
+  | \.mypy_cache
+  | \.tox
+  | \.venv
+  | venv
+  | build
+  | dist
+)/
+'''
