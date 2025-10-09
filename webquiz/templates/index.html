@@ -1072,12 +1072,12 @@
                     option.classList.add('disabled');
                 });
 
-                // Hide submit button and show continue button
+                // Hide submit button (no continue button needed - auto-advance)
                 const submitBtn = document.getElementById('submit-answer-btn');
-                const continueBtn = document.getElementById('continue-btn');
-
                 submitBtn.classList.add('hidden');
-                continueBtn.classList.remove('hidden');
+
+                // Auto-advance to next question immediately (no manual button click needed)
+                continueToNextQuestion();
                 return;
             }
 

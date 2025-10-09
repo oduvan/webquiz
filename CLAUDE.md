@@ -50,6 +50,7 @@ WebQuiz - A modern web-based quiz and testing system built with Python and aioht
 - Web interface with auto-generated index.html if not present
 - Real-time answer validation via REST API
 - **Immediate answer feedback**: Visual confirmation (green/red) after each answer submission
+- **Auto-advance functionality**: Seamless question progression when `show_right_answer: false` (no continue button needed)
 - Server-side timing for accurate response measurement (starts on approval if approval required)
 - In-memory storage with periodic CSV backup (30s intervals) to configurable file path
 - User session persistence with cookie-based user ID storage
@@ -107,6 +108,7 @@ WebQuiz - A modern web-based quiz and testing system built with Python and aioht
   - `test_admin_api.py` - Admin API functionality tests (13 tests)
   - `test_config_management.py` - Config editor and validation tests (17 tests)
   - `test_registration_approval.py` - Registration approval workflow tests (23 tests)
+  - `test_auto_advance.py` - Auto-advance Selenium tests for show_right_answer behavior (6 tests)
   - `conftest.py` - Test fixtures and configuration with parallel testing support
 - `pyproject.toml` - Poetry configuration and dependencies (includes PyInstaller 6.15)
 - `requirements.txt` - Legacy pip dependencies
@@ -222,6 +224,7 @@ python -m webquiz.cli
 - **In-memory storage**: Fast responses, CSV backup for persistence, resets on quiz switch
 - **Session persistence**: Cookie-based user_id storage for seamless user experience
 - **Real-time monitoring**: WebSocket-based live statistics with automatic client cleanup and broadcasting
+- **Auto-advance behavior**: When `show_right_answer: false`, quiz automatically progresses to next question after answer submission without requiring manual continue button click, creating seamless quiz flow
 - **Mobile-first responsive design**: All UI elements use responsive widths with @media queries for ≤768px screens
   - Input fields: `width: 100%; max-width: [desktop-size]` pattern
   - Tables: Stack vertically on mobile with `display: block` for td elements
@@ -284,7 +287,14 @@ python -m webquiz.cli
   - PUT /api/admin/approve-user (6 tests)
   - WebSocket /ws/admin (3 tests - partial)
   - Timing behavior validation (2 tests)
-- **Total: 61 tests** with GitHub Actions CI/CD pipeline
+- **Auto-Advance Selenium Tests (6)**: Test automatic question progression when show_right_answer is false
+  - Auto-advance behavior with show_right_answer: false (1 test)
+  - Manual continue with show_right_answer: true (1 test)
+  - Multi-question auto-advance flow (1 test)
+  - Auto-advance without visual feedback (1 test)
+  - Last question auto-advance to results (1 test)
+  - Button state management during auto-advance (1 test)
+- **Total: 67 tests** with GitHub Actions CI/CD pipeline
 - **Parallel Testing**: Tests use predefined ports (8080-8087) with worker-based allocation to prevent conflicts
 - **Fast Server Startup**: Port availability checking instead of HTTP requests for efficient fixture startup
 - **Test Isolation**: `custom_webquiz_server` fixture automatically cleans up directories and config files after each test to prevent data contamination between sequential test runs
