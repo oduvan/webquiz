@@ -615,12 +615,14 @@ def test_files_functionality_with_real_csv_data():
             if response.status_code == 200:
                 data = response.json()
                 if data['csv']:
-                    csv_file = data['csv'][0]
-                    assert csv_file['size'] > 0
+                    # Find the users CSV file (contains username data)
+                    users_csv_file = next((f for f in data['csv'] if f['name'].endswith('.users.csv')), None)
+                    assert users_csv_file is not None, "Users CSV file not found"
+                    assert users_csv_file['size'] > 0
 
                     # Try to view the CSV content
                     view_response = requests.get(
-                        f'http://localhost:{port}/api/files/csv/view/{csv_file["name"]}',
+                        f'http://localhost:{port}/api/files/csv/view/{users_csv_file["name"]}',
                         headers=headers
                     )
 
