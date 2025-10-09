@@ -21,8 +21,9 @@ admin:
 # Optional: Registration configuration
 # Uncomment and configure to collect additional user information
 # registration:
-#   approve: false        # Set to true to require admin approval before users can start
-#   fields:               # Additional registration fields (supports Cyrillic)
+#   approve: false                     # Set to true to require admin approval before users can start
+#   username_label: "Ім'я користувача" # Label for username field (default: Ukrainian)
+#   fields:                            # Additional registration fields (supports Cyrillic)
 #     - Grade
 #     - School
 

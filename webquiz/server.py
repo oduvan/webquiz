@@ -108,6 +108,7 @@ class RegistrationConfig:
 
     fields: List[str] = None
     approve: bool = False
+    username_label: str = "Ім'я користувача"
 
     def __post_init__(self):
         if self.fields is None:
@@ -742,10 +743,15 @@ class TestingServer:
                 '<table style="margin: 10px auto; border-collapse: collapse; max-width: 500px; width: 100%;">'
             )
 
+            # Get username label from config
+            username_label = "Ім'я користувача"
+            if hasattr(self.config, "registration") and hasattr(self.config.registration, "username_label"):
+                username_label = self.config.registration.username_label
+
             # Add username field as first row
-            registration_fields_html += """
+            registration_fields_html += f"""
                 <tr>
-                    <td style="padding: 5px 10px; text-align: right; font-weight: bold;">Ім'я користувача:</td>
+                    <td style="padding: 5px 10px; text-align: right; font-weight: bold;">{username_label}:</td>
                     <td style="padding: 5px 10px;">
                         <input type="text" id="username" style="padding: 8px; width: 100%; max-width: 250px; box-sizing: border-box;">
                     </td>
@@ -765,10 +771,11 @@ class TestingServer:
 
             registration_fields_html += "</table>"
 
-            # Inject questions data, title, version, registration fields, and show_right_answer setting into template
+            # Inject questions data, title, version, registration fields, username label, and show_right_answer setting into template
             html_content = template_content.replace("{{QUESTIONS_DATA}}", questions_json)
             html_content = html_content.replace("{{QUIZ_TITLE}}", self.quiz_title)
             html_content = html_content.replace("{{REGISTRATION_FIELDS}}", registration_fields_html)
+            html_content = html_content.replace("{{USERNAME_LABEL}}", username_label)
             html_content = html_content.replace("{{SHOW_RIGHT_ANSWER}}", "true" if self.show_right_answer else "false")
             html_content = html_content.replace("{{WEBQUIZ_VERSION}}", get_package_version())
 
@@ -1834,6 +1841,9 @@ class TestingServer:
                 if "approve" in registration:
                     if not isinstance(registration["approve"], bool):
                         errors.append("'registration.approve' must be a boolean")
+                if "username_label" in registration:
+                    if not isinstance(registration["username_label"], str):
+                        errors.append("'registration.username_label' must be a string")
 
         # Validate quizzes section (optional)
         if "quizzes" in data:
@@ -2199,7 +2209,7 @@ class TestingServer:
     async def serve_index_page(self, request):
         """Serve the index.html page from static directory"""
         index_path = f"{self.static_dir}/index.html"
-        return web.FileResponse(index_path, headers={"Content-Type": "text/html"})
+        return web.FileResponse(index_path, headers={"Content-Type": "text/html; charset=utf-8"})
 
     async def serve_admin_page(self, request):
         """Serve the admin interface page"""

@@ -72,6 +72,7 @@ admin:
 ```
 registration:
   approve: false
+  username_label: "Ім'я користувача"
   fields:
     - Grade
     - School
@@ -82,6 +83,18 @@ This section defines how users register before taking quizzes.
 - **approve**
   If set to `true`, the user will not be able to start the quiz immediately after filling out the form — their request will be added to a waiting list, and the administrator must approve it manually.
   If the value is `false`, the user can start the quiz immediately after registration.
+
+- **username_label**
+  Customizes the label text for the username input field in the registration form.
+  Default: `"Ім'я користувача"` (Ukrainian for "Username").
+  Usage examples:
+  ```
+  username_label: "Full Name"
+  username_label: "Student ID"
+  username_label: "Прізвище та ім'я"
+  ```
+  This label appears in both the registration form and the waiting for approval form.
+  Supports special characters, emojis, and multilingual text.
 
 - **fields**
   Additional registration fields that appear in the form before starting the quiz.

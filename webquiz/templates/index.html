@@ -776,7 +776,7 @@
 
             // Create a table similar to registration form
             let fieldsHTML = '<table style="margin: 20px auto; max-width: 500px; width: 100%;">';
-            fieldsHTML += `<tr><td style="padding: 8px; text-align: right; width: 200px;">Ім'я користувача:</td><td style="padding: 8px;"><input type="text" id="waiting-username" value="${registrationData.username || ''}" style="width: 100%; max-width: 250px; padding: 8px; border: 1px solid var(--border-color); border-radius: 5px; box-sizing: border-box;" /></td></tr>`;
+            fieldsHTML += `<tr><td style="padding: 8px; text-align: right; width: 200px;">{{USERNAME_LABEL}}:</td><td style="padding: 8px;"><input type="text" id="waiting-username" value="${registrationData.username || ''}" style="width: 100%; max-width: 250px; padding: 8px; border: 1px solid var(--border-color); border-radius: 5px; box-sizing: border-box;" /></td></tr>`;
 
             // Add additional registration fields if they exist
             const additionalFields = document.querySelectorAll('.registration-field');

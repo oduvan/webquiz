@@ -40,6 +40,7 @@ WebQuiz - A modern web-based quiz and testing system built with Python and aioht
 
 **Key Features:**
 - User registration with unique usernames and UUID-based user IDs
+- **Customizable username label**: Configurable `registration.username_label` to customize the username field label (default: Ukrainian "Ім'я користувача")
 - **Mobile-responsive UI**: All forms and interfaces adapt to mobile screens (≤768px) with proper input sizing and table stacking
 - **Registration approval workflow**: Optional admin approval for new registrations with real-time notifications
 - **Multi-quiz system**: Questions loaded from `quizzes/` directory with multiple YAML files
@@ -109,6 +110,7 @@ WebQuiz - A modern web-based quiz and testing system built with Python and aioht
   - `test_config_management.py` - Config editor and validation tests (17 tests)
   - `test_registration_approval.py` - Registration approval workflow tests (23 tests)
   - `test_auto_advance.py` - Auto-advance Selenium tests for show_right_answer behavior (6 tests)
+  - `test_username_label.py` - Username label customization tests (10 tests)
   - `conftest.py` - Test fixtures and configuration with parallel testing support
 - `pyproject.toml` - Poetry configuration and dependencies (includes PyInstaller 6.15)
 - `requirements.txt` - Legacy pip dependencies
@@ -236,6 +238,8 @@ python -m webquiz.cli
   - All binaries are zipped for easier distribution and download
   - Only zipped binaries are attached to GitHub releases (8 total assets: 2 Python packages + 4 zipped binaries + 2 PDF docs)
   - Local `poetry run build_binary` creates binary for current OS/architecture only (PyInstaller limitation)
+- **UTF-8 Content-Type header**: Index.html served with `Content-Type: text/html; charset=utf-8` to ensure proper display of Ukrainian/multilingual text (prevents ISO-8859-1 default encoding issues)
+- **Customizable username label**: Config option `registration.username_label` allows customization of username field label in both registration and waiting approval forms
 - **Comprehensive testing**: Integration tests for API + unit tests for internal logic
 
 ## Data Flow
@@ -294,7 +298,18 @@ python -m webquiz.cli
   - Auto-advance without visual feedback (1 test)
   - Last question auto-advance to results (1 test)
   - Button state management during auto-advance (1 test)
-- **Total: 67 tests** with GitHub Actions CI/CD pipeline
+- **Username Label Tests (10)**: Test customizable username field label functionality
+  - Default Ukrainian label (1 test)
+  - Custom English label (1 test)
+  - Custom Ukrainian label (1 test)
+  - Label in waiting approval form (1 test)
+  - Special characters (apostrophes) (1 test)
+  - HTML escaping/XSS (1 test)
+  - Emoji characters (1 test)
+  - Config validation for non-string values (1 test)
+  - Label appears in both forms (1 test)
+  - Empty string handling (1 test)
+- **Total: 77 tests** with GitHub Actions CI/CD pipeline
 - **Parallel Testing**: Tests use predefined ports (8080-8087) with worker-based allocation to prevent conflicts
 - **Fast Server Startup**: Port availability checking instead of HTTP requests for efficient fixture startup
 - **Test Isolation**: `custom_webquiz_server` fixture automatically cleans up directories and config files after each test to prevent data contamination between sequential test runs
@@ -325,6 +340,12 @@ python -m webquiz.cli
   - Admin receives real-time WebSocket notifications
   - Manual "Check" button for students to check approval status
   - Default: `approve: false` (auto-approve, existing behavior)
+- **Username label customization** (`registration.username_label`):
+  - Customize the label for the username field in registration forms
+  - Default: "Ім'я користувача" (Ukrainian for "Username")
+  - Appears in both registration form and waiting approval form
+  - Supports special characters, emojis, and multilingual text
+  - Config validation ensures string type
 - **Mobile responsiveness**:
   - All forms and inputs are mobile-responsive (tested at ≤768px viewport)
   - Registration form fields use `width: 100%; max-width: 250px` pattern
