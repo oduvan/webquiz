@@ -8,6 +8,7 @@ A modern web-based quiz and testing system built with Python and aiohttp that al
 - **Multi-Quiz System**: Questions loaded from `quizzes/` directory with multiple YAML files
 - **Admin Interface**: Web-based admin panel with master key authentication for quiz management
 - **Registration Approval**: Optional admin approval workflow for new registrations with real-time notifications
+- **Question Randomization**: Configurable per-student question order randomization for fair testing
 - **Dynamic Quiz Switching**: Real-time quiz switching with automatic server state reset
 - **Config File Editor**: Web-based configuration editor with real-time validation
 - **Live Statistics**: Real-time WebSocket-powered dashboard showing user progress
@@ -273,6 +274,7 @@ Questions are stored in YAML files in the `quizzes/` directory. The server autom
 
 ```yaml
 title: "Mathematics Quiz"
+randomize_questions: true  # Set to true to randomize question order for each student (default: false)
 questions:
   - question: "What is 2 + 2?"
     options:
@@ -290,6 +292,12 @@ questions:
       - "25"
     correct_answer: 1  # 0-indexed (option "15")
 ```
+
+**Question Randomization:**
+- Set `randomize_questions: true` in your quiz YAML to give each student a unique question order
+- Each student receives a randomized order that persists across sessions
+- Helps prevent cheating and ensures fair testing
+- Default is `false` (questions appear in YAML order)
 
 ### Server Configuration
 
@@ -398,6 +406,7 @@ The binary includes all templates and configuration examples, with automatic dir
 - **Multi-quiz system**: Questions loaded from `quizzes/` directory with YAML files
 - **Master key authentication**: Admin endpoints protected with decorator-based authentication
 - **Server-side timing**: All timing calculated server-side for accuracy
+- **Server-side question randomization**: Random question order generated server-side, stored per-user, ensures unique randomized order for each student with session persistence
 - **UUID-based sessions**: Secure user identification without passwords
 - **Middleware error handling**: Clean error management with proper HTTP status codes
 - **CSV module usage**: Proper escaping for data with commas/quotes

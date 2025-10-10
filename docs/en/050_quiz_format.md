@@ -14,6 +14,7 @@ The basic structure of a test file looks like this:
 title: "Test Title"
 description: "Test description (optional)"
 show_right_answer: false
+randomize_questions: false  # true for randomized question order for each student
 questions:
   - question: "Question text"
     options: ["Option 1", "Option 2", "Option 3"]
@@ -56,6 +57,21 @@ show_right_answer: false  # Automatic progression to the next question
 ```
 
 > 💡 **Using `show_right_answer: false`** creates a fast, seamless quiz-taking experience without interruptions, which is useful for quick surveys or tests where students should not see correct answers during the testing process.
+
+---
+
+#### `randomize_questions` (optional)
+
+Determines whether each student receives a unique randomized question order. This is useful for preventing cheating and ensuring fair testing.
+
+- **`true`** — each student receives a unique randomized question order that persists throughout the entire session
+- **`false`** (default) — questions are displayed in the order defined in the YAML file
+
+```
+randomize_questions: true  # Each student gets a unique question order
+```
+
+> 💡 **Using `randomize_questions: true`** helps ensure fair testing, as students sitting next to each other will receive questions in different orders. The question order is generated server-side during student registration and persists throughout the entire session, even after page reloads.
 
 ---
 
@@ -186,6 +202,7 @@ Below is an example of a complete test file with different types of questions:
 title: "Comprehensive Test with Various Question Types"
 description: "Example test demonstrating all formatting capabilities"
 show_right_answer: true
+randomize_questions: false  # Set to true for randomized question order
 
 questions:
   # Simple question with one correct option
@@ -477,6 +494,7 @@ The YAML format for tests in **WebQuiz** allows:
 ✅ Adding images to questions and answer options
 ✅ Setting minimum number of correct answers
 ✅ Showing or hiding correct answers after completion
+✅ Randomizing question order for each student to prevent cheating
 ✅ Easily editing tests in web interface with automatic validation
 
 **Recommendation:** Use the administrator web interface to create and edit tests — it automatically validates syntax and warns about errors!

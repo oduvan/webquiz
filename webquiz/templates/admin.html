@@ -679,11 +679,18 @@
                         <small style="color: var(--text-muted);">Якщо не вказано, буде використана стандартна назва</small>
                     </div>
                     <div class="form-group">
-                        <label style="display: flex; align-items: center; margin-bottom: 20px;">
+                        <label style="display: flex; align-items: center; margin-bottom: 10px;">
                             <input type="checkbox" id="show-right-answer" checked style="margin-right: 10px;">
                             Показувати правильні відповіді
                         </label>
-                        <small style="color: var(--text-muted);">Якщо вимкнено, правильні відповіді не показуватимуться під час питань та в підсумковій таблиці</small>
+                        <small style="color: var(--text-muted); display: block; margin-bottom: 20px;">Якщо вимкнено, правильні відповіді не показуватимуться під час питань та в підсумковій таблиці</small>
+                    </div>
+                    <div class="form-group">
+                        <label style="display: flex; align-items: center; margin-bottom: 10px;">
+                            <input type="checkbox" id="randomize-questions" style="margin-right: 10px;">
+                            Рандомізувати порядок питань
+                        </label>
+                        <small style="color: var(--text-muted); display: block; margin-bottom: 20px;">Кожен студент отримає унікальний випадковий порядок питань для запобігання списування</small>
                     </div>
                     <div class="form-group">
                         <div id="questions-container">
@@ -1387,6 +1394,9 @@
             // Populate show_right_answer field
             document.getElementById('show-right-answer').checked = quizData.show_right_answer !== false;
 
+            // Populate randomize_questions field
+            document.getElementById('randomize-questions').checked = quizData.randomize_questions === true;
+
             if (quizData.questions) {
                 quizData.questions.forEach(question => {
                     const questionDiv = document.createElement('div');
@@ -1567,6 +1577,9 @@
 
             // Include show_right_answer setting
             quizData.show_right_answer = document.getElementById('show-right-answer').checked;
+
+            // Include randomize_questions setting
+            quizData.randomize_questions = document.getElementById('randomize-questions').checked;
 
             return quizData;
         }

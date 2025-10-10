@@ -49,6 +49,7 @@ webdriver-manager = "^4.0.0"
 pytest-html = "^4.1.0"
 black = "^24.0.0"
 pre-commit = "^3.0.0"
+websockets = "^14.1"
 
 [tool.poetry.scripts]
 webquiz = "webquiz.cli:main"

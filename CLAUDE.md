@@ -52,6 +52,7 @@ WebQuiz - A modern web-based quiz and testing system built with Python and aioht
 - Real-time answer validation via REST API
 - **Immediate answer feedback**: Visual confirmation (green/red) after each answer submission
 - **Auto-advance functionality**: Seamless question progression when `show_right_answer: false` (no continue button needed)
+- **Question randomization**: Configurable per-student question order randomization with `randomize_questions: true` in quiz YAML
 - Server-side timing for accurate response measurement (starts on approval if approval required)
 - In-memory storage with periodic CSV backup (30s intervals) to configurable file path
 - User session persistence with cookie-based user ID storage
@@ -111,6 +112,9 @@ WebQuiz - A modern web-based quiz and testing system built with Python and aioht
   - `test_registration_approval.py` - Registration approval workflow tests (23 tests)
   - `test_auto_advance.py` - Auto-advance Selenium tests for show_right_answer behavior (6 tests)
   - `test_username_label.py` - Username label customization tests (10 tests)
+  - `test_randomize_questions.py` - Question randomization tests (13 tests)
+  - `test_admin_quiz_editor.py` - Admin quiz editor with randomize_questions tests (5 tests)
+  - `test_live_stats_websocket.py` - Live stats WebSocket tests with randomization (5 tests)
   - `conftest.py` - Test fixtures and configuration with parallel testing support
 - `pyproject.toml` - Poetry configuration and dependencies (includes PyInstaller 6.15)
 - `requirements.txt` - Legacy pip dependencies
@@ -125,7 +129,7 @@ WebQuiz - A modern web-based quiz and testing system built with Python and aioht
 - `POST /api/register` - Register unique username (returns user_id, requires_approval, approved flags)
 - `PUT /api/update-registration` - Update registration data (only if not approved yet)
 - `POST /api/submit-answer` - Submit answer (user_id, question_id, selected_answer)
-- `GET /api/verify-user/{user_id}` - Verify user session, get progress, and check approval status
+- `GET /api/verify-user/{user_id}` - Verify user session, get progress, and check approval status (includes question_order array when randomization enabled)
 
 ### Admin Endpoints (require master key authentication)
 - **`GET /admin`** - Serve admin interface webpage
@@ -240,7 +244,9 @@ python -m webquiz.cli
   - Local `poetry run build_binary` creates binary for current OS/architecture only (PyInstaller limitation)
 - **UTF-8 Content-Type header**: Index.html served with `Content-Type: text/html; charset=utf-8` to ensure proper display of Ukrainian/multilingual text (prevents ISO-8859-1 default encoding issues)
 - **Customizable username label**: Config option `registration.username_label` allows customization of username field label in both registration and waiting approval forms
-- **Comprehensive testing**: Integration tests for API + unit tests for internal logic
+- **Server-side question randomization**: Random question order generated server-side during user registration/approval, stored per-user, and sent to client for reordering. Ensures each student gets unique randomized order that persists across sessions. Client-side JavaScript reorders questions array based on server-provided question IDs.
+- **Live stats first question tracking**: When randomization enabled, live stats initialization uses user's actual first question ID from `question_order` array instead of hardcoded question 1, preventing duplicate "thinking" indicators in live stats dashboard.
+- **Comprehensive testing**: Integration tests for API + unit tests for internal logic + WebSocket integration tests
 
 ## Data Flow
 
@@ -280,6 +286,17 @@ python -m webquiz.cli
 8. Next time student clicks "Check" → API returns `approved: true`
 9. Student UI shows first question → **timing already started server-side**
 
+### Question Randomization Flow (when `randomize_questions: true`)
+1. Server loads quiz YAML → reads `randomize_questions` setting (default: false)
+2. Student registers → server generates random question order using `random.shuffle()` → stores as `question_order` array in user data
+   - If approval required: order generated at registration (before approval)
+   - If no approval: order generated immediately at registration
+3. Student verifies → server returns `question_order` array in API response (e.g., `[3, 1, 4, 2, 5]`)
+4. Client receives question order → JavaScript `applyQuestionOrder()` function reorders questions array based on IDs
+5. Questions displayed in randomized order → user submits answers using original question IDs
+6. Question order persists across page reloads and browser sessions (stored server-side per user)
+7. Each student gets unique randomized order (different students, different orders)
+
 ## Test Strategy
 - **CLI Directory Creation Tests (8)**: Test directory and file creation by webquiz CLI command
 - **Admin API Tests (13)**: Test admin interface authentication, quiz management, and validation endpoints
@@ -309,7 +326,32 @@ python -m webquiz.cli
   - Config validation for non-string values (1 test)
   - Label appears in both forms (1 test)
   - Empty string handling (1 test)
-- **Total: 77 tests** with GitHub Actions CI/CD pipeline
+- **Question Randomization Tests (13)**: Test question order randomization functionality
+  - Randomization disabled by default (1 test)
+  - Randomization enabled generates question_order (1 test)
+  - Different users get different orders (1 test)
+  - Question order persists across verifications (1 test)
+  - Randomization with approval workflow (1 test)
+  - YAML validation accepts randomize_questions boolean (1 test)
+  - YAML validation rejects non-boolean randomize_questions (1 test)
+  - randomize_questions: false behaves like disabled (1 test)
+  - Question order contains all IDs exactly once (1 test)
+  - Randomization with single question (1 test)
+  - YAML validation accepts other top-level fields (1 test)
+  - Edge cases and data integrity (2 tests)
+- **Admin Quiz Editor Tests (5)**: Test admin panel quiz editor with randomize_questions
+  - Create quiz with randomize_questions via wizard (1 test)
+  - Default behavior when randomize_questions not specified (1 test)
+  - Edit quiz to add randomize_questions (1 test)
+  - Preserve randomize_questions setting after edit (1 test)
+  - Disable randomize_questions via edit (1 test)
+- **Live Stats WebSocket Tests (5)**: Test WebSocket live stats with question randomization
+  - Correct first question in randomized order (1 test)
+  - No duplicate question notifications (1 test)
+  - Correct first question with approval workflow (1 test)
+  - Question 1 shown without randomization (1 test)
+  - Multiple users get different first questions (1 test)
+- **Total: 100 tests** with GitHub Actions CI/CD pipeline
 - **Parallel Testing**: Tests use predefined ports (8080-8087) with worker-based allocation to prevent conflicts
 - **Fast Server Startup**: Port availability checking instead of HTTP requests for efficient fixture startup
 - **Test Isolation**: `custom_webquiz_server` fixture automatically cleans up directories and config files after each test to prevent data contamination between sequential test runs
@@ -346,6 +388,15 @@ python -m webquiz.cli
   - Appears in both registration form and waiting approval form
   - Supports special characters, emojis, and multilingual text
   - Config validation ensures string type
+- **Question randomization** (`randomize_questions: true`):
+  - Each student receives unique randomized question order
+  - Order generated server-side at registration/approval, persists across sessions
+  - Client receives question_order array (e.g., [3, 1, 4, 2, 5]) and reorders questions
+  - Default: `false` (questions appear in YAML order)
+  - Must be boolean value, validated during quiz validation
+  - **Admin panel support**: Wizard mode includes checkbox for enabling/disabling randomization
+  - Checkbox state properly loaded when editing existing quizzes
+  - Setting persists when saving/editing quizzes through admin interface
 - **Mobile responsiveness**:
   - All forms and inputs are mobile-responsive (tested at ≤768px viewport)
   - Registration form fields use `width: 100%; max-width: 250px` pattern

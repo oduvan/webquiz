@@ -661,12 +661,16 @@ class TestingServer:
                 # Store show_right_answer setting (default: True)
                 self.show_right_answer = data.get("show_right_answer", True)
 
+                # Store randomize_questions setting (default: False)
+                self.randomize_questions = data.get("randomize_questions", False)
+
                 # Add automatic IDs based on array index (for quiz execution only)
                 for i, question in enumerate(self.questions):
                     question["id"] = i + 1
 
                 logger.info(
-                    f"Loaded {len(self.questions)} questions from {quiz_file_path}, show_right_answer: {self.show_right_answer}"
+                    f"Loaded {len(self.questions)} questions from {quiz_file_path}, "
+                    f"show_right_answer: {self.show_right_answer}, randomize_questions: {self.randomize_questions}"
                 )
         except Exception as e:
             logger.error(f"Error loading questions from {quiz_file_path}: {e}")
@@ -985,6 +989,24 @@ class TestingServer:
         else:
             return str(answer_indices)
 
+    def generate_random_question_order(self) -> list:
+        """Generate a random question order for a user.
+
+        Returns a list of question IDs in random order.
+        Only called if self.randomize_questions is True.
+        """
+        import random
+
+        # Create a list of all question IDs
+        question_ids = [q["id"] for q in self.questions]
+
+        # Shuffle the list to create random order
+        shuffled_ids = question_ids.copy()
+        random.shuffle(shuffled_ids)
+
+        logger.info(f"Generated random question order: {shuffled_ids}")
+        return shuffled_ids
+
     def update_live_stats(self, user_id: str, question_id: int, state: str, time_taken: float = None):
         """Update live stats for a user and question"""
         if user_id not in self.live_stats:
@@ -1039,6 +1061,11 @@ class TestingServer:
                     raise ValueError(f'Поле "{field_label}" не може бути порожнім')
                 user_data[field_name] = field_value
 
+        # Generate random question order if randomization is enabled
+        if self.randomize_questions:
+            user_data["question_order"] = self.generate_random_question_order()
+            logger.info(f"Generated random question order for user {user_id}: {user_data['question_order']}")
+
         self.users[user_id] = user_data
 
         # If approval not required, start timing and live stats immediately
@@ -1048,7 +1075,10 @@ class TestingServer:
 
             # Initialize live stats: set first question to "think"
             if len(self.questions) > 0:
-                self.update_live_stats(user_id, 1, "think")
+                # Determine first question ID (use question_order if randomization enabled)
+                first_question_id = user_data.get("question_order", [1])[0] if self.randomize_questions else 1
+
+                self.update_live_stats(user_id, first_question_id, "think")
 
                 # Broadcast new user registration to live stats
                 await self.broadcast_to_websockets(
@@ -1056,7 +1086,7 @@ class TestingServer:
                         "type": "user_registered",
                         "user_id": user_id,
                         "username": username,
-                        "question_id": 1,
+                        "question_id": first_question_id,
                         "state": "think",
                         "time_taken": None,
                         "total_questions": len(self.questions),
@@ -1067,15 +1097,21 @@ class TestingServer:
             await self.broadcast_to_admin_websockets({"type": "new_registration", "user_data": user_data})
 
         logger.info(f"Registered user: {username} with ID: {user_id}, requires_approval: {requires_approval}")
-        return web.json_response(
-            {
-                "username": username,
-                "user_id": user_id,
-                "message": "User registered successfully",
-                "requires_approval": requires_approval,
-                "approved": user_data["approved"],
-            }
-        )
+
+        # Build response
+        response_data = {
+            "username": username,
+            "user_id": user_id,
+            "message": "User registered successfully",
+            "requires_approval": requires_approval,
+            "approved": user_data["approved"],
+        }
+
+        # Include question_order if randomization is enabled
+        if self.randomize_questions and "question_order" in user_data:
+            response_data["question_order"] = user_data["question_order"]
+
+        return web.json_response(response_data)
 
     async def update_registration(self, request):
         """Update registration data for a user (only if not approved yet)"""
@@ -1334,17 +1370,21 @@ class TestingServer:
         requires_approval = hasattr(self.config, "registration") and self.config.registration.approve
         if requires_approval and not approved:
             # User waiting for approval
-            return web.json_response(
-                {
-                    "valid": True,
-                    "user_id": user_id,
-                    "username": username,
-                    "approved": False,
-                    "requires_approval": True,
-                    "user_data": user_data,
-                    "message": "User waiting for approval",
-                }
-            )
+            response_data = {
+                "valid": True,
+                "user_id": user_id,
+                "username": username,
+                "approved": False,
+                "requires_approval": True,
+                "user_data": user_data,
+                "message": "User waiting for approval",
+            }
+
+            # Include question_order if randomization is enabled
+            if self.randomize_questions and "question_order" in user_data:
+                response_data["question_order"] = user_data["question_order"]
+
+            return web.json_response(response_data)
 
         # User is approved (or approval not required), return test state
         # Get last answered question ID from progress tracking
@@ -1353,11 +1393,20 @@ class TestingServer:
         # Find the index of next question to answer
         next_question_index = 0
         if last_answered_question_id > 0:
-            # Find the index of last answered question, then add 1
-            for i, question in enumerate(self.questions):
-                if question["id"] == last_answered_question_id:
-                    next_question_index = i + 1
-                    break
+            if self.randomize_questions and "question_order" in user_data:
+                # With randomization: find index in user's custom order
+                try:
+                    last_index = user_data["question_order"].index(last_answered_question_id)
+                    next_question_index = last_index + 1
+                except ValueError:
+                    # Question ID not found in order (shouldn't happen), default to 0
+                    next_question_index = 0
+            else:
+                # Without randomization: find index in original question order
+                for i, question in enumerate(self.questions):
+                    if question["id"] == last_answered_question_id:
+                        next_question_index = i + 1
+                        break
 
         # Ensure we don't go beyond available questions
         if next_question_index >= len(self.questions):
@@ -1376,6 +1425,10 @@ class TestingServer:
             "last_answered_question_id": last_answered_question_id,
             "test_completed": test_completed,
         }
+
+        # Include question_order if randomization is enabled
+        if self.randomize_questions and "question_order" in user_data:
+            response_data["question_order"] = user_data["question_order"]
 
         if test_completed:
             # Get final results for completed test
@@ -1448,6 +1501,12 @@ class TestingServer:
 
         # Approve the user
         user_data["approved"] = True
+
+        # Generate random question order if randomization is enabled and not yet generated
+        if self.randomize_questions and "question_order" not in user_data:
+            user_data["question_order"] = self.generate_random_question_order()
+            logger.info(f"Generated random question order for approved user {user_id}: {user_data['question_order']}")
+
         self.users[user_id] = user_data
 
         # Start timing for first question
@@ -1455,7 +1514,10 @@ class TestingServer:
 
         # Initialize live stats: set first question to "think"
         if len(self.questions) > 0:
-            self.update_live_stats(user_id, 1, "think")
+            # Determine first question ID (use question_order if randomization enabled)
+            first_question_id = user_data.get("question_order", [1])[0] if self.randomize_questions else 1
+
+            self.update_live_stats(user_id, first_question_id, "think")
 
             # Broadcast user approval to live stats WebSocket
             await self.broadcast_to_websockets(
@@ -1463,7 +1525,7 @@ class TestingServer:
                     "type": "user_registered",
                     "user_id": user_id,
                     "username": user_data["username"],
-                    "question_id": 1,
+                    "question_id": first_question_id,
                     "state": "think",
                     "time_taken": None,
                     "total_questions": len(self.questions),
@@ -1770,6 +1832,16 @@ class TestingServer:
                     errors.append(f"Question {i+1} min_correct must be at least 1")
                 elif min_correct > len(question["correct_answer"]):
                     errors.append(f"Question {i+1} min_correct cannot exceed number of correct answers")
+
+        # Validate optional top-level fields
+        if "show_right_answer" in data and not isinstance(data["show_right_answer"], bool):
+            errors.append("'show_right_answer' must be a boolean (true or false)")
+
+        if "randomize_questions" in data and not isinstance(data["randomize_questions"], bool):
+            errors.append("'randomize_questions' must be a boolean (true or false)")
+
+        if "title" in data and not isinstance(data["title"], str):
+            errors.append("'title' must be a string")
 
         return len(errors) == 0
 
