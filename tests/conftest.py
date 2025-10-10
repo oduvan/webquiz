@@ -112,6 +112,18 @@ def custom_webquiz_server(config=None, quizzes=None):
     with open(config_filename, "w") as f:
         yaml.dump(final_config, f)
 
+    # Check if port is already in use before starting server
+    import socket
+
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+        sock.settimeout(0.1)
+        result = sock.connect_ex(("localhost", port))
+        if result == 0:
+            raise RuntimeError(
+                f"Port {port} is already in use! Another webquiz server or process "
+                f"is running on this port. Please stop it before running tests."
+            )
+
     # Start server using sys.executable to ensure we use the same Python interpreter
     import sys
 
