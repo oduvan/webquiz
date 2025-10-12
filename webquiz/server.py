@@ -1,10 +1,8 @@
 import asyncio
 import json
 import csv
-import uuid
 import yaml
 import os
-import sys
 import socket
 import subprocess
 import platform
@@ -17,7 +15,7 @@ from aiohttp import web, WSMsgType, ClientSession
 import aiofiles
 import logging
 from io import StringIO
-from dataclasses import dataclass, asdict
+from dataclasses import dataclass, field
 
 from webquiz import __version__ as package_version
 
@@ -74,20 +72,10 @@ class ServerConfig:
 class PathsConfig:
     """Paths configuration data class"""
 
-    quizzes_dir: str = None
-    logs_dir: str = None
-    csv_dir: str = None
-    static_dir: str = None
-
-    def __post_init__(self):
-        if self.quizzes_dir is None:
-            self.quizzes_dir = resolve_path_relative_to_binary("quizzes")
-        if self.logs_dir is None:
-            self.logs_dir = resolve_path_relative_to_binary("logs")
-        if self.csv_dir is None:
-            self.csv_dir = resolve_path_relative_to_binary("data")
-        if self.static_dir is None:
-            self.static_dir = resolve_path_relative_to_binary("static")
+    quizzes_dir: str = field(default_factory=lambda: resolve_path_relative_to_binary("quizzes"))
+    logs_dir: str = field(default_factory=lambda: resolve_path_relative_to_binary("logs"))
+    csv_dir: str = field(default_factory=lambda: resolve_path_relative_to_binary("data"))
+    static_dir: str = field(default_factory=lambda: resolve_path_relative_to_binary("static"))
 
 
 @dataclass
@@ -95,24 +83,16 @@ class AdminConfig:
     """Admin configuration data class"""
 
     master_key: Optional[str] = None
-    trusted_ips: List[str] = None
-
-    def __post_init__(self):
-        if self.trusted_ips is None:
-            self.trusted_ips = ["127.0.0.1"]
+    trusted_ips: List[str] = field(default_factory=lambda: ["127.0.0.1"])
 
 
 @dataclass
 class RegistrationConfig:
     """Registration configuration data class"""
 
-    fields: List[str] = None
+    fields: List[str] = field(default_factory=list)
     approve: bool = False
     username_label: str = "Ім'я користувача"
-
-    def __post_init__(self):
-        if self.fields is None:
-            self.fields = []
 
 
 @dataclass
@@ -128,35 +108,19 @@ class DownloadableQuiz:
 class QuizzesConfig:
     """Downloadable quizzes configuration data class"""
 
-    quizzes: List[DownloadableQuiz] = None
-
-    def __post_init__(self):
-        if self.quizzes is None:
-            self.quizzes = []
+    quizzes: List[DownloadableQuiz] = field(default_factory=list)
 
 
 @dataclass
 class WebQuizConfig:
     """Main configuration data class"""
 
-    server: ServerConfig = None
-    paths: PathsConfig = None
-    admin: AdminConfig = None
-    registration: RegistrationConfig = None
-    quizzes: QuizzesConfig = None
+    server: ServerConfig = field(default_factory=ServerConfig)
+    paths: PathsConfig = field(default_factory=PathsConfig)
+    admin: AdminConfig = field(default_factory=AdminConfig)
+    registration: RegistrationConfig = field(default_factory=RegistrationConfig)
+    quizzes: QuizzesConfig = field(default_factory=QuizzesConfig)
     config_path: Optional[str] = None  # Path to the config file that was loaded
-
-    def __post_init__(self):
-        if self.server is None:
-            self.server = ServerConfig()
-        if self.paths is None:
-            self.paths = PathsConfig()
-        if self.admin is None:
-            self.admin = AdminConfig()
-        if self.registration is None:
-            self.registration = RegistrationConfig()
-        if self.quizzes is None:
-            self.quizzes = QuizzesConfig()
 
 
 def ensure_directory_exists(path: str) -> str:
