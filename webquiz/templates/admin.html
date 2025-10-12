@@ -690,6 +690,7 @@
             <div class="admin-footer">
                 <div class="footer-version" id="footer-version">
                     WebQuiz v<span id="version-number">...</span>
+                    <span id="footer-docs-link" style="margin-left: 15px;"></span>
                 </div>
                 <div id="footer-update" class="footer-update hidden"></div>
             </div>
@@ -2084,10 +2085,17 @@
         // Version display functionality
         function displayVersion() {
             const versionSpan = document.getElementById('version-number');
+            const docsLinkSpan = document.getElementById('footer-docs-link');
+
             if (typeof WEBQUIZ_VERSION !== 'undefined') {
                 versionSpan.textContent = WEBQUIZ_VERSION;
+
+                // Add documentation link
+                const docUrl = `https://github.com/oduvan/webquiz/releases/download/v${WEBQUIZ_VERSION}/webquiz-documentation-uk.pdf`;
+                docsLinkSpan.innerHTML = `| <a href="${docUrl}" target="_blank" style="color: var(--button-bg); text-decoration: none;">📄 Документація</a>`;
             } else {
                 versionSpan.textContent = 'unknown';
+                docsLinkSpan.innerHTML = '';
             }
         }
 
