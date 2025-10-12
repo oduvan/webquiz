@@ -2312,11 +2312,12 @@ class TestingServer:
                         {"name": quiz.name, "download_path": quiz.download_path, "folder": quiz.folder}
                     )
 
-            # Inject trusted IP status, network info, and downloadable quizzes into the template
+            # Inject trusted IP status, network info, downloadable quizzes, and version into the template
             server_data_script = f"""
         const IS_TRUSTED_IP = {str(is_trusted_ip).lower()};
         const NETWORK_INFO = {json.dumps(network_info)};
-        const DOWNLOADABLE_QUIZZES = {json.dumps(downloadable_quizzes)};"""
+        const DOWNLOADABLE_QUIZZES = {json.dumps(downloadable_quizzes)};
+        const WEBQUIZ_VERSION = {json.dumps(package_version)};"""
 
             template_content = template_content.replace("<script>", f"<script>{server_data_script}\n")
 
