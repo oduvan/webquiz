@@ -52,8 +52,10 @@ webquiz -d  # daemon
 # Test (⚠️ CRITICAL: ALWAYS activate venv first!)
 source venv/bin/activate && python -m pytest tests/ -v -n 4
 
-# Test with coverage (subprocess tracking enabled)
-source venv/bin/activate && python -m pytest tests/ -v --cov=webquiz --cov-report=html --cov-report=term
+# Test with coverage (subprocess tracking enabled, use pytest-cov)
+source venv/bin/activate && python -m pytest tests/ -v --cov=webquiz --cov-report=html --cov-report=term-missing
+
+# Note: Use pytest-cov (--cov) not "coverage run" for subprocess tracking
 
 # Build binary (current OS only)
 poetry run build_binary
@@ -108,10 +110,12 @@ poetry run build_binary
 - Subprocess coverage enabled conditionally via `COVERAGE_PROCESS_START` env var
 - Production builds have **zero coverage overhead** (conditional import)
 - CLI checks for `COVERAGE_PROCESS_START` before importing coverage module
-- `.coveragerc` configures multiprocessing support
+- `.coveragerc` configures multiprocessing support with `parallel = true`
 - Tests spawn real server subprocesses that are tracked by coverage
 - conftest.py automatically sets env var when `.coveragerc` exists
-- Run tests with: `source venv/bin/activate && python -m pytest tests/ -v --cov=webquiz`
+- **Use pytest-cov**: `pytest --cov=webquiz` (NOT `coverage run`)
+  - pytest-cov handles subprocess data combination automatically
+  - `coverage run` alone won't combine parallel coverage files
 - ⚠️ **CRITICAL**: Always activate venv before running tests/coverage
 
 ## Important Notes

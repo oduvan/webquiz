@@ -50,9 +50,7 @@ jobs:
     - name: Run tests with coverage
       if: matrix.python-version == '3.9'
       run: |
-        poetry run coverage run -m pytest tests/
-        poetry run coverage report --show-missing
-        poetry run coverage xml
+        poetry run pytest tests/ --cov=webquiz --cov-report=term-missing --cov-report=xml
 
     - name: Upload coverage to Codecov
       if: matrix.python-version == '3.9'
