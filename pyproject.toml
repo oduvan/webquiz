@@ -87,6 +87,10 @@ concurrency = ["multiprocessing"]
 sigterm = true
 parallel = true
 source = ["webquiz"]
+omit = [
+    "*/webquiz/build.py",
+    "*/webquiz/binary_entry.py",
+]
 
 [tool.coverage.report]
 exclude_lines = [

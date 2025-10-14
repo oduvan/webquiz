@@ -80,6 +80,7 @@ poetry run build_binary
 - **Test completion detection** uses answer count (`len(user_answers[user_id])`) instead of question ID to support randomization
 - **Live stats first question** uses user's actual first from `question_order` (prevents duplicates)
 - **Multi-platform binaries** via GitHub Actions (macOS-13 Intel, macOS-14 ARM64, Linux, Windows)
+- **Coverage excludes build tools**: build.py and binary_entry.py omitted from coverage (not runtime code)
 
 ## Key Flows
 
@@ -116,6 +117,9 @@ poetry run build_binary
 - **Use pytest-cov**: `pytest --cov=webquiz` (NOT `coverage run`)
   - pytest-cov handles subprocess data combination automatically
   - `coverage run` alone won't combine parallel coverage files
+- **GitHub Actions CI**:
+  - Python 3.9: Runs tests once WITH coverage + Selenium (uploaded to Codecov)
+  - Python 3.10+: Runs tests WITHOUT coverage, skips Selenium (faster CI)
 - ⚠️ **CRITICAL**: Always activate venv before running tests/coverage
 
 ## Important Notes
