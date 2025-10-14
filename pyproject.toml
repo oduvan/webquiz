@@ -66,6 +66,17 @@ addopts = "-ra -q"
 testpaths = [
     "tests",
 ]
+norecursedirs = [
+    ".*",
+    "build",
+    "dist",
+    "venv",
+    "*.egg",
+    "webquiz",
+]
+filterwarnings = [
+    "ignore:cannot collect test class 'TestingServer':pytest.PytestCollectionWarning",
+]
 asyncio_mode = "auto"
 
 [tool.poetry.urls]

@@ -98,7 +98,11 @@ poetry run build_binary
 - Live stats WebSocket (5)
 - Config loading & utilities (18)
 
-**Setup**: Parallel testing with ports 8080-8087, `custom_webquiz_server` fixture auto-cleans directories, `conftest.py` for shared fixtures
+**Setup**:
+- Parallel testing with ports 8080-8087
+- `custom_webquiz_server` fixture auto-cleans directories
+- `conftest.py` for shared fixtures
+- pytest configured to ignore TestingServer collection warning (filterwarnings in pyproject.toml)
 
 **Coverage Tracking**:
 - Subprocess coverage enabled conditionally via `COVERAGE_PROCESS_START` env var
