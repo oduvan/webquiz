@@ -1987,7 +1987,6 @@ class TestingServer:
             )
 
         except Exception as e:
-            raise
             logger.error(f"Error downloading quiz: {e}")
             return web.json_response({"error": f"Download failed: {str(e)}"}, status=500)
 
