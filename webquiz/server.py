@@ -1241,7 +1241,8 @@ class TestingServer:
         )
 
         # Check if this was the last question and calculate final stats
-        if question_id == len(self.questions):
+        # Use the number of answers instead of question_id to support randomization
+        if len(self.user_answers.get(user_id, [])) == len(self.questions):
             # Test completed - calculate and store final stats
             self.calculate_and_store_user_stats(user_id)
             logger.info(f"Test completed for user {user_id} - final stats calculated")

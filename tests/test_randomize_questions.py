@@ -423,3 +423,67 @@ def test_progress_tracking_without_randomization(temp_dir):
         assert response.status_code == 200
         data = response.json()
         assert data["next_question_index"] == 1
+
+
+def test_final_results_with_randomization(temp_dir):
+    """Test that final results show all answers correctly when randomization is enabled."""
+    quiz_data = {
+        "title": "Randomized Quiz",
+        "randomize_questions": True,
+        "show_right_answer": True,
+        "questions": [
+            {"question": "Q1", "options": ["A1", "B1"], "correct_answer": 0},
+            {"question": "Q2", "options": ["A2", "B2"], "correct_answer": 1},
+            {"question": "Q3", "options": ["A3", "B3"], "correct_answer": 0},
+            {"question": "Q4", "options": ["A4", "B4"], "correct_answer": 1},
+            {"question": "Q5", "options": ["A5", "B5"], "correct_answer": 0},
+        ],
+    }
+
+    with custom_webquiz_server(quizzes={"test.yaml": quiz_data}) as (proc, port):
+        # Register a user
+        response = requests.post(f"http://localhost:{port}/api/register", json={"username": "testuser"})
+        assert response.status_code == 200
+        user_id = response.json()["user_id"]
+
+        # Get user's randomized question order
+        response = requests.get(f"http://localhost:{port}/api/verify-user/{user_id}")
+        assert response.status_code == 200
+        data = response.json()
+        question_order = data["question_order"]
+        assert len(question_order) == 5
+
+        # Answer all questions in the randomized order
+        for question_id in question_order:
+            response = requests.post(
+                f"http://localhost:{port}/api/submit-answer",
+                json={"user_id": user_id, "question_id": question_id, "selected_answer": 0},
+            )
+            assert response.status_code == 200
+
+        # After all questions answered, verify user to get final results
+        response = requests.get(f"http://localhost:{port}/api/verify-user/{user_id}")
+        assert response.status_code == 200
+        data = response.json()
+
+        # Verify test is marked as completed
+        assert data["test_completed"] == True
+        assert "final_results" in data
+
+        # Verify final results contain all questions
+        final_results = data["final_results"]
+        assert final_results["total_count"] == 5
+        assert len(final_results["test_results"]) == 5
+
+        # Verify all test results have required fields
+        for result in final_results["test_results"]:
+            assert "question" in result
+            assert "selected_answer" in result
+            assert "correct_answer" in result
+            assert "is_correct" in result
+            assert "time_taken" in result
+
+        # Verify the results are in the order the user answered them (randomized order)
+        for i, result in enumerate(final_results["test_results"]):
+            expected_question = f"Q{question_order[i]}"
+            assert result["question"] == expected_question
