@@ -1,0 +1,16 @@
+[run]
+concurrency = multiprocessing
+sigterm = true
+parallel = true
+source = webquiz
+
+[report]
+exclude_lines =
+    pragma: no cover
+    def __repr__
+    raise AssertionError
+    raise NotImplementedError
+    if __name__ == .__main__.:
+    if TYPE_CHECKING:
+    if 0:
+    if False:

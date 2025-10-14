@@ -18,14 +18,14 @@ WebQuiz - Python/aiohttp quiz system with multi-quiz management, real-time WebSo
 - **Frontend**: Vanilla HTML/JS (mobile-responsive @media ≤768px)
 - **Storage**: In-memory → CSV (30s flush), YAML configs, quiz state resets on switch
 - **Auth**: Master key decorator for admin endpoints
-- **Testing**: Integration + unit tests (101 total)
+- **Testing**: Integration + unit tests (119 total) with subprocess coverage tracking
 
 ## Key Files
 - `webquiz/server.py` - Main aiohttp server
 - `webquiz/cli.py` - CLI with daemon support
 - `webquiz/build.py` - PyInstaller build script
 - `webquiz/templates/` - index.html, admin.html, files.html, live_stats.html
-- `tests/` - Test suite (8+13+17+23+6+10+14+5+5 = 101 tests)
+- `tests/` - Test suite (8+13+17+23+6+10+14+5+5+18 = 119 tests)
 - `docs/uk/`, `docs/en/` - Documentation (compiled to PDF with version)
 
 ## API Endpoints
@@ -49,8 +49,11 @@ poetry install
 webquiz --master-key secret123
 webquiz -d  # daemon
 
-# Test (ALWAYS use venv!)
+# Test (⚠️ CRITICAL: ALWAYS activate venv first!)
 source venv/bin/activate && python -m pytest tests/ -v -n 4
+
+# Test with coverage (subprocess tracking enabled)
+source venv/bin/activate && python -m pytest tests/ -v --cov=webquiz --cov-report=html --cov-report=term
 
 # Build binary (current OS only)
 poetry run build_binary
@@ -83,7 +86,7 @@ poetry run build_binary
 **Randomization**: Load YAML → register → `random.shuffle()` → store `question_order` per-user → client receives array → JS reorders → persists across sessions
 **Admin**: Switch quiz → reset all state (users, progress, responses) → new CSV → session isolation
 
-## Tests (101 total)
+## Tests (119 total)
 - CLI directory creation (8)
 - Admin API (13)
 - Config management (17)
@@ -93,8 +96,19 @@ poetry run build_binary
 - Question randomization (14)
 - Admin quiz editor (5)
 - Live stats WebSocket (5)
+- Config loading & utilities (18)
 
 **Setup**: Parallel testing with ports 8080-8087, `custom_webquiz_server` fixture auto-cleans directories, `conftest.py` for shared fixtures
+
+**Coverage Tracking**:
+- Subprocess coverage enabled conditionally via `COVERAGE_PROCESS_START` env var
+- Production builds have **zero coverage overhead** (conditional import)
+- CLI checks for `COVERAGE_PROCESS_START` before importing coverage module
+- `.coveragerc` configures multiprocessing support
+- Tests spawn real server subprocesses that are tracked by coverage
+- conftest.py automatically sets env var when `.coveragerc` exists
+- Run tests with: `source venv/bin/activate && python -m pytest tests/ -v --cov=webquiz`
+- ⚠️ **CRITICAL**: Always activate venv before running tests/coverage
 
 ## Important Notes
 - **CSV files** (2 per session): `{quiz_name}_user_responses.csv` (submissions) + `{quiz_name}_user_responses.users.csv` (user stats)

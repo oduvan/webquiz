@@ -50,6 +50,7 @@ pytest-html = "^4.1.0"
 black = "^24.0.0"
 pre-commit = "^3.0.0"
 websockets = "^14.1"
+pytest-cov = "^7.0.0"
 
 [tool.poetry.scripts]
 webquiz = "webquiz.cli:main"
@@ -69,6 +70,24 @@ asyncio_mode = "auto"
 
 [tool.poetry.urls]
 "Bug Tracker" = "https://github.com/oduvan/webquiz/issues"
+
+[tool.coverage.run]
+concurrency = ["multiprocessing"]
+sigterm = true
+parallel = true
+source = ["webquiz"]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "raise AssertionError",
+    "raise NotImplementedError",
+    "if __name__ == .__main__.:",
+    "if TYPE_CHECKING:",
+    "if 0:",
+    "if False:",
+]
 
 [tool.black]
 line-length = 120
