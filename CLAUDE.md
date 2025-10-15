@@ -18,14 +18,14 @@ WebQuiz - Python/aiohttp quiz system with multi-quiz management, real-time WebSo
 - **Frontend**: Vanilla HTML/JS (mobile-responsive @media ≤768px)
 - **Storage**: In-memory → CSV (30s flush), YAML configs, quiz state resets on switch
 - **Auth**: Master key decorator for admin endpoints
-- **Testing**: Integration + unit tests (119 total) with subprocess coverage tracking
+- **Testing**: Integration + unit tests with subprocess coverage tracking
 
 ## Key Files
 - `webquiz/server.py` - Main aiohttp server
 - `webquiz/cli.py` - CLI with daemon support
 - `webquiz/build.py` - PyInstaller build script
 - `webquiz/templates/` - index.html, admin.html, files.html, live_stats.html
-- `tests/` - Test suite (8+13+17+23+6+10+14+5+5+18 = 119 tests)
+- `tests/` - Test suite
 - `docs/uk/`, `docs/en/` - Documentation (compiled to PDF with version)
 
 ## API Endpoints
@@ -89,7 +89,7 @@ poetry run build_binary
 **Randomization**: Load YAML → register → `random.shuffle()` → store `question_order` per-user → client receives array → JS reorders → persists across sessions
 **Admin**: Switch quiz → reset all state (users, progress, responses) → new CSV → session isolation
 
-## Tests (119 total)
+## Tests (122 total)
 - CLI directory creation (8)
 - Admin API (13)
 - Config management (17)
@@ -97,9 +97,10 @@ poetry run build_binary
 - Auto-advance UI (6)
 - Username label (10)
 - Question randomization (14)
-- Admin quiz editor (5)
+- Admin quiz editor (18 + 2 images)
 - Live stats WebSocket (5)
 - Config loading & utilities (18)
+- CSV collision handling (1)
 
 **Setup**:
 - Parallel testing with ports 8080-8087
@@ -109,14 +110,15 @@ poetry run build_binary
 
 **Coverage Tracking**:
 - Subprocess coverage enabled conditionally via `COVERAGE_PROCESS_START` env var
-- Production builds have **zero coverage overhead** (conditional import)
+- Production builds have **zero coverage overhead** (conditional import in cli.py)
 - CLI checks for `COVERAGE_PROCESS_START` before importing coverage module
-- `.coveragerc` configures multiprocessing support with `parallel = true`
+- `pyproject.toml` configures multiprocessing support with `parallel = true` and `concurrency = ["multiprocessing"]`
 - Tests spawn real server subprocesses that are tracked by coverage
-- conftest.py automatically sets env var when `.coveragerc` exists
+- conftest.py automatically sets `COVERAGE_PROCESS_START=pyproject.toml` when file exists
 - **Use pytest-cov**: `pytest --cov=webquiz` (NOT `coverage run`)
   - pytest-cov handles subprocess data combination automatically
   - `coverage run` alone won't combine parallel coverage files
+- **Coverage status**: ~62-64% overall, server.py ~62-64% (uncovered lines are mostly error handlers, admin download feature, and edge cases)
 - **GitHub Actions CI**:
   - Python 3.9: Runs tests once WITH coverage + Selenium (uploaded to Codecov)
   - Python 3.10+: Runs tests WITHOUT coverage, skips Selenium (faster CI)
