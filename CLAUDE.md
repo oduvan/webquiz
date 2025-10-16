@@ -18,14 +18,14 @@ WebQuiz - Python/aiohttp quiz system with multi-quiz management, real-time WebSo
 - **Frontend**: Vanilla HTML/JS (mobile-responsive @media ≤768px)
 - **Storage**: In-memory → CSV (30s flush), YAML configs, quiz state resets on switch
 - **Auth**: Master key decorator for admin endpoints
-- **Testing**: Integration + unit tests with subprocess coverage tracking
+- **Testing**: Integration + unit tests (149 total) with subprocess coverage tracking
 
 ## Key Files
 - `webquiz/server.py` - Main aiohttp server
 - `webquiz/cli.py` - CLI with daemon support
 - `webquiz/build.py` - PyInstaller build script
 - `webquiz/templates/` - index.html, admin.html, files.html, live_stats.html
-- `tests/` - Test suite
+- `tests/` - Test suite (149 tests total)
 - `docs/uk/`, `docs/en/` - Documentation (compiled to PDF with version)
 
 ## API Endpoints
@@ -89,7 +89,7 @@ poetry run build_binary
 **Randomization**: Load YAML → register → `random.shuffle()` → store `question_order` per-user → client receives array → JS reorders → persists across sessions
 **Admin**: Switch quiz → reset all state (users, progress, responses) → new CSV → session isolation
 
-## Tests (122 total)
+## Tests (149 total)
 - CLI directory creation (8)
 - Admin API (13)
 - Config management (17)
@@ -98,9 +98,10 @@ poetry run build_binary
 - Username label (10)
 - Question randomization (14)
 - Admin quiz editor (18 + 2 images)
-- Live stats WebSocket (5)
+- Live stats WebSocket (5 + 4 edge cases)
 - Config loading & utilities (18)
 - CSV collision handling (1)
+- Quiz validation edge cases (23)
 
 **Setup**:
 - Parallel testing with ports 8080-8087
@@ -118,11 +119,18 @@ poetry run build_binary
 - **Use pytest-cov**: `pytest --cov=webquiz` (NOT `coverage run`)
   - pytest-cov handles subprocess data combination automatically
   - `coverage run` alone won't combine parallel coverage files
-- **Coverage status**: ~62-64% overall, server.py ~62-64% (uncovered lines are mostly error handlers, admin download feature, and edge cases)
+- **Coverage status**: ~69-75% overall, server.py ~69-75%
+  - **Uncovered but acceptable**:
+    - Admin quiz management endpoints (decorator + subprocess tracking limitation)
+    - admin_download_quiz (89 lines - complex ZIP download, used in production, requires manual testing)
+    - Error exception handlers throughout codebase
+    - Initialization paths (admin selection page, default config creation)
+  - **Newly covered**: Quiz validation edge cases (23 tests), WebSocket edge cases (4 tests)
 - **GitHub Actions CI**:
   - Python 3.9: Runs tests once WITH coverage + Selenium (uploaded to Codecov)
   - Python 3.10+: Runs tests WITHOUT coverage, skips Selenium (faster CI)
 - ⚠️ **CRITICAL**: Always activate venv before running tests/coverage
+- ⚠️ **Test timeout**: Set to at least 10 minutes for full test suite execution
 
 ## Important Notes
 - **CSV files** (2 per session): `{quiz_name}_user_responses.csv` (submissions) + `{quiz_name}_user_responses.users.csv` (user stats)
