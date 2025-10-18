@@ -528,3 +528,51 @@ def test_quiz_operations_without_auth(temp_dir):
                 response = requests.delete(url)
 
             assert response.status_code == 401, f"Operation {method} {url} should require auth"
+
+
+def test_admin_list_images_empty_directory(temp_dir):
+    """Test listing images when imgs directory doesn't exist."""
+    with custom_webquiz_server() as (proc, port):
+        headers = {"X-Master-Key": "test123"}
+        response = requests.get(f"http://localhost:{port}/api/admin/list-images", headers=headers)
+
+        assert response.status_code == 200
+        data = response.json()
+        assert "images" in data
+        assert data["images"] == []
+
+
+def test_admin_list_images_with_files(temp_dir):
+    """Test listing images when imgs directory contains image files."""
+    with custom_webquiz_server() as (proc, port):
+        # Create imgs directory with test images
+        imgs_dir = f"quizzes_{port}/imgs"
+        os.makedirs(imgs_dir, exist_ok=True)
+
+        # Create dummy image files
+        test_images = ["test1.png", "test2.jpg", "test3.gif", "diagram.svg"]
+        for img_name in test_images:
+            with open(os.path.join(imgs_dir, img_name), "w") as f:
+                f.write("fake image content")
+
+        # Also create a non-image file (should be ignored)
+        with open(os.path.join(imgs_dir, "notes.txt"), "w") as f:
+            f.write("not an image")
+
+        headers = {"X-Master-Key": "test123"}
+        response = requests.get(f"http://localhost:{port}/api/admin/list-images", headers=headers)
+
+        assert response.status_code == 200
+        data = response.json()
+        assert "images" in data
+        assert len(data["images"]) == 4  # Only image files
+
+        # Verify structure
+        for img in data["images"]:
+            assert "filename" in img
+            assert "path" in img
+            assert img["path"].startswith("/imgs/")
+
+        # Verify filenames are sorted alphabetically
+        filenames = [img["filename"] for img in data["images"]]
+        assert filenames == sorted(filenames, key=str.lower)

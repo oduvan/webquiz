@@ -127,8 +127,16 @@ def custom_webquiz_server(config=None, quizzes=None):
     # Start server using sys.executable to ensure we use the same Python interpreter
     import sys
 
+    # Enable coverage tracking for subprocess
+    env = os.environ.copy()
+    # Set COVERAGE_PROCESS_START to enable subprocess coverage tracking
+    # Coverage.py will read configuration from pyproject.toml
+    pyproject_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "pyproject.toml")
+    if os.path.exists(pyproject_path):
+        env["COVERAGE_PROCESS_START"] = pyproject_path
+
     cmd = [sys.executable, "-m", "webquiz.cli", "--config", config_filename]
-    proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+    proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, env=env)
 
     try:
         # Wait for server to be ready

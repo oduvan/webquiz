@@ -20,6 +20,15 @@ from pathlib import Path
 import asyncio
 from aiohttp import web
 
+# Enable coverage tracking for subprocesses only when COVERAGE_PROCESS_START is set
+if os.environ.get("COVERAGE_PROCESS_START"):
+    try:
+        import coverage
+
+        coverage.process_startup()
+    except ImportError:
+        pass  # Coverage not installed, skip
+
 from .server import create_app, load_config_with_overrides
 
 
