@@ -532,19 +532,34 @@
             }
 
             handleStateUpdate(data) {
-                if (!this.liveStats[data.user_id]) {
-                    this.liveStats[data.user_id] = {};
+                const userId = data.user_id;
+                const questionId = data.question_id;
+                const newState = data.state;
+                const timeTaken = data.time_taken;
+
+                // Get old state for incremental stats update
+                const oldState = (this.liveStats[userId] && this.liveStats[userId][questionId])
+                    ? this.liveStats[userId][questionId].state
+                    : 'empty';
+
+                // Update live stats
+                if (!this.liveStats[userId]) {
+                    this.liveStats[userId] = {};
                 }
-                this.liveStats[data.user_id][data.question_id] = {
-                    state: data.state,
-                    time_taken: data.time_taken
+                this.liveStats[userId][questionId] = {
+                    state: newState,
+                    time_taken: timeTaken
                 };
 
-                // Calculate statistics client-side
-                this.calculateStatistics();
+                // Update statistics incrementally
+                this.updateStatisticsIncremental(userId, questionId, oldState, newState);
 
-                // Always rebuild table to update headers with new statistics
-                this.buildTable();
+                // Update only the affected cell
+                this.updateCell(userId, questionId, newState, timeTaken);
+
+                // Update affected headers/stats
+                this.updateQuestionHeader(questionId);
+                this.updateUserStats(userId);
             }
 
             handleQuizSwitched(data) {
@@ -603,6 +618,36 @@
                                 this.questionStatistics[qId].correct_count++;
                             }
                         }
+                    }
+                }
+            }
+
+            updateStatisticsIncremental(userId, questionId, oldState, newState) {
+                // Initialize stats if needed
+                if (!this.userStatistics[userId]) {
+                    this.userStatistics[userId] = { correct_count: 0, total_answered: 0 };
+                }
+                if (!this.questionStatistics[questionId]) {
+                    this.questionStatistics[questionId] = { correct_count: 0, total_attempts: 0 };
+                }
+
+                // Remove old state contribution
+                if (oldState === 'ok' || oldState === 'fail') {
+                    this.userStatistics[userId].total_answered--;
+                    this.questionStatistics[questionId].total_attempts--;
+                    if (oldState === 'ok') {
+                        this.userStatistics[userId].correct_count--;
+                        this.questionStatistics[questionId].correct_count--;
+                    }
+                }
+
+                // Add new state contribution
+                if (newState === 'ok' || newState === 'fail') {
+                    this.userStatistics[userId].total_answered++;
+                    this.questionStatistics[questionId].total_attempts++;
+                    if (newState === 'ok') {
+                        this.userStatistics[userId].correct_count++;
+                        this.questionStatistics[questionId].correct_count++;
                     }
                 }
             }
@@ -715,6 +760,34 @@
                             ${timeDisplay ? `<div class="time-display">${timeDisplay}</div>` : ''}
                         </div>
                     `;
+                }
+            }
+
+            updateQuestionHeader(questionId) {
+                const questionStats = this.questionStatistics[questionId] || { correct_count: 0, total_attempts: 0 };
+                const statsText = `${questionStats.correct_count}/${questionStats.total_attempts}`;
+
+                // Find the question header element
+                const headerCell = this.tableHeaderElement.children[questionId]; // questionId is 1-indexed, array is 0-indexed, but we have username column at 0
+                if (headerCell) {
+                    const statsElement = headerCell.querySelector('.question-stats');
+                    if (statsElement) {
+                        statsElement.textContent = statsText;
+                    }
+                }
+            }
+
+            updateUserStats(userId) {
+                const userStats = this.userStatistics[userId] || { correct_count: 0, total_answered: 0 };
+                const userStatsText = `${userStats.correct_count}/${userStats.total_answered}`;
+
+                // Find the user stats element
+                const userRow = document.getElementById(`user-${userId}`);
+                if (userRow) {
+                    const statsElement = userRow.querySelector('.user-stats');
+                    if (statsElement) {
+                        statsElement.textContent = userStatsText;
+                    }
                 }
             }
 
