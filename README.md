@@ -25,7 +25,7 @@ A modern web-based quiz and testing system built with Python and aiohttp that al
 
 ### Prerequisites
 
-- Python 3.9+ (required by aiohttp)
+- Python 3.9-3.14 (required by aiohttp)
 - Poetry (recommended) or pip
 - Git
 
@@ -457,7 +457,7 @@ The binary includes all templates and configuration examples, with automatic dir
 
 ### Architecture
 
-- **Backend**: Python 3.9+ with aiohttp async web framework
+- **Backend**: Python 3.9-3.14 with aiohttp async web framework
 - **Frontend**: Vanilla HTML/CSS/JavaScript (no frameworks)
 - **Storage**: In-memory with periodic CSV backups (30-second intervals)
 - **Session Management**: Cookie-based with server-side validation
