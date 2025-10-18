@@ -2,8 +2,8 @@
 
 ## ⚠️ CRITICAL: Every Code Change MUST Include
 
-1. **Update CLAUDE.md** - Reflect architectural changes, new features, API endpoints, technical decisions
-2. **Update README.md** - User-facing documentation
+1. **Update CLAUDE.md** - Reflect architectural changes, new features, API endpoints, technical decisions. Keep this file MINIMAL - detailed user-facing info belongs in README.md
+2. **Update README.md** - User-facing documentation with detailed usage instructions
 3. **Update docs/** - Both Ukrainian (`docs/uk/`) and English (`docs/en/`) in sync
 4. **Write tests FIRST** - All functionality requires automated tests (update test counts below)
 5. **Mobile support** - All UI must be responsive (≤768px viewport, `width: 100%; max-width: [size]`)
@@ -18,14 +18,14 @@ WebQuiz - Python/aiohttp quiz system with multi-quiz management, real-time WebSo
 - **Frontend**: Vanilla HTML/JS (mobile-responsive @media ≤768px)
 - **Storage**: In-memory → CSV (30s flush), YAML configs, quiz state resets on switch
 - **Auth**: Master key decorator for admin endpoints
-- **Testing**: Integration + unit tests (149 total) with subprocess coverage tracking
+- **Testing**: Integration + unit test
 
 ## Key Files
 - `webquiz/server.py` - Main aiohttp server
 - `webquiz/cli.py` - CLI with daemon support
 - `webquiz/build.py` - PyInstaller build script
 - `webquiz/templates/` - index.html, admin.html, files.html, live_stats.html
-- `tests/` - Test suite (149 tests total)
+- `tests/` - Test suite
 - `docs/uk/`, `docs/en/` - Documentation (compiled to PDF with version)
 
 ## API Endpoints
@@ -41,15 +41,17 @@ WebQuiz - Python/aiohttp quiz system with multi-quiz management, real-time WebSo
 
 ## Dev Commands
 
+⚠️ **ALWAYS use venv**: All Python commands and poetry operations must run inside virtual environment (`source venv/bin/activate` or `poetry shell`)
+
 ```bash
 # Setup
-poetry install
+source venv/bin/activate && poetry install
 
 # Run
-webquiz --master-key secret123
-webquiz -d  # daemon
+source venv/bin/activate && webquiz --master-key secret123
+source venv/bin/activate && webquiz -d  # daemon
 
-# Test (⚠️ CRITICAL: ALWAYS activate venv first!)
+# Test
 source venv/bin/activate && python -m pytest tests/ -v -n 4
 
 # Test with coverage (subprocess tracking enabled, use pytest-cov)
@@ -58,7 +60,19 @@ source venv/bin/activate && python -m pytest tests/ -v --cov=webquiz --cov-repor
 # Note: Use pytest-cov (--cov) not "coverage run" for subprocess tracking
 
 # Build binary (current OS only)
-poetry run build_binary
+source venv/bin/activate && poetry run build_binary
+```
+
+## Stress Testing
+
+**Note**: Stress testing moved to separate project: [webquiz-stress-test](https://github.com/oduvan/webquiz-stress-test)
+
+```bash
+# Install stress test tool
+pip install webquiz-stress-test
+
+# Run stress test
+webquiz-stress-test -c 50
 ```
 
 ## Technical Decisions
@@ -89,48 +103,7 @@ poetry run build_binary
 **Randomization**: Load YAML → register → `random.shuffle()` → store `question_order` per-user → client receives array → JS reorders → persists across sessions
 **Admin**: Switch quiz → reset all state (users, progress, responses) → new CSV → session isolation
 
-## Tests (149 total)
-- CLI directory creation (8)
-- Admin API (13)
-- Config management (17)
-- Registration approval (23)
-- Auto-advance UI (6)
-- Username label (10)
-- Question randomization (14)
-- Admin quiz editor (18 + 2 images)
-- Live stats WebSocket (5 + 4 edge cases)
-- Config loading & utilities (18)
-- CSV collision handling (1)
-- Quiz validation edge cases (23)
-
-**Setup**:
-- Parallel testing with ports 8080-8087
-- `custom_webquiz_server` fixture auto-cleans directories
-- `conftest.py` for shared fixtures
-- pytest configured to ignore TestingServer collection warning (filterwarnings in pyproject.toml)
-
-**Coverage Tracking**:
-- Subprocess coverage enabled conditionally via `COVERAGE_PROCESS_START` env var
-- Production builds have **zero coverage overhead** (conditional import in cli.py)
-- CLI checks for `COVERAGE_PROCESS_START` before importing coverage module
-- `pyproject.toml` configures multiprocessing support with `parallel = true` and `concurrency = ["multiprocessing"]`
-- Tests spawn real server subprocesses that are tracked by coverage
-- conftest.py automatically sets `COVERAGE_PROCESS_START=pyproject.toml` when file exists
-- **Use pytest-cov**: `pytest --cov=webquiz` (NOT `coverage run`)
-  - pytest-cov handles subprocess data combination automatically
-  - `coverage run` alone won't combine parallel coverage files
-- **Coverage status**: ~69-75% overall, server.py ~69-75%
-  - **Uncovered but acceptable**:
-    - Admin quiz management endpoints (decorator + subprocess tracking limitation)
-    - admin_download_quiz (89 lines - complex ZIP download, used in production, requires manual testing)
-    - Error exception handlers throughout codebase
-    - Initialization paths (admin selection page, default config creation)
-  - **Newly covered**: Quiz validation edge cases (23 tests), WebSocket edge cases (4 tests)
-- **GitHub Actions CI**:
-  - Python 3.9: Runs tests once WITH coverage + Selenium (uploaded to Codecov)
-  - Python 3.10+: Runs tests WITHOUT coverage, skips Selenium (faster CI)
-- ⚠️ **CRITICAL**: Always activate venv before running tests/coverage
-- ⚠️ **Test timeout**: Set to at least 10 minutes for full test suite execution
+**Setup**: Parallel testing with ports 8080-8087, `custom_webquiz_server` fixture auto-cleans directories, `conftest.py` for shared fixtures
 
 ## Important Notes
 - **CSV files** (2 per session): `{quiz_name}_user_responses.csv` (submissions) + `{quiz_name}_user_responses.users.csv` (user stats)

@@ -487,3 +487,207 @@ def test_final_results_with_randomization(temp_dir):
         for i, result in enumerate(final_results["test_results"]):
             expected_question = f"Q{question_order[i]}"
             assert result["question"] == expected_question
+
+
+def test_cannot_skip_questions_with_randomization(temp_dir):
+    """Test that users cannot answer questions out of order when randomization is enabled."""
+    quiz_data = {
+        "title": "Randomized Quiz",
+        "randomize_questions": True,
+        "questions": [
+            {"question": "Q1", "options": ["A", "B"], "correct_answer": 0},
+            {"question": "Q2", "options": ["C", "D"], "correct_answer": 1},
+            {"question": "Q3", "options": ["E", "F"], "correct_answer": 0},
+            {"question": "Q4", "options": ["G", "H"], "correct_answer": 1},
+            {"question": "Q5", "options": ["I", "J"], "correct_answer": 0},
+        ],
+    }
+
+    with custom_webquiz_server(quizzes={"test.yaml": quiz_data}) as (proc, port):
+        # Register a user
+        response = requests.post(f"http://localhost:{port}/api/register", json={"username": "testuser"})
+        assert response.status_code == 200
+        user_id = response.json()["user_id"]
+
+        # Get user's randomized question order
+        response = requests.get(f"http://localhost:{port}/api/verify-user/{user_id}")
+        assert response.status_code == 200
+        data = response.json()
+        question_order = data["question_order"]
+
+        # Get the expected first and third questions
+        first_question_id = question_order[0]
+        third_question_id = question_order[2]
+
+        # Try to answer the third question without answering the first - should fail
+        response = requests.post(
+            f"http://localhost:{port}/api/submit-answer",
+            json={"user_id": user_id, "question_id": third_question_id, "selected_answer": 0},
+        )
+        assert response.status_code == 403, "Should reject answering out-of-order question"
+        data = response.json()
+        assert "error" in data
+        assert data["expected_question_id"] == first_question_id
+
+        # Answer the first question correctly
+        response = requests.post(
+            f"http://localhost:{port}/api/submit-answer",
+            json={"user_id": user_id, "question_id": first_question_id, "selected_answer": 0},
+        )
+        assert response.status_code == 200
+
+        # Now try to skip the second question and answer the third - should still fail
+        second_question_id = question_order[1]
+        response = requests.post(
+            f"http://localhost:{port}/api/submit-answer",
+            json={"user_id": user_id, "question_id": third_question_id, "selected_answer": 0},
+        )
+        assert response.status_code == 403, "Should reject skipping second question"
+        data = response.json()
+        assert data["expected_question_id"] == second_question_id
+
+
+def test_cannot_answer_already_answered_questions_with_randomization(temp_dir):
+    """Test that users cannot re-answer questions with randomization enabled."""
+    quiz_data = {
+        "title": "Randomized Quiz",
+        "randomize_questions": True,
+        "questions": [
+            {"question": "Q1", "options": ["A", "B"], "correct_answer": 0},
+            {"question": "Q2", "options": ["C", "D"], "correct_answer": 1},
+            {"question": "Q3", "options": ["E", "F"], "correct_answer": 0},
+        ],
+    }
+
+    with custom_webquiz_server(quizzes={"test.yaml": quiz_data}) as (proc, port):
+        # Register a user
+        response = requests.post(f"http://localhost:{port}/api/register", json={"username": "testuser"})
+        user_id = response.json()["user_id"]
+
+        # Get question order
+        response = requests.get(f"http://localhost:{port}/api/verify-user/{user_id}")
+        question_order = response.json()["question_order"]
+
+        first_question_id = question_order[0]
+        second_question_id = question_order[1]
+
+        # Answer the first question
+        response = requests.post(
+            f"http://localhost:{port}/api/submit-answer",
+            json={"user_id": user_id, "question_id": first_question_id, "selected_answer": 0},
+        )
+        assert response.status_code == 200
+
+        # Try to answer the first question again - should fail
+        response = requests.post(
+            f"http://localhost:{port}/api/submit-answer",
+            json={"user_id": user_id, "question_id": first_question_id, "selected_answer": 1},
+        )
+        assert response.status_code == 403, "Should reject re-answering previous question"
+        data = response.json()
+        assert data["expected_question_id"] == second_question_id
+
+
+def test_cannot_answer_after_completing_quiz_with_randomization(temp_dir):
+    """Test that users cannot submit answers after completing all questions."""
+    quiz_data = {
+        "title": "Randomized Quiz",
+        "randomize_questions": True,
+        "questions": [
+            {"question": "Q1", "options": ["A", "B"], "correct_answer": 0},
+            {"question": "Q2", "options": ["C", "D"], "correct_answer": 1},
+        ],
+    }
+
+    with custom_webquiz_server(quizzes={"test.yaml": quiz_data}) as (proc, port):
+        # Register a user
+        response = requests.post(f"http://localhost:{port}/api/register", json={"username": "testuser"})
+        user_id = response.json()["user_id"]
+
+        # Get question order
+        response = requests.get(f"http://localhost:{port}/api/verify-user/{user_id}")
+        question_order = response.json()["question_order"]
+
+        # Answer all questions
+        for question_id in question_order:
+            response = requests.post(
+                f"http://localhost:{port}/api/submit-answer",
+                json={"user_id": user_id, "question_id": question_id, "selected_answer": 0},
+            )
+            assert response.status_code == 200
+
+        # Try to answer the first question again after completing - should fail
+        response = requests.post(
+            f"http://localhost:{port}/api/submit-answer",
+            json={"user_id": user_id, "question_id": question_order[0], "selected_answer": 1},
+        )
+        assert response.status_code == 400, "Should reject answering after quiz completion"
+        data = response.json()
+        assert "вже відповіли на всі питання" in data["error"]
+
+
+def test_sequential_answering_allowed_without_randomization(temp_dir):
+    """Test that sequential answering still works when randomization is disabled."""
+    quiz_data = {
+        "title": "Non-Randomized Quiz",
+        "randomize_questions": False,
+        "questions": [
+            {"question": "Q1", "options": ["A", "B"], "correct_answer": 0},
+            {"question": "Q2", "options": ["C", "D"], "correct_answer": 1},
+            {"question": "Q3", "options": ["E", "F"], "correct_answer": 0},
+        ],
+    }
+
+    with custom_webquiz_server(quizzes={"test.yaml": quiz_data}) as (proc, port):
+        # Register a user
+        response = requests.post(f"http://localhost:{port}/api/register", json={"username": "testuser"})
+        user_id = response.json()["user_id"]
+
+        # Answer questions in order 1, 2, 3 - should all succeed
+        for question_id in [1, 2, 3]:
+            response = requests.post(
+                f"http://localhost:{port}/api/submit-answer",
+                json={"user_id": user_id, "question_id": question_id, "selected_answer": 0},
+            )
+            assert response.status_code == 200, f"Question {question_id} should be accepted"
+
+
+def test_validation_error_message_quality(temp_dir):
+    """Test that validation error messages are clear and helpful."""
+    quiz_data = {
+        "title": "Randomized Quiz",
+        "randomize_questions": True,
+        "questions": [
+            {"question": "Q1", "options": ["A", "B"], "correct_answer": 0},
+            {"question": "Q2", "options": ["C", "D"], "correct_answer": 1},
+            {"question": "Q3", "options": ["E", "F"], "correct_answer": 0},
+        ],
+    }
+
+    with custom_webquiz_server(quizzes={"test.yaml": quiz_data}) as (proc, port):
+        # Register a user
+        response = requests.post(f"http://localhost:{port}/api/register", json={"username": "testuser"})
+        user_id = response.json()["user_id"]
+
+        # Get question order
+        response = requests.get(f"http://localhost:{port}/api/verify-user/{user_id}")
+        question_order = response.json()["question_order"]
+
+        expected_first = question_order[0]
+        wrong_question = question_order[2]
+
+        # Try to answer wrong question
+        response = requests.post(
+            f"http://localhost:{port}/api/submit-answer",
+            json={"user_id": user_id, "question_id": wrong_question, "selected_answer": 0},
+        )
+
+        # Verify error response structure
+        assert response.status_code == 403
+        data = response.json()
+        assert "error" in data
+        assert "expected_question_id" in data
+        assert data["expected_question_id"] == expected_first
+
+        # Verify error message is in Ukrainian and clear
+        assert "поточне питання" in data["error"].lower() or "питання" in data["error"].lower()

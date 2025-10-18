@@ -25,7 +25,7 @@ A modern web-based quiz and testing system built with Python and aiohttp that al
 
 ### Prerequisites
 
-- Python 3.9+ (required by aiohttp)
+- Python 3.9-3.14 (required by aiohttp)
 - Poetry (recommended) or pip
 - Git
 
@@ -264,6 +264,46 @@ The project has **210+ tests** across **14 test files** covering:
 
 The test suite uses GitHub Actions CI/CD for automated testing on every commit.
 
+## 🔥 Stress Testing
+
+Stress testing has been moved to a separate project for better maintainability and independent versioning.
+
+### Installation
+
+```bash
+# Install from PyPI
+pip install webquiz-stress-test
+
+# Or download pre-built binaries from releases
+# https://github.com/oduvan/webquiz-stress-test/releases
+```
+
+### Quick Start
+
+```bash
+# Basic test with 10 concurrent users
+webquiz-stress-test
+
+# Heavy load test with 100 users
+webquiz-stress-test -c 100
+
+# Test custom server
+webquiz-stress-test -u http://localhost:9000 -c 50
+```
+
+### Features
+
+- Concurrent client simulation with configurable users
+- Realistic user behavior (random delays, page reloads)
+- Randomized quiz support
+- Approval workflow testing
+- Detailed performance statistics
+- Multi-platform binaries (Linux, macOS, Windows)
+
+### Documentation
+
+For complete documentation, see the [webquiz-stress-test repository](https://github.com/oduvan/webquiz-stress-test).
+
 ## 📋 Configuration Format
 
 ### Quiz Files
@@ -417,7 +457,7 @@ The binary includes all templates and configuration examples, with automatic dir
 
 ### Architecture
 
-- **Backend**: Python 3.9+ with aiohttp async web framework
+- **Backend**: Python 3.9-3.14 with aiohttp async web framework
 - **Frontend**: Vanilla HTML/CSS/JavaScript (no frameworks)
 - **Storage**: In-memory with periodic CSV backups (30-second intervals)
 - **Session Management**: Cookie-based with server-side validation

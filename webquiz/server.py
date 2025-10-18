@@ -912,11 +912,23 @@ class TestingServer:
     def _format_answer_text(self, answer_indices, options):
         """Format answer text for CSV with | separator for multiple answers"""
         if isinstance(answer_indices, int):
-            return options[answer_indices]
+            # Validate index bounds
+            if 0 <= answer_indices < len(options):
+                return options[answer_indices]
+            else:
+                logger.warning(f"Invalid answer index {answer_indices} for options with length {len(options)}")
+                return f"Invalid index: {answer_indices}"
         elif isinstance(answer_indices, list):
             # Sort indices and join corresponding option texts with |
             sorted_indices = sorted(answer_indices)
-            return "|".join(options[idx] for idx in sorted_indices)
+            valid_options = []
+            for idx in sorted_indices:
+                if 0 <= idx < len(options):
+                    valid_options.append(options[idx])
+                else:
+                    logger.warning(f"Invalid answer index {idx} in list for options with length {len(options)}")
+                    valid_options.append(f"Invalid index: {idx}")
+            return "|".join(valid_options)
         else:
             return str(answer_indices)
 
@@ -1106,6 +1118,46 @@ class TestingServer:
             return web.json_response({"error": "Користувача не знайдено"}, status=404)
 
         username = self.users[user_id]["username"]
+        user_data = self.users[user_id]
+
+        # Validate question order for randomized quizzes (security check)
+        if getattr(self, "randomize_questions", False) and "question_order" in user_data:
+            question_order = user_data["question_order"]
+            last_answered_id = self.user_progress.get(user_id, 0)
+
+            # Determine the expected next question
+            if last_answered_id == 0:
+                # First question - should be the first in their order
+                expected_question_id = question_order[0]
+            else:
+                # Find the index of last answered question in their order
+                try:
+                    last_index = question_order.index(last_answered_id)
+                    next_index = last_index + 1
+
+                    # Check if user has finished all questions
+                    if next_index >= len(question_order):
+                        return web.json_response({"error": "Ви вже відповіли на всі питання"}, status=400)
+
+                    expected_question_id = question_order[next_index]
+                except ValueError:
+                    # Last answered question not in order (shouldn't happen)
+                    logger.error(f"User {user_id} last_answered_id {last_answered_id} not found in question_order")
+                    return web.json_response({"error": "Помилка валідації порядку питань"}, status=500)
+
+            # Validate submitted question matches expected
+            if question_id != expected_question_id:
+                logger.warning(
+                    f"User {user_id} attempted to answer question {question_id} "
+                    f"but expected question {expected_question_id}"
+                )
+                return web.json_response(
+                    {
+                        "error": "Ви можете відповідати лише на поточне питання",
+                        "expected_question_id": expected_question_id,
+                    },
+                    status=403,
+                )
 
         # Find the question
         question = next((q for q in self.questions if q["id"] == question_id), None)
