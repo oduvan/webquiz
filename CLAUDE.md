@@ -2,8 +2,8 @@
 
 ## ⚠️ CRITICAL: Every Code Change MUST Include
 
-1. **Update CLAUDE.md** - Reflect architectural changes, new features, API endpoints, technical decisions
-2. **Update README.md** - User-facing documentation
+1. **Update CLAUDE.md** - Reflect architectural changes, new features, API endpoints, technical decisions. Keep this file MINIMAL - detailed user-facing info belongs in README.md
+2. **Update README.md** - User-facing documentation with detailed usage instructions
 3. **Update docs/** - Both Ukrainian (`docs/uk/`) and English (`docs/en/`) in sync
 4. **Write tests FIRST** - All functionality requires automated tests (update test counts below)
 5. **Mobile support** - All UI must be responsive (≤768px viewport, `width: 100%; max-width: [size]`)
@@ -18,14 +18,14 @@ WebQuiz - Python/aiohttp quiz system with multi-quiz management, real-time WebSo
 - **Frontend**: Vanilla HTML/JS (mobile-responsive @media ≤768px)
 - **Storage**: In-memory → CSV (30s flush), YAML configs, quiz state resets on switch
 - **Auth**: Master key decorator for admin endpoints
-- **Testing**: Integration + unit tests (101 total)
+- **Testing**: Integration + unit test
 
 ## Key Files
 - `webquiz/server.py` - Main aiohttp server
 - `webquiz/cli.py` - CLI with daemon support
 - `webquiz/build.py` - PyInstaller build script
 - `webquiz/templates/` - index.html, admin.html, files.html, live_stats.html
-- `tests/` - Test suite (8+13+17+23+6+10+14+5+5 = 101 tests)
+- `tests/` - Test suite
 - `docs/uk/`, `docs/en/` - Documentation (compiled to PDF with version)
 
 ## API Endpoints
@@ -41,19 +41,33 @@ WebQuiz - Python/aiohttp quiz system with multi-quiz management, real-time WebSo
 
 ## Dev Commands
 
+⚠️ **ALWAYS use venv**: All Python commands and poetry operations must run inside virtual environment (`source venv/bin/activate` or `poetry shell`)
+
 ```bash
 # Setup
-poetry install
+source venv/bin/activate && poetry install
 
 # Run
-webquiz --master-key secret123
-webquiz -d  # daemon
+source venv/bin/activate && webquiz --master-key secret123
+source venv/bin/activate && webquiz -d  # daemon
 
-# Test (ALWAYS use venv!)
+# Test
 source venv/bin/activate && python -m pytest tests/ -v -n 4
 
 # Build binary (current OS only)
-poetry run build_binary
+source venv/bin/activate && poetry run build_binary
+```
+
+## Stress Testing
+
+**Note**: Stress testing moved to separate project: [webquiz-stress-test](https://github.com/oduvan/webquiz-stress-test)
+
+```bash
+# Install stress test tool
+pip install webquiz-stress-test
+
+# Run stress test
+webquiz-stress-test -c 50
 ```
 
 ## Technical Decisions
@@ -82,17 +96,6 @@ poetry run build_binary
 **Approval**: Register → `approved: false` → wait → admin WebSocket notified → approve button → **timing starts** → student checks → quiz begins
 **Randomization**: Load YAML → register → `random.shuffle()` → store `question_order` per-user → client receives array → JS reorders → persists across sessions
 **Admin**: Switch quiz → reset all state (users, progress, responses) → new CSV → session isolation
-
-## Tests (101 total)
-- CLI directory creation (8)
-- Admin API (13)
-- Config management (17)
-- Registration approval (23)
-- Auto-advance UI (6)
-- Username label (10)
-- Question randomization (14)
-- Admin quiz editor (5)
-- Live stats WebSocket (5)
 
 **Setup**: Parallel testing with ports 8080-8087, `custom_webquiz_server` fixture auto-cleans directories, `conftest.py` for shared fixtures
 
