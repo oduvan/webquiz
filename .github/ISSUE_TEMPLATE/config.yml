@@ -1,0 +1,11 @@
+blank_issues_enabled: true
+contact_links:
+  - name: 💬 Discussions
+    url: https://github.com/oduvan/webquiz/discussions
+    about: Ask questions and discuss ideas with the community
+  - name: 📖 Documentation
+    url: https://github.com/oduvan/webquiz/blob/master/README.md
+    about: Read the documentation for setup and usage guides
+  - name: 🤖 Copilot Guide
+    url: https://github.com/oduvan/webquiz/blob/master/CLAUDE.md
+    about: View technical documentation and architecture details
