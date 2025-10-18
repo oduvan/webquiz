@@ -876,6 +876,20 @@ class TestingServer:
             self.admin_websocket_clients, message, "admin WebSocket"
         )
 
+    def _extract_registration_fields(self, user_data: dict) -> dict:
+        """Extract only custom registration fields for display to admin
+
+        Excludes system fields: user_id, username, approved, registered_at, question_order
+        Returns only the custom fields configured in registration.fields
+        """
+        fields = {}
+        if hasattr(self.config, "registration") and self.config.registration.fields:
+            for field_label in self.config.registration.fields:
+                field_name = field_label.lower().replace(" ", "_")
+                if field_name in user_data:
+                    fields[field_name] = user_data[field_name]
+        return fields
+
     def _validate_answer(self, selected_answer, question):
         """Validate answer for both single and multiple choice questions"""
         correct_answer = question["correct_answer"]
@@ -1037,7 +1051,14 @@ class TestingServer:
                 )
         else:
             # Broadcast to admin WebSocket for approval
-            await self.broadcast_to_admin_websockets({"type": "new_registration", "user_data": user_data})
+            await self.broadcast_to_admin_websockets(
+                {
+                    "type": "new_registration",
+                    "user_id": user_data["user_id"],
+                    "username": user_data["username"],
+                    "registration_fields": self._extract_registration_fields(user_data),
+                }
+            )
 
         logger.info(f"Registered user: {username} with ID: {user_id}, requires_approval: {requires_approval}")
 
@@ -1098,7 +1119,12 @@ class TestingServer:
 
         # Broadcast update to admin WebSocket
         await self.broadcast_to_admin_websockets(
-            {"type": "registration_updated", "user_id": user_id, "user_data": user_data}
+            {
+                "type": "registration_updated",
+                "user_id": user_id,
+                "username": user_data["username"],
+                "registration_fields": self._extract_registration_fields(user_data),
+            }
         )
 
         logger.info(f"Updated registration data for user: {user_id}")
@@ -2382,12 +2408,15 @@ class TestingServer:
 
     async def websocket_admin(self, request):
         """WebSocket endpoint for admin real-time notifications (registration approvals)"""
-        # Filter users waiting for approval
+        # Filter users waiting for approval and extract only registration fields
         pending_users = {}
         if hasattr(self.config, "registration") and self.config.registration.approve:
-            pending_users = {
-                user_id: user_data for user_id, user_data in self.users.items() if not user_data.get("approved", True)
-            }
+            for user_id, user_data in self.users.items():
+                if not user_data.get("approved", True):
+                    pending_users[user_id] = {
+                        "username": user_data["username"],
+                        "registration_fields": self._extract_registration_fields(user_data),
+                    }
 
         initial_data = {
             "type": "initial_state",

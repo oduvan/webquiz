@@ -1968,18 +1968,22 @@
                     displayPendingUsers();
                 }
             } else if (data.type === 'new_registration') {
-                // New user registered
-                const user_data = data.user_data;
-                pendingUsers[user_data.user_id] = user_data;
+                // New user registered - data now contains user_id, username, registration_fields
+                pendingUsers[data.user_id] = {
+                    username: data.username,
+                    registration_fields: data.registration_fields || {}
+                };
                 document.getElementById('pending-approvals-section').classList.remove('hidden');
                 displayPendingUsers();
-                showMessage(`Новий користувач: ${user_data.username}`, 'success');
+                showMessage(`Новий користувач: ${data.username}`, 'success');
             } else if (data.type === 'registration_updated') {
-                // User updated registration data
-                const user_data = data.user_data;
-                pendingUsers[user_data.user_id] = user_data;
+                // User updated registration data - data now contains user_id, username, registration_fields
+                pendingUsers[data.user_id] = {
+                    username: data.username,
+                    registration_fields: data.registration_fields || {}
+                };
                 displayPendingUsers();
-                showMessage(`Користувач ${user_data.username} оновив дані`, 'success');
+                showMessage(`Користувач ${data.username} оновив дані`, 'success');
             } else if (data.type === 'user_approved') {
                 // User was approved
                 const user_id = data.user_id;
@@ -2016,12 +2020,10 @@
                             <div class="pending-user-name">👤 ${user.username}</div>
                 `;
 
-                // Add additional registration fields
-                for (const [key, value] of Object.entries(user)) {
-                    if (key !== 'user_id' && key !== 'username' && key !== 'approved' && key !== 'registered_at') {
-                        const label = fieldNameToLabel(key);
-                        html += `<div class="pending-user-data">${label}: ${value}</div>`;
-                    }
+                // Add registration fields (only custom fields from server)
+                for (const [key, value] of Object.entries(user.registration_fields || {})) {
+                    const label = fieldNameToLabel(key);
+                    html += `<div class="pending-user-data">${label}: ${value}</div>`;
                 }
 
                 html += `
