@@ -33,7 +33,7 @@ include = [
 ]
 
 [tool.poetry.dependencies]
-python = "^3.9"
+python = ">=3.9,<3.15"
 aiohttp = "^3.12.13"
 PyYAML = "^6.0.2"
 aiofiles = "^24.1.0"
@@ -51,6 +51,7 @@ pytest-html = "^4.1.0"
 black = "^24.0.0"
 pre-commit = "^3.0.0"
 websockets = "^14.1"
+pytest-cov = "^7.0.0"
 
 [tool.poetry.scripts]
 webquiz = "webquiz.cli:main"
@@ -66,14 +67,47 @@ addopts = "-ra -q"
 testpaths = [
     "tests",
 ]
+norecursedirs = [
+    ".*",
+    "build",
+    "dist",
+    "venv",
+    "*.egg",
+    "webquiz",
+]
+filterwarnings = [
+    "ignore:cannot collect test class 'TestingServer':pytest.PytestCollectionWarning",
+]
 asyncio_mode = "auto"
 
 [tool.poetry.urls]
 "Bug Tracker" = "https://github.com/oduvan/webquiz/issues"
 
+[tool.coverage.run]
+concurrency = ["multiprocessing"]
+sigterm = true
+parallel = true
+source = ["webquiz"]
+omit = [
+    "*/webquiz/build.py",
+    "*/webquiz/binary_entry.py",
+]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "raise AssertionError",
+    "raise NotImplementedError",
+    "if __name__ == .__main__.:",
+    "if TYPE_CHECKING:",
+    "if 0:",
+    "if False:",
+]
+
 [tool.black]
 line-length = 120
-target-version = ['py39', 'py310', 'py311', 'py312', 'py313']
+target-version = ['py39', 'py310', 'py311', 'py312']
 include = '\.pyi?$'
 extend-exclude = '''
 /(

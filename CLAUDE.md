@@ -54,6 +54,11 @@ source venv/bin/activate && webquiz -d  # daemon
 # Test
 source venv/bin/activate && python -m pytest tests/ -v -n 4
 
+# Test with coverage (subprocess tracking enabled, use pytest-cov)
+source venv/bin/activate && python -m pytest tests/ -v --cov=webquiz --cov-report=html --cov-report=term-missing
+
+# Note: Use pytest-cov (--cov) not "coverage run" for subprocess tracking
+
 # Build binary (current OS only)
 source venv/bin/activate && poetry run build_binary
 ```
@@ -89,6 +94,7 @@ webquiz-stress-test -c 50
 - **Test completion detection** uses answer count (`len(user_answers[user_id])`) instead of question ID to support randomization
 - **Live stats first question** uses user's actual first from `question_order` (prevents duplicates)
 - **Multi-platform binaries** via GitHub Actions (macOS-13 Intel, macOS-14 ARM64, Linux, Windows)
+- **Coverage excludes build tools**: build.py and binary_entry.py omitted from coverage (not runtime code)
 
 ## Key Flows
 

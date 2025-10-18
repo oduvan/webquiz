@@ -234,3 +234,125 @@ async def test_live_stats_websocket_multiple_users_different_orders(temp_dir):
             assert len(unique_first_questions) > 1, (
                 "Expected at least some users to have different first questions, " f"but all got: {first_questions}"
             )
+
+
+@pytest.mark.asyncio
+async def test_websocket_ping_pong(temp_dir):
+    """Test WebSocket ping/pong functionality."""
+    with custom_webquiz_server() as (proc, port):
+        ws_url = f"ws://localhost:{port}/ws/live-stats"
+
+        async with websockets.connect(ws_url) as websocket:
+            # Receive initial_state message
+            initial_msg = await asyncio.wait_for(websocket.recv(), timeout=2.0)
+            initial_data = json.loads(initial_msg)
+            assert initial_data["type"] == "initial_state"
+
+            # Send ping message
+            ping_msg = {"type": "ping"}
+            await websocket.send(json.dumps(ping_msg))
+
+            # Should receive pong response
+            response = await asyncio.wait_for(websocket.recv(), timeout=2.0)
+            response_data = json.loads(response)
+            assert response_data["type"] == "pong"
+
+
+@pytest.mark.asyncio
+async def test_websocket_client_disconnect_cleanup(temp_dir):
+    """Test that WebSocket clients are properly cleaned up on disconnect."""
+    with custom_webquiz_server() as (proc, port):
+        ws_url = f"ws://localhost:{port}/ws/live-stats"
+
+        # Connect and disconnect first client
+        async with websockets.connect(ws_url) as websocket1:
+            # Receive initial_state
+            await asyncio.wait_for(websocket1.recv(), timeout=2.0)
+
+        # First client is now disconnected
+        # Connect second client and verify system still works
+        async with websockets.connect(ws_url) as websocket2:
+            # Should receive initial_state without errors
+            initial_msg = await asyncio.wait_for(websocket2.recv(), timeout=2.0)
+            initial_data = json.loads(initial_msg)
+            assert initial_data["type"] == "initial_state"
+
+            # Register a user to trigger broadcast
+            response = requests.post(f"http://localhost:{port}/api/register", json={"username": "testuser"})
+            assert response.status_code == 200
+
+            # Second client should receive the message (not crash from disconnected client)
+            message = await asyncio.wait_for(websocket2.recv(), timeout=2.0)
+            ws_data = json.loads(message)
+            assert ws_data["type"] == "user_registered"
+
+
+@pytest.mark.asyncio
+async def test_websocket_invalid_json_message(temp_dir):
+    """Test WebSocket handles invalid JSON messages gracefully."""
+    with custom_webquiz_server() as (proc, port):
+        ws_url = f"ws://localhost:{port}/ws/live-stats"
+
+        async with websockets.connect(ws_url) as websocket:
+            # Receive initial_state message
+            await asyncio.wait_for(websocket.recv(), timeout=2.0)
+
+            # Send invalid JSON
+            await websocket.send("invalid{json}data")
+
+            # Connection should remain open - send ping to verify
+            ping_msg = {"type": "ping"}
+            await websocket.send(json.dumps(ping_msg))
+
+            # Should still receive pong response
+            response = await asyncio.wait_for(websocket.recv(), timeout=2.0)
+            response_data = json.loads(response)
+            assert response_data["type"] == "pong"
+
+
+@pytest.mark.asyncio
+async def test_websocket_multiple_simultaneous_clients(temp_dir):
+    """Test multiple WebSocket clients can connect simultaneously."""
+    with custom_webquiz_server() as (proc, port):
+        ws_url = f"ws://localhost:{port}/ws/live-stats"
+
+        # Connect 3 clients simultaneously
+        async with (
+            websockets.connect(ws_url) as ws1,
+            websockets.connect(ws_url) as ws2,
+            websockets.connect(ws_url) as ws3,
+        ):
+
+            # All clients should receive initial_state
+            msg1 = await asyncio.wait_for(ws1.recv(), timeout=2.0)
+            msg2 = await asyncio.wait_for(ws2.recv(), timeout=2.0)
+            msg3 = await asyncio.wait_for(ws3.recv(), timeout=2.0)
+
+            data1 = json.loads(msg1)
+            data2 = json.loads(msg2)
+            data3 = json.loads(msg3)
+
+            assert data1["type"] == "initial_state"
+            assert data2["type"] == "initial_state"
+            assert data3["type"] == "initial_state"
+
+            # Register a user - all clients should receive the broadcast
+            response = requests.post(f"http://localhost:{port}/api/register", json={"username": "broadcasttest"})
+            assert response.status_code == 200
+
+            # All 3 clients should receive the user_registered message
+            broadcast1 = await asyncio.wait_for(ws1.recv(), timeout=2.0)
+            broadcast2 = await asyncio.wait_for(ws2.recv(), timeout=2.0)
+            broadcast3 = await asyncio.wait_for(ws3.recv(), timeout=2.0)
+
+            b1_data = json.loads(broadcast1)
+            b2_data = json.loads(broadcast2)
+            b3_data = json.loads(broadcast3)
+
+            assert b1_data["type"] == "user_registered"
+            assert b2_data["type"] == "user_registered"
+            assert b3_data["type"] == "user_registered"
+
+            assert b1_data["username"] == "broadcasttest"
+            assert b2_data["username"] == "broadcasttest"
+            assert b3_data["username"] == "broadcasttest"

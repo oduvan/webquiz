@@ -283,23 +283,6 @@ def load_config_with_overrides(config_path: Optional[str] = None, **cli_override
     return config
 
 
-def generate_unique_filename(base_path: str) -> str:
-    """Generate a unique filename with suffix (0001, 0002, etc.) if file exists"""
-    if not os.path.exists(base_path):
-        return base_path
-
-    # Split the path into name and extension
-    name, ext = os.path.splitext(base_path)
-
-    # Find the next available suffix
-    suffix = 1
-    while True:
-        new_path = f"{name}_{suffix:04d}{ext}"
-        if not os.path.exists(new_path):
-            return new_path
-        suffix += 1
-
-
 def get_client_ip(request):
     """Extract client IP address from request, handling proxies"""
     client_ip = request.remote or "127.0.0.1"
@@ -340,58 +323,6 @@ def get_network_interfaces():
         pass
 
     return list(set(interfaces))  # Remove duplicates
-
-
-def get_wifi_name():
-    """Get the current WiFi network name"""
-    try:
-        system = platform.system()
-
-        if system == "Darwin":  # macOS
-            result = subprocess.run(
-                ["networksetup", "-getairportnetwork", "en0"], capture_output=True, text=True, timeout=5
-            )
-            if result.returncode == 0:
-                output = result.stdout.strip()
-                if "Current Wi-Fi Network:" in output:
-                    return output.split("Current Wi-Fi Network:")[1].strip()
-
-        elif system == "Linux":
-            # Try multiple methods for Linux
-            commands = [
-                ["iwgetid", "-r"],
-                ["nmcli", "-t", "-f", "active,ssid", "dev", "wifi"],
-            ]
-
-            for cmd in commands:
-                try:
-                    result = subprocess.run(cmd, capture_output=True, text=True, timeout=5)
-                    if result.returncode == 0:
-                        output = result.stdout.strip()
-                        if output:
-                            # For nmcli, filter active connections
-                            if "nmcli" in cmd:
-                                lines = output.split("\n")
-                                for line in lines:
-                                    if line.startswith("yes:"):
-                                        return line.split(":", 1)[1]
-                            else:
-                                return output
-                except (subprocess.TimeoutExpired, subprocess.CalledProcessError, FileNotFoundError):
-                    continue
-
-        elif system == "Windows":
-            result = subprocess.run(["netsh", "wlan", "show", "profiles"], capture_output=True, text=True, timeout=5)
-            if result.returncode == 0:
-                lines = result.stdout.split("\n")
-                for line in lines:
-                    if "All User Profile" in line and "*" in line:
-                        return line.split(":")[1].strip()
-
-    except Exception:
-        pass
-
-    return "Unknown"
 
 
 def admin_auth_required(func):
@@ -2108,7 +2039,6 @@ class TestingServer:
             )
 
         except Exception as e:
-            raise
             logger.error(f"Error downloading quiz: {e}")
             return web.json_response({"error": f"Download failed: {str(e)}"}, status=500)
 

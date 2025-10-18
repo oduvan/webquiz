@@ -40,19 +40,21 @@ jobs:
       run: |
         poetry install --no-interaction --no-ansi
 
-    - name: Run tests
+    - name: Run tests with coverage (Python 3.9 only)
+      if: matrix.python-version == '3.9'
+      run: |
+        poetry run pytest tests/ -v --tb=short --cov=webquiz --cov-report=term-missing --cov-report=xml
+      env:
+        SKIP_SELENIUM: "false"
+        PYTEST_XDIST_WORKER: gw${{ strategy.job-index }}
+
+    - name: Run tests without coverage (Python 3.10+)
+      if: matrix.python-version != '3.9'
       run: |
         poetry run python -m pytest tests/ -v --tb=short
       env:
-        SKIP_SELENIUM: ${{ matrix.python-version != '3.9' }}
+        SKIP_SELENIUM: "true"
         PYTEST_XDIST_WORKER: gw${{ strategy.job-index }}
-
-    - name: Run tests with coverage
-      if: matrix.python-version == '3.9'
-      run: |
-        poetry run coverage run -m pytest tests/
-        poetry run coverage report --show-missing
-        poetry run coverage xml
 
     - name: Upload coverage to Codecov
       if: matrix.python-version == '3.9'
