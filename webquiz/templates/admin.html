@@ -1535,7 +1535,15 @@
                     if (q.image) {
                         questionYaml += `\n  image: "${q.image}"`;
                     }
-                    questionYaml += `\n  options:\n${q.options.map(opt => `  - "${opt}"`).join('\n')}\n  correct_answer: ${q.correct_answer}`;
+                    // Format correct_answer properly for YAML
+                    const correctAnswerYaml = Array.isArray(q.correct_answer) 
+                        ? `[${q.correct_answer.join(', ')}]` 
+                        : q.correct_answer;
+                    questionYaml += `\n  options:\n${q.options.map(opt => `  - "${opt}"`).join('\n')}\n  correct_answer: ${correctAnswerYaml}`;
+                    // Add min_correct if present
+                    if (q.min_correct !== undefined) {
+                        questionYaml += `\n  min_correct: ${q.min_correct}`;
+                    }
                     return questionYaml;
                 }).join('\n')}`;
                 document.getElementById('quiz-content').value = yamlContent;
