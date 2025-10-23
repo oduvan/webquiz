@@ -277,18 +277,23 @@ def test_create_quiz_with_multiple_correct_answers_array_format(temp_dir):
         # Ensure it's not malformed with the broken format like "correct_answer: 0,2"
         # The broken format would parse as a string "0,2" not an array [0, 2]
         # Python's yaml.dump produces multi-line array format by default, which is fine
-        # But we want to ensure it's NOT the broken comma-only format
+        # We specifically check that comma-separated values on the same line have brackets
+        def is_valid_correct_answer_format(line):
+            """Check if correct_answer line has valid YAML format (not broken comma-only)."""
+            if 'correct_answer:' not in line or not line.strip().startswith('correct_answer:'):
+                return True  # Not a correct_answer line
+            after_colon = line.split('correct_answer:')[1].strip()
+            if not after_colon:
+                return True  # Multi-line format (value on next line)
+            if after_colon.startswith('['):
+                return True  # Flow style with brackets
+            # If has commas but no brackets, it's the broken format
+            return ',' not in after_colon
+        
         lines = content.split('\n')
         for line in lines:
-            if 'correct_answer:' in line and line.strip().startswith('correct_answer:'):
-                # If correct_answer is on same line, it should be flow style [x, y] or just whitespace
-                # It should NOT be like "correct_answer: 0,2" (without brackets)
-                after_colon = line.split('correct_answer:')[1].strip()
-                if after_colon and not after_colon.startswith('['):
-                    # If there's content and it doesn't start with [, it's likely multi-line (OK)
-                    # But let's check it's not the broken format
-                    assert ',' not in after_colon or '[' in after_colon, \
-                        f"Found malformed correct_answer format: {line}"
+            assert is_valid_correct_answer_format(line), \
+                f"Found malformed correct_answer format (comma-separated without brackets): {line}"
         
         # Verify min_correct is present in the YAML
         assert "min_correct: 2" in content or "min_correct:\n  2" in content, \
