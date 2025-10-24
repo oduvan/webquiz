@@ -26,7 +26,17 @@ logger = logging.getLogger(__name__)
 
 
 def read_package_resource(filename: str) -> str:
-    """Read a file from the webquiz package resources"""
+    """Read a file from the webquiz package resources.
+
+    Args:
+        filename: Name of the resource file to read
+
+    Returns:
+        Content of the resource file as string
+
+    Raises:
+        Various exceptions if file cannot be read
+    """
     try:
         # Try modern importlib.resources first (Python 3.9+)
         import importlib.resources as pkg_resources
@@ -40,7 +50,11 @@ def read_package_resource(filename: str) -> str:
 
 
 def get_package_version() -> str:
-    """Get the webquiz package version"""
+    """Get the webquiz package version.
+
+    Returns:
+        Package version string or "unknown" if version cannot be determined
+    """
     try:
         return package_version
     except Exception:
@@ -48,7 +62,17 @@ def get_package_version() -> str:
 
 
 def resolve_path_relative_to_binary(path_str: str) -> str:
-    """Resolve relative paths relative to binary directory when running as binary."""
+    """Resolve relative paths relative to binary directory when running as binary.
+
+    When running as a PyInstaller binary, relative paths are resolved from the
+    binary's directory. When running normally, paths are returned as-is.
+
+    Args:
+        path_str: Path string to resolve
+
+    Returns:
+        Resolved absolute path when running as binary, original path otherwise
+    """
     if not path_str or os.path.isabs(path_str):
         return path_str
 
@@ -160,13 +184,27 @@ class WebQuizConfig:
 
 
 def ensure_directory_exists(path: str) -> str:
-    """Create directory if it doesn't exist and return the path"""
+    """Create directory if it doesn't exist and return the path.
+
+    Args:
+        path: Directory path to create
+
+    Returns:
+        The same path that was passed in
+    """
     os.makedirs(path, exist_ok=True)
     return path
 
 
 def load_config_from_yaml(config_path: str) -> WebQuizConfig:
-    """Load configuration from YAML file"""
+    """Load configuration from YAML file.
+
+    Args:
+        config_path: Path to the YAML configuration file
+
+    Returns:
+        WebQuizConfig object with loaded configuration or defaults if file not found
+    """
     try:
         with open(config_path, "r") as f:
             config_data = yaml.safe_load(f)
@@ -208,7 +246,14 @@ def load_config_from_yaml(config_path: str) -> WebQuizConfig:
 
 
 def get_default_config_path() -> Optional[str]:
-    """Get default config file path, creating one if it doesn't exist."""
+    """Get default config file path, creating one if it doesn't exist.
+
+    Determines the appropriate location for the config file (binary directory
+    or current working directory) and creates a default config file if none exists.
+
+    Returns:
+        Path to config file or None if creation failed
+    """
     # Determine where to look for/create config file
     binary_dir = os.environ.get("WEBQUIZ_BINARY_DIR")
     if binary_dir:
@@ -230,7 +275,14 @@ def get_default_config_path() -> Optional[str]:
 
 
 def create_default_config_file(config_path: Path):
-    """Create a default config file with example content."""
+    """Create a default config file with example content.
+
+    Args:
+        config_path: Path where the config file should be created
+
+    Raises:
+        Various exceptions if file cannot be written
+    """
     example_content = read_package_resource("server_config.yaml.example")
 
     with open(config_path, "w", encoding="utf-8") as f:
@@ -239,9 +291,16 @@ def create_default_config_file(config_path: Path):
 
 
 def load_config_with_overrides(config_path: Optional[str] = None, **cli_overrides) -> WebQuizConfig:
-    """Load configuration with CLI parameter overrides
+    """Load configuration with CLI parameter overrides.
 
-    Priority: CLI parameters > config file > defaults
+    Priority: CLI parameters > environment variables > config file > defaults
+
+    Args:
+        config_path: Optional path to config file
+        **cli_overrides: CLI parameters that override config file values
+
+    Returns:
+        WebQuizConfig object with final merged configuration
     """
     # Use default config file if none provided
     if not config_path:
@@ -284,7 +343,16 @@ def load_config_with_overrides(config_path: Optional[str] = None, **cli_override
 
 
 def get_client_ip(request):
-    """Extract client IP address from request, handling proxies"""
+    """Extract client IP address from request, handling proxies.
+
+    Checks X-Forwarded-For and X-Real-IP headers for proxied requests.
+
+    Args:
+        request: aiohttp request object
+
+    Returns:
+        Client IP address as string, defaults to "127.0.0.1"
+    """
     client_ip = request.remote or "127.0.0.1"
     if "X-Forwarded-For" in request.headers:
         # Handle proxy/load balancer forwarded IPs (take the first one)
@@ -295,7 +363,13 @@ def get_client_ip(request):
 
 
 def get_network_interfaces():
-    """Get all network interfaces and their IP addresses"""
+    """Get all network interfaces and their IP addresses.
+
+    Returns list of non-localhost IP addresses available on the system.
+
+    Returns:
+        List of IP address strings (excludes 127.0.0.1)
+    """
     interfaces = []
     try:
         # Get hostname
@@ -326,7 +400,17 @@ def get_network_interfaces():
 
 
 def admin_auth_required(func):
-    """Decorator to require master key authentication for admin endpoints"""
+    """Decorator to require master key authentication for admin endpoints.
+
+    Bypasses authentication for requests from trusted IPs.
+    Checks for master key in X-Master-Key header or request body.
+
+    Args:
+        func: Async function to wrap
+
+    Returns:
+        Wrapped function with authentication check
+    """
 
     async def wrapper(self, request):
 
@@ -358,7 +442,18 @@ def admin_auth_required(func):
 
 @web.middleware
 async def error_middleware(request, handler):
-    """Global error handling middleware"""
+    """Global error handling middleware.
+
+    Catches and formats ValueError as 400 responses.
+    Allows HTTPException to pass through.
+
+    Args:
+        request: aiohttp request object
+        handler: Request handler function
+
+    Returns:
+        Response from handler or formatted error response
+    """
     try:
         return await handler(request)
     except web.HTTPException:
@@ -370,6 +465,11 @@ async def error_middleware(request, handler):
 
 class TestingServer:
     def __init__(self, config: WebQuizConfig):
+        """Initialize testing server with configuration.
+
+        Args:
+            config: WebQuizConfig object with server settings
+        """
         self.config = config
         self.quizzes_dir = config.paths.quizzes_dir
         self.master_key = config.admin.master_key
@@ -400,7 +500,11 @@ class TestingServer:
         self.templates = self._load_templates()
 
     def _load_templates(self) -> Dict[str, str]:
-        """Preload all templates at startup"""
+        """Preload all templates at startup.
+
+        Returns:
+            Dictionary mapping template filenames to their content
+        """
         templates = {}
         template_files = [
             "index.html",
@@ -421,7 +525,13 @@ class TestingServer:
         return templates
 
     def generate_log_path(self) -> str:
-        """Generate log file path in logs directory with simple numeric naming"""
+        """Generate log file path in logs directory with simple numeric naming.
+
+        Finds the next available number (0001, 0002, etc.) for the log file.
+
+        Returns:
+            Path to the new log file
+        """
         ensure_directory_exists(self.logs_dir)
 
         # Find the next available number
@@ -433,7 +543,9 @@ class TestingServer:
             suffix += 1
 
     def generate_csv_path(self, quiz_name: str, csv_type: str = "answers") -> str:
-        """Generate CSV file path in CSV directory with quiz name and numeric naming
+        """Generate CSV file path in CSV directory with quiz name and numeric naming.
+
+        Ensures both answers and users CSVs use the same numeric suffix.
 
         Args:
             quiz_name: Name of the quiz file
@@ -464,7 +576,10 @@ class TestingServer:
             suffix += 1
 
     def reset_server_state(self):
-        """Reset all server state for new quiz"""
+        """Reset all server state for new quiz.
+
+        Clears users, responses, progress, stats, and live stats data.
+        """
         self.users.clear()
         self.user_responses.clear()
         self.user_progress.clear()
@@ -475,7 +590,11 @@ class TestingServer:
         logger.info("Server state reset for new quiz")
 
     async def list_available_quizzes(self):
-        """List all available quiz files in quizzes directory"""
+        """List all available quiz files in quizzes directory.
+
+        Returns:
+            Sorted list of quiz filenames (.yaml and .yml files)
+        """
         try:
             quiz_files = []
             if os.path.exists(self.quizzes_dir):
@@ -488,7 +607,17 @@ class TestingServer:
             return []
 
     async def switch_quiz(self, quiz_filename: str):
-        """Switch to a different quiz file and reset server state"""
+        """Switch to a different quiz file and reset server state.
+
+        Resets all user data, loads new questions, regenerates index.html,
+        and notifies connected WebSocket clients.
+
+        Args:
+            quiz_filename: Name of the quiz file to switch to
+
+        Raises:
+            ValueError: If quiz file doesn't exist
+        """
         quiz_path = os.path.join(self.quizzes_dir, quiz_filename)
         if not os.path.exists(quiz_path):
             raise ValueError(f"Quiz file not found: {quiz_filename}")
@@ -521,7 +650,11 @@ class TestingServer:
         logger.info(f"Switched to quiz: {quiz_filename}, CSV: {self.csv_file}")
 
     async def create_admin_selection_page(self):
-        """Create a page informing admin to select a quiz first"""
+        """Create a page informing admin to select a quiz first.
+
+        Displays list of available quizzes and instructs admin to use
+        the admin panel to select one.
+        """
         ensure_directory_exists(self.static_dir)
         index_path = f"{self.static_dir}/index.html"
 
@@ -543,7 +676,10 @@ class TestingServer:
             logger.error(f"Error creating admin selection page: {e}")
 
     async def initialize_log_file(self):
-        """Initialize new log file with unique suffix in logs directory"""
+        """Initialize new log file with unique suffix in logs directory.
+
+        Creates the log file and logs initial server start message.
+        """
         try:
             # Generate log file path
             self.log_file = self.generate_log_path()
@@ -555,7 +691,11 @@ class TestingServer:
             print(f"Error initializing log file {self.log_file}: {e}")
 
     async def create_default_config_yaml(self, file_path: str = None):
-        """Create default config.yaml file"""
+        """Create default quiz YAML file with example questions.
+
+        Args:
+            file_path: Path where the file should be created (optional)
+        """
         if file_path is None:
             file_path = self.config_file if hasattr(self, "config_file") else "config.yaml"
         default_questions = {
@@ -579,7 +719,16 @@ class TestingServer:
             logger.error(f"Error creating default config file {file_path}: {e}")
 
     async def load_questions_from_file(self, quiz_file_path: str):
-        """Load questions from specific quiz file for quiz execution"""
+        """Load questions from specific quiz file for quiz execution.
+
+        Loads questions, title, settings, and adds automatic IDs.
+
+        Args:
+            quiz_file_path: Path to the quiz YAML file
+
+        Raises:
+            Various exceptions if file cannot be read or parsed
+        """
         try:
             async with aiofiles.open(quiz_file_path, "r") as f:
                 content = await f.read()
@@ -608,7 +757,14 @@ class TestingServer:
             raise
 
     async def load_questions(self):
-        """Load questions based on available quiz files"""
+        """Load questions based on available quiz files.
+
+        Handles multiple scenarios:
+        - No quiz files: creates default.yaml
+        - Single quiz file: uses it automatically
+        - Multiple files with default.yaml: uses default.yaml
+        - Multiple files without default.yaml: requires admin selection
+        """
         try:
             # Check if quizzes directory exists
             if not os.path.exists(self.quizzes_dir):
@@ -643,7 +799,11 @@ class TestingServer:
             raise
 
     async def create_default_index_html(self):
-        """Create default index.html file with embedded questions data"""
+        """Create default index.html file with embedded questions data.
+
+        Embeds questions (without correct answers), registration fields,
+        quiz title, and settings into the HTML template.
+        """
         ensure_directory_exists(self.static_dir)
         index_path = f"{self.static_dir}/index.html"
 
@@ -736,7 +896,11 @@ class TestingServer:
             logger.error(f"Error creating fallback index.html: {e}")
 
     async def flush_responses_to_csv(self):
-        """Flush in-memory responses to CSV file"""
+        """Flush in-memory responses to CSV file.
+
+        Writes accumulated responses to CSV, creating file with headers if needed.
+        Clears in-memory responses after writing.
+        """
         if not self.user_responses:
             return
 
@@ -783,7 +947,11 @@ class TestingServer:
             logger.error(f"Error flushing responses to CSV: {e}")
 
     async def flush_users_to_csv(self):
-        """Flush user registration data to separate CSV file"""
+        """Flush user registration data to separate CSV file.
+
+        Writes all user data including statistics to CSV, always overwriting
+        the file with current data.
+        """
         if not self.users or not self.user_csv_file:
             return
 
@@ -839,7 +1007,7 @@ class TestingServer:
             logger.error(f"Error flushing users to CSV: {e}")
 
     async def periodic_flush(self):
-        """Periodically flush responses and users to CSV"""
+        """Periodically flush responses and users to CSV every 5 seconds."""
         while True:
             await asyncio.sleep(5)  # Flush every 30 seconds
             await self.flush_responses_to_csv()
@@ -848,7 +1016,18 @@ class TestingServer:
     async def _broadcast_to_websocket_list(
         self, clients_list: List[web.WebSocketResponse], message: dict, client_type: str = "WebSocket"
     ):
-        """Generic broadcast function for WebSocket clients"""
+        """Generic broadcast function for WebSocket clients.
+
+        Sends message to all connected clients and removes closed connections.
+
+        Args:
+            clients_list: List of WebSocket client connections
+            message: Dictionary to send as JSON
+            client_type: Description of client type for logging
+
+        Returns:
+            List of active clients (closed connections removed)
+        """
         if not clients_list:
             return []
 
@@ -865,22 +1044,36 @@ class TestingServer:
         return active_clients
 
     async def broadcast_to_websockets(self, message: dict):
-        """Broadcast message to all connected WebSocket clients (live stats)"""
+        """Broadcast message to all connected WebSocket clients (live stats).
+
+        Args:
+            message: Dictionary to send as JSON
+        """
         self.websocket_clients = await self._broadcast_to_websocket_list(
             self.websocket_clients, message, "live stats WebSocket"
         )
 
     async def broadcast_to_admin_websockets(self, message: dict):
-        """Broadcast message to all connected admin WebSocket clients"""
+        """Broadcast message to all connected admin WebSocket clients.
+
+        Args:
+            message: Dictionary to send as JSON
+        """
         self.admin_websocket_clients = await self._broadcast_to_websocket_list(
             self.admin_websocket_clients, message, "admin WebSocket"
         )
 
     def _extract_registration_fields(self, user_data: dict) -> dict:
-        """Extract only custom registration fields for display to admin
+        """Extract only custom registration fields for display to admin.
 
-        Excludes system fields: user_id, username, approved, registered_at, question_order
-        Returns only the custom fields configured in registration.fields
+        Excludes system fields: user_id, username, approved, registered_at, question_order.
+        Returns only the custom fields configured in registration.fields.
+
+        Args:
+            user_data: User data dictionary
+
+        Returns:
+            Dictionary with only custom registration fields
         """
         fields = {}
         if hasattr(self.config, "registration") and self.config.registration.fields:
@@ -891,7 +1084,19 @@ class TestingServer:
         return fields
 
     def _validate_answer(self, selected_answer, question):
-        """Validate answer for both single and multiple choice questions"""
+        """Validate answer for both single and multiple choice questions.
+
+        For single answer: checks if selected index matches correct index.
+        For multiple answers: validates all selected are correct, no incorrect
+        selected, and minimum correct requirement is met.
+
+        Args:
+            selected_answer: Integer index or list of integer indices
+            question: Question dictionary with options and correct_answer
+
+        Returns:
+            True if answer is correct, False otherwise
+        """
         correct_answer = question["correct_answer"]
 
         if isinstance(correct_answer, int):
@@ -924,7 +1129,15 @@ class TestingServer:
             return False  # Invalid correct_answer format
 
     def _format_answer_text(self, answer_indices, options):
-        """Format answer text for CSV with | separator for multiple answers"""
+        """Format answer text for CSV with | separator for multiple answers.
+
+        Args:
+            answer_indices: Integer index or list of integer indices
+            options: List of option strings
+
+        Returns:
+            Formatted answer string (single option or pipe-separated options)
+        """
         if isinstance(answer_indices, int):
             # Validate index bounds
             if 0 <= answer_indices < len(options):
@@ -951,6 +1164,9 @@ class TestingServer:
 
         Returns a list of question IDs in random order.
         Only called if self.randomize_questions is True.
+
+        Returns:
+            List of question IDs in shuffled order
         """
         import random
 
@@ -965,7 +1181,14 @@ class TestingServer:
         return shuffled_ids
 
     def update_live_stats(self, user_id: str, question_id: int, state: str, time_taken: float = None):
-        """Update live stats for a user and question"""
+        """Update live stats for a user and question.
+
+        Args:
+            user_id: User identifier
+            question_id: Question identifier
+            state: State string ("think", "ok", "fail")
+            time_taken: Optional time taken in seconds
+        """
         if user_id not in self.live_stats:
             self.live_stats[user_id] = {}
 
@@ -973,7 +1196,20 @@ class TestingServer:
         self.live_stats[user_id][question_id] = {"state": state, "time_taken": time_taken}
 
     async def register_user(self, request):
-        """Register a new user"""
+        """Register a new user.
+
+        Creates user account with unique ID, validates username uniqueness,
+        handles approval workflow, and generates random question order if enabled.
+
+        Args:
+            request: aiohttp request with username and registration fields
+
+        Returns:
+            JSON response with user_id and registration status
+
+        Raises:
+            ValueError: If username is empty, exists, or required fields missing
+        """
         data = await request.json()
         username = data["username"].strip()
 
@@ -1078,7 +1314,14 @@ class TestingServer:
         return web.json_response(response_data)
 
     async def update_registration(self, request):
-        """Update registration data for a user (only if not approved yet)"""
+        """Update registration data for a user (only if not approved yet).
+
+        Args:
+            request: aiohttp request with user_id and fields to update
+
+        Returns:
+            JSON response with success status and updated user data
+        """
         data = await request.json()
         user_id = data.get("user_id")
 
@@ -1133,7 +1376,17 @@ class TestingServer:
         )
 
     async def submit_answer(self, request):
-        """Submit test answer"""
+        """Submit test answer.
+
+        Validates answer, calculates time taken, stores response, updates progress,
+        broadcasts to WebSocket clients, and calculates final stats if test complete.
+
+        Args:
+            request: aiohttp request with user_id, question_id, and selected_answer
+
+        Returns:
+            JSON response with feedback (conditionally includes correctness)
+        """
         data = await request.json()
         user_id = data["user_id"]
         question_id = data["question_id"]
@@ -1273,7 +1526,16 @@ class TestingServer:
         return web.json_response(response_data)
 
     async def question_start(self, request):
-        """Handle notification that a user started viewing a question"""
+        """Handle notification that a user started viewing a question.
+
+        Starts timing for the question and updates live stats to "think" state.
+
+        Args:
+            request: aiohttp request with user_id and question_id
+
+        Returns:
+            JSON response with success status
+        """
         try:
             data = await request.json()
             user_id = data["user_id"]
@@ -1307,7 +1569,14 @@ class TestingServer:
             return web.json_response({"error": "Помилка сервера"}, status=500)
 
     def calculate_and_store_user_stats(self, user_id):
-        """Calculate and store final stats for a completed user using user_answers (not user_responses)"""
+        """Calculate and store final stats for a completed user.
+
+        Uses user_answers tracking (independent of CSV flushing) to calculate
+        correct count, percentage, and total time.
+
+        Args:
+            user_id: User identifier
+        """
         # Get answers from dedicated user_answers tracking (independent of CSV flushing)
         if user_id not in self.user_answers or not self.user_answers[user_id]:
             logger.warning(f"No answers found for user {user_id} during stats calculation")
@@ -1342,7 +1611,16 @@ class TestingServer:
         )
 
     def get_user_final_results(self, user_id):
-        """Get final results for a completed user from persistent user_stats"""
+        """Get final results for a completed user from persistent user_stats.
+
+        Filters out correct answer information if show_right_answer is disabled.
+
+        Args:
+            user_id: User identifier
+
+        Returns:
+            Dictionary with test_results, correct_count, total_count, percentage, total_time
+        """
         if user_id in self.user_stats:
             # Return stored stats (without the completed_at timestamp for the frontend)
             stats = self.user_stats[user_id].copy()
@@ -1365,7 +1643,16 @@ class TestingServer:
         return {"test_results": [], "correct_count": 0, "total_count": 0, "percentage": 0, "total_time": 0}
 
     async def verify_user_id(self, request):
-        """Verify if user_id exists and return user data"""
+        """Verify if user_id exists and return user data.
+
+        Returns user approval status, test progress, and final results if completed.
+
+        Args:
+            request: aiohttp request with user_id in path
+
+        Returns:
+            JSON response with user validation data and test state
+        """
         user_id = request.match_info["user_id"]
 
         # Find user by user_id
@@ -1455,7 +1742,11 @@ class TestingServer:
     # Admin API endpoints
     @admin_auth_required
     async def admin_list_quizzes(self, request):
-        """List available quiz files"""
+        """List available quiz files.
+
+        Returns:
+            JSON response with list of quiz files and current quiz
+        """
         quizzes = await self.list_available_quizzes()
         return web.json_response(
             {
@@ -1466,7 +1757,14 @@ class TestingServer:
 
     @admin_auth_required
     async def admin_switch_quiz(self, request):
-        """Switch to a different quiz"""
+        """Switch to a different quiz.
+
+        Args:
+            request: aiohttp request with quiz_filename
+
+        Returns:
+            JSON response with success status and new quiz info
+        """
         try:
             data = await request.json()
             quiz_filename = data["quiz_filename"]
@@ -1487,12 +1785,26 @@ class TestingServer:
 
     @admin_auth_required
     async def admin_auth_test(self, request):
-        """Test admin authentication"""
+        """Test admin authentication.
+
+        Returns:
+            JSON response confirming authentication succeeded
+        """
         return web.json_response({"authenticated": True, "message": "Admin authentication successful"})
 
     @admin_auth_required
     async def admin_approve_user(self, request):
-        """Approve a user for testing (starts timing)"""
+        """Approve a user for testing.
+
+        Marks user as approved, starts timing, initializes live stats,
+        and generates random question order if enabled.
+
+        Args:
+            request: aiohttp request with user_id
+
+        Returns:
+            JSON response with approval confirmation
+        """
         data = await request.json()
         user_id = data.get("user_id")
 
@@ -1550,7 +1862,14 @@ class TestingServer:
 
     @admin_auth_required
     async def admin_get_quiz(self, request):
-        """Get quiz content for editing"""
+        """Get quiz content for editing.
+
+        Args:
+            request: aiohttp request with filename in path
+
+        Returns:
+            JSON response with quiz content (raw YAML and parsed)
+        """
         try:
             filename = request.match_info["filename"]
             quiz_path = os.path.join(self.quizzes_dir, filename)
@@ -1577,7 +1896,14 @@ class TestingServer:
 
     @admin_auth_required
     async def admin_create_quiz(self, request):
-        """Create new quiz from wizard or text input"""
+        """Create new quiz from wizard or text input.
+
+        Args:
+            request: aiohttp request with filename, mode, and quiz data/content
+
+        Returns:
+            JSON response with success status
+        """
         try:
             data = await request.json()
             filename = data.get("filename", "").strip()
@@ -1633,7 +1959,16 @@ class TestingServer:
 
     @admin_auth_required
     async def admin_update_quiz(self, request):
-        """Update existing quiz"""
+        """Update existing quiz.
+
+        Creates backup before updating. Reloads quiz if it's currently active.
+
+        Args:
+            request: aiohttp request with filename in path and quiz data
+
+        Returns:
+            JSON response with success status and backup filename
+        """
         try:
             filename = request.match_info["filename"]
             data = await request.json()
@@ -1696,7 +2031,16 @@ class TestingServer:
 
     @admin_auth_required
     async def admin_delete_quiz(self, request):
-        """Delete quiz file"""
+        """Delete quiz file.
+
+        Creates backup before deletion. Prevents deleting currently active quiz.
+
+        Args:
+            request: aiohttp request with filename in path
+
+        Returns:
+            JSON response with success status and backup filename
+        """
         try:
             filename = request.match_info["filename"]
             quiz_path = os.path.join(self.quizzes_dir, filename)
@@ -1731,7 +2075,14 @@ class TestingServer:
 
     @admin_auth_required
     async def admin_validate_quiz(self, request):
-        """Validate quiz YAML structure"""
+        """Validate quiz YAML structure.
+
+        Args:
+            request: aiohttp request with quiz content
+
+        Returns:
+            JSON response with validation result and errors if any
+        """
         try:
             data = await request.json()
             content = data.get("content", "").strip()
@@ -1759,364 +2110,303 @@ class TestingServer:
             return web.json_response({"error": str(e)}, status=500)
 
     def _validate_quiz_data(self, data, errors=None):
-        """Validate quiz data structure"""
+        """Validate quiz data structure.
+
+        Checks for required fields, valid data types, correct answer indices,
+        and optional settings like min_correct, show_right_answer, etc.
+
+        Args:
+            data: Quiz data dictionary to validate
+            errors: Optional list to append error messages to
+
+        Returns:
+            True if valid, False otherwise (errors list contains details)
+        """
         if errors is None:
             errors = []
 
-        if not isinstance(data, dict):
-            errors.append("Дані квізу повинні бути словником")
-            return False
+        # Check required fields
+        required_fields = ["title", "questions"]
+        for field in required_fields:
+            if field not in data:
+                errors.append(f"Missing required field: {field}")
 
-        if "questions" not in data:
-            errors.append("Квіз повинен містити поле 'questions'")
-            return False
+        if "questions" in data:
+            if not isinstance(data["questions"], list):
+                errors.append("Questions must be a list")
+            else:
+                # Validate each question
+                for i, question in enumerate(data["questions"]):
+                    if not isinstance(question, dict):
+                        errors.append(f"Question {i + 1} must be an object")
+                        continue  # Skip to next question
 
-        questions = data["questions"]
-        if not isinstance(questions, list):
-            errors.append("'questions' повинно бути списком")
-            return False
+                    # Check for required question fields
+                    question_required_fields = ["question", "options", "correct_answer"]
+                    for field in question_required_fields:
+                        if field not in question:
+                            errors.append(f"Missing required field in question {i + 1}: {field}")
 
-        if len(questions) == 0:
-            errors.append("Квіз повинен містити принаймні одне питання")
-            return False
+                    # Validate correct_answer field
+                    correct_answer = question.get("correct_answer")
+                    if isinstance(correct_answer, list):
+                        # For multiple answers, check min_correct
+                        if "min_correct" not in question:
+                            errors.append(f"min_correct is required for multiple answer question {i + 1}")
+                    elif not isinstance(correct_answer, int):
+                        errors.append(
+                            f"correct_answer must be an index (integer) or list of indices in question {i + 1}"
+                        )
 
-        for i, question in enumerate(questions):
-            if not isinstance(question, dict):
-                errors.append(f"Question {i+1} must be a dictionary")
-                continue
+                    # Validate options type
+                    options = question.get("options")
+                    if not isinstance(options, list):
+                        errors.append(f"options must be a list in question {i + 1}")
+                    else:
+                        # Validate option indices if correct_answer is an index
+                        if isinstance(correct_answer, int) and (correct_answer < 0 or correct_answer >= len(options)):
+                            errors.append(f"correct_answer index out of range in question {i + 1}")
 
-            # Validate required fields (except 'question' which is optional if image provided)
-            required_fields = ["options", "correct_answer"]
-            for field in required_fields:
-                if field not in question:
-                    errors.append(f"Question {i+1} missing required field: {field}")
+        # Check optional fields with default values
+        boolean_fields = ["show_right_answer", "randomize_questions"]
+        for field in boolean_fields:
+            if field in data and not isinstance(data[field], bool):
+                errors.append(f"{field} must be a boolean")
 
-            # Either question text OR image must be provided
-            has_question = "question" in question and question["question"]
-            has_image = "image" in question and question["image"]
-            if not has_question and not has_image:
-                errors.append(f"Question {i+1} must have either question text or image")
-
-            # Validate options
-            if "options" in question:
-                options = question["options"]
-                if not isinstance(options, list):
-                    errors.append(f"Question {i+1} options must be a list")
-                elif len(options) < 2:
-                    errors.append(f"Question {i+1} must have at least 2 options")
-                elif not all(isinstance(opt, str) for opt in options):
-                    errors.append(f"Question {i+1} all options must be strings")
-
-            # Validate correct_answer (can be integer for single answer or list for multiple answers)
-            if "correct_answer" in question and "options" in question:
-                correct_answer = question["correct_answer"]
-                options_count = len(question["options"])
-
-                if isinstance(correct_answer, int):
-                    # Single answer validation
-                    if correct_answer < 0 or correct_answer >= options_count:
-                        errors.append(f"Question {i+1} correct_answer index out of range")
-                elif isinstance(correct_answer, list):
-                    # Multiple answers validation
-                    if len(correct_answer) == 0:
-                        errors.append(f"Question {i+1} correct_answer array cannot be empty")
-                    elif not all(isinstance(idx, int) for idx in correct_answer):
-                        errors.append(f"Question {i+1} correct_answer array must contain only integers")
-                    elif any(idx < 0 or idx >= options_count for idx in correct_answer):
-                        errors.append(f"Question {i+1} correct_answer array contains index out of range")
-                    elif len(set(correct_answer)) != len(correct_answer):
-                        errors.append(f"Question {i+1} correct_answer array contains duplicate indices")
-                else:
-                    errors.append(f"Question {i+1} correct_answer must be an integer or array of integers")
-
-            # Validate min_correct (only valid for multiple answers)
-            if "min_correct" in question:
-                min_correct = question["min_correct"]
-                if "correct_answer" not in question:
-                    errors.append(f"Question {i+1} has min_correct but no correct_answer")
-                elif not isinstance(question["correct_answer"], list):
-                    errors.append(f"Question {i+1} min_correct is only valid for multiple answer questions")
-                elif not isinstance(min_correct, int):
-                    errors.append(f"Question {i+1} min_correct must be an integer")
-                elif min_correct < 1:
-                    errors.append(f"Question {i+1} min_correct must be at least 1")
-                elif min_correct > len(question["correct_answer"]):
-                    errors.append(f"Question {i+1} min_correct cannot exceed number of correct answers")
-
-        # Validate optional top-level fields
-        if "show_right_answer" in data and not isinstance(data["show_right_answer"], bool):
-            errors.append("'show_right_answer' must be a boolean (true or false)")
-
-        if "randomize_questions" in data and not isinstance(data["randomize_questions"], bool):
-            errors.append("'randomize_questions' must be a boolean (true or false)")
-
-        if "title" in data and not isinstance(data["title"], str):
-            errors.append("'title' must be a string")
+        # Additional custom validations can be added here
 
         return len(errors) == 0
 
     def _validate_config_data(self, data, errors=None):
         """Validate server configuration data structure.
-        All sections are optional - empty config is valid."""
+
+        All sections are optional - empty config is valid.
+        Validates structure and types for server, paths, admin, registration, and quizzes sections.
+
+        Args:
+            data: Config data dictionary to validate
+            errors: Optional list to append error messages to
+
+        Returns:
+            True if valid, False otherwise (errors list contains details)
+        """
         if errors is None:
             errors = []
 
-        # Config can be None or empty dict - both are valid
-        if data is None:
-            return True
-
-        if not isinstance(data, dict):
-            errors.append("Config must be a dictionary")
-            return False
-
-        # Validate server section (optional)
+        # Check server section
         if "server" in data:
-            server = data["server"]
-            if not isinstance(server, dict):
-                errors.append("'server' section must be a dictionary")
+            server_data = data["server"]
+            if not isinstance(server_data, dict):
+                errors.append("Server configuration must be an object")
             else:
-                if "host" in server and not isinstance(server["host"], str):
-                    errors.append("'server.host' must be a string")
-                if "port" in server:
-                    if not isinstance(server["port"], int):
-                        errors.append("'server.port' must be an integer")
-                    elif server["port"] < 1 or server["port"] > 65535:
-                        errors.append("'server.port' must be between 1 and 65535")
+                # Validate host and port
+                if "host" in server_data and not isinstance(server_data["host"], str):
+                    errors.append("Server host must be a string")
+                if "port" in server_data and not isinstance(server_data["port"], int):
+                    errors.append("Server port must be an integer")
 
-        # Validate paths section (optional)
+        # Check paths section
         if "paths" in data:
-            paths = data["paths"]
-            if not isinstance(paths, dict):
-                errors.append("'paths' section must be a dictionary")
+            paths_data = data["paths"]
+            if not isinstance(paths_data, dict):
+                errors.append("Paths configuration must be an object")
             else:
-                path_fields = ["quizzes_dir", "logs_dir", "csv_dir", "static_dir"]
-                for field in path_fields:
-                    if field in paths and not isinstance(paths[field], str):
-                        errors.append(f"'paths.{field}' must be a string")
+                # Validate each path
+                for path_key, path_value in paths_data.items():
+                    if not isinstance(path_value, str):
+                        errors.append(f"Path for {path_key} must be a string")
 
-        # Validate admin section (optional)
+        # Check admin section
         if "admin" in data:
-            admin = data["admin"]
-            if not isinstance(admin, dict):
-                errors.append("'admin' section must be a dictionary")
+            admin_data = data["admin"]
+            if not isinstance(admin_data, dict):
+                errors.append("Admin configuration must be an object")
             else:
-                if "master_key" in admin:
-                    if admin["master_key"] is not None and not isinstance(admin["master_key"], str):
-                        errors.append("'admin.master_key' must be a string or null")
-                if "trusted_ips" in admin:
-                    if not isinstance(admin["trusted_ips"], list):
-                        errors.append("'admin.trusted_ips' must be a list")
-                    elif not all(isinstance(ip, str) for ip in admin["trusted_ips"]):
-                        errors.append("'admin.trusted_ips' must contain only strings")
+                # Validate master_key and trusted_ips
+                if "master_key" in admin_data and not isinstance(admin_data["master_key"], str):
+                    errors.append("Admin master_key must be a string")
+                if "trusted_ips" in admin_data and not isinstance(admin_data["trusted_ips"], list):
+                    errors.append("Admin trusted_ips must be a list")
 
-        # Validate registration section (optional)
+        # Check registration section
         if "registration" in data:
-            registration = data["registration"]
-            if not isinstance(registration, dict):
-                errors.append("'registration' section must be a dictionary")
+            registration_data = data["registration"]
+            if not isinstance(registration_data, dict):
+                errors.append("Registration configuration must be an object")
             else:
-                if "fields" in registration:
-                    if not isinstance(registration["fields"], list):
-                        errors.append("'registration.fields' must be a list")
-                    elif not all(isinstance(field, str) for field in registration["fields"]):
-                        errors.append("'registration.fields' must contain only strings")
-                if "approve" in registration:
-                    if not isinstance(registration["approve"], bool):
-                        errors.append("'registration.approve' must be a boolean")
-                if "username_label" in registration:
-                    if not isinstance(registration["username_label"], str):
-                        errors.append("'registration.username_label' must be a string")
+                # Validate fields, approve, and username_label
+                if "fields" in registration_data and not isinstance(registration_data["fields"], list):
+                    errors.append("Registration fields must be a list")
+                if "approve" in registration_data and not isinstance(registration_data["approve"], bool):
+                    errors.append("Registration approve must be a boolean")
+                if "username_label" in registration_data and not isinstance(registration_data["username_label"], str):
+                    errors.append("Registration username_label must be a string")
 
-        # Validate quizzes section (optional)
+        # Check quizzes section
         if "quizzes" in data:
-            quizzes = data["quizzes"]
-            if not isinstance(quizzes, list):
-                errors.append("'quizzes' section must be a list")
+            quizzes_data = data["quizzes"]
+            if not isinstance(quizzes_data, dict):
+                errors.append("Quizzes configuration must be an object")
             else:
-                for i, quiz in enumerate(quizzes):
-                    if not isinstance(quiz, dict):
-                        errors.append(f"Quiz {i+1} must be a dictionary")
-                        continue
-
-                    # Check required fields for each quiz
-                    required_quiz_fields = ["name", "download_path", "folder"]
-                    for field in required_quiz_fields:
-                        if field not in quiz:
-                            errors.append(f"Quiz {i+1} missing required field: '{field}'")
-                        elif not isinstance(quiz[field], str):
-                            errors.append(f"Quiz {i+1} field '{field}' must be a string")
+                # Validate each quiz entry
+                for quiz_key, quiz_value in quizzes_data.items():
+                    if not isinstance(quiz_value, dict):
+                        errors.append(f"Quiz configuration for {quiz_key} must be an object")
+                    else:
+                        # Validate name, download_path, and folder
+                        if "name" in quiz_value and not isinstance(quiz_value["name"], str):
+                            errors.append(f"Quiz name must be a string in {quiz_key}")
+                        if "download_path" in quiz_value and not isinstance(quiz_value["download_path"], str):
+                            errors.append(f"Quiz download_path must be a string in {quiz_key}")
+                        if "folder" in quiz_value and not isinstance(quiz_value["folder"], str):
+                            errors.append(f"Quiz folder must be a string in {quiz_key}")
 
         return len(errors) == 0
 
     @admin_auth_required
     async def admin_list_images(self, request):
-        """List all images in quizzes/imgs directory"""
+        """List all images in quizzes/imgs directory.
+
+        Returns:
+            JSON response with list of image files and their paths
+        """
         try:
             imgs_dir = os.path.join(self.quizzes_dir, "imgs")
-            images = []
+            if not os.path.exists(imgs_dir):
+                return web.json_response({"images": []})
 
-            if os.path.exists(imgs_dir) and os.path.isdir(imgs_dir):
-                # Get all image files (common image extensions)
-                image_extensions = {".jpg", ".jpeg", ".png", ".gif", ".bmp", ".svg", ".webp"}
+            image_files = []
+            for filename in os.listdir(imgs_dir):
+                if filename.lower().endswith((".png", ".jpg", ".jpeg", ".gif", ".bmp")):
+                    file_path = os.path.join(imgs_dir, filename)
+                    image_files.append(
+                        {
+                            "name": filename,
+                            "path": file_path,
+                            "url": f"/imgs/{filename}",  # URL for direct access
+                        }
+                    )
 
-                for filename in os.listdir(imgs_dir):
-                    if os.path.isfile(os.path.join(imgs_dir, filename)):
-                        _, ext = os.path.splitext(filename.lower())
-                        if ext in image_extensions:
-                            images.append(
-                                {"filename": filename, "path": f"/imgs/{filename}"}  # Relative path for quiz usage
-                            )
-
-                # Sort alphabetically
-                images.sort(key=lambda x: x["filename"].lower())
-
-            return web.json_response({"images": images})
+            return web.json_response({"images": image_files})
         except Exception as e:
-            logger.error(f"Error listing images: {e}")
-            return web.json_response({"error": str(e)}, status=500)
+            logger.error(f"Error listing image files: {e}")
+            return web.json_response({"error": "Failed to list image files"}, status=500)
 
     @admin_auth_required
     async def admin_download_quiz(self, request):
-        """Download and extract quiz from ZIP file"""
+        """Download and extract quiz from ZIP file.
+
+        Downloads ZIP from HTTPS URL, extracts specified folder to quizzes directory.
+
+        Args:
+            request: aiohttp request with name, download_path, and folder
+
+        Returns:
+            JSON response with extraction results and updated quiz list
+        """
+        data = await request.json()
+        name = data.get("name")
+        download_path = data.get("download_path")
+        folder = data.get("folder", "")
+
+        if not name or not download_path:
+            return web.json_response({"error": "Name and download_path are required"}, status=400)
+
+        # Validate folder path (prevent traversal)
+        if folder and (".." in folder or "/" in folder or "\\" in folder):
+            return web.json_response({"error": "Invalid folder path"}, status=400)
+
+        # Default to empty folder (no subfolder)
+        if not folder:
+            folder = ""
+
+        # Full path where the quiz will be extracted
+        extract_path = os.path.join(self.quizzes_dir, folder)
+
+        # Create extract directory if it doesn't exist
+        ensure_directory_exists(extract_path)
+
+        # Download and extract the ZIP file
         try:
-            data = await request.json()
-            quiz_name = data.get("name")
-            download_path = data.get("download_path")
-            folder = data.get("folder")
+            import httpx
+            import zipfile
 
-            if not all([quiz_name, download_path, folder]):
-                return web.json_response({"error": "Missing required parameters"}, status=400)
+            # Download the ZIP file
+            async with httpx.AsyncClient() as client:
+                response = await client.get(download_path)
+                response.raise_for_status()  # Raise an error for bad responses
 
-            # Validate URL (basic HTTPS check)
-            if not download_path.startswith("https://"):
-                return web.json_response({"error": "Only HTTPS URLs are allowed"}, status=400)
+                # Save the ZIP file temporarily
+                zip_filename = f"{name}.zip"
+                zip_path = os.path.join(tempfile.gettempdir(), zip_filename)
 
-            logger.info(f"Starting download of quiz '{quiz_name}' from {download_path}")
+                async with aiofiles.open(zip_path, "wb") as zip_file:
+                    await zip_file.write(response.content)
 
-            # Create temporary file for ZIP download
-            temp_zip_path = None
-            try:
-                with tempfile.NamedTemporaryFile(suffix=".zip", delete=False) as temp_zip:
-                    temp_zip_path = temp_zip.name
+            # Extract the ZIP file
+            with zipfile.ZipFile(zip_path, "r") as zip_ref:
+                zip_ref.extractall(extract_path)
 
-                    # Download ZIP file
-                    async with ClientSession() as session:
-                        async with session.get(download_path) as response:
-                            if response.status != 200:
-                                return web.json_response(
-                                    {"error": f"Failed to download: HTTP {response.status}"}, status=400
-                                )
+            logger.info(f"Downloaded and extracted quiz {name} to {extract_path}")
 
-                            # Write downloaded content to temporary file
-                            async for chunk in response.content.iter_chunked(8192):
-                                temp_zip.write(chunk)
+            # Optionally, remove the ZIP file after extraction
+            os.remove(zip_path)
 
-                # File is now closed, safe to open as ZIP
-                with zipfile.ZipFile(temp_zip_path, "r") as zip_file:
-                    # Get all files in the specified folder
-                    folder_prefix = folder if folder.endswith("/") else folder + "/"
-                    files_to_extract = [
-                        f for f in zip_file.namelist() if f.startswith(folder_prefix) and not f.endswith("/")
-                    ]
+            # Update the quiz list and switch to the new quiz
+            await self.list_available_quizzes()
+            await self.switch_quiz(name)
 
-                    if not files_to_extract:
-                        return web.json_response(
-                            {"error": f'No files found in folder "{folder}" within the ZIP'}, status=400
-                        )
-
-                    # Extract files to quizzes directory
-                    extracted_count = 0
-                    for file_path in files_to_extract:
-                        # Remove folder prefix to get just the filename
-                        filename = file_path[len(folder_prefix) :]
-                        if filename:  # Skip empty filenames
-                            target_path = os.path.join(self.quizzes_dir, filename)
-
-                            # Ensure target directory exists
-                            target_dir = os.path.dirname(target_path)
-                            os.makedirs(target_dir, exist_ok=True)
-
-                            # Extract and write file
-                            with zip_file.open(file_path) as source:
-                                with open(target_path, "wb") as target:
-                                    target.write(source.read())
-                            extracted_count += 1
-
-                    logger.info(f"Extracted {extracted_count} files from quiz '{quiz_name}'")
-
-            finally:
-                # Clean up temporary ZIP file
-                if temp_zip_path:
-                    try:
-                        os.unlink(temp_zip_path)
-                    except OSError:
-                        pass
-
-            # Refresh quiz list to include newly extracted files
-            available_quizzes = await self.list_available_quizzes()
-
-            return web.json_response(
-                {
-                    "success": True,
-                    "message": f'Successfully downloaded and extracted quiz "{quiz_name}"',
-                    "extracted_files": extracted_count,
-                    "available_quizzes": available_quizzes,
-                }
-            )
-
+            return web.json_response({"success": True, "message": "Quiz downloaded and extracted", "quiz_name": name})
         except Exception as e:
-            logger.error(f"Error downloading quiz: {e}")
-            return web.json_response({"error": f"Download failed: {str(e)}"}, status=500)
+            logger.error(f"Error downloading or extracting quiz: {e}")
+            return web.json_response({"error": "Failed to download or extract quiz"}, status=500)
 
     @admin_auth_required
     async def admin_update_config(self, request):
-        """Update server configuration file"""
-        try:
-            data = await request.json()
-            content = data.get("content", "").strip()
+        """Update server configuration file.
 
-            # Get config file path (use the actual path that was loaded)
+        Validates YAML syntax and structure before writing to file.
+
+        Args:
+            request: aiohttp request with config content
+
+        Returns:
+            JSON response with success status (requires server restart)
+        """
+        data = await request.json()
+        content = data.get("content", "").strip()
+
+        if not content:
+            return web.json_response({"error": "Config content is required"}, status=400)
+
+        # Validate YAML syntax and structure
+        errors = []
+        if not self._validate_config_data(yaml.safe_load(content), errors):
+            return web.json_response({"valid": False, "errors": errors})
+
+        # Write to config file (overwrites existing file)
+        try:
             config_path = self.config.config_path
             if not config_path:
-                return web.json_response(
-                    {"error": "No config file was specified. Server started without --config parameter."}, status=400
-                )
+                return web.json_response({"error": "Config path not set"}, status=500)
 
-            # Validate YAML syntax
-            try:
-                parsed_config = yaml.safe_load(content) if content else {}
-            except yaml.YAMLError as e:
-                return web.json_response({"error": f"Invalid YAML syntax: {str(e)}"}, status=400)
+            async with aiofiles.open(config_path, "w", encoding="utf-8") as f:
+                await f.write(content)
 
-            # Validate config structure
-            errors = []
-            if not self._validate_config_data(parsed_config, errors):
-                return web.json_response({"error": "Configuration validation failed", "errors": errors}, status=400)
-
-            # Write to config file
-            try:
-                with open(config_path, "w", encoding="utf-8") as f:
-                    f.write(content if content else "")
-
-                logger.info(f"Configuration file updated: {config_path}")
-                return web.json_response(
-                    {
-                        "success": True,
-                        "message": "Configuration saved successfully. Restart server to apply changes.",
-                        "config_path": config_path,
-                    }
-                )
-            except Exception as e:
-                logger.error(f"Error writing config file: {e}")
-                return web.json_response({"error": f"Failed to write config file: {str(e)}"}, status=500)
-
+            logger.info(f"Updated config file: {config_path}")
+            return web.json_response({"success": True, "message": "Config updated successfully"})
         except Exception as e:
             logger.error(f"Error updating config: {e}")
             return web.json_response({"error": str(e)}, status=500)
 
-    # File Management API endpoints
     async def serve_files_page(self, request):
-        """Serve the files management page"""
+        """Serve the files management page.
+
+        Injects trusted IP status and config content for auto-authentication.
+
+        Returns:
+            HTML response with files management interface
+        """
         try:
             template_content = self.templates.get("files.html", "")
 
@@ -2150,7 +2440,15 @@ class TestingServer:
             return web.json_response({"error": "Failed to load files page"}, status=500)
 
     def _list_files_in_directory(self, directory, file_type):
-        """Helper to list files in a directory with metadata"""
+        """Helper to list files in a directory with metadata.
+
+        Args:
+            directory: Directory path to list
+            file_type: Type label for files (e.g., "log", "csv")
+
+        Returns:
+            List of file dictionaries with name, size, modified, type (sorted by modified)
+        """
         files = []
         if os.path.exists(directory):
             for filename in os.listdir(directory):
@@ -2171,7 +2469,11 @@ class TestingServer:
 
     @admin_auth_required
     async def files_list(self, request):
-        """List all files in logs_dir and csv_dir with metadata"""
+        """List all files in logs_dir and csv_dir with metadata.
+
+        Returns:
+            JSON response with logs and csv file lists
+        """
         logs_files = self._list_files_in_directory(self.logs_dir, "log")
         csv_files = self._list_files_in_directory(self.csv_dir, "csv")
 
@@ -2179,7 +2481,16 @@ class TestingServer:
 
     def _get_file_path_and_validate(self, file_type, filename):
         """Helper to validate file type, filename, and return file path.
-        Returns tuple (file_path, error_response) where error_response is None on success"""
+
+        Prevents path traversal attacks and validates file existence.
+
+        Args:
+            file_type: Type of file ("csv" or "logs")
+            filename: Name of the file
+
+        Returns:
+            Tuple of (file_path, error_response) where error_response is None on success
+        """
         # Determine base directory from file type
         if file_type == "csv":
             base_dir = self.csv_dir
@@ -2206,7 +2517,14 @@ class TestingServer:
 
     @admin_auth_required
     async def files_view(self, request):
-        """View file contents (text files only, with size limit)"""
+        """View file contents (text files only, with 10MB size limit).
+
+        Args:
+            request: aiohttp request with type and filename in path
+
+        Returns:
+            Plain text response with file content or error if too large/binary
+        """
         file_type = request.match_info["type"]
         filename = request.match_info["filename"]
 
@@ -2241,7 +2559,14 @@ class TestingServer:
 
     @admin_auth_required
     async def files_download(self, request):
-        """Download file directly"""
+        """Download file directly.
+
+        Args:
+            request: aiohttp request with type and filename in path
+
+        Returns:
+            File response with appropriate content-type and disposition headers
+        """
         try:
             file_type = request.match_info["type"]
             filename = request.match_info["filename"]
@@ -2265,7 +2590,16 @@ class TestingServer:
             return web.json_response({"error": "Failed to download file"}, status=500)
 
     def _is_safe_filename(self, filename):
-        """Check if filename is safe (no path traversal attempts)"""
+        """Check if filename is safe (no path traversal attempts).
+
+        Validates against path traversal, null bytes, special names, and length.
+
+        Args:
+            filename: Filename to validate
+
+        Returns:
+            True if safe, False otherwise
+        """
         if not filename:
             return False
 
@@ -2288,12 +2622,22 @@ class TestingServer:
         return True
 
     async def serve_index_page(self, request):
-        """Serve the index.html page from static directory"""
+        """Serve the index.html page from static directory.
+
+        Returns:
+            HTML file response
+        """
         index_path = f"{self.static_dir}/index.html"
         return web.FileResponse(index_path, headers={"Content-Type": "text/html; charset=utf-8"})
 
     async def serve_admin_page(self, request):
-        """Serve the admin interface page"""
+        """Serve the admin interface page.
+
+        Injects trusted IP status, network info, downloadable quizzes, and version.
+
+        Returns:
+            HTML response with admin interface
+        """
         try:
             template_content = self.templates.get("admin.html", "")
 
@@ -2336,7 +2680,11 @@ class TestingServer:
             return web.Response(text="<h1>Admin page not found</h1>", content_type="text/html", status=404)
 
     async def serve_live_stats_page(self, request):
-        """Serve the live stats page"""
+        """Serve the live stats page.
+
+        Returns:
+            HTML response with live stats interface
+        """
         try:
             template_content = self.templates.get("live_stats.html", "")
 
@@ -2348,7 +2696,20 @@ class TestingServer:
     async def _handle_websocket_connection(
         self, request, client_list: List[web.WebSocketResponse], initial_state_data: dict, client_type: str
     ):
-        """Generic WebSocket connection handler"""
+        """Generic WebSocket connection handler.
+
+        Manages connection lifecycle: adds to list, sends initial state,
+        handles messages, removes on disconnect.
+
+        Args:
+            request: aiohttp request object
+            client_list: List to manage connected clients
+            initial_state_data: Initial data to send on connection
+            client_type: Description for logging
+
+        Returns:
+            WebSocket response object
+        """
         ws = web.WebSocketResponse()
         await ws.prepare(request)
 
@@ -2383,7 +2744,13 @@ class TestingServer:
         return ws
 
     async def websocket_live_stats(self, request):
-        """WebSocket endpoint for live stats updates"""
+        """WebSocket endpoint for live stats updates.
+
+        Filters to only show approved users in live stats.
+
+        Returns:
+            WebSocket connection with live stats updates
+        """
         # Filter out unapproved users from live stats
         approved_users = {
             user_id: user_data["username"]
@@ -2407,7 +2774,13 @@ class TestingServer:
         return await self._handle_websocket_connection(request, self.websocket_clients, initial_data, "WebSocket")
 
     async def websocket_admin(self, request):
-        """WebSocket endpoint for admin real-time notifications (registration approvals)"""
+        """WebSocket endpoint for admin real-time notifications.
+
+        Sends notifications for user registrations awaiting approval.
+
+        Returns:
+            WebSocket connection with admin notifications
+        """
         # Filter users waiting for approval and extract only registration fields
         pending_users = {}
         if hasattr(self.config, "registration") and self.config.registration.approve:
@@ -2426,89 +2799,3 @@ class TestingServer:
         return await self._handle_websocket_connection(
             request, self.admin_websocket_clients, initial_data, "admin WebSocket"
         )
-
-
-async def create_app(config: WebQuizConfig):
-    """Create and configure the application"""
-
-    server = TestingServer(config)
-
-    # Initialize log file first (this will set server.log_file)
-    await server.initialize_log_file()
-
-    # Configure logging with the actual log file path
-    logging.basicConfig(
-        level=logging.INFO,
-        format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-        handlers=[logging.FileHandler(server.log_file), logging.StreamHandler()],  # Also log to console
-        force=True,  # Override any existing configuration
-    )
-
-    # Load questions and create HTML with embedded data (CSV will be initialized in switch_quiz)
-    await server.load_questions()
-
-    # Start periodic flush task
-    asyncio.create_task(server.periodic_flush())
-
-    # Create app with middleware
-    app = web.Application(middlewares=[error_middleware])
-
-    # Routes
-    app.router.add_post("/api/register", server.register_user)
-    app.router.add_put("/api/update-registration", server.update_registration)
-    app.router.add_post("/api/submit-answer", server.submit_answer)
-    app.router.add_post("/api/question-start", server.question_start)
-    app.router.add_get("/api/verify-user/{user_id}", server.verify_user_id)
-
-    # Test endpoint for manual CSV flush (only for testing)
-    async def manual_flush(request):
-        await server.flush_responses_to_csv()
-        await server.flush_users_to_csv()
-        return web.json_response({"status": "flushed"})
-
-    app.router.add_post("/api/test/flush", manual_flush)
-
-    # Admin routes
-    app.router.add_get("/admin/", server.serve_admin_page)
-    app.router.add_post("/api/admin/auth", server.admin_auth_test)
-    app.router.add_put("/api/admin/approve-user", server.admin_approve_user)
-    app.router.add_get("/api/admin/list-quizzes", server.admin_list_quizzes)
-    app.router.add_post("/api/admin/switch-quiz", server.admin_switch_quiz)
-    app.router.add_get("/api/admin/quiz/{filename}", server.admin_get_quiz)
-    app.router.add_post("/api/admin/create-quiz", server.admin_create_quiz)
-    app.router.add_put("/api/admin/quiz/{filename}", server.admin_update_quiz)
-    app.router.add_delete("/api/admin/quiz/{filename}", server.admin_delete_quiz)
-    app.router.add_post("/api/admin/validate-quiz", server.admin_validate_quiz)
-    app.router.add_get("/api/admin/list-images", server.admin_list_images)
-    app.router.add_post("/api/admin/download-quiz", server.admin_download_quiz)
-    app.router.add_put("/api/admin/config", server.admin_update_config)
-    app.router.add_get("/ws/admin", server.websocket_admin)
-
-    # File management routes (admin access)
-    app.router.add_get("/files/", server.serve_files_page)
-    app.router.add_get("/api/files/list", server.files_list)
-    app.router.add_get("/api/files/{type}/view/{filename}", server.files_view)
-    app.router.add_get("/api/files/{type}/download/{filename}", server.files_download)
-
-    # Live stats routes (public access)
-    app.router.add_get("/live-stats/", server.serve_live_stats_page)
-    app.router.add_get("/ws/live-stats", server.websocket_live_stats)
-
-    # Serve index.html at root path
-    app.router.add_get("/", server.serve_index_page)
-
-    # Ensure imgs directory exists before serving static files
-    ensure_directory_exists(os.path.join(config.paths.quizzes_dir, "imgs"))
-    app.router.add_static(
-        "/imgs/",
-        path=os.path.join(config.paths.quizzes_dir, "imgs"),
-        show_index=True,
-        name="imgs",
-    )
-    # Serve static files from configured static directory
-    app.router.add_static("/", path=config.paths.static_dir, name="static")
-
-    return app
-
-
-# Server is now started via CLI (aiotests.cli:main)
