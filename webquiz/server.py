@@ -1954,55 +1954,95 @@ class TestingServer:
         if errors is None:
             errors = []
 
-        # Check required fields
-        required_fields = ["title", "questions"]
-        for field in required_fields:
-            if field not in data:
-                errors.append(f"Missing required field: {field}")
+        if not isinstance(data, dict):
+            errors.append("Дані квізу повинні бути словником")
+            return False
 
-        if "questions" in data:
-            if not isinstance(data["questions"], list):
-                errors.append("Questions must be a list")
-            else:
-                # Validate each question
-                for i, question in enumerate(data["questions"]):
-                    if not isinstance(question, dict):
-                        errors.append(f"Question {i + 1} must be an object")
-                        continue  # Skip to next question
+        if "questions" not in data:
+            errors.append("Квіз повинен містити поле 'questions'")
+            return False
 
-                    # Check for required question fields
-                    question_required_fields = ["question", "options", "correct_answer"]
-                    for field in question_required_fields:
-                        if field not in question:
-                            errors.append(f"Missing required field in question {i + 1}: {field}")
+        questions = data["questions"]
+        if not isinstance(questions, list):
+            errors.append("'questions' повинно бути списком")
+            return False
 
-                    # Validate correct_answer field
-                    correct_answer = question.get("correct_answer")
-                    if isinstance(correct_answer, list):
-                        # For multiple answers, check min_correct
-                        if "min_correct" not in question:
-                            errors.append(f"min_correct is required for multiple answer question {i + 1}")
-                    elif not isinstance(correct_answer, int):
-                        errors.append(
-                            f"correct_answer must be an index (integer) or list of indices in question {i + 1}"
-                        )
+        if len(questions) == 0:
+            errors.append("Квіз повинен містити принаймні одне питання")
+            return False
 
-                    # Validate options type
-                    options = question.get("options")
-                    if not isinstance(options, list):
-                        errors.append(f"options must be a list in question {i + 1}")
-                    else:
-                        # Validate option indices if correct_answer is an index
-                        if isinstance(correct_answer, int) and (correct_answer < 0 or correct_answer >= len(options)):
-                            errors.append(f"correct_answer index out of range in question {i + 1}")
+        for i, question in enumerate(questions):
+            if not isinstance(question, dict):
+                errors.append(f"Question {i+1} must be a dictionary")
+                continue
 
-        # Check optional fields with default values
-        boolean_fields = ["show_right_answer", "randomize_questions"]
-        for field in boolean_fields:
-            if field in data and not isinstance(data[field], bool):
-                errors.append(f"{field} must be a boolean")
+            # Validate required fields (except 'question' which is optional if image provided)
+            required_fields = ["options", "correct_answer"]
+            for field in required_fields:
+                if field not in question:
+                    errors.append(f"Question {i+1} missing required field: {field}")
 
-        # Additional custom validations can be added here
+            # Either question text OR image must be provided
+            has_question = "question" in question and question["question"]
+            has_image = "image" in question and question["image"]
+            if not has_question and not has_image:
+                errors.append(f"Question {i+1} must have either question text or image")
+
+            # Validate options
+            if "options" in question:
+                options = question["options"]
+                if not isinstance(options, list):
+                    errors.append(f"Question {i+1} options must be a list")
+                elif len(options) < 2:
+                    errors.append(f"Question {i+1} must have at least 2 options")
+                elif not all(isinstance(opt, str) for opt in options):
+                    errors.append(f"Question {i+1} all options must be strings")
+
+            # Validate correct_answer (can be integer for single answer or list for multiple answers)
+            if "correct_answer" in question and "options" in question:
+                correct_answer = question["correct_answer"]
+                options_count = len(question["options"])
+
+                if isinstance(correct_answer, int):
+                    # Single answer validation
+                    if correct_answer < 0 or correct_answer >= options_count:
+                        errors.append(f"Question {i+1} correct_answer index out of range")
+                elif isinstance(correct_answer, list):
+                    # Multiple answers validation
+                    if len(correct_answer) == 0:
+                        errors.append(f"Question {i+1} correct_answer array cannot be empty")
+                    elif not all(isinstance(idx, int) for idx in correct_answer):
+                        errors.append(f"Question {i+1} correct_answer array must contain only integers")
+                    elif any(idx < 0 or idx >= options_count for idx in correct_answer):
+                        errors.append(f"Question {i+1} correct_answer array contains index out of range")
+                    elif len(set(correct_answer)) != len(correct_answer):
+                        errors.append(f"Question {i+1} correct_answer array contains duplicate indices")
+                else:
+                    errors.append(f"Question {i+1} correct_answer must be an integer or array of integers")
+
+            # Validate min_correct (only valid for multiple answers)
+            if "min_correct" in question:
+                min_correct = question["min_correct"]
+                if "correct_answer" not in question:
+                    errors.append(f"Question {i+1} has min_correct but no correct_answer")
+                elif not isinstance(question["correct_answer"], list):
+                    errors.append(f"Question {i+1} min_correct is only valid for multiple answer questions")
+                elif not isinstance(min_correct, int):
+                    errors.append(f"Question {i+1} min_correct must be an integer")
+                elif min_correct < 1:
+                    errors.append(f"Question {i+1} min_correct must be at least 1")
+                elif min_correct > len(question["correct_answer"]):
+                    errors.append(f"Question {i+1} min_correct cannot exceed number of correct answers")
+
+        # Validate optional top-level fields
+        if "show_right_answer" in data and not isinstance(data["show_right_answer"], bool):
+            errors.append("'show_right_answer' must be a boolean (true or false)")
+
+        if "randomize_questions" in data and not isinstance(data["randomize_questions"], bool):
+            errors.append("'randomize_questions' must be a boolean (true or false)")
+
+        if "title" in data and not isinstance(data["title"], str):
+            errors.append("'title' must be a string")
 
         return len(errors) == 0
 
@@ -2106,15 +2146,16 @@ class TestingServer:
 
             image_files = []
             for filename in os.listdir(imgs_dir):
-                if filename.lower().endswith((".png", ".jpg", ".jpeg", ".gif", ".bmp")):
-                    file_path = os.path.join(imgs_dir, filename)
+                if filename.lower().endswith((".png", ".jpg", ".jpeg", ".gif", ".bmp", ".svg")):
                     image_files.append(
                         {
-                            "name": filename,
-                            "path": file_path,
-                            "url": f"/imgs/{filename}",  # URL for direct access
+                            "filename": filename,
+                            "path": f"/imgs/{filename}",
                         }
                     )
+
+            # Sort alphabetically by filename (case-insensitive)
+            image_files.sort(key=lambda x: x["filename"].lower())
 
             return web.json_response({"images": image_files})
         except Exception as e:
