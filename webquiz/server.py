@@ -2370,15 +2370,16 @@ class TestingServer:
 
     @admin_auth_required
     async def files_list(self, request):
-        """List all files in logs_dir and csv_dir with metadata.
+        """List all files in logs_dir, csv_dir, and quizzes_dir with metadata.
 
         Returns:
-            JSON response with logs and csv file lists
+            JSON response with logs, csv, and quizzes file lists
         """
         logs_files = self._list_files_in_directory(self.logs_dir, "log")
         csv_files = self._list_files_in_directory(self.csv_dir, "csv")
+        quizzes_files = self._list_files_in_directory(self.quizzes_dir, "yaml")
 
-        return web.json_response({"logs": logs_files, "csv": csv_files})
+        return web.json_response({"logs": logs_files, "csv": csv_files, "quizzes": quizzes_files})
 
     def _get_file_path_and_validate(self, file_type, filename):
         """Helper to validate file type, filename, and return file path.
@@ -2386,7 +2387,7 @@ class TestingServer:
         Prevents path traversal attacks and validates file existence.
 
         Args:
-            file_type: Type of file ("csv" or "logs")
+            file_type: Type of file ("csv", "logs", or "quizzes")
             filename: Name of the file
 
         Returns:
@@ -2397,6 +2398,8 @@ class TestingServer:
             base_dir = self.csv_dir
         elif file_type == "logs":
             base_dir = self.logs_dir
+        elif file_type == "quizzes":
+            base_dir = self.quizzes_dir
         else:
             return None, web.json_response({"error": "Invalid file type"}, status=400)
 
@@ -2478,7 +2481,12 @@ class TestingServer:
                 return error
 
             # Determine content type
-            content_type = "text/csv" if file_type == "csv" else "text/plain"
+            if file_type == "csv":
+                content_type = "text/csv"
+            elif file_type == "quizzes":
+                content_type = "text/yaml"
+            else:
+                content_type = "text/plain"
 
             # Return file response with proper headers
             return web.FileResponse(
@@ -2489,6 +2497,74 @@ class TestingServer:
         except Exception as e:
             logger.error(f"Error downloading file: {e}")
             return web.json_response({"error": "Failed to download file"}, status=500)
+
+    @admin_auth_required
+    async def files_save_quiz(self, request):
+        """Save quiz file with validation and backup.
+
+        Args:
+            request: aiohttp request with filename in path and content in body
+
+        Returns:
+            JSON response with success status and backup filename
+        """
+        try:
+            filename = request.match_info["filename"]
+            data = await request.json()
+            content = data.get("content", "").strip()
+
+            if not content:
+                return web.json_response({"error": "Content is required"}, status=400)
+
+            # Validate filename
+            if not self._is_safe_filename(filename):
+                return web.json_response({"error": "Invalid filename"}, status=400)
+
+            quiz_path = os.path.join(self.quizzes_dir, filename)
+
+            if not os.path.exists(quiz_path):
+                return web.json_response({"error": "Quiz file not found"}, status=404)
+
+            # Validate YAML
+            try:
+                import yaml
+
+                parsed = yaml.safe_load(content)
+                errors = []
+                if not self._validate_quiz_data(parsed, errors):
+                    return web.json_response(
+                        {"error": "Неправильна структура даних квізу", "errors": errors}, status=400
+                    )
+            except yaml.YAMLError as e:
+                return web.json_response({"error": f"Неправильний YAML: {str(e)}"}, status=400)
+
+            # Create backup
+            backup_path = quiz_path + ".backup"
+            import shutil
+
+            shutil.copy2(quiz_path, backup_path)
+
+            # Write the updated content
+            with open(quiz_path, "w", encoding="utf-8") as f:
+                f.write(content)
+
+            # If this is the currently active quiz, reload it
+            if filename == self.current_quiz_file:
+                logger.info(f"Reloading active quiz after edit: {filename}")
+                await self.load_questions()
+
+            logger.info(f"Saved quiz file: {filename}")
+            return web.json_response(
+                {
+                    "success": True,
+                    "message": f'Quiz "{filename}" saved successfully (backup created)',
+                    "backup": backup_path,
+                }
+            )
+
+        except Exception as e:
+            logger.error(f"Error saving quiz file: {e}")
+            return web.json_response({"error": str(e)}, status=500)
 
     def _is_safe_filename(self, filename):
         """Check if filename is safe (no path traversal attempts).
@@ -2763,6 +2839,7 @@ async def create_app(config: WebQuizConfig):
     app.router.add_get("/api/files/list", server.files_list)
     app.router.add_get("/api/files/{type}/view/{filename}", server.files_view)
     app.router.add_get("/api/files/{type}/download/{filename}", server.files_download)
+    app.router.add_put("/api/files/quizzes/save/{filename}", server.files_save_quiz)
 
     # Live stats routes (public access)
     app.router.add_get("/live-stats/", server.serve_live_stats_page)

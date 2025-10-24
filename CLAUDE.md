@@ -36,6 +36,8 @@ WebQuiz - Python/aiohttp quiz system with multi-quiz management, real-time WebSo
 
 **Admin (master key required):**
 - `GET /admin`, `POST /api/admin/auth`, `PUT /api/admin/approve-user`, `GET /api/admin/list-quizzes`, `POST /api/admin/switch-quiz`, `PUT /api/admin/config`
+- Quiz management: `GET /api/admin/quiz/{filename}`, `POST /api/admin/create-quiz`, `PUT /api/admin/quiz/{filename}`, `DELETE /api/admin/quiz/{filename}`
+- File management: `GET /api/files/list`, `GET /api/files/{type}/view/{filename}`, `GET /api/files/{type}/download/{filename}`, `PUT /api/files/quizzes/save/{filename}`
 
 **WebSockets:**
 - `WS /ws/live-stats` (public), `WS /ws/admin` (admin approval notifications)
@@ -97,7 +99,8 @@ webquiz-stress-test -c 50
 - **Live stats first question** uses user's actual first from `question_order` (prevents duplicates)
 - **Multi-platform binaries** via GitHub Actions (macOS-13 Intel, macOS-14 ARM64, Linux, Windows)
 - **Coverage excludes build tools**: build.py and binary_entry.py omitted from coverage (not runtime code)
-- **Raw YAML from server** - Quiz editor text mode uses original YAML from server directly (no JS generation); text mode disabled when creating new quiz
+- **Wizard-only quiz editor** - Admin panel uses wizard mode only; YAML editing available in file manager with validation
+- **File manager quiz editing** - Direct YAML editing with validation button, automatic backup, and active quiz reload
 
 ## Key Flows
 

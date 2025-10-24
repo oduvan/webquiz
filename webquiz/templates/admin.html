@@ -228,33 +228,8 @@
             color: var(--text-color);
         }
 
-        .mode-toggle {
-            margin: 20px 0;
-            text-align: center;
-        }
-
-        .mode-toggle button {
-            margin: 0 5px;
-        }
-
-        .mode-toggle button.active {
-            background: var(--button-hover);
-        }
-
         .editor-content {
             margin-top: 20px;
-        }
-
-        .wizard-form {
-            display: none;
-        }
-
-        .text-editor {
-            display: none;
-        }
-
-        .wizard-form.active, .text-editor.active {
-            display: block;
         }
 
         .question-item {
@@ -285,17 +260,6 @@
 
         .option-item input[type="radio"] {
             margin-right: 5px;
-        }
-
-        .text-editor textarea {
-            width: 100%;
-            height: 400px;
-            font-family: 'Courier New', monospace;
-            font-size: 14px;
-            border: 1px solid var(--border-color);
-            border-radius: 5px;
-            padding: 10px;
-            resize: vertical;
         }
 
         .validation-errors {
@@ -713,14 +677,9 @@
                 <input type="text" id="quiz-filename" placeholder="Введіть ім'я файлу (без розширення .yaml)">
             </div>
 
-            <div class="mode-toggle">
-                <button id="wizard-mode-btn" class="active" onclick="switchEditorMode('wizard')">🧙‍♂️ Режим Майстра</button>
-                <button id="text-mode-btn" onclick="switchEditorMode('text')">📝 Текстовий Режим</button>
-            </div>
-
             <div class="editor-content">
-                <!-- Wizard Mode -->
-                <div id="wizard-form" class="wizard-form active">
+                <!-- Wizard Form -->
+                <div id="wizard-form">
                     <div class="form-group">
                         <label>Назва Quiz (необов'язково):</label>
                         <input type="text" id="quiz-title" placeholder="наприклад, Математичний Quiz" style="width: 100%; margin-bottom: 20px;">
@@ -746,16 +705,6 @@
                         </div>
                         <button type="button" onclick="addQuestion()">➕ Додати Питання</button>
                     </div>
-                </div>
-
-                <!-- Text Mode -->
-                <div id="text-form" class="text-editor">
-                    <div class="form-group">
-                        <label for="quiz-content">YAML Контент:</label>
-                        <textarea id="quiz-content" placeholder="Введіть YAML контент quiz тут..."></textarea>
-                    </div>
-                    <button type="button" onclick="validateQuizContent()">✅ Перевірити YAML</button>
-                    <div id="validation-results"></div>
                 </div>
             </div>
 
@@ -987,25 +936,18 @@
         });
 
         // Quiz Editor Variables
-        let editorMode = 'wizard';
         let isEditMode = false;
         let editingQuizName = '';
         let questionCounter = 1;
-        let originalYamlContent = ''; // Store original YAML from server when editing
 
         // Quiz Editor Functions
         function createNewQuiz() {
             isEditMode = false;
             editingQuizName = '';
-            originalYamlContent = ''; // Clear original content for new quiz
             document.getElementById('modal-title').textContent = 'Створити Новий Quiz';
             document.getElementById('quiz-filename').value = '';
             document.getElementById('quiz-filename').disabled = false;
             resetQuizEditor();
-
-            // Disable text mode button for new quiz (no YAML to show)
-            document.getElementById('text-mode-btn').style.display = 'none';
-
             document.getElementById('quiz-editor-modal').style.display = 'block';
         }
 
@@ -1032,15 +974,9 @@
 
                 if (response.ok) {
                     // Load quiz data into editor
-                    originalYamlContent = data.content; // Store original YAML from server
-                    document.getElementById('quiz-content').value = data.content;
                     if (data.parsed) {
                         loadQuizDataToWizard(data.parsed);
                     }
-
-                    // Enable text mode button for editing (we have original YAML)
-                    document.getElementById('text-mode-btn').style.display = 'inline-block';
-
                     document.getElementById('quiz-editor-modal').style.display = 'block';
                 } else {
                     showMessage(data.error || 'Не вдалося завантажити quiz', 'error');
@@ -1145,50 +1081,13 @@
             resetQuizEditor();
         }
 
-        function switchEditorMode(mode) {
-            // Text mode only available when editing existing quiz
-            if (mode === 'text' && !isEditMode) {
-                showMessage('Текстовий режим доступний тільки при редагуванні існуючого quiz', 'warning');
-                return;
-            }
-
-            editorMode = mode;
-
-            // Update buttons
-            document.getElementById('wizard-mode-btn').classList.toggle('active', mode === 'wizard');
-            document.getElementById('text-mode-btn').classList.toggle('active', mode === 'text');
-
-            // Show/hide forms
-            document.getElementById('wizard-form').classList.toggle('active', mode === 'wizard');
-            document.getElementById('text-form').classList.toggle('active', mode === 'text');
-
-            // Sync data between modes
-            if (mode === 'text') {
-                syncWizardToText();
-            } else {
-                syncTextToWizard();
-            }
-        }
-
         function resetQuizEditor() {
-            editorMode = 'wizard';
             questionCounter = 1;
-            originalYamlContent = ''; // Clear original content
-
-            // Reset mode buttons
-            document.getElementById('wizard-mode-btn').classList.add('active');
-            document.getElementById('text-mode-btn').classList.remove('active');
-
-            // Reset forms
-            document.getElementById('wizard-form').classList.add('active');
-            document.getElementById('text-form').classList.remove('active');
 
             // Clear content
             document.getElementById('questions-container').innerHTML = '';
-            document.getElementById('quiz-content').value = '';
-            document.getElementById('validation-results').innerHTML = '';
 
-            // Add initial question if in wizard mode
+            // Add initial question
             addQuestion();
         }
 
@@ -1542,27 +1441,6 @@
             }
         }
 
-        function syncWizardToText() {
-            // Use the original YAML from server (only available when editing)
-            if (originalYamlContent) {
-                document.getElementById('quiz-content').value = originalYamlContent;
-            }
-        }
-
-        function syncTextToWizard() {
-            try {
-                const content = document.getElementById('quiz-content').value.trim();
-                if (content) {
-                    // Basic YAML parsing simulation - in production, you'd want proper YAML parsing
-                    const lines = content.split('\n');
-                    // This is a simplified sync - full implementation would need proper YAML parsing
-                    showMessage('Синхронізація тексту з майстром - може знадобитися ручне оновлення', 'warning');
-                }
-            } catch (error) {
-                showMessage('Помилка синхронізації тексту з майстром: ' + error.message, 'error');
-            }
-        }
-
         function getWizardData() {
             const questions = [];
             const questionDivs = document.querySelectorAll('.question-item');
@@ -1641,63 +1519,18 @@
             return quizData;
         }
 
-        async function validateQuizContent() {
-            const content = document.getElementById('quiz-content').value.trim();
-            const resultsDiv = document.getElementById('validation-results');
-
-            if (!content) {
-                resultsDiv.innerHTML = '<div class="validation-errors">Контент порожній</div>';
-                return;
-            }
-
-            try {
-                const response = await fetch('/api/admin/validate-quiz', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'X-Master-Key': currentMasterKey
-                    },
-                    body: JSON.stringify({ content })
-                });
-
-                const data = await response.json();
-
-                if (response.ok) {
-                    if (data.valid) {
-                        resultsDiv.innerHTML = `<div class="success">✅ Valid YAML! Found ${data.question_count} questions.</div>`;
-                    } else {
-                        resultsDiv.innerHTML = `<div class="validation-errors">❌ Validation errors:<ul>${data.errors.map(err => `<li>${err}</li>`).join('')}</ul></div>`;
-                    }
-                } else {
-                    resultsDiv.innerHTML = `<div class="validation-errors">Error: ${data.error}</div>`;
-                }
-            } catch (error) {
-                resultsDiv.innerHTML = `<div class="validation-errors">Error: ${error.message}</div>`;
-            }
-        }
-
         async function saveQuiz() {
             const filename = document.getElementById('quiz-filename').value.trim();
 
             if (!filename) {
-                showMessage('Будь ласка, введіть ім’я файлу', 'error');
+                showMessage('Будь ласка, введіть ім\'я файлу', 'error');
                 return;
             }
 
-            let quizData, content;
-
-            if (editorMode === 'wizard') {
-                quizData = getWizardData();
-                if (!quizData.questions || quizData.questions.length === 0) {
-                    showMessage('Будь ласка, додайте принаймні одне питання', 'error');
-                    return;
-                }
-            } else {
-                content = document.getElementById('quiz-content').value.trim();
-                if (!content) {
-                    showMessage('Будь ласка, введіть контент quiz', 'error');
-                    return;
-                }
+            const quizData = getWizardData();
+            if (!quizData.questions || quizData.questions.length === 0) {
+                showMessage('Будь ласка, додайте принаймні одне питання', 'error');
+                return;
             }
 
             try {
@@ -1712,9 +1545,8 @@
                     },
                     body: JSON.stringify({
                         filename,
-                        mode: editorMode,
-                        quiz_data: editorMode === 'wizard' ? quizData : undefined,
-                        content: editorMode === 'text' ? content : undefined
+                        mode: 'wizard',
+                        quiz_data: quizData
                     })
                 });
 

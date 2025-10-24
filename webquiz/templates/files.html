@@ -408,6 +408,7 @@
             <div class="tabs">
                 <button class="tab active" data-tab="csv" onclick="switchTab('csv')">📊 CSV Files</button>
                 <button class="tab" data-tab="logs" onclick="switchTab('logs')">📋 Log Files</button>
+                <button class="tab" data-tab="quizzes" onclick="switchTab('quizzes')">📝 Quiz Files</button>
                 <button class="tab" data-tab="config" onclick="switchTab('config')" id="config-tab-button" style="display: none;">⚙️ Config</button>
             </div>
 
@@ -422,6 +423,13 @@
             <div id="logs-tab" class="tab-content">
                 <div id="logs-files" class="file-grid">
                     <div class="loading">Loading log files...</div>
+                </div>
+            </div>
+
+            <!-- Quiz Files Tab -->
+            <div id="quizzes-tab" class="tab-content">
+                <div id="quizzes-files" class="file-grid">
+                    <div class="loading">Loading quiz files...</div>
                 </div>
             </div>
 
@@ -471,10 +479,36 @@
         </div>
     </div>
 
+    <!-- Quiz Editor Modal -->
+    <div id="quiz-editor-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 id="quiz-editor-title">Edit Quiz</h2>
+                <span class="close" onclick="closeQuizEditor()">&times;</span>
+            </div>
+            <div class="modal-body">
+                <div class="warning message">
+                    ⚠️ <strong>Note:</strong> Changes will create a backup. If this is the active quiz, it will be reloaded.
+                </div>
+                <div class="form-group">
+                    <label for="quiz-editor-content">Quiz YAML Content:</label>
+                    <textarea id="quiz-editor-content" rows="20" style="width: 100%; font-family: 'Courier New', monospace; font-size: 14px; padding: 10px; border: 1px solid var(--border-color); border-radius: 5px; box-sizing: border-box;"></textarea>
+                </div>
+                <div class="actions">
+                    <button onclick="validateQuizYAML()" class="btn-view">✅ Validate YAML</button>
+                    <button onclick="saveQuizFile()">💾 Save</button>
+                    <button onclick="closeQuizEditor()" style="background: var(--muted-gray);">❌ Cancel</button>
+                </div>
+                <div id="quiz-editor-message-area"></div>
+            </div>
+        </div>
+    </div>
+
     <script>
         let currentMasterKey = '';
-        let allFiles = { logs: [], csv: [] };
+        let allFiles = { logs: [], csv: [], quizzes: [] };
         let currentTab = 'csv';
+        let currentEditingQuiz = '';
 
         function switchTab(tabName) {
             currentTab = tabName;
@@ -556,16 +590,19 @@
         function displayFiles() {
             displayFileSection('csv', allFiles.csv);
             displayFileSection('logs', allFiles.logs);
+            displayFileSection('quizzes', allFiles.quizzes);
         }
 
         function displayFileSection(type, files) {
             const container = document.getElementById(`${type}-files`);
 
             if (files.length === 0) {
+                const icons = {logs: '📋', csv: '📊', quizzes: '📝'};
+                const labels = {logs: 'log', csv: 'CSV', quizzes: 'quiz'};
                 container.innerHTML = `
                     <div class="empty-state">
-                        <div class="icon">${type === 'logs' ? '📋' : '📊'}</div>
-                        <div>No ${type === 'csv' ? 'CSV' : 'log'} files found</div>
+                        <div class="icon">${icons[type] || '📄'}</div>
+                        <div>No ${labels[type] || type} files found</div>
                     </div>
                 `;
                 return;
@@ -576,6 +613,13 @@
                 const size = formatFileSize(file.size);
                 const date = formatDate(file.modified);
 
+                // Quiz files get Edit button, others get View button
+                const actionButtons = type === 'quizzes'
+                    ? `<button class="btn-small btn-view" onclick="editQuizFile('${file.name}')">✏️ Edit</button>
+                       <button class="btn-small btn-download" onclick="downloadFile('${type}', '${file.name}')">💾 Download</button>`
+                    : `<button class="btn-small btn-view" onclick="viewFile('${type}', '${file.name}')">👁️ View</button>
+                       <button class="btn-small btn-download" onclick="downloadFile('${type}', '${file.name}')">💾 Download</button>`;
+
                 html += `
                     <div class="file-item" data-filename="${file.name.toLowerCase()}">
                         <div class="file-info">
@@ -583,8 +627,7 @@
                             <div class="file-meta">Size: ${size} | Modified: ${date}</div>
                         </div>
                         <div class="file-actions">
-                            <button class="btn-small btn-view" onclick="viewFile('${type}', '${file.name}')">👁️ View</button>
-                            <button class="btn-small btn-download" onclick="downloadFile('${type}', '${file.name}')">💾 Download</button>
+                            ${actionButtons}
                         </div>
                     </div>
                 `;
@@ -764,11 +807,127 @@
             initializePanelData();
         }
 
+        // Quiz Editor Functions
+        async function editQuizFile(filename) {
+            try {
+                currentEditingQuiz = filename;
+                document.getElementById('quiz-editor-title').textContent = `Edit Quiz: ${filename}`;
+                document.getElementById('quiz-editor-content').value = '';
+                document.getElementById('quiz-editor-message-area').innerHTML = '';
+                document.getElementById('quiz-editor-modal').style.display = 'block';
+
+                const response = await fetch(`/api/files/quizzes/view/${encodeURIComponent(filename)}`, {
+                    headers: {
+                        'X-Master-Key': currentMasterKey
+                    }
+                });
+
+                if (response.ok) {
+                    const content = await response.text();
+                    document.getElementById('quiz-editor-content').value = content;
+                } else {
+                    const data = await response.json();
+                    document.getElementById('quiz-editor-message-area').innerHTML = `<div class="message error">Error: ${data.error}</div>`;
+                }
+            } catch (error) {
+                document.getElementById('quiz-editor-message-area').innerHTML = `<div class="message error">Error loading file: ${error.message}</div>`;
+            }
+        }
+
+        async function validateQuizYAML() {
+            const content = document.getElementById('quiz-editor-content').value.trim();
+            const messageArea = document.getElementById('quiz-editor-message-area');
+
+            if (!content) {
+                messageArea.innerHTML = '<div class="message error">Content is empty</div>';
+                return;
+            }
+
+            try {
+                const response = await fetch('/api/admin/validate-quiz', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-Master-Key': currentMasterKey
+                    },
+                    body: JSON.stringify({ content })
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    if (data.valid) {
+                        messageArea.innerHTML = `<div class="message success">✅ Valid YAML! Found ${data.question_count} questions.</div>`;
+                    } else {
+                        let errorHTML = '<div class="message error">❌ Validation errors:<ul>';
+                        data.errors.forEach(err => {
+                            errorHTML += `<li>${err}</li>`;
+                        });
+                        errorHTML += '</ul></div>';
+                        messageArea.innerHTML = errorHTML;
+                    }
+                } else {
+                    messageArea.innerHTML = `<div class="message error">Error: ${data.error}</div>`;
+                }
+            } catch (error) {
+                messageArea.innerHTML = `<div class="message error">Error: ${error.message}</div>`;
+            }
+        }
+
+        async function saveQuizFile() {
+            const content = document.getElementById('quiz-editor-content').value;
+            const messageArea = document.getElementById('quiz-editor-message-area');
+
+            if (!content.trim()) {
+                messageArea.innerHTML = '<div class="message error">Content cannot be empty</div>';
+                return;
+            }
+
+            try {
+                const response = await fetch(`/api/files/quizzes/save/${encodeURIComponent(currentEditingQuiz)}`, {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-Master-Key': currentMasterKey
+                    },
+                    body: JSON.stringify({ content })
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    messageArea.innerHTML = `<div class="message success">${data.message}</div>`;
+                    showMessage(`Saved ${currentEditingQuiz}`, 'success');
+                    await loadFiles(); // Refresh file list
+                    setTimeout(() => {
+                        closeQuizEditor();
+                    }, 2000);
+                } else {
+                    let errorMessage = data.error || 'Failed to save quiz';
+                    if (data.errors && data.errors.length > 0) {
+                        errorMessage += ':<ul>' + data.errors.map(err => `<li>${err}</li>`).join('') + '</ul>';
+                    }
+                    messageArea.innerHTML = `<div class="message error">${errorMessage}</div>`;
+                }
+            } catch (error) {
+                messageArea.innerHTML = `<div class="message error">Error: ${error.message}</div>`;
+            }
+        }
+
+        function closeQuizEditor() {
+            document.getElementById('quiz-editor-modal').style.display = 'none';
+            currentEditingQuiz = '';
+        }
+
         // Close modal when clicking outside
         window.onclick = function(event) {
-            const modal = document.getElementById('file-viewer-modal');
-            if (event.target === modal) {
+            const fileModal = document.getElementById('file-viewer-modal');
+            const quizModal = document.getElementById('quiz-editor-modal');
+            if (event.target === fileModal) {
                 closeFileViewer();
+            }
+            if (event.target === quizModal) {
+                closeQuizEditor();
             }
         }
     </script>
