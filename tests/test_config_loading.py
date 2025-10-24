@@ -10,19 +10,21 @@ import tempfile
 import yaml
 from pathlib import Path
 
-from webquiz.server import (
+from webquiz.config import (
     load_config_from_yaml,
-    load_config_with_overrides,
-    get_default_config_path,
     resolve_path_relative_to_binary,
-    read_package_resource,
-    get_package_version,
-    ensure_directory_exists,
     WebQuizConfig,
     ServerConfig,
     PathsConfig,
     AdminConfig,
     RegistrationConfig,
+)
+from webquiz.server import (
+    load_config_with_overrides,
+    get_default_config_path,
+    read_package_resource,
+    get_package_version,
+    ensure_directory_exists,
 )
 
 

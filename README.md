@@ -4,7 +4,6 @@ A modern web-based quiz and testing system built with Python and aiohttp that al
 
 ## ✨ Features
 
-- **User Management**: Unique username registration with UUID-based session tracking
 - **Multi-Quiz System**: Questions loaded from `quizzes/` directory with multiple YAML files
 - **Admin Interface**: Web-based admin panel with master key authentication for quiz management
 - **Registration Approval**: Optional admin approval workflow for new registrations with real-time notifications
@@ -447,7 +446,6 @@ The binary includes all templates and configuration examples, with automatic dir
 - **Master key authentication**: Admin endpoints protected with decorator-based authentication
 - **Server-side timing**: All timing calculated server-side for accuracy
 - **Server-side question randomization**: Random question order generated server-side, stored per-user, ensures unique randomized order for each student with session persistence
-- **UUID-based sessions**: Secure user identification without passwords
 - **Middleware error handling**: Clean error management with proper HTTP status codes
 - **CSV module usage**: Proper escaping for data with commas/quotes
 - **Smart file naming**: CSV files prefixed with quiz names, unique suffixes prevent overwrites

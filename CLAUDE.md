@@ -22,6 +22,7 @@ WebQuiz - Python/aiohttp quiz system with multi-quiz management, real-time WebSo
 
 ## Key Files
 - `webquiz/server.py` - Main aiohttp server
+- `webquiz/config.py` - Configuration dataclasses and loading functions
 - `webquiz/cli.py` - CLI with daemon support
 - `webquiz/build.py` - PyInstaller build script
 - `webquiz/templates/` - index.html, admin.html, files.html, live_stats.html
@@ -77,6 +78,7 @@ webquiz-stress-test -c 50
 
 ## Technical Decisions
 - **Middleware-based error handling** for aiohttp
+- **Configuration module separation** - config.py contains dataclasses for configuration (using standard dataclasses module with field(default_factory=...))
 - **6 digits user ID** stored by user_id as key
 - **Server-side timing** for accuracy (starts on admin approval if required)
 - **Multi-file quiz system** in `quizzes/` dir, auto-created if missing

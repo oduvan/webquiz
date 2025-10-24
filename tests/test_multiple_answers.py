@@ -6,7 +6,8 @@ import pytest
 import json
 from unittest.mock import patch, MagicMock
 from datetime import datetime, timedelta
-from webquiz.server import TestingServer, WebQuizConfig
+from webquiz.server import TestingServer
+from webquiz.config import WebQuizConfig
 
 
 class TestMultipleAnswersValidation:
