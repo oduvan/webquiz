@@ -991,15 +991,21 @@
         let isEditMode = false;
         let editingQuizName = '';
         let questionCounter = 1;
+        let originalYamlContent = ''; // Store original YAML from server when editing
 
         // Quiz Editor Functions
         function createNewQuiz() {
             isEditMode = false;
             editingQuizName = '';
+            originalYamlContent = ''; // Clear original content for new quiz
             document.getElementById('modal-title').textContent = 'Створити Новий Quiz';
             document.getElementById('quiz-filename').value = '';
             document.getElementById('quiz-filename').disabled = false;
             resetQuizEditor();
+
+            // Disable text mode button for new quiz (no YAML to show)
+            document.getElementById('text-mode-btn').style.display = 'none';
+
             document.getElementById('quiz-editor-modal').style.display = 'block';
         }
 
@@ -1026,10 +1032,15 @@
 
                 if (response.ok) {
                     // Load quiz data into editor
+                    originalYamlContent = data.content; // Store original YAML from server
                     document.getElementById('quiz-content').value = data.content;
                     if (data.parsed) {
                         loadQuizDataToWizard(data.parsed);
                     }
+
+                    // Enable text mode button for editing (we have original YAML)
+                    document.getElementById('text-mode-btn').style.display = 'inline-block';
+
                     document.getElementById('quiz-editor-modal').style.display = 'block';
                 } else {
                     showMessage(data.error || 'Не вдалося завантажити quiz', 'error');
@@ -1135,6 +1146,12 @@
         }
 
         function switchEditorMode(mode) {
+            // Text mode only available when editing existing quiz
+            if (mode === 'text' && !isEditMode) {
+                showMessage('Текстовий режим доступний тільки при редагуванні існуючого quiz', 'warning');
+                return;
+            }
+
             editorMode = mode;
 
             // Update buttons
@@ -1156,6 +1173,7 @@
         function resetQuizEditor() {
             editorMode = 'wizard';
             questionCounter = 1;
+            originalYamlContent = ''; // Clear original content
 
             // Reset mode buttons
             document.getElementById('wizard-mode-btn').classList.add('active');
@@ -1525,20 +1543,9 @@
         }
 
         function syncWizardToText() {
-            const quizData = getWizardData();
-            if (quizData) {
-                const yamlContent = `questions:\n${quizData.questions.map(q => {
-                    let questionYaml = '-';
-                    if (q.question) {
-                        questionYaml += ` question: "${q.question}"`;
-                    }
-                    if (q.image) {
-                        questionYaml += `\n  image: "${q.image}"`;
-                    }
-                    questionYaml += `\n  options:\n${q.options.map(opt => `  - "${opt}"`).join('\n')}\n  correct_answer: ${q.correct_answer}`;
-                    return questionYaml;
-                }).join('\n')}`;
-                document.getElementById('quiz-content').value = yamlContent;
+            // Use the original YAML from server (only available when editing)
+            if (originalYamlContent) {
+                document.getElementById('quiz-content').value = originalYamlContent;
             }
         }
 

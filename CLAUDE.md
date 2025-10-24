@@ -97,6 +97,7 @@ webquiz-stress-test -c 50
 - **Live stats first question** uses user's actual first from `question_order` (prevents duplicates)
 - **Multi-platform binaries** via GitHub Actions (macOS-13 Intel, macOS-14 ARM64, Linux, Windows)
 - **Coverage excludes build tools**: build.py and binary_entry.py omitted from coverage (not runtime code)
+- **Raw YAML from server** - Quiz editor text mode uses original YAML from server directly (no JS generation); text mode disabled when creating new quiz
 
 ## Key Flows
 
