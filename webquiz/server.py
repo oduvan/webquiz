@@ -2062,73 +2062,90 @@ class TestingServer:
         if errors is None:
             errors = []
 
-        # Check server section
+        # Config can be None or empty dict - both are valid
+        if data is None:
+            return True
+
+        if not isinstance(data, dict):
+            errors.append("Config must be a dictionary")
+            return False
+
+        # Validate server section (optional)
         if "server" in data:
-            server_data = data["server"]
-            if not isinstance(server_data, dict):
-                errors.append("Server configuration must be an object")
+            server = data["server"]
+            if not isinstance(server, dict):
+                errors.append("'server' section must be a dictionary")
             else:
-                # Validate host and port
-                if "host" in server_data and not isinstance(server_data["host"], str):
-                    errors.append("Server host must be a string")
-                if "port" in server_data and not isinstance(server_data["port"], int):
-                    errors.append("Server port must be an integer")
+                if "host" in server and not isinstance(server["host"], str):
+                    errors.append("'server.host' must be a string")
+                if "port" in server:
+                    if not isinstance(server["port"], int):
+                        errors.append("'server.port' must be an integer")
+                    elif server["port"] < 1 or server["port"] > 65535:
+                        errors.append("'server.port' must be between 1 and 65535")
 
-        # Check paths section
+        # Validate paths section (optional)
         if "paths" in data:
-            paths_data = data["paths"]
-            if not isinstance(paths_data, dict):
-                errors.append("Paths configuration must be an object")
+            paths = data["paths"]
+            if not isinstance(paths, dict):
+                errors.append("'paths' section must be a dictionary")
             else:
-                # Validate each path
-                for path_key, path_value in paths_data.items():
-                    if not isinstance(path_value, str):
-                        errors.append(f"Path for {path_key} must be a string")
+                path_fields = ["quizzes_dir", "logs_dir", "csv_dir", "static_dir"]
+                for field in path_fields:
+                    if field in paths and not isinstance(paths[field], str):
+                        errors.append(f"'paths.{field}' must be a string")
 
-        # Check admin section
+        # Validate admin section (optional)
         if "admin" in data:
-            admin_data = data["admin"]
-            if not isinstance(admin_data, dict):
-                errors.append("Admin configuration must be an object")
+            admin = data["admin"]
+            if not isinstance(admin, dict):
+                errors.append("'admin' section must be a dictionary")
             else:
-                # Validate master_key and trusted_ips
-                if "master_key" in admin_data and not isinstance(admin_data["master_key"], str):
-                    errors.append("Admin master_key must be a string")
-                if "trusted_ips" in admin_data and not isinstance(admin_data["trusted_ips"], list):
-                    errors.append("Admin trusted_ips must be a list")
+                if "master_key" in admin:
+                    if admin["master_key"] is not None and not isinstance(admin["master_key"], str):
+                        errors.append("'admin.master_key' must be a string or null")
+                if "trusted_ips" in admin:
+                    if not isinstance(admin["trusted_ips"], list):
+                        errors.append("'admin.trusted_ips' must be a list")
+                    elif not all(isinstance(ip, str) for ip in admin["trusted_ips"]):
+                        errors.append("'admin.trusted_ips' must contain only strings")
 
-        # Check registration section
+        # Validate registration section (optional)
         if "registration" in data:
-            registration_data = data["registration"]
-            if not isinstance(registration_data, dict):
-                errors.append("Registration configuration must be an object")
+            registration = data["registration"]
+            if not isinstance(registration, dict):
+                errors.append("'registration' section must be a dictionary")
             else:
-                # Validate fields, approve, and username_label
-                if "fields" in registration_data and not isinstance(registration_data["fields"], list):
-                    errors.append("Registration fields must be a list")
-                if "approve" in registration_data and not isinstance(registration_data["approve"], bool):
-                    errors.append("Registration approve must be a boolean")
-                if "username_label" in registration_data and not isinstance(registration_data["username_label"], str):
-                    errors.append("Registration username_label must be a string")
+                if "fields" in registration:
+                    if not isinstance(registration["fields"], list):
+                        errors.append("'registration.fields' must be a list")
+                    elif not all(isinstance(field, str) for field in registration["fields"]):
+                        errors.append("'registration.fields' must contain only strings")
+                if "approve" in registration:
+                    if not isinstance(registration["approve"], bool):
+                        errors.append("'registration.approve' must be a boolean")
+                if "username_label" in registration:
+                    if not isinstance(registration["username_label"], str):
+                        errors.append("'registration.username_label' must be a string")
 
-        # Check quizzes section
+        # Validate quizzes section (optional)
         if "quizzes" in data:
-            quizzes_data = data["quizzes"]
-            if not isinstance(quizzes_data, dict):
-                errors.append("Quizzes configuration must be an object")
+            quizzes = data["quizzes"]
+            if not isinstance(quizzes, list):
+                errors.append("'quizzes' section must be a list")
             else:
-                # Validate each quiz entry
-                for quiz_key, quiz_value in quizzes_data.items():
-                    if not isinstance(quiz_value, dict):
-                        errors.append(f"Quiz configuration for {quiz_key} must be an object")
-                    else:
-                        # Validate name, download_path, and folder
-                        if "name" in quiz_value and not isinstance(quiz_value["name"], str):
-                            errors.append(f"Quiz name must be a string in {quiz_key}")
-                        if "download_path" in quiz_value and not isinstance(quiz_value["download_path"], str):
-                            errors.append(f"Quiz download_path must be a string in {quiz_key}")
-                        if "folder" in quiz_value and not isinstance(quiz_value["folder"], str):
-                            errors.append(f"Quiz folder must be a string in {quiz_key}")
+                for i, quiz in enumerate(quizzes):
+                    if not isinstance(quiz, dict):
+                        errors.append(f"Quiz {i+1} must be a dictionary")
+                        continue
+
+                    # Check required fields for each quiz
+                    required_quiz_fields = ["name", "download_path", "folder"]
+                    for field in required_quiz_fields:
+                        if field not in quiz:
+                            errors.append(f"Quiz {i+1} missing required field: '{field}'")
+                        elif not isinstance(quiz[field], str):
+                            errors.append(f"Quiz {i+1} field '{field}' must be a string")
 
         return len(errors) == 0
 
@@ -2240,28 +2257,45 @@ class TestingServer:
         Returns:
             JSON response with success status (requires server restart)
         """
-        data = await request.json()
-        content = data.get("content", "").strip()
-
-        if not content:
-            return web.json_response({"error": "Config content is required"}, status=400)
-
-        # Validate YAML syntax and structure
-        errors = []
-        if not self._validate_config_data(yaml.safe_load(content), errors):
-            return web.json_response({"valid": False, "errors": errors})
-
-        # Write to config file (overwrites existing file)
         try:
+            data = await request.json()
+            content = data.get("content", "").strip()
+
+            # Get config file path (use the actual path that was loaded)
             config_path = self.config.config_path
             if not config_path:
-                return web.json_response({"error": "Config path not set"}, status=500)
+                return web.json_response(
+                    {"error": "No config file was specified. Server started without --config parameter."}, status=400
+                )
 
-            async with aiofiles.open(config_path, "w", encoding="utf-8") as f:
-                await f.write(content)
+            # Validate YAML syntax
+            try:
+                parsed_config = yaml.safe_load(content) if content else {}
+            except yaml.YAMLError as e:
+                return web.json_response({"error": f"Invalid YAML syntax: {str(e)}"}, status=400)
 
-            logger.info(f"Updated config file: {config_path}")
-            return web.json_response({"success": True, "message": "Config updated successfully"})
+            # Validate config structure
+            errors = []
+            if not self._validate_config_data(parsed_config, errors):
+                return web.json_response({"error": "Configuration validation failed", "errors": errors}, status=400)
+
+            # Write to config file
+            try:
+                async with aiofiles.open(config_path, "w", encoding="utf-8") as f:
+                    await f.write(content if content else "")
+
+                logger.info(f"Configuration file updated: {config_path}")
+                return web.json_response(
+                    {
+                        "success": True,
+                        "message": "Configuration saved successfully. Restart server to apply changes.",
+                        "config_path": config_path,
+                    }
+                )
+            except Exception as e:
+                logger.error(f"Error writing config file: {e}")
+                return web.json_response({"error": f"Failed to write config file: {str(e)}"}, status=500)
+
         except Exception as e:
             logger.error(f"Error updating config: {e}")
             return web.json_response({"error": str(e)}, status=500)
