@@ -311,6 +311,37 @@
             border: 2px solid #007bff;
             transition: background-color 0.3s ease;
         }
+
+        /* Question transition animations */
+        @keyframes fadeOut {
+            from {
+                opacity: 1;
+                transform: translateY(0);
+            }
+            to {
+                opacity: 0;
+                transform: translateY(-10px);
+            }
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .question-fade-out {
+            animation: fadeOut 0.9s ease-out forwards;
+        }
+
+        .question-fade-in {
+            animation: fadeIn 1s ease-out forwards;
+        }
         #loading {
             text-align: center;
             padding: 40px;
@@ -934,10 +965,10 @@
             selectedAnswer = null;
             testResults = [];
             document.getElementById('test-section').classList.remove('hidden');
-            await showCurrentQuestion();
+            await showCurrentQuestion(false); // Don't animate first question
         }
 
-        async function showCurrentQuestion() {
+        async function showCurrentQuestion(withAnimation = true) {
             if (currentQuestionIndex >= questions.length) {
                 // Test completed - fetch final results from server to ensure consistency
                 await fetchAndShowFinalResults();
@@ -983,6 +1014,14 @@
                     </div>
                 </div>
             `;
+
+            // Add fade-in animation to newly displayed question (only for manual transitions)
+            if (withAnimation) {
+                const newQuestion = container.querySelector('.current-question');
+                if (newQuestion) {
+                    newQuestion.classList.add('question-fade-in');
+                }
+            }
 
             // Reset button states
             const submitBtn = document.getElementById('submit-answer-btn');
@@ -1131,7 +1170,8 @@
                 submitBtn.classList.add('hidden');
 
                 // Auto-advance to next question immediately (no manual button click needed)
-                continueToNextQuestion();
+                // Skip animation for fast auto-advance
+                continueToNextQuestion(false);
                 return;
             }
 
@@ -1190,14 +1230,26 @@
             continueBtn.classList.remove('hidden');
         }
 
-        async function continueToNextQuestion() {
+        async function continueToNextQuestion(withAnimation = true) {
+            // Only apply fade-out animation for manual transitions (not auto-advance)
+            if (withAnimation) {
+                const container = document.getElementById('current-question-container');
+                const currentQuestion = container.querySelector('.current-question');
+
+                if (currentQuestion) {
+                    currentQuestion.classList.add('question-fade-out');
+                    // Wait for fade-out animation to complete (900ms)
+                    await new Promise(resolve => setTimeout(resolve, 900));
+                }
+            }
+
             // Move to next question
             currentQuestionIndex++;
 
             // Check if we've reached the end before notifying server
             if (currentQuestionIndex >= questions.length) {
                 // Test completed - go directly to results
-                await showCurrentQuestion();
+                await showCurrentQuestion(false); // No animation for results screen
                 return;
             }
 
@@ -1205,7 +1257,13 @@
             // This should ONLY happen when user clicks "Продовжити" to open next question
             notifyQuestionStart(questions[currentQuestionIndex].id);
 
-            await showCurrentQuestion();
+            await showCurrentQuestion(withAnimation); // Pass animation parameter through
+
+            // If animation was applied, wait for it to complete before allowing further interaction
+            // This ensures Selenium tests can reliably detect the new question after animation
+            if (withAnimation) {
+                await new Promise(resolve => setTimeout(resolve, 1050)); // Wait for fade-in to complete (300ms + buffer)
+            }
         }
 
         async function fetchAndShowFinalResults() {
