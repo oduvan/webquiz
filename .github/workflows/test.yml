@@ -54,12 +54,3 @@ jobs:
       env:
         SKIP_SELENIUM: "true"
         PYTEST_XDIST_WORKER: gw${{ strategy.job-index }}
-
-    - name: Upload coverage to Codecov
-      if: matrix.python-version == '3.9'
-      uses: codecov/codecov-action@v3
-      with:
-        file: ./coverage.xml
-        flags: unittests
-        name: codecov-umbrella
-        fail_ci_if_error: false
