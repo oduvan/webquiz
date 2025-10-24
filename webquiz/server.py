@@ -2625,3 +2625,86 @@ class TestingServer:
         return await self._handle_websocket_connection(
             request, self.admin_websocket_clients, initial_data, "admin WebSocket"
         )
+
+
+async def create_app(config: WebQuizConfig):
+    """Create and configure the application"""
+
+    server = TestingServer(config)
+
+    # Initialize log file first (this will set server.log_file)
+    await server.initialize_log_file()
+
+    # Configure logging with the actual log file path
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+        handlers=[logging.FileHandler(server.log_file), logging.StreamHandler()],  # Also log to console
+        force=True,  # Override any existing configuration
+    )
+
+    # Load questions and create HTML with embedded data (CSV will be initialized in switch_quiz)
+    await server.load_questions()
+
+    # Start periodic flush task
+    asyncio.create_task(server.periodic_flush())
+
+    # Create app with middleware
+    app = web.Application(middlewares=[error_middleware])
+
+    # Routes
+    app.router.add_post("/api/register", server.register_user)
+    app.router.add_put("/api/update-registration", server.update_registration)
+    app.router.add_post("/api/submit-answer", server.submit_answer)
+    app.router.add_post("/api/question-start", server.question_start)
+    app.router.add_get("/api/verify-user/{user_id}", server.verify_user_id)
+
+    # Test endpoint for manual CSV flush (only for testing)
+    async def manual_flush(request):
+        await server.flush_responses_to_csv()
+        await server.flush_users_to_csv()
+        return web.json_response({"status": "flushed"})
+
+    app.router.add_post("/api/test/flush", manual_flush)
+
+    # Admin routes
+    app.router.add_get("/admin/", server.serve_admin_page)
+    app.router.add_post("/api/admin/auth", server.admin_auth_test)
+    app.router.add_put("/api/admin/approve-user", server.admin_approve_user)
+    app.router.add_get("/api/admin/list-quizzes", server.admin_list_quizzes)
+    app.router.add_post("/api/admin/switch-quiz", server.admin_switch_quiz)
+    app.router.add_get("/api/admin/quiz/{filename}", server.admin_get_quiz)
+    app.router.add_post("/api/admin/create-quiz", server.admin_create_quiz)
+    app.router.add_put("/api/admin/quiz/{filename}", server.admin_update_quiz)
+    app.router.add_delete("/api/admin/quiz/{filename}", server.admin_delete_quiz)
+    app.router.add_post("/api/admin/validate-quiz", server.admin_validate_quiz)
+    app.router.add_get("/api/admin/list-images", server.admin_list_images)
+    app.router.add_post("/api/admin/download-quiz", server.admin_download_quiz)
+    app.router.add_put("/api/admin/config", server.admin_update_config)
+    app.router.add_get("/ws/admin", server.websocket_admin)
+
+    # File management routes (admin access)
+    app.router.add_get("/files/", server.serve_files_page)
+    app.router.add_get("/api/files/list", server.files_list)
+    app.router.add_get("/api/files/{type}/view/{filename}", server.files_view)
+    app.router.add_get("/api/files/{type}/download/{filename}", server.files_download)
+
+    # Live stats routes (public access)
+    app.router.add_get("/live-stats/", server.serve_live_stats_page)
+    app.router.add_get("/ws/live-stats", server.websocket_live_stats)
+
+    # Serve index.html at root path
+    app.router.add_get("/", server.serve_index_page)
+
+    # Ensure imgs directory exists before serving static files
+    ensure_directory_exists(os.path.join(config.paths.quizzes_dir, "imgs"))
+    app.router.add_static(
+        "/imgs/",
+        path=os.path.join(config.paths.quizzes_dir, "imgs"),
+        show_index=True,
+        name="imgs",
+    )
+    # Serve static files from configured static directory
+    app.router.add_static("/", path=config.paths.static_dir, name="static")
+
+    return app
