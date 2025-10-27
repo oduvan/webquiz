@@ -22,6 +22,7 @@ from selenium_helpers import (
     browser,
     wait_for_element,
     wait_for_clickable,
+    wait_for_question_transition,
     register_user,
     find_options,
     is_multiple_choice_question,
@@ -379,7 +380,7 @@ def test_multiple_submissions_different_questions(browser):
         wait_for_clickable(browser, By.ID, "continue-btn").click()
 
         # Question 2: Multiple choice (checkboxes)
-        wait_for_element(browser, By.CSS_SELECTOR, ".question-text")
+        wait_for_question_transition(browser)
         options = find_options(browser)
         assert len(options) == 4, "Should have checkboxes for multiple choice"
         options[0].click()
@@ -388,7 +389,7 @@ def test_multiple_submissions_different_questions(browser):
         wait_for_clickable(browser, By.ID, "continue-btn").click()
 
         # Question 3: Single answer (radio buttons)
-        wait_for_element(browser, By.CSS_SELECTOR, ".question-text")
+        wait_for_question_transition(browser)
         options = find_options(browser)
         assert len(options) == 3, "Should have radio buttons again"
         options[1].click()
@@ -726,7 +727,7 @@ def test_complete_all_multiple_choice_quiz(browser):
         wait_for_clickable(browser, By.ID, "continue-btn").click()
 
         # Q2: Answer correctly
-        wait_for_element(browser, By.CSS_SELECTOR, ".question-text")
+        wait_for_question_transition(browser)
         options = find_options(browser)
         options[0].click()
         options[2].click()
@@ -735,7 +736,7 @@ def test_complete_all_multiple_choice_quiz(browser):
         wait_for_clickable(browser, By.ID, "continue-btn").click()
 
         # Q3: Answer correctly
-        wait_for_element(browser, By.CSS_SELECTOR, ".question-text")
+        wait_for_question_transition(browser)
         options = find_options(browser)
         options[0].click()
         options[2].click()
@@ -771,7 +772,7 @@ def test_mixed_single_and_multiple_choice_quiz(browser):
         wait_for_clickable(browser, By.ID, "continue-btn").click()
 
         # Q2: Checkboxes
-        wait_for_element(browser, By.CSS_SELECTOR, ".question-text")
+        wait_for_question_transition(browser)
         options = find_options(browser)
         assert len(options) > 0, "Should have checkboxes"
         options[0].click()
@@ -807,7 +808,7 @@ def test_perfect_score_multiple_choice(browser):
         wait_for_clickable(browser, By.ID, "continue-btn").click()
 
         # Q2: Correct
-        wait_for_element(browser, By.CSS_SELECTOR, ".question-text")
+        wait_for_question_transition(browser)
         options = find_options(browser)
         options[1].click()
         options[2].click()
@@ -843,7 +844,7 @@ def test_zero_score_multiple_choice(browser):
         wait_for_clickable(browser, By.ID, "continue-btn").click()
 
         # Q2: Select wrong answer
-        wait_for_element(browser, By.CSS_SELECTOR, ".question-text")
+        wait_for_question_transition(browser)
         options = find_options(browser)
         options[0].click()  # Wrong
         browser.find_element(By.ID, "submit-answer-btn").click()
@@ -879,14 +880,14 @@ def test_partial_score_mixed_quiz(browser):
         wait_for_clickable(browser, By.ID, "continue-btn").click()
 
         # Q2: Wrong (select wrong ones)
-        wait_for_element(browser, By.CSS_SELECTOR, ".question-text")
+        wait_for_question_transition(browser)
         options = find_options(browser)
         options[2].click()  # Wrong
         browser.find_element(By.ID, "submit-answer-btn").click()
         wait_for_clickable(browser, By.ID, "continue-btn").click()
 
         # Q3: Correct
-        wait_for_element(browser, By.CSS_SELECTOR, ".question-text")
+        wait_for_question_transition(browser)
         options = find_options(browser)
         options[1].click()
         options[2].click()
@@ -1001,7 +1002,7 @@ def test_results_checkmark_and_x_for_multiple_choice(browser):
         wait_for_clickable(browser, By.ID, "continue-btn").click()
 
         # Q2: Wrong
-        wait_for_element(browser, By.CSS_SELECTOR, ".question-text")
+        wait_for_question_transition(browser)
         options = find_options(browser)
         options[2].click()
         browser.find_element(By.ID, "submit-answer-btn").click()
@@ -1039,7 +1040,7 @@ def test_results_table_displays_all_questions(browser):
         wait_for_clickable(browser, By.ID, "continue-btn").click()
 
         # Q2: Multiple
-        wait_for_element(browser, By.CSS_SELECTOR, ".question-text")
+        wait_for_question_transition(browser)
         options = find_options(browser)
         options[0].click()
         options[1].click()
@@ -1089,7 +1090,7 @@ def test_progress_bar_advances_after_multiple_choice(browser):
         wait_for_clickable(browser, By.ID, "continue-btn").click()
 
         # Progress should have increased
-        wait_for_element(browser, By.CSS_SELECTOR, ".question-text")
+        wait_for_question_transition(browser)
         progress_fill = browser.find_element(By.ID, "progress-fill")
         new_width = progress_fill.get_attribute("style")
 
@@ -1125,7 +1126,7 @@ def test_question_counter_multiple_choice(browser):
         wait_for_clickable(browser, By.ID, "continue-btn").click()
 
         # Check Q2 counter
-        wait_for_element(browser, By.CSS_SELECTOR, ".question-text")
+        wait_for_question_transition(browser)
         progress_text = browser.find_element(By.ID, "progress-text")
         assert "2" in progress_text.text and "3" in progress_text.text
 

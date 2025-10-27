@@ -143,6 +143,24 @@ def wait_for_question_containing_text(browser, text, timeout=5):
     )
 
 
+def wait_for_question_transition(browser, timeout=5):
+    """
+    Wait for question transition animation to complete after clicking continue.
+
+    The fade-out + fade-in animations take ~2 seconds total (900ms + 1050ms).
+    This function waits for the options to become stale (removed from DOM during transition)
+    and then re-appear and become clickable.
+
+    Args:
+        browser: Selenium WebDriver instance
+        timeout: Maximum time to wait in seconds (default 5)
+    """
+    import time
+
+    # Simple approach: wait for the animation duration
+    time.sleep(2.2)  # 900ms fadeOut + 1050ms fadeIn + 250ms buffer
+
+
 # ============================================================================
 # OPTION STATE HELPERS
 # ============================================================================

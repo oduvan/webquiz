@@ -126,7 +126,10 @@ def test_complete_quiz_journey(temp_dir, browser):
         continue_button.click()
 
         # Answer second question
-        wait_for_question_text(browser)
+        # Wait for the text to actually change (animation takes ~2 seconds)
+        WebDriverWait(browser, 5).until(
+            EC.text_to_be_present_in_element((By.CSS_SELECTOR, ".question-text"), "capital")
+        )
 
         paris_option = find_option_by_text(browser, "Paris")
         paris_option.click()
@@ -238,6 +241,8 @@ def test_progress_bar_functionality(temp_dir, browser):
         wait_for_clickable(browser, By.ID, "continue-btn").click()
 
         # Check progress after first question
+        # Wait for progress to update (animation takes ~2 seconds)
+        WebDriverWait(browser, 5).until(EC.text_to_be_present_in_element((By.ID, "progress-text"), "Питання 2 з 3"))
         progress_text = browser.find_element(By.ID, "progress-text")
         assert "Питання 2 з 3" in progress_text.text
 
@@ -253,6 +258,8 @@ def test_progress_bar_functionality(temp_dir, browser):
         wait_for_clickable(browser, By.ID, "continue-btn").click()
 
         # Check final progress
+        # Wait for progress to update (animation takes ~2 seconds)
+        WebDriverWait(browser, 5).until(EC.text_to_be_present_in_element((By.ID, "progress-text"), "Питання 3 з 3"))
         progress_text = browser.find_element(By.ID, "progress-text")
         assert "Питання 3 з 3" in progress_text.text
 

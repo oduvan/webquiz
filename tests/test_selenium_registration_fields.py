@@ -208,7 +208,8 @@ def test_quiz_flow_with_registration_fields(temp_dir, browser):
         continue_btn.click()
 
         # Answer second question
-        time.sleep(0.5)
+        # Wait for the text to actually change (animation takes ~2 seconds)
+        WebDriverWait(browser, 5).until(EC.text_to_be_present_in_element((By.CSS_SELECTOR, ".question-text"), "2+2"))
         option = browser.find_element(By.ID, "option_1")
         option.click()
 
