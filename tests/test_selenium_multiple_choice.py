@@ -1156,7 +1156,8 @@ def test_continue_button_works_multiple_choice(browser):
         continue_btn.click()
 
         # Should be on Q2
-        wait_for_element(browser, By.CSS_SELECTOR, ".question-text")
+        # Wait for the text to actually change (animation takes ~2 seconds)
+        WebDriverWait(browser, 5).until(EC.text_to_be_present_in_element((By.CSS_SELECTOR, ".question-text"), "Second"))
         question_text = browser.find_element(By.CSS_SELECTOR, ".question-text").text
         assert "Second" in question_text
 

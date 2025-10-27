@@ -131,7 +131,10 @@ def test_manual_continue_with_show_right_answer_true(temp_dir, browser):
         continue_button.click()
 
         # Now should advance to question 2
-        wait_for_element(browser, By.CSS_SELECTOR, ".question-text", timeout=3)
+        # Wait for the text to actually change (animation takes ~2 seconds)
+        WebDriverWait(browser, 5).until(
+            EC.text_to_be_present_in_element((By.CSS_SELECTOR, ".question-text"), "Question 2?")
+        )
         question_text = browser.find_element(By.CSS_SELECTOR, ".question-text")
         assert "Question 2?" in question_text.text
 

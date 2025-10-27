@@ -320,9 +320,9 @@ def test_session_persistence_on_reload(temp_dir, browser):
         wait_for_clickable(browser, By.ID, "continue-btn").click()
 
         # Verify we're on second question
-        wait_for_element(browser, By.CSS_SELECTOR, ".question-text")
-        question_text = browser.find_element(By.CSS_SELECTOR, ".question-text")
-        assert "Second question?" in question_text.text
+        WebDriverWait(browser, 5).until(
+            EC.text_to_be_present_in_element((By.CSS_SELECTOR, ".question-text"), "Second question?")
+        )
 
         # Reload page
         browser.refresh()
@@ -385,9 +385,9 @@ def test_different_question_types(temp_dir, browser):
         wait_for_clickable(browser, By.ID, "continue-btn").click()
 
         # Question 2: Text with image
-        wait_for_element(browser, By.CSS_SELECTOR, ".question-text")
-        question_text = browser.find_element(By.CSS_SELECTOR, ".question-text")
-        assert "Question with image?" in question_text.text
+        WebDriverWait(browser, 5).until(
+            EC.text_to_be_present_in_element((By.CSS_SELECTOR, ".question-text"), "Question with image?")
+        )
         # Should have both text and image
         assert "Question with image?" in browser.page_source
         try:
@@ -403,6 +403,10 @@ def test_different_question_types(temp_dir, browser):
         wait_for_clickable(browser, By.ID, "continue-btn").click()
 
         # Question 3: Image only (no text)
+        # Wait for the new options to appear (animation takes up to 2 seconds)
+        WebDriverWait(browser, 5).until(
+            lambda d: any("Image only" in opt.text for opt in d.find_elements(By.CSS_SELECTOR, ".quiz-option"))
+        )
         # Should not have question text, only image and options
         current_html = browser.page_source
         assert "Image only A" in current_html  # Options should be there
@@ -495,9 +499,9 @@ def test_results_display_accuracy(temp_dir, browser):
         wait_for_clickable(browser, By.ID, "continue-btn").click()
 
         # Answer second question incorrectly
-        wait_for_element(browser, By.CSS_SELECTOR, ".question-text")
-        question_text = browser.find_element(By.CSS_SELECTOR, ".question-text")
-        assert "Incorrect answer question?" in question_text.text
+        WebDriverWait(browser, 5).until(
+            EC.text_to_be_present_in_element((By.CSS_SELECTOR, ".question-text"), "Incorrect answer question?")
+        )
         find_option_by_text(browser, "Wrong").click()
         browser.find_element(By.ID, "submit-answer-btn").click()
         wait_for_clickable(browser, By.ID, "continue-btn").click()

@@ -126,6 +126,23 @@ def wait_for_question_text(browser, timeout=10):
     return wait_for_element(browser, By.CSS_SELECTOR, ".question-text", timeout)
 
 
+def wait_for_question_containing_text(browser, text, timeout=5):
+    """
+    Wait for question text to contain specific text.
+
+    This is useful after clicking continue button, as animations take ~2 seconds
+    to complete before the new question text appears.
+
+    Args:
+        browser: Selenium WebDriver instance
+        text: Text to wait for in the question
+        timeout: Maximum time to wait in seconds (default 5)
+    """
+    return WebDriverWait(browser, timeout).until(
+        EC.text_to_be_present_in_element((By.CSS_SELECTOR, ".question-text"), text)
+    )
+
+
 # ============================================================================
 # OPTION STATE HELPERS
 # ============================================================================
