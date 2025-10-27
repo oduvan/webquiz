@@ -1169,9 +1169,11 @@
                 const submitBtn = document.getElementById('submit-answer-btn');
                 submitBtn.classList.add('hidden');
 
-                // Auto-advance to next question immediately (no manual button click needed)
-                // Skip animation for fast auto-advance
-                continueToNextQuestion(false);
+                // Auto-advance to next question with animation after a brief pause
+                // Brief delay allows user to see their selection before transition
+                setTimeout(() => {
+                    continueToNextQuestion(true);
+                }, 200);
                 return;
             }
 
