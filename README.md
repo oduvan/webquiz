@@ -8,6 +8,7 @@ A modern web-based quiz and testing system built with Python and aiohttp that al
 - **Admin Interface**: Web-based admin panel with master key authentication for quiz management
 - **Registration Approval**: Optional admin approval workflow for new registrations with real-time notifications
 - **Question Randomization**: Configurable per-student question order randomization for fair testing
+- **Dynamic Answer Visibility**: Optional delayed answer reveal - show correct answers only after all students complete
 - **Dynamic Quiz Switching**: Real-time quiz switching with automatic server state reset
 - **Config File Editor**: Web-based configuration editor with real-time validation
 - **Live Statistics**: Real-time WebSocket-powered dashboard showing user progress
@@ -17,7 +18,7 @@ A modern web-based quiz and testing system built with Python and aiohttp that al
 - **Data Export**: Automatic CSV export with quiz-prefixed filenames and unique suffixes
 - **Responsive UI**: Clean web interface with dark/light theme support
 - **Binary Distribution**: Standalone PyInstaller executable with auto-configuration
-- **Comprehensive Testing**: 210+ tests covering all functionality with CI/CD pipeline
+- **Comprehensive Testing**: 222+ tests covering all functionality with CI/CD pipeline
 - **Flexible File Paths**: Configurable paths for quizzes, logs, CSV, and static files
 
 ## 🚀 Quick Start
@@ -247,19 +248,22 @@ pytest tests/test_registration_approval.py
 
 ### Test Coverage
 
-The project has **210+ tests** across **14 test files** covering:
+The project has **222+ tests** across **15 test files** covering:
 
 - **CLI and Directory Creation** (7 tests): Directory and file creation
 - **Admin API** (14 tests): Admin interface and authentication
 - **Admin Quiz Management** (18 tests): Quiz switching and management
+- **Admin Quiz Editor** (7 tests): Wizard mode quiz creation with randomize_questions and show_answers_on_completion
 - **Config Management** (16 tests): Config editor and validation
 - **Registration Approval** (20 tests): Approval workflow and timing
 - **Files Management** (32 tests): File manager interface
 - **Index Generation** (13 tests): Template generation tests
 - **Registration Fields** (12 tests): Custom registration fields
 - **Show Right Answer** (5 tests): Answer display functionality
+- **Show Answers on Completion** (10 tests): Dynamic answer visibility after all students complete
 - **Integration Tests** (6 tests): Multiple choice, multiple answers
 - **Selenium Tests** (56 tests): End-to-end browser testing
+- **Auto-Advance** (6 tests): Automatic progression behavior
 
 The test suite uses GitHub Actions CI/CD for automated testing on every commit.
 
@@ -355,10 +359,26 @@ registration:
       required: true
 
 quiz:
-  show_right_answer: false  # Show correct answer after submission
+  show_right_answer: false          # Show correct answer after submission
+  show_answers_on_completion: true  # Reveal answers only after all students complete
 ```
 
 All configuration sections are optional and have sensible defaults.
+
+### Answer Visibility Options
+
+WebQuiz offers flexible control over when students can see correct answers:
+
+- **`show_right_answer: true`** (default): Students see correct answers immediately after submitting each question
+- **`show_right_answer: false`**: Correct answers are completely hidden during the quiz and on the final results page
+- **`show_answers_on_completion: true`**: Works with `show_right_answer: false` to reveal answers dynamically:
+  - Answers remain hidden until ALL students complete the quiz
+  - Students see a waiting message with a reload button
+  - Once all students finish, correct answers become visible
+  - If new students register, answers are hidden again until everyone completes
+  - In approval mode, only approved students count toward completion
+
+**Example Use Case**: Useful for collaborative learning environments where you want students to discuss answers together after everyone has completed the quiz independently.
 
 ## 📊 Data Export
 

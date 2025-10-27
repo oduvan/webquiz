@@ -573,13 +573,17 @@ class TestingServer:
                 # Store randomize_questions setting (default: False)
                 self.randomize_questions = data.get("randomize_questions", False)
 
+                # Store show_answers_on_completion setting (default: False)
+                self.show_answers_on_completion = data.get("show_answers_on_completion", False)
+
                 # Add automatic IDs based on array index (for quiz execution only)
                 for i, question in enumerate(self.questions):
                     question["id"] = i + 1
 
                 logger.info(
                     f"Loaded {len(self.questions)} questions from {quiz_file_path}, "
-                    f"show_right_answer: {self.show_right_answer}, randomize_questions: {self.randomize_questions}"
+                    f"show_right_answer: {self.show_right_answer}, randomize_questions: {self.randomize_questions}, "
+                    f"show_answers_on_completion: {self.show_answers_on_completion}"
                 )
         except Exception as e:
             logger.error(f"Error loading questions from {quiz_file_path}: {e}")
@@ -1439,24 +1443,69 @@ class TestingServer:
             f"Stored final stats for user {user_id}: {correct_count}/{total_count} ({percentage}%) using user_answers"
         )
 
+    def all_students_completed(self):
+        """Check if all students have completed the quiz.
+
+        Counts only approved students when approval is required.
+        Dynamically evaluates based on current state.
+
+        Returns:
+            bool: True if all students have completed, False otherwise
+        """
+        # Get count of approved students (or all students if approval not required)
+        requires_approval = hasattr(self.config, "registration") and self.config.registration.approve
+
+        if requires_approval:
+            # Count only approved students
+            approved_count = sum(1 for user_data in self.users.values() if user_data.get("approved", False))
+            total_students = approved_count
+        else:
+            # Count all registered students
+            total_students = len(self.users)
+
+        # Count completed students
+        completed_count = len(self.user_stats)
+
+        # Return True if all students have completed
+        # Handle edge case: if no students registered, return False
+        if total_students == 0:
+            return False
+
+        return completed_count >= total_students
+
     def get_user_final_results(self, user_id):
         """Get final results for a completed user from persistent user_stats.
 
-        Filters out correct answer information if show_right_answer is disabled.
+        Filters out correct answer information based on configuration:
+        - If show_right_answer is True: always show correct answers
+        - If show_answers_on_completion is True and all students completed: show correct answers
+        - Otherwise: hide correct answers
 
         Args:
             user_id: User identifier
 
         Returns:
-            Dictionary with test_results, correct_count, total_count, percentage, total_time
+            Dictionary with test_results, correct_count, total_count, percentage, total_time,
+            all_completed, and show_answers_on_completion flags
         """
         if user_id in self.user_stats:
             # Return stored stats (without the completed_at timestamp for the frontend)
             stats = self.user_stats[user_id].copy()
             stats.pop("completed_at", None)  # Remove timestamp from response
 
-            # If show_right_answer is disabled, remove correct answer information from test results
-            if not self.show_right_answer:
+            # Check if all students have completed
+            all_completed = self.all_students_completed()
+
+            # Add flags for frontend
+            stats["all_completed"] = all_completed
+            stats["show_answers_on_completion"] = self.show_answers_on_completion
+
+            # Determine if correct answers should be shown
+            # Priority: show_right_answer > show_answers_on_completion
+            should_show_answers = self.show_right_answer or (self.show_answers_on_completion and all_completed)
+
+            # If answers should not be shown, remove correct answer information from test results
+            if not should_show_answers:
                 # Create a copy of test_results without correct_answer and is_correct fields
                 modified_results = []
                 for result in stats.get("test_results", []):
@@ -1469,7 +1518,15 @@ class TestingServer:
             return stats
 
         # Fallback - should not happen if calculate_and_store_user_stats was called
-        return {"test_results": [], "correct_count": 0, "total_count": 0, "percentage": 0, "total_time": 0}
+        return {
+            "test_results": [],
+            "correct_count": 0,
+            "total_count": 0,
+            "percentage": 0,
+            "total_time": 0,
+            "all_completed": False,
+            "show_answers_on_completion": False,
+        }
 
     async def verify_user_id(self, request):
         """Verify if user_id exists and return user data.

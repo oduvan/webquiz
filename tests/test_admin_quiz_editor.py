@@ -211,3 +211,86 @@ def test_disable_randomize_questions_via_edit(temp_dir):
         data = response.json()
         assert data["parsed"]["randomize_questions"] is False
         assert data["parsed"]["title"] == "No Longer Randomized"
+
+
+def test_create_quiz_with_show_answers_on_completion(temp_dir):
+    """Test creating a quiz with show_answers_on_completion using wizard mode."""
+    config = {"admin": {"master_key": "test123"}}
+
+    with custom_webquiz_server(config=config) as (proc, port):
+        quiz_data = {
+            "title": "Completion Answers Quiz",
+            "show_right_answer": False,
+            "show_answers_on_completion": True,
+            "questions": [
+                {"question": "Q1", "options": ["A", "B"], "correct_answer": 0},
+                {"question": "Q2", "options": ["C", "D"], "correct_answer": 1},
+            ],
+        }
+
+        # Create quiz via wizard mode
+        response = requests.post(
+            f"http://localhost:{port}/api/admin/create-quiz",
+            json={"filename": "test_completion_answers", "mode": "wizard", "quiz_data": quiz_data},
+            headers={"X-Master-Key": "test123"},
+        )
+
+        assert response.status_code == 200
+        data = response.json()
+        assert "message" in data
+
+        # Verify quiz was created with show_answers_on_completion
+        response = requests.get(
+            f"http://localhost:{port}/api/admin/quiz/test_completion_answers.yaml", headers={"X-Master-Key": "test123"}
+        )
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["parsed"]["show_answers_on_completion"] is True
+        assert data["parsed"]["show_right_answer"] is False
+
+
+def test_edit_quiz_to_enable_show_answers_on_completion(temp_dir):
+    """Test editing an existing quiz to enable show_answers_on_completion."""
+    quiz_data = {
+        "title": "Original Quiz",
+        "show_right_answer": False,
+        "questions": [{"question": "Q1", "options": ["A", "B"], "correct_answer": 0}],
+    }
+
+    config = {"admin": {"master_key": "test123"}}
+
+    with custom_webquiz_server(config=config, quizzes={"enable_completion.yaml": quiz_data}) as (proc, port):
+        # First, verify the quiz doesn't have show_answers_on_completion
+        response = requests.get(
+            f"http://localhost:{port}/api/admin/quiz/enable_completion.yaml", headers={"X-Master-Key": "test123"}
+        )
+        assert response.status_code == 200
+        data = response.json()
+        assert data["parsed"].get("show_answers_on_completion", False) is False
+
+        # Update quiz to enable show_answers_on_completion
+        updated_data = {
+            "title": "Updated Quiz",
+            "show_right_answer": False,
+            "show_answers_on_completion": True,
+            "questions": [{"question": "Q1", "options": ["A", "B"], "correct_answer": 0}],
+        }
+
+        response = requests.put(
+            f"http://localhost:{port}/api/admin/quiz/enable_completion.yaml",
+            json={"mode": "wizard", "quiz_data": updated_data},
+            headers={"X-Master-Key": "test123"},
+        )
+
+        assert response.status_code == 200
+
+        # Verify show_answers_on_completion was added
+        response = requests.get(
+            f"http://localhost:{port}/api/admin/quiz/enable_completion.yaml", headers={"X-Master-Key": "test123"}
+        )
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["parsed"]["show_answers_on_completion"] is True
+        assert data["parsed"]["title"] == "Updated Quiz"

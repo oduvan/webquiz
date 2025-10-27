@@ -687,10 +687,17 @@
                     </div>
                     <div class="form-group">
                         <label style="display: flex; align-items: center; margin-bottom: 10px;">
-                            <input type="checkbox" id="show-right-answer" checked style="margin-right: 10px;">
+                            <input type="checkbox" id="show-right-answer" checked style="margin-right: 10px;" onchange="toggleShowAnswersOnCompletion()">
                             Показувати правильні відповіді
                         </label>
                         <small style="color: var(--text-muted); display: block; margin-bottom: 20px;">Якщо вимкнено, правильні відповіді не показуватимуться під час питань та в підсумковій таблиці</small>
+                    </div>
+                    <div class="form-group" id="show-answers-on-completion-group" style="display: none;">
+                        <label style="display: flex; align-items: center; margin-bottom: 10px;">
+                            <input type="checkbox" id="show-answers-on-completion" style="margin-right: 10px;">
+                            Показувати відповіді після завершення всіма
+                        </label>
+                        <small style="color: var(--text-muted); display: block; margin-bottom: 20px;">Правильні відповіді будуть показані тільки після того, як всі студенти завершать тест (працює тільки з вимкненим "Показувати правильні відповіді")</small>
                     </div>
                     <div class="form-group">
                         <label style="display: flex; align-items: center; margin-bottom: 10px;">
@@ -749,6 +756,21 @@
                 "'": '&#39;'
             };
             return String(text).replace(/[&<>"']/g, m => map[m]);
+        }
+
+        // Toggle visibility of show_answers_on_completion based on show_right_answer state
+        function toggleShowAnswersOnCompletion() {
+            const showRightAnswer = document.getElementById('show-right-answer').checked;
+            const showAnswersOnCompletionGroup = document.getElementById('show-answers-on-completion-group');
+
+            // Only show the option when show_right_answer is FALSE
+            if (showRightAnswer) {
+                showAnswersOnCompletionGroup.style.display = 'none';
+                // Also uncheck it when hiding
+                document.getElementById('show-answers-on-completion').checked = false;
+            } else {
+                showAnswersOnCompletionGroup.style.display = 'block';
+            }
         }
 
         async function authenticate() {
@@ -1364,6 +1386,12 @@
             // Populate randomize_questions field
             document.getElementById('randomize-questions').checked = quizData.randomize_questions === true;
 
+            // Populate show_answers_on_completion field
+            document.getElementById('show-answers-on-completion').checked = quizData.show_answers_on_completion === true;
+
+            // Update visibility of show_answers_on_completion based on show_right_answer
+            toggleShowAnswersOnCompletion();
+
             if (quizData.questions) {
                 quizData.questions.forEach(question => {
                     const questionDiv = document.createElement('div');
@@ -1515,6 +1543,9 @@
 
             // Include randomize_questions setting
             quizData.randomize_questions = document.getElementById('randomize-questions').checked;
+
+            // Include show_answers_on_completion setting
+            quizData.show_answers_on_completion = document.getElementById('show-answers-on-completion').checked;
 
             return quizData;
         }

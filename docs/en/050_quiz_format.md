@@ -60,6 +60,32 @@ show_right_answer: false  # Automatic progression to the next question
 
 ---
 
+#### `show_answers_on_completion` (optional)
+
+Determines whether to show correct answers after **all** students complete the quiz. Works in combination with `show_right_answer: false`.
+
+- **`true`** — correct answers are dynamically revealed only after all students finish the quiz
+- **`false`** (default) — correct answers are never shown (if `show_right_answer: false`)
+
+```
+show_right_answer: false            # Hide answers during quiz
+show_answers_on_completion: true    # Reveal after all complete
+```
+
+**How it works:**
+
+1. During the quiz, students **do not see** correct answers
+2. After completing the quiz, students see their results but **without correct answers**
+3. Students see a message: _"Correct answers will be available after all students complete. Reload the page later."_
+4. Once **all registered students** finish the quiz, correct answers become visible
+5. If a new student registers later, answers are hidden again until they complete
+
+> 💡 **Using `show_answers_on_completion: true`** is useful for group learning environments where you want students to discuss answers together after everyone has completed the quiz independently.
+
+> ⚠️ **Important:** If approval mode is enabled (`registration.approve: true`), only **approved** students are counted. Students waiting for approval do not affect answer visibility.
+
+---
+
 #### `randomize_questions` (optional)
 
 Determines whether each student receives a unique randomized question order. This is useful for preventing cheating and ensuring fair testing.
@@ -202,6 +228,7 @@ Below is an example of a complete test file with different types of questions:
 title: "Comprehensive Test with Various Question Types"
 description: "Example test demonstrating all formatting capabilities"
 show_right_answer: true
+show_answers_on_completion: false  # Show answers after all students complete
 randomize_questions: false  # Set to true for randomized question order
 
 questions:

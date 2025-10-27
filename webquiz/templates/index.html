@@ -1397,9 +1397,27 @@
             const correctCount = finalResults.correct_count;
             const totalCount = finalResults.total_count;
             const percentage = finalResults.percentage;
+            const showAnswersOnCompletion = finalResults.show_answers_on_completion || false;
+            const allCompleted = finalResults.all_completed || false;
+
+            // Determine if we should show the waiting message
+            const shouldShowWaitingMessage = showAnswersOnCompletion && !allCompleted;
+
+            // Check if correct answers are available (is_correct field exists in test_results)
+            const hasCorrectAnswers = finalResults.test_results.length > 0 &&
+                                      finalResults.test_results[0].is_correct !== undefined;
 
             container.innerHTML = `
                 <p><strong>Результат:</strong> ${correctCount}/${totalCount} (${percentage}%)</p>
+                ${shouldShowWaitingMessage ? `
+                    <div style="background: var(--stats-bg); padding: 15px; border-radius: 5px; margin: 15px 0; border-left: 4px solid #2196f3;">
+                        <p style="margin: 0 0 10px 0;"><strong>ℹ️ Правильні відповіді будуть доступні після завершення тесту всіма учнями.</strong></p>
+                        <p style="margin: 0 0 10px 0; font-size: 14px;">Перезавантажте сторінку пізніше, щоб побачити правильні відповіді.</p>
+                        <button onclick="location.reload()" style="background: #2196f3; color: white; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer; font-size: 14px;">
+                            🔄 Перезавантажити сторінку
+                        </button>
+                    </div>
+                ` : ''}
                 <table class="results-table">
                     <thead>
                         <tr>
@@ -1416,7 +1434,7 @@
                                     <span class="${result.is_correct === true ? 'answer-correct' : (result.is_correct === false ? 'answer-incorrect' : '')}">
                                         ${formatAnswerForDisplay(result.selected_answer)}
                                     </span>
-                                    ${result.is_correct === false && result.correct_answer && showRightAnswer ? `<div class="correct-answer-hint">Правильна: ${formatAnswerForDisplay(result.correct_answer)}</div>` : ''}
+                                    ${result.is_correct === false && result.correct_answer && (showRightAnswer || hasCorrectAnswers) ? `<div class="correct-answer-hint">Правильна: ${formatAnswerForDisplay(result.correct_answer)}</div>` : ''}
                                 </td>
                                 <td data-label="Правильно" style="text-align: center;">
                                     ${result.is_correct !== undefined ? `<span class="${result.is_correct ? 'correct' : 'incorrect'}" style="font-size: 18px;">${result.is_correct ? '✓' : '✗'}</span>` : '<span style="color: #666;">—</span>'}

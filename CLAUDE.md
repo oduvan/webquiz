@@ -101,6 +101,7 @@ webquiz-stress-test -c 50
 - **Coverage excludes build tools**: build.py and binary_entry.py omitted from coverage (not runtime code)
 - **Wizard-only quiz editor** - Admin panel uses wizard mode only; YAML editing available in file manager with validation
 - **File manager quiz editing** - Direct YAML editing with validation button, automatic backup, and active quiz reload
+- **Dynamic answer visibility** - `show_answers_on_completion: true` reveals correct answers only after all approved students complete, with automatic re-hiding when new students register
 
 ## Key Flows
 
@@ -119,6 +120,7 @@ webquiz-stress-test -c 50
   - `registration.username_label` - Customize username field label (default: "Ім'я користувача")
   - `randomize_questions: true` - Per-student random order, stored as `question_order` array (default: false)
   - `show_right_answer: false` - Auto-advance without continue button (seamless flow)
+  - `show_answers_on_completion: true` - Reveal correct answers dynamically after all approved students complete, with waiting message and reload prompt (default: false)
 - Questions use **0-indexed** `correct_answer` field
 - Usernames unique per quiz session
 - Switching quizzes = full state reset
