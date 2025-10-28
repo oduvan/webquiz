@@ -14,6 +14,7 @@ from selenium_helpers import (
     find_option_by_index,
     find_option_by_text,
     wait_for_question_text,
+    wait_for_question_containing_text,
 )
 
 
@@ -753,8 +754,8 @@ def test_show_right_answer_multi_question_journey(temp_dir, browser):
         correct_option_1.click()
         browser.find_element(By.ID, "submit-answer-btn").click()
 
-        # With show_right_answer: false, should auto-advance to Question 2 (no continue button)
-        wait_for_element(browser, By.CSS_SELECTOR, ".question-text", timeout=3)
+        # With show_right_answer: false, should auto-advance to Question 2 (wait for animation)
+        wait_for_question_containing_text(browser, "What is 2 * 3?", timeout=5)
         question_text = browser.find_element(By.CSS_SELECTOR, ".question-text")
         assert "What is 2 * 3?" in question_text.text, "Should auto-advance to Question 2"
 
@@ -763,9 +764,8 @@ def test_show_right_answer_multi_question_journey(temp_dir, browser):
         wrong_option_2.click()
         browser.find_element(By.ID, "submit-answer-btn").click()
 
-        # Should auto-advance to Question 3
-        wait_for_element(browser, By.CSS_SELECTOR, ".question-text", timeout=3)
-        time.sleep(0.2)  # Small delay to ensure DOM is updated
+        # Should auto-advance to Question 3 (wait for animation)
+        wait_for_question_containing_text(browser, "What is 10 / 2?", timeout=5)
         question_text = browser.find_element(By.CSS_SELECTOR, ".question-text")
         assert "What is 10 / 2?" in question_text.text, "Should auto-advance to Question 3"
 

@@ -15,6 +15,7 @@ from selenium_helpers import (
     find_register_button,
     find_option_by_text,
     wait_for_question_text,
+    wait_for_question_containing_text,
 )
 
 
@@ -52,9 +53,6 @@ def test_auto_advance_with_show_right_answer_false(temp_dir, browser):
         submit_button = browser.find_element(By.ID, "submit-answer-btn")
         submit_button.click()
 
-        # Wait a moment for the submission to complete
-        time.sleep(0.5)
-
         # Continue button should NOT appear (verify it stays hidden)
         continue_button = browser.find_element(By.ID, "continue-btn")
         assert "hidden" in continue_button.get_attribute(
@@ -62,7 +60,8 @@ def test_auto_advance_with_show_right_answer_false(temp_dir, browser):
         ), "Continue button should remain hidden with auto-advance"
 
         # Question 2 should appear automatically without clicking continue
-        wait_for_element(browser, By.CSS_SELECTOR, ".question-text", timeout=3)
+        # Wait for animation to complete (200ms delay + 900ms fade-out + 1000ms fade-in)
+        wait_for_question_containing_text(browser, "Question 2?", timeout=5)
         question_text = browser.find_element(By.CSS_SELECTOR, ".question-text")
         assert "Question 2?" in question_text.text, "Should auto-advance to Question 2 without clicking continue button"
 
@@ -169,18 +168,16 @@ def test_auto_advance_multiple_questions(temp_dir, browser):
         find_option_by_text(browser, "A").click()
         browser.find_element(By.ID, "submit-answer-btn").click()
 
-        # Should auto-advance to Q2
-        wait_for_element(browser, By.CSS_SELECTOR, ".question-text", timeout=3)
-        time.sleep(0.2)  # Small delay to ensure DOM is updated
+        # Should auto-advance to Q2 (wait for animation)
+        wait_for_question_containing_text(browser, "Q2?", timeout=5)
         assert "Q2?" in browser.page_source
 
         # Answer Q2
         find_option_by_text(browser, "C").click()
         browser.find_element(By.ID, "submit-answer-btn").click()
 
-        # Should auto-advance to Q3
-        wait_for_element(browser, By.CSS_SELECTOR, ".question-text", timeout=3)
-        time.sleep(0.2)
+        # Should auto-advance to Q3 (wait for animation)
+        wait_for_question_containing_text(browser, "Q3?", timeout=5)
         assert "Q3?" in browser.page_source
 
         # Answer Q3
@@ -223,9 +220,8 @@ def test_auto_advance_no_visual_feedback(temp_dir, browser):
         wrong_option.click()
         browser.find_element(By.ID, "submit-answer-btn").click()
 
-        # Wait for next question to appear
-        wait_for_element(browser, By.CSS_SELECTOR, ".question-text", timeout=3)
-        time.sleep(0.2)  # Small delay to ensure DOM is updated
+        # Wait for next question to appear (wait for animation)
+        wait_for_question_containing_text(browser, "Next?", timeout=5)
 
         # Verify we're on next question (check displayed text, not page source)
         question_text = browser.find_element(By.CSS_SELECTOR, ".question-text")
@@ -297,9 +293,8 @@ def test_button_state_during_auto_advance(temp_dir, browser):
         submit_button = browser.find_element(By.ID, "submit-answer-btn")
         submit_button.click()
 
-        # Wait for next question to appear (auto-advance should happen)
-        wait_for_element(browser, By.CSS_SELECTOR, ".question-text", timeout=3)
-        time.sleep(0.2)  # Small delay to ensure DOM is updated
+        # Wait for next question to appear (auto-advance should happen, wait for animation)
+        wait_for_question_containing_text(browser, "Second?", timeout=5)
 
         # Verify we're on second question with fresh button state
         question_text = browser.find_element(By.CSS_SELECTOR, ".question-text")
