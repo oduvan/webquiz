@@ -1439,7 +1439,7 @@
                                     ${result.is_correct === false && result.correct_answer && (showRightAnswer || hasCorrectAnswers) ? `<div class="correct-answer-hint">Правильна: ${formatAnswerForDisplay(result.correct_answer)}</div>` : ''}
                                 </td>
                                 <td data-label="Правильно" style="text-align: center;">
-                                    ${result.is_correct !== undefined ? `<span class="${result.is_correct ? 'correct' : 'incorrect'}" style="font-size: 18px;">${result.is_correct ? '✓' : '✗'}</span>` : '<span style="color: #666;">—</span>'}
+                                    ${result.is_correct !== undefined ? `<span class="${result.is_correct ? 'correct' : 'incorrect'}" style="font-size: 18px;">${result.is_correct ? '✓' : '✗'}</span>` : '<span style="color: #666;">не відомо</span>'}
                                 </td>
                             </tr>
                         `).join('')}
