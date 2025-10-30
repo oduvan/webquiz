@@ -123,3 +123,81 @@ This section allows the administrator to download quizzes from external sources 
 - **name** — the name of the quiz that appears in the admin panel.
 - **download_path** — link to an archive with the quiz (for example, `.zip`).
 - **folder** — the folder where the archive contents will be extracted after download.
+
+---
+
+### Section `tunnel` (optional)
+
+**Option 1: Fetch config from server**
+```
+tunnel:
+  server: "tunnel.example.com"
+  public_key: "keys/id_ed25519.pub"
+  private_key: "keys/id_ed25519"
+  # Config will be fetched from https://tunnel.example.com/tunnel_config.yaml
+```
+
+**Option 2: Local config (bypasses server fetch)**
+```
+tunnel:
+  server: "tunnel.example.com"
+  public_key: "keys/id_ed25519.pub"
+  private_key: "keys/id_ed25519"
+  config:  # Optional: Provide locally to skip fetching from server
+    username: "tunneluser"
+    socket_directory: "/var/run/tunnels"
+    base_url: "https://tunnel.example.com/tests"
+```
+
+The `tunnel` section allows you to configure an SSH tunnel for public access to your local server through an external tunnel server. This is useful for:
+- Running quizzes from a local computer without port forwarding configuration
+- Temporary public access without dedicated hosting
+- Classroom environments where students connect from outside the local network
+
+**Parameters:**
+
+- **server** — domain name or IP address of the tunnel server (e.g., `"tunnel.example.com"`).
+  This is the server that provides public access to your local WebQuiz instance.
+
+- **public_key** — path to the SSH public key file.
+  If the file doesn't exist, WebQuiz will automatically generate an ED25519 key pair.
+  Example: `"keys/id_ed25519.pub"`
+
+- **private_key** — path to the SSH private key file.
+  Used for authentication on the tunnel server.
+  Example: `"keys/id_ed25519"`
+
+- **config** (optional subsection) — local tunnel configuration.
+  If provided, WebQuiz will use this configuration instead of fetching from the server.
+  - **username** — SSH user for tunnel server connection
+  - **socket_directory** — directory on server for Unix domain sockets
+  - **base_url** — base URL for tunnel access (e.g., `"https://tunnel.example.com/tests"`)
+
+**How it works:**
+
+1. **Automatic key generation**: If keys are missing, WebQuiz automatically creates an ED25519 key pair without a passphrase.
+
+2. **Admin panel control**: Open the administrative panel to view the tunnel status.
+
+3. **Copy public key**: Copy the generated public key and add it to the `~/.ssh/authorized_keys` file on your tunnel server.
+
+4. **Connect**: Click the "Connect" button in the admin panel to establish the tunnel.
+
+5. **Public URL**: Once connected, a public URL will be displayed (e.g., `https://tunnel.example.com/tests/a3f7b2/`).
+
+6. **Auto-reconnect**: If the connection drops, WebQuiz automatically attempts to restore it.
+
+**Server requirements:**
+- The tunnel server must support Unix domain socket forwarding
+- The server must provide a `tunnel_config.yaml` endpoint at `https://[server]/tunnel_config.yaml` with the following parameters:
+  ```yaml
+  username: tunneluser
+  socket_directory: /var/run/tunnels
+  base_url: https://tunnel.example.com/tests
+  ```
+
+**Security notes:**
+- SSH keys are generated without a passphrase for automated connection
+- The private key is stored with 600 permissions (owner only)
+- Connection is admin-initiated (no auto-connect on startup)
+- Connection status is displayed in real-time via WebSocket

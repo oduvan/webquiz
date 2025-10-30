@@ -109,6 +109,32 @@ class QuizzesConfig:
 
 
 @dataclass
+class TunnelServerConfig:
+    """Tunnel server configuration data class (fetched from server or provided locally)"""
+
+    username: str
+    socket_directory: str
+    base_url: str
+
+
+@dataclass
+class TunnelConfig:
+    """SSH Tunnel configuration data class"""
+
+    server: Optional[str] = None
+    public_key: Optional[str] = None
+    private_key: Optional[str] = None
+    config: Optional[TunnelServerConfig] = None
+
+    def __post_init__(self):
+        """Resolve key paths relative to binary directory when running as binary"""
+        if self.public_key:
+            self.public_key = resolve_path_relative_to_binary(self.public_key)
+        if self.private_key:
+            self.private_key = resolve_path_relative_to_binary(self.private_key)
+
+
+@dataclass
 class WebQuizConfig:
     """Main configuration data class"""
 
@@ -117,6 +143,7 @@ class WebQuizConfig:
     admin: AdminConfig = field(default_factory=AdminConfig)
     registration: RegistrationConfig = field(default_factory=RegistrationConfig)
     quizzes: QuizzesConfig = field(default_factory=QuizzesConfig)
+    tunnel: TunnelConfig = field(default_factory=TunnelConfig)
     config_path: Optional[str] = None  # Path to the config file that was loaded
 
 
@@ -154,12 +181,24 @@ def load_config_from_yaml(config_path: str) -> WebQuizConfig:
                 )
         quizzes_config = QuizzesConfig(quizzes=downloadable_quizzes)
 
+        # Parse tunnel configuration
+        tunnel_data = config_data.get("tunnel", {})
+        tunnel_server_config = None
+
+        # Check for nested config subsection
+        if "config" in tunnel_data:
+            config_subsection = tunnel_data.pop("config")  # Remove from dict to avoid unpacking error
+            tunnel_server_config = TunnelServerConfig(**config_subsection)
+
+        tunnel_config = TunnelConfig(**tunnel_data, config=tunnel_server_config)
+
         return WebQuizConfig(
             server=server_config,
             paths=paths_config,
             admin=admin_config,
             registration=registration_config,
             quizzes=quizzes_config,
+            tunnel=tunnel_config,
         )
     except FileNotFoundError:
         logger.warning(f"Config file not found: {config_path}, using defaults")

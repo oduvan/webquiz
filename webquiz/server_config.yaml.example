@@ -37,6 +37,23 @@ admin:
 #     download_path: "https://example.com/quizzes/geography.zip"
 #     folder: "geography/"
 
+# Optional: SSH Tunnel configuration for public access
+# Uncomment and configure to enable SSH tunnel for remote access
+# tunnel:
+#   server: "tunnel.example.com"           # SSH tunnel server hostname
+#   public_key: "keys/id_ed25519.pub"      # SSH public key path (auto-generated if missing)
+#   private_key: "keys/id_ed25519"         # SSH private key path (auto-generated if missing)
+#
+#   # Option 1: Fetch config from server (default)
+#   # Config will be fetched from https://tunnel.example.com/tunnel_config.yaml
+#
+#   # Option 2: Provide local config (bypasses server fetch)
+#   # Uncomment to use local configuration instead of fetching from server
+#   # config:
+#   #   username: "tunneluser"
+#   #   socket_directory: "/var/run/tunnels"
+#   #   base_url: "https://tunnel.example.com/tests"
+
 # Usage examples:
 # webquiz --config server_config.yaml
 # webquiz --config server_config.yaml --master-key override-key

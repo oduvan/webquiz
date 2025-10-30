@@ -23,6 +23,7 @@ WebQuiz - Python/aiohttp quiz system with multi-quiz management, real-time WebSo
 ## Key Files
 - `webquiz/server.py` - Main aiohttp server
 - `webquiz/config.py` - Configuration dataclasses and loading functions
+- `webquiz/tunnel.py` - SSH tunnel manager for public access
 - `webquiz/cli.py` - CLI with daemon support
 - `webquiz/build.py` - PyInstaller build script
 - `webquiz/templates/` - index.html, admin.html, files.html, live_stats.html
@@ -38,9 +39,10 @@ WebQuiz - Python/aiohttp quiz system with multi-quiz management, real-time WebSo
 - `GET /admin`, `POST /api/admin/auth`, `PUT /api/admin/approve-user`, `GET /api/admin/list-quizzes`, `POST /api/admin/switch-quiz`, `PUT /api/admin/config`
 - Quiz management: `GET /api/admin/quiz/{filename}`, `POST /api/admin/create-quiz`, `PUT /api/admin/quiz/{filename}`, `DELETE /api/admin/quiz/{filename}`
 - File management: `GET /api/files/list`, `GET /api/files/{type}/view/{filename}`, `GET /api/files/{type}/download/{filename}`, `PUT /api/files/quizzes/save/{filename}`
+- Tunnel management: `POST /api/admin/tunnel/connect`, `POST /api/admin/tunnel/disconnect`
 
 **WebSockets:**
-- `WS /ws/live-stats` (public), `WS /ws/admin` (admin approval notifications)
+- `WS /ws/live-stats` (public), `WS /ws/admin` (admin approval + tunnel status notifications)
 
 ## Dev Commands
 
@@ -102,6 +104,13 @@ webquiz-stress-test -c 50
 - **Wizard-only quiz editor** - Admin panel uses wizard mode only; YAML editing available in file manager with validation
 - **File manager quiz editing** - Direct YAML editing with validation button, automatic backup, and active quiz reload
 - **Dynamic answer visibility** - `show_answers_on_completion: true` reveals correct answers only after all approved students complete, with automatic re-hiding when new students register
+- **SSH Tunnel for public access** - Optional feature to expose local server via SSH reverse tunnel with Unix domain sockets
+- **ED25519 SSH keys** - Auto-generated if missing, stored with binary-relative paths for PyInstaller compatibility
+- **Tunnel auto-reconnect** - Exponential backoff (5s → 300s max), connection monitoring via asyncssh
+- **asyncssh forward_remote_path_to_port** - Used for forwarding remote Unix socket to local TCP port (not forward_remote_path)
+- **WebSocket tunnel status** - Real-time updates broadcast to admin clients, no polling needed
+- **Admin-triggered connection** - No auto-connect on startup, admin clicks button to establish tunnel
+- **Tunnel URL in access list** - Public tunnel URL automatically added to "URL для доступу з інших пристроїв:" list with green background when connected
 
 ## Key Flows
 
@@ -109,6 +118,7 @@ webquiz-stress-test -c 50
 **Approval**: Register → `approved: false` → wait → admin WebSocket notified → approve button → **timing starts** → student checks → quiz begins
 **Randomization**: Load YAML → register → `random.shuffle()` → store `question_order` per-user → client receives array → JS reorders → persists across sessions
 **Admin**: Switch quiz → reset all state (users, progress, responses) → new CSV → session isolation
+**Tunnel**: Initialize → check/generate keys → admin clicks connect → fetch server config → create SSH connection → forward remote Unix socket to local port (forward_remote_path_to_port) → broadcast public URL via WebSocket → auto-reconnect on disconnect
 
 **Setup**: Parallel testing with ports 8080-8087, `custom_webquiz_server` fixture auto-cleans directories, `conftest.py` for shared fixtures
 
@@ -121,6 +131,10 @@ webquiz-stress-test -c 50
   - `randomize_questions: true` - Per-student random order, stored as `question_order` array (default: false)
   - `show_right_answer: false` - Auto-advance without continue button (seamless flow)
   - `show_answers_on_completion: true` - Reveal correct answers dynamically after all approved students complete, with waiting message and reload prompt (default: false)
+  - `tunnel.server` - SSH tunnel server hostname (e.g., "tunnel.example.com")
+  - `tunnel.public_key` - Path to SSH public key file (auto-generated if missing)
+  - `tunnel.private_key` - Path to SSH private key file (auto-generated if missing)
+  - `tunnel.config` - Optional nested config subsection (username, socket_directory, base_url) - bypasses server fetch when provided
 - Questions use **0-indexed** `correct_answer` field
 - Usernames unique per quiz session
 - Switching quizzes = full state reset
