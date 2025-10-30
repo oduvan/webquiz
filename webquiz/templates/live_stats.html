@@ -80,6 +80,33 @@
             display: flex;
             flex-direction: column;
             min-height: 0;
+            gap: 20px;
+            padding: 10px;
+        }
+
+        .group-section {
+            display: flex;
+            flex-direction: column;
+            min-height: 0;
+        }
+
+        .group-header {
+            background: var(--header-bg);
+            color: var(--header-color);
+            padding: 12px 20px;
+            border-radius: 8px 8px 0 0;
+            font-weight: bold;
+            font-size: 16px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .group-count {
+            background: rgba(255, 255, 255, 0.2);
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-size: 14px;
         }
 
         .stats-table {
@@ -345,21 +372,47 @@
     </div>
 
     <div class="stats-container">
-        <div class="table-wrapper">
-            <table class="stats-table" id="statsTable">
-                <thead>
-                    <tr id="tableHeader">
-                        <th class="username-header">User</th>
-                    </tr>
-                </thead>
-                <tbody id="tableBody">
-                    <tr>
-                        <td colspan="100" class="no-data">
-                            Waiting for users to join the quiz...
-                        </td>
-                    </tr>
-                </tbody>
-            </table>
+        <!-- In Progress Group -->
+        <div id="inProgressSection" class="group-section" style="display: none;">
+            <div class="group-header">
+                <span>🔄 In Progress</span>
+                <span class="group-count" id="inProgressCount">0</span>
+            </div>
+            <div class="table-wrapper">
+                <table class="stats-table" id="inProgressTable">
+                    <thead>
+                        <tr id="inProgressHeader">
+                            <th class="username-header">User</th>
+                        </tr>
+                    </thead>
+                    <tbody id="inProgressBody">
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Completed Group -->
+        <div id="completedSection" class="group-section" style="display: none;">
+            <div class="group-header">
+                <span>✅ Completed</span>
+                <span class="group-count" id="completedCount">0</span>
+            </div>
+            <div class="table-wrapper">
+                <table class="stats-table" id="completedTable">
+                    <thead>
+                        <tr id="completedHeader">
+                            <th class="username-header">User</th>
+                        </tr>
+                    </thead>
+                    <tbody id="completedBody">
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- No data message -->
+        <div id="noDataMessage" class="no-data" style="padding: 40px; text-align: center;">
+            Waiting for users to join the quiz...
         </div>
     </div>
 
@@ -369,6 +422,7 @@
                 this.ws = null;
                 this.users = {};
                 this.liveStats = {};
+                this.completedUsers = {};  // user_id -> boolean (completed status)
                 this.questions = [];
                 this.totalQuestions = 0;
                 this.currentQuiz = null;
@@ -383,8 +437,21 @@
                 this.currentQuizElement = document.getElementById('currentQuiz');
                 this.totalQuestionsElement = document.getElementById('totalQuestions');
                 this.activeUsersElement = document.getElementById('activeUsers');
-                this.tableHeaderElement = document.getElementById('tableHeader');
-                this.tableBodyElement = document.getElementById('tableBody');
+                
+                // In Progress group elements
+                this.inProgressSection = document.getElementById('inProgressSection');
+                this.inProgressHeader = document.getElementById('inProgressHeader');
+                this.inProgressBody = document.getElementById('inProgressBody');
+                this.inProgressCount = document.getElementById('inProgressCount');
+                
+                // Completed group elements
+                this.completedSection = document.getElementById('completedSection');
+                this.completedHeader = document.getElementById('completedHeader');
+                this.completedBody = document.getElementById('completedBody');
+                this.completedCount = document.getElementById('completedCount');
+                
+                // No data message
+                this.noDataMessage = document.getElementById('noDataMessage');
 
                 this.connect();
             }
@@ -481,6 +548,7 @@
             handleInitialState(data) {
                 this.users = data.users || {};
                 this.liveStats = this.normalizeStatsData(data.live_stats || {});
+                this.completedUsers = data.completed_users || {};
                 this.questions = data.questions || [];
                 this.totalQuestions = data.total_questions || 0;
                 this.currentQuiz = data.current_quiz || 'No quiz selected';
@@ -489,7 +557,7 @@
                 this.calculateStatistics();
 
                 this.updateQuizInfo();
-                this.buildTable();
+                this.buildTables();
             }
 
             normalizeStatsData(liveStats) {
@@ -523,12 +591,15 @@
                     state: data.state,
                     time_taken: data.time_taken
                 };
+                
+                // New users are not completed yet
+                this.completedUsers[data.user_id] = false;
 
                 // Calculate statistics client-side
                 this.calculateStatistics();
 
                 this.updateQuizInfo();
-                this.buildTable();
+                this.buildTables();
             }
 
             handleStateUpdate(data) {
@@ -536,6 +607,11 @@
                 const questionId = data.question_id;
                 const newState = data.state;
                 const timeTaken = data.time_taken;
+                const completed = data.completed || false;
+
+                // Check if user is moving from in-progress to completed
+                const wasCompleted = this.completedUsers[userId] || false;
+                const isNowCompleted = completed;
 
                 // Get old state for incremental stats update
                 const oldState = (this.liveStats[userId] && this.liveStats[userId][questionId])
@@ -551,20 +627,29 @@
                     time_taken: timeTaken
                 };
 
+                // Update completion status
+                this.completedUsers[userId] = isNowCompleted;
+
                 // Update statistics incrementally
                 this.updateStatisticsIncremental(userId, questionId, oldState, newState);
 
-                // Update only the affected cell
-                this.updateCell(userId, questionId, newState, timeTaken);
-
-                // Update affected headers/stats
-                this.updateQuestionHeader(questionId);
-                this.updateUserStats(userId);
+                // If user moved groups, rebuild tables completely
+                if (!wasCompleted && isNowCompleted) {
+                    this.buildTables();
+                } else {
+                    // Update only the affected cell
+                    this.updateCell(userId, questionId, newState, timeTaken);
+                    
+                    // Update affected headers/stats
+                    this.updateQuestionHeader(questionId);
+                    this.updateUserStats(userId);
+                }
             }
 
             handleQuizSwitched(data) {
                 this.users = {};
                 this.liveStats = {};
+                this.completedUsers = {};
                 this.questions = data.questions || [];
                 this.totalQuestions = data.total_questions || 0;
                 this.currentQuiz = data.current_quiz || 'No quiz selected';
@@ -573,7 +658,7 @@
                 this.calculateStatistics();
 
                 this.updateQuizInfo();
-                this.buildTable();
+                this.buildTables();
             }
 
             calculateStatistics() {
@@ -659,7 +744,56 @@
                 this.quizInfoElement.style.display = 'block';
             }
 
-            buildTable() {
+            buildTables() {
+                const userIds = Object.keys(this.users);
+                
+                // If no users, show no-data message
+                if (userIds.length === 0) {
+                    this.noDataMessage.style.display = 'block';
+                    this.inProgressSection.style.display = 'none';
+                    this.completedSection.style.display = 'none';
+                    return;
+                }
+                
+                this.noDataMessage.style.display = 'none';
+                
+                // Separate users into two groups
+                const inProgressUsers = [];
+                const completedUsers = [];
+                
+                userIds.forEach(userId => {
+                    if (this.completedUsers[userId]) {
+                        completedUsers.push(userId);
+                    } else {
+                        inProgressUsers.push(userId);
+                    }
+                });
+                
+                // Build headers for both tables (same headers)
+                const headerHtml = this.buildTableHeader();
+                this.inProgressHeader.innerHTML = headerHtml;
+                this.completedHeader.innerHTML = headerHtml;
+                
+                // Build in-progress table
+                if (inProgressUsers.length > 0) {
+                    this.inProgressSection.style.display = 'flex';
+                    this.inProgressBody.innerHTML = this.buildTableRows(inProgressUsers);
+                    this.inProgressCount.textContent = inProgressUsers.length;
+                } else {
+                    this.inProgressSection.style.display = 'none';
+                }
+                
+                // Build completed table
+                if (completedUsers.length > 0) {
+                    this.completedSection.style.display = 'flex';
+                    this.completedBody.innerHTML = this.buildTableRows(completedUsers);
+                    this.completedCount.textContent = completedUsers.length;
+                } else {
+                    this.completedSection.style.display = 'none';
+                }
+            }
+            
+            buildTableHeader() {
                 // Build header with question statistics
                 let headerHtml = '<th class="username-header">User</th>';
                 for (let i = 0; i < this.questions.length; i++) {
@@ -692,21 +826,10 @@
                         </th>`;
                     }
                 }
-                this.tableHeaderElement.innerHTML = headerHtml;
-
-                // Build body with user statistics
-                const userIds = Object.keys(this.users);
-                if (userIds.length === 0) {
-                    this.tableBodyElement.innerHTML = `
-                        <tr>
-                            <td colspan="${this.questions.length + 1}" class="no-data">
-                                Waiting for users to join the quiz...
-                            </td>
-                        </tr>
-                    `;
-                    return;
-                }
-
+                return headerHtml;
+            }
+            
+            buildTableRows(userIds) {
                 let bodyHtml = '';
                 userIds.forEach(userId => {
                     const username = this.users[userId];
@@ -743,8 +866,8 @@
 
                     bodyHtml += '</tr>';
                 });
-
-                this.tableBodyElement.innerHTML = bodyHtml;
+                
+                return bodyHtml;
             }
 
             updateCell(userId, questionId, state, timeTaken) {
@@ -767,14 +890,17 @@
                 const questionStats = this.questionStatistics[questionId] || { correct_count: 0, total_attempts: 0 };
                 const statsText = `${questionStats.correct_count}/${questionStats.total_attempts}`;
 
-                // Find the question header element
-                const headerCell = this.tableHeaderElement.children[questionId]; // questionId is 1-indexed, array is 0-indexed, but we have username column at 0
-                if (headerCell) {
-                    const statsElement = headerCell.querySelector('.question-stats');
-                    if (statsElement) {
-                        statsElement.textContent = statsText;
+                // Update header in both tables
+                const headers = [this.inProgressHeader, this.completedHeader];
+                headers.forEach(headerElement => {
+                    const headerCell = headerElement.children[questionId];
+                    if (headerCell) {
+                        const statsElement = headerCell.querySelector('.question-stats');
+                        if (statsElement) {
+                            statsElement.textContent = statsText;
+                        }
                     }
-                }
+                });
             }
 
             updateUserStats(userId) {
