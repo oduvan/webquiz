@@ -90,13 +90,14 @@ webquiz-stress-test -c 50
 - **Quiz state reset** on switch for complete isolation
 - **In-memory → CSV** with 30s periodic flush using CSV module
 - **Cookie-based session** persistence (user_id)
-- **WebSocket live stats** with automatic client cleanup
+- **WebSocket live stats** with automatic client cleanup and **two-group display** (in-progress/completed)
 - **Auto-advance UI** when `show_right_answer: false`
 - **Mobile-first** with `width: 100%; max-width: [size]` and @media ≤768px
 - **UTF-8 Content-Type** for Ukrainian/multilingual text support
 - **Server-side question randomization** generated at registration, stored per-user as `question_order` array, client reorders via JS
 - **Test completion detection** uses answer count (`len(user_answers[user_id])`) instead of question ID to support randomization
 - **Live stats first question** uses user's actual first from `question_order` (prevents duplicates)
+- **Two-group live stats** - Users split into "In Progress" and "Completed" groups, automatically move on completion
 - **Multi-platform binaries** via GitHub Actions (macOS-13 Intel, macOS-14 ARM64, Linux, Windows)
 - **Coverage excludes build tools**: build.py and binary_entry.py omitted from coverage (not runtime code)
 - **Wizard-only quiz editor** - Admin panel uses wizard mode only; YAML editing available in file manager with validation
@@ -109,6 +110,7 @@ webquiz-stress-test -c 50
 **Approval**: Register → `approved: false` → wait → admin WebSocket notified → approve button → **timing starts** → student checks → quiz begins
 **Randomization**: Load YAML → register → `random.shuffle()` → store `question_order` per-user → client receives array → JS reorders → persists across sessions
 **Admin**: Switch quiz → reset all state (users, progress, responses) → new CSV → session isolation
+**Live Stats Groups**: Users display in "In Progress" group → answer questions → complete final question → automatically move to "Completed" group with `completed: true` flag in WebSocket
 
 **Setup**: Parallel testing with ports 8080-8087, `custom_webquiz_server` fixture auto-cleans directories, `conftest.py` for shared fixtures
 
