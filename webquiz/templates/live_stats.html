@@ -387,19 +387,6 @@
     <div id="connectionStatus" class="connection-status" style="display: none;">
     </div>
 
-    <div id="quizInfo" class="quiz-info" style="display: none;">
-        <strong>Current Quiz:</strong> <span id="currentQuiz">-</span> |
-        <strong>Total Questions:</strong> <span id="totalQuestions">0</span> |
-        <strong>Active Users:</strong> <span id="activeUsers">0</span>
-    </div>
-
-    <div class="legend">
-        <div class="legend-item state-think">🟡 Thinking</div>
-        <div class="legend-item state-ok">🟢 Correct</div>
-        <div class="legend-item state-fail">🔴 Incorrect</div>
-        <div class="legend-item state-empty">⚪ Not Started</div>
-    </div>
-
     <!-- Filter Bar -->
     <div class="filter-bar">
         <button class="filter-button active" id="filterAll" onclick="window.liveStatsClient.setFilter('all')">
@@ -460,12 +447,12 @@
                 this.currentQuizElement = document.getElementById('currentQuiz');
                 this.totalQuestionsElement = document.getElementById('totalQuestions');
                 this.activeUsersElement = document.getElementById('activeUsers');
-                
+
                 // Single table elements
                 this.statsSection = document.getElementById('statsSection');
                 this.statsHeader = document.getElementById('statsHeader');
                 this.statsBody = document.getElementById('statsBody');
-                
+
                 // Filter elements
                 this.filterAll = document.getElementById('filterAll');
                 this.filterInProgress = document.getElementById('filterInProgress');
@@ -473,7 +460,7 @@
                 this.countAll = document.getElementById('countAll');
                 this.countInProgress = document.getElementById('countInProgress');
                 this.countCompleted = document.getElementById('countCompleted');
-                
+
                 // No data message
                 this.noDataMessage = document.getElementById('noDataMessage');
 
@@ -485,12 +472,12 @@
 
             setFilter(filter) {
                 this.currentFilter = filter;
-                
+
                 // Update active button state
                 this.filterAll.classList.remove('active');
                 this.filterInProgress.classList.remove('active');
                 this.filterCompleted.classList.remove('active');
-                
+
                 if (filter === 'all') {
                     this.filterAll.classList.add('active');
                 } else if (filter === 'inProgress') {
@@ -498,7 +485,7 @@
                 } else if (filter === 'completed') {
                     this.filterCompleted.classList.add('active');
                 }
-                
+
                 // Rebuild table with current filter
                 this.buildTable();
             }
@@ -638,7 +625,7 @@
                     state: data.state,
                     time_taken: data.time_taken
                 };
-                
+
                 // New users are not completed yet
                 this.completedUsers[data.user_id] = false;
 
@@ -686,7 +673,7 @@
                 } else {
                     // Update only the affected cell
                     this.updateCell(userId, questionId, newState, timeTaken);
-                    
+
                     // Update affected headers/stats
                     this.updateQuestionHeader(questionId);
                     this.updateUserStats(userId);
@@ -793,11 +780,11 @@
 
             buildTable() {
                 const userIds = Object.keys(this.users);
-                
+
                 // Separate users into two groups
                 const inProgressUsers = [];
                 const completedUsers = [];
-                
+
                 userIds.forEach(userId => {
                     if (this.completedUsers[userId]) {
                         completedUsers.push(userId);
@@ -805,12 +792,12 @@
                         inProgressUsers.push(userId);
                     }
                 });
-                
+
                 // Update filter counts
                 this.countAll.textContent = userIds.length;
                 this.countInProgress.textContent = inProgressUsers.length;
                 this.countCompleted.textContent = completedUsers.length;
-                
+
                 // Determine which users to display based on filter
                 let displayUsers = [];
                 if (this.currentFilter === 'all') {
@@ -820,12 +807,12 @@
                 } else if (this.currentFilter === 'completed') {
                     displayUsers = completedUsers;
                 }
-                
+
                 // If no users or no users in filtered view, show no-data message
                 if (userIds.length === 0 || displayUsers.length === 0) {
                     this.noDataMessage.style.display = 'block';
                     this.statsSection.style.display = 'none';
-                    
+
                     if (userIds.length === 0) {
                         this.noDataMessage.textContent = 'Waiting for users to join the quiz...';
                     } else {
@@ -833,15 +820,15 @@
                     }
                     return;
                 }
-                
+
                 this.noDataMessage.style.display = 'none';
                 this.statsSection.style.display = 'flex';
-                
+
                 // Build table
                 this.statsHeader.innerHTML = this.buildTableHeader();
                 this.statsBody.innerHTML = this.buildTableRows(displayUsers);
             }
-            
+
             buildTableHeader() {
                 // Build header with question statistics
                 let headerHtml = '<th class="username-header">User</th>';
@@ -877,7 +864,7 @@
                 }
                 return headerHtml;
             }
-            
+
             buildTableRows(userIds) {
                 let bodyHtml = '';
                 userIds.forEach(userId => {
@@ -915,7 +902,7 @@
 
                     bodyHtml += '</tr>';
                 });
-                
+
                 return bodyHtml;
             }
 
