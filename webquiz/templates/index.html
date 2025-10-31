@@ -250,6 +250,11 @@
         button:hover {
             background: #0056b3;
         }
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            pointer-events: none;
+        }
         .button-container {
             position: relative;
             margin: 20px 0;
@@ -336,11 +341,11 @@
         }
 
         .question-fade-out {
-            animation: fadeOut 0.9s ease-out forwards;
+            animation: fadeOut 0.45s ease-out forwards;
         }
 
         .question-fade-in {
-            animation: fadeIn 1s ease-out forwards;
+            animation: fadeIn 0.5s ease-out forwards;
         }
         #loading {
             text-align: center;
@@ -1103,6 +1108,10 @@
             // Clear previous errors
             hideError('test-error');
 
+            // Disable submit button immediately to prevent double-clicks
+            const submitBtn = document.getElementById('submit-answer-btn');
+            submitBtn.disabled = true;
+
             try {
                 const response = await fetch('api/submit-answer', {
                     method: 'POST',
@@ -1160,6 +1169,8 @@
 
             } catch (error) {
                 showError('test-error', 'Помилка відправки відповіді: ' + error.message);
+                // Re-enable submit button on error so user can retry
+                submitBtn.disabled = false;
             }
         }
 
@@ -1181,7 +1192,7 @@
                 // Brief delay allows user to see their selection before transition
                 setTimeout(() => {
                     continueToNextQuestion(true);
-                }, 200);
+                }, 100);
                 return;
             }
 
@@ -1238,9 +1249,16 @@
 
             submitBtn.classList.add('hidden');
             continueBtn.classList.remove('hidden');
+            continueBtn.disabled = false; // Re-enable for the next question
         }
 
         async function continueToNextQuestion(withAnimation = true) {
+            // Disable continue button to prevent double-clicks during animation
+            const continueBtn = document.getElementById('continue-btn');
+            if (continueBtn) {
+                continueBtn.disabled = true;
+            }
+
             // Only apply fade-out animation for manual transitions (not auto-advance)
             if (withAnimation) {
                 const container = document.getElementById('current-question-container');
@@ -1248,8 +1266,8 @@
 
                 if (currentQuestion) {
                     currentQuestion.classList.add('question-fade-out');
-                    // Wait for fade-out animation to complete (900ms)
-                    await new Promise(resolve => setTimeout(resolve, 900));
+                    // Wait for fade-out animation to complete (450ms)
+                    await new Promise(resolve => setTimeout(resolve, 450));
                 }
             }
 
@@ -1272,7 +1290,7 @@
             // If animation was applied, wait for it to complete before allowing further interaction
             // This ensures Selenium tests can reliably detect the new question after animation
             if (withAnimation) {
-                await new Promise(resolve => setTimeout(resolve, 1050)); // Wait for fade-in to complete (300ms + buffer)
+                await new Promise(resolve => setTimeout(resolve, 525)); // Wait for fade-in to complete (500ms + buffer)
             }
         }
 
