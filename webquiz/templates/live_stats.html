@@ -432,6 +432,7 @@
                 this.users = {};
                 this.liveStats = {};
                 this.completedUsers = {};  // user_id -> boolean (completed status)
+                this.completionTimes = {};  // user_id -> ISO timestamp when completed
                 this.questions = [];
                 this.totalQuestions = 0;
                 this.currentQuiz = null;
@@ -583,6 +584,7 @@
                 this.users = data.users || {};
                 this.liveStats = this.normalizeStatsData(data.live_stats || {});
                 this.completedUsers = data.completed_users || {};
+                this.completionTimes = data.completion_times || {};
                 this.questions = data.questions || [];
                 this.totalQuestions = data.total_questions || 0;
                 this.currentQuiz = data.current_quiz || 'No quiz selected';
@@ -642,6 +644,7 @@
                 const newState = data.state;
                 const timeTaken = data.time_taken;
                 const completed = data.completed || false;
+                const completedAt = data.completed_at;
 
                 // Check if user is moving from in-progress to completed
                 const wasCompleted = this.completedUsers[userId] || false;
@@ -661,8 +664,11 @@
                     time_taken: timeTaken
                 };
 
-                // Update completion status
+                // Update completion status and time
                 this.completedUsers[userId] = isNowCompleted;
+                if (isNowCompleted && completedAt) {
+                    this.completionTimes[userId] = completedAt;
+                }
 
                 // Update statistics incrementally
                 this.updateStatisticsIncremental(userId, questionId, oldState, newState);
@@ -791,6 +797,22 @@
                     } else {
                         inProgressUsers.push(userId);
                     }
+                });
+
+                // Sort completed users by completion time (most recent first)
+                completedUsers.sort((a, b) => {
+                    const timeA = this.completionTimes[a];
+                    const timeB = this.completionTimes[b];
+
+                    // If both have completion times, sort by time (descending - newest first)
+                    if (timeA && timeB) {
+                        return new Date(timeB) - new Date(timeA);
+                    }
+                    // If only one has completion time, prioritize it
+                    if (timeA) return -1;
+                    if (timeB) return 1;
+                    // If neither has completion time, maintain order
+                    return 0;
                 });
 
                 // Update filter counts
