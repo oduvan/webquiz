@@ -250,6 +250,11 @@
         button:hover {
             background: #0056b3;
         }
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            pointer-events: none;
+        }
         .button-container {
             position: relative;
             margin: 20px 0;
@@ -336,11 +341,11 @@
         }
 
         .question-fade-out {
-            animation: fadeOut 0.9s ease-out forwards;
+            animation: fadeOut 0.45s ease-out forwards;
         }
 
         .question-fade-in {
-            animation: fadeIn 1s ease-out forwards;
+            animation: fadeIn 0.5s ease-out forwards;
         }
         #loading {
             text-align: center;
@@ -580,10 +585,18 @@
         let selectedAnswers = []; // For multiple choice questions
         let testResults = [];
 
+        // Helper function to convert absolute paths to relative paths
+        function makeRelativePath(path) {
+            if (path && typeof path === 'string' && path.startsWith('/')) {
+                return path.substring(1);
+            }
+            return path;
+        }
+
         // Notify server when question starts (for timing and live stats)
         async function notifyQuestionStart(questionId) {
             try {
-                await fetch('/api/question-start', {
+                await fetch('api/question-start', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json'
@@ -710,7 +723,7 @@
             if (storedUserId) {
                 // User ID stored, verify it with server
                 try {
-                    const response = await fetch(`/api/verify-user/${storedUserId}`);
+                    const response = await fetch(`api/verify-user/${storedUserId}`);
                     const data = await response.json();
 
                     if (response.ok && data.valid) {
@@ -800,7 +813,7 @@
             hideError('registration-error');
 
             try {
-                const response = await fetch('/api/register', {
+                const response = await fetch('api/register', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json'
@@ -889,7 +902,7 @@
             hideError('waiting-error');
 
             try {
-                const response = await fetch('/api/update-registration', {
+                const response = await fetch('api/update-registration', {
                     method: 'PUT',
                     headers: {
                         'Content-Type': 'application/json'
@@ -932,7 +945,7 @@
             hideError('waiting-error');
 
             try {
-                const response = await fetch(`/api/verify-user/${currentUserId}`);
+                const response = await fetch(`api/verify-user/${currentUserId}`);
                 const data = await response.json();
 
                 if (response.ok && data.valid) {
@@ -989,7 +1002,7 @@
             container.innerHTML = `
                 <div class="current-question active-question">
                     ${question.question ? `<h3 class="question-text">${question.question}</h3>` : ''}
-                    ${question.image ? `<a href="${question.image}" target="_blank"><img src="${question.image}" alt="Question image" class="question-image quiz-question-img"></a>` : ''}
+                    ${question.image ? `<a href="${makeRelativePath(question.image)}" target="_blank"><img src="${makeRelativePath(question.image)}" alt="Question image" class="question-image quiz-question-img"></a>` : ''}
                     <div class="options">
                         ${question.is_multiple_choice ? '<p class="multiple-choice-hint" style="font-size: 14px; color: var(--text-muted); margin-bottom: 10px;">📋 Можна обрати кілька відповідей</p>' : ''}
                         ${question.options.map((option, optionIndex) => {
@@ -999,7 +1012,7 @@
                                 return `
                                     <div class="option quiz-option" data-option-index="${optionIndex}" onclick="selectCurrentAnswer(${optionIndex})" id="option_${optionIndex}">
                                         <div class="option-content">
-                                            <img src="${option}" alt="Option ${optionIndex + 1}" class="option-image">
+                                            <img src="${makeRelativePath(option)}" alt="Option ${optionIndex + 1}" class="option-image">
                                         </div>
                                     </div>
                                 `;
@@ -1095,8 +1108,12 @@
             // Clear previous errors
             hideError('test-error');
 
+            // Disable submit button immediately to prevent double-clicks
+            const submitBtn = document.getElementById('submit-answer-btn');
+            submitBtn.disabled = true;
+
             try {
-                const response = await fetch('/api/submit-answer', {
+                const response = await fetch('api/submit-answer', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json'
@@ -1152,6 +1169,8 @@
 
             } catch (error) {
                 showError('test-error', 'Помилка відправки відповіді: ' + error.message);
+                // Re-enable submit button on error so user can retry
+                submitBtn.disabled = false;
             }
         }
 
@@ -1173,7 +1192,7 @@
                 // Brief delay allows user to see their selection before transition
                 setTimeout(() => {
                     continueToNextQuestion(true);
-                }, 200);
+                }, 100);
                 return;
             }
 
@@ -1230,9 +1249,16 @@
 
             submitBtn.classList.add('hidden');
             continueBtn.classList.remove('hidden');
+            continueBtn.disabled = false; // Re-enable for the next question
         }
 
         async function continueToNextQuestion(withAnimation = true) {
+            // Disable continue button to prevent double-clicks during animation
+            const continueBtn = document.getElementById('continue-btn');
+            if (continueBtn) {
+                continueBtn.disabled = true;
+            }
+
             // Only apply fade-out animation for manual transitions (not auto-advance)
             if (withAnimation) {
                 const container = document.getElementById('current-question-container');
@@ -1240,8 +1266,8 @@
 
                 if (currentQuestion) {
                     currentQuestion.classList.add('question-fade-out');
-                    // Wait for fade-out animation to complete (900ms)
-                    await new Promise(resolve => setTimeout(resolve, 900));
+                    // Wait for fade-out animation to complete (450ms)
+                    await new Promise(resolve => setTimeout(resolve, 450));
                 }
             }
 
@@ -1264,14 +1290,14 @@
             // If animation was applied, wait for it to complete before allowing further interaction
             // This ensures Selenium tests can reliably detect the new question after animation
             if (withAnimation) {
-                await new Promise(resolve => setTimeout(resolve, 1050)); // Wait for fade-in to complete (300ms + buffer)
+                await new Promise(resolve => setTimeout(resolve, 525)); // Wait for fade-in to complete (500ms + buffer)
             }
         }
 
         async function fetchAndShowFinalResults() {
             try {
                 // Fetch final results from server to ensure consistency with page reload
-                const response = await fetch(`/api/verify-user/${currentUserId}`);
+                const response = await fetch(`api/verify-user/${currentUserId}`);
                 const data = await response.json();
 
                 if (response.ok && data.valid && data.test_completed && data.final_results) {
@@ -1291,7 +1317,7 @@
         function formatQuestionForDisplay(questionText, questionImage) {
             if (questionImage && questionImage.startsWith('/')) {
                 // Display image with optional text
-                let html = `<img src="${questionImage}" alt="Question image" style="max-width: 200px; max-height: 150px; border-radius: 5px;">`;
+                let html = `<img src="${makeRelativePath(questionImage)}" alt="Question image" style="max-width: 200px; max-height: 150px; border-radius: 5px;">`;
                 if (questionText) {
                     html = `${questionText}<br>${html}`;
                 }
@@ -1315,7 +1341,7 @@
                     const trimmedAnswer = answer.trim();
                     if (trimmedAnswer.startsWith('/')) {
                         // Image answer
-                        return `<div style="margin: 2px 0;"><img src="${trimmedAnswer}" alt="Answer option" style="max-width: 100px; max-height: 75px; border-radius: 3px;"></div>`;
+                        return `<div style="margin: 2px 0;"><img src="${makeRelativePath(trimmedAnswer)}" alt="Answer option" style="max-width: 100px; max-height: 75px; border-radius: 3px;"></div>`;
                     } else {
                         // Text answer
                         return `<div style="margin: 2px 0;">${trimmedAnswer}</div>`;
@@ -1325,7 +1351,7 @@
                 // Single answer
                 if (answerText.startsWith('/')) {
                     // Display image for answer option
-                    return `<img src="${answerText}" alt="Answer option" style="max-width: 100px; max-height: 75px; border-radius: 3px;">`;
+                    return `<img src="${makeRelativePath(answerText)}" alt="Answer option" style="max-width: 100px; max-height: 75px; border-radius: 3px;">`;
                 } else {
                     // Text answer
                     return answerText;

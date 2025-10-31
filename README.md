@@ -17,6 +17,7 @@ A modern web-based quiz and testing system built with Python and aiohttp that al
 - **Performance Tracking**: Server-side timing for accurate response measurement
 - **Data Export**: Automatic CSV export with quiz-prefixed filenames and unique suffixes
 - **Responsive UI**: Clean web interface with dark/light theme support
+- **SSH Tunnel Support**: Optional public access via SSH reverse tunnel with auto-reconnect
 - **Binary Distribution**: Standalone PyInstaller executable with auto-configuration
 - **Comprehensive Testing**: 222+ tests covering all functionality with CI/CD pipeline
 - **Flexible File Paths**: Configurable paths for quizzes, logs, CSV, and static files
@@ -379,6 +380,60 @@ WebQuiz offers flexible control over when students can see correct answers:
   - In approval mode, only approved students count toward completion
 
 **Example Use Case**: Useful for collaborative learning environments where you want students to discuss answers together after everyone has completed the quiz independently.
+
+### SSH Tunnel for Public Access
+
+WebQuiz can expose your local server to the internet via an SSH reverse tunnel, making it accessible from a public URL. This is useful for:
+- Running quizzes from a local computer without port forwarding
+- Temporary public access without dedicated hosting
+- Classroom environments where students connect from outside the network
+
+**Configuration** (`webquiz.yaml`):
+
+**Option 1: Fetch config from server**
+```yaml
+tunnel:
+  server: "tunnel.example.com"          # SSH tunnel server hostname
+  public_key: "keys/id_ed25519.pub"     # Path to SSH public key (auto-generated if missing)
+  private_key: "keys/id_ed25519"        # Path to SSH private key (auto-generated if missing)
+  # Config will be fetched from https://tunnel.example.com/tunnel_config.yaml
+```
+
+**Option 2: Local config (bypasses server fetch)**
+```yaml
+tunnel:
+  server: "tunnel.example.com"
+  public_key: "keys/id_ed25519.pub"
+  private_key: "keys/id_ed25519"
+  config:  # Optional: Provide locally to skip fetching from server
+    username: "tunneluser"
+    socket_directory: "/var/run/tunnels"
+    base_url: "https://tunnel.example.com/tests"
+```
+
+**How it works:**
+
+1. **Automatic Key Generation**: If keys don't exist, WebQuiz automatically generates ED25519 SSH key pairs
+2. **Admin Control**: Navigate to the admin panel to see the tunnel status
+3. **Copy Public Key**: Copy the generated public key and add it to `~/.ssh/authorized_keys` on your tunnel server
+4. **Connect**: Click the "Connect" button in the admin panel to establish the tunnel
+5. **Public URL**: Once connected, a public URL will be displayed (e.g., `https://tunnel.example.com/tests/a3f7b2/`)
+6. **Auto-Reconnect**: If the connection drops, WebQuiz automatically attempts to reconnect
+
+**Server Requirements:**
+- The tunnel server must be configured to support Unix domain socket forwarding
+- The server should provide a `tunnel_config.yaml` endpoint at `https://[server]/tunnel_config.yaml` with:
+  ```yaml
+  username: tunneluser
+  socket_directory: /var/run/tunnels
+  base_url: https://tunnel.example.com/tests
+  ```
+
+**Security Notes:**
+- SSH keys are generated with no passphrase for automated connection
+- Keys are stored with proper permissions (600 for private key)
+- Connection is admin-initiated (no auto-connect on startup)
+- Connection status is shown in real-time via WebSocket
 
 ## 📊 Data Export
 

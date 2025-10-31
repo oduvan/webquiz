@@ -18,6 +18,7 @@ import logging
 from io import StringIO
 
 from .config import WebQuizConfig, load_config_from_yaml
+from .tunnel import TunnelManager
 
 from webquiz import __version__ as package_version
 
@@ -325,6 +326,9 @@ class TestingServer:
         self.admin_websocket_clients: List[web.WebSocketResponse] = []  # Connected admin WebSocket clients
         self.live_stats: Dict[str, Dict[int, str]] = {}  # user_id -> {question_id: state}
 
+        # SSH Tunnel infrastructure
+        self.tunnel_manager = None  # Will be initialized if tunnel is configured
+
         # Preload templates
         self.templates = self._load_templates()
 
@@ -518,6 +522,46 @@ class TestingServer:
             logger.info(f"=== Server Started - New Log File Created: {self.log_file} ===")
         except Exception as e:
             print(f"Error initializing log file {self.log_file}: {e}")
+
+    async def initialize_tunnel(self):
+        """Initialize SSH tunnel if configured.
+
+        Checks if tunnel is configured, validates/generates keys, but does not
+        auto-connect. Connection is initiated by admin via button click.
+        """
+        if not self.config.tunnel.server:
+            logger.info("SSH tunnel not configured, skipping initialization")
+            return
+
+        try:
+            logger.info(f"Initializing SSH tunnel for server: {self.config.tunnel.server}")
+
+            # Create tunnel manager
+            self.tunnel_manager = TunnelManager(self.config.tunnel, local_port=self.config.server.port)
+
+            # Set up status callback to broadcast changes to admin clients
+            async def tunnel_status_callback(status):
+                # Include configured and server fields in status updates
+                tunnel_update = {
+                    "configured": True,
+                    "server": self.config.tunnel.server,
+                    "socket_name": self.config.tunnel.socket_name,
+                    **status,
+                }
+                await self.broadcast_to_admin_websockets({"type": "tunnel_status", "tunnel": tunnel_update})
+
+            self.tunnel_manager.set_status_callback(tunnel_status_callback)
+
+            # Ensure keys exist (generate if needed), but don't connect yet
+            success, message = await self.tunnel_manager.ensure_keys_exist()
+
+            if success:
+                logger.info(f"SSH tunnel initialized successfully: {message}")
+            else:
+                logger.warning(f"SSH tunnel keys not ready: {message}")
+
+        except Exception as e:
+            logger.error(f"Error initializing SSH tunnel: {e}")
 
     async def create_default_config_yaml(self, file_path: str = None):
         """Create default quiz YAML file with example questions.
@@ -2359,6 +2403,55 @@ class TestingServer:
             logger.error(f"Error updating config: {e}")
             return web.json_response({"error": str(e)}, status=500)
 
+    @admin_auth_required
+    async def tunnel_connect(self, request):
+        """Connect SSH tunnel.
+
+        Args:
+            request: aiohttp request
+
+        Returns:
+            JSON response with success status and URL or error
+        """
+        try:
+            if not self.tunnel_manager:
+                return web.json_response({"error": "Tunnel not configured"}, status=400)
+
+            success, result = await self.tunnel_manager.connect()
+
+            if success:
+                logger.info(f"Tunnel connected: {result}")
+                return web.json_response({"success": True, "url": result})
+            else:
+                logger.error(f"Tunnel connection failed: {result}")
+                return web.json_response({"error": result}, status=500)
+
+        except Exception as e:
+            logger.error(f"Error connecting tunnel: {e}")
+            return web.json_response({"error": str(e)}, status=500)
+
+    @admin_auth_required
+    async def tunnel_disconnect(self, request):
+        """Disconnect SSH tunnel.
+
+        Args:
+            request: aiohttp request
+
+        Returns:
+            JSON response with success status
+        """
+        try:
+            if not self.tunnel_manager:
+                return web.json_response({"error": "Tunnel not configured"}, status=400)
+
+            await self.tunnel_manager.disconnect()
+            logger.info("Tunnel disconnected")
+            return web.json_response({"success": True})
+
+        except Exception as e:
+            logger.error(f"Error disconnecting tunnel: {e}")
+            return web.json_response({"error": str(e)}, status=500)
+
     async def serve_files_page(self, request):
         """Serve the files management page.
 
@@ -2834,10 +2927,22 @@ class TestingServer:
                         "registration_fields": self._extract_registration_fields(user_data),
                     }
 
+        # Get tunnel status if configured
+        tunnel_info = None
+        if self.tunnel_manager:
+            tunnel_status = self.tunnel_manager.get_status()
+            tunnel_info = {
+                "configured": True,
+                "server": self.config.tunnel.server,
+                "socket_name": self.config.tunnel.socket_name,
+                **tunnel_status,
+            }
+
         initial_data = {
             "type": "initial_state",
             "pending_users": pending_users,
             "requires_approval": hasattr(self.config, "registration") and self.config.registration.approve,
+            "tunnel": tunnel_info,
         }
         return await self._handle_websocket_connection(
             request, self.admin_websocket_clients, initial_data, "admin WebSocket"
@@ -2859,6 +2964,9 @@ async def create_app(config: WebQuizConfig):
         handlers=[logging.FileHandler(server.log_file), logging.StreamHandler()],  # Also log to console
         force=True,  # Override any existing configuration
     )
+
+    # Initialize SSH tunnel if configured (checks keys, but doesn't auto-connect)
+    await server.initialize_tunnel()
 
     # Load questions and create HTML with embedded data (CSV will be initialized in switch_quiz)
     await server.load_questions()
@@ -2898,6 +3006,11 @@ async def create_app(config: WebQuizConfig):
     app.router.add_get("/api/admin/list-images", server.admin_list_images)
     app.router.add_post("/api/admin/download-quiz", server.admin_download_quiz)
     app.router.add_put("/api/admin/config", server.admin_update_config)
+
+    # Tunnel routes
+    app.router.add_post("/api/admin/tunnel/connect", server.tunnel_connect)
+    app.router.add_post("/api/admin/tunnel/disconnect", server.tunnel_disconnect)
+
     app.router.add_get("/ws/admin", server.websocket_admin)
 
     # File management routes (admin access)

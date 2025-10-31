@@ -371,6 +371,52 @@
             font-family: monospace;
         }
 
+        .tunnel-info {
+            background: var(--info-bg);
+            border: 1px solid var(--info-border);
+            border-radius: 5px;
+            padding: 20px;
+            margin: 20px 0;
+        }
+
+        .tunnel-info h3 {
+            margin-top: 0;
+            color: var(--info-color);
+        }
+
+        .tunnel-public-key {
+            background: var(--white);
+            border: 1px solid var(--border-color);
+            border-radius: 3px;
+            padding: 10px;
+            margin: 10px 0;
+            font-family: monospace;
+            font-size: 12px;
+            word-break: break-all;
+            position: relative;
+        }
+
+        .copy-button {
+            margin-left: 10px;
+            padding: 5px 10px;
+            font-size: 12px;
+            cursor: pointer;
+        }
+
+        .tunnel-url {
+            background: var(--success-bg);
+            border: 1px solid var(--success-border);
+            border-radius: 3px;
+            padding: 10px;
+            margin: 10px 0;
+            font-family: monospace;
+        }
+
+        .tunnel-error {
+            color: var(--error-color);
+            margin: 10px 0;
+        }
+
         .url-item .label {
             font-weight: bold;
             color: var(--button-bg);
@@ -640,6 +686,21 @@
                         Визначення мережевих інтерфейсів...
                     </div>
                 </div>
+            </div>
+
+            <!-- SSH Tunnel Section -->
+            <div class="tunnel-info" id="tunnel-section" style="display: none;">
+                <h3>SSH Tunnel</h3>
+                <div class="info-section">
+                    <strong>Server:</strong> <span id="tunnel-server"></span>
+                </div>
+                <div id="tunnel-socket-name-section" class="info-section" style="display: none;">
+                    <strong>Socket Name:</strong> <span id="tunnel-socket-name"></span>
+                </div>
+                <div class="info-section">
+                    <button id="tunnel-connect-btn" onclick="toggleTunnel()" style="margin-top: 10px;">Connect</button>
+                </div>
+                <div id="tunnel-error" class="tunnel-error" style="display: none;"></div>
             </div>
 
             <div class="back-link">
@@ -1837,6 +1898,15 @@
                     pendingUsers = data.pending_users || {};
                     displayPendingUsers();
                 }
+                // Handle tunnel initial state
+                if (data.tunnel) {
+                    updateTunnelUI(data.tunnel);
+                }
+            } else if (data.type === 'tunnel_status') {
+                // Tunnel status update
+                if (data.tunnel) {
+                    updateTunnelUI(data.tunnel);
+                }
             } else if (data.type === 'new_registration') {
                 // New user registered - data now contains user_id, username, registration_fields
                 pendingUsers[data.user_id] = {
@@ -2027,6 +2097,118 @@
             } catch (error) {
                 // Silently fail - don't show any error messages
                 return;
+            }
+        }
+
+        // Tunnel Management Functions
+        function updateTunnelUI(tunnelData) {
+            const tunnelSection = document.getElementById('tunnel-section');
+
+            // Only hide tunnel section if explicitly not configured (initial load)
+            if (!tunnelData) {
+                tunnelSection.style.display = 'none';
+                return;
+            }
+
+            // If configured is explicitly false, hide section
+            if (tunnelData.configured === false) {
+                tunnelSection.style.display = 'none';
+                return;
+            }
+
+            // Show tunnel section (for both initial load and status updates)
+            tunnelSection.style.display = 'block';
+
+            // Update server name (only if provided, to preserve during status updates)
+            if (tunnelData.server) {
+                document.getElementById('tunnel-server').textContent = tunnelData.server;
+            }
+
+            // Update socket name if provided
+            const socketNameSection = document.getElementById('tunnel-socket-name-section');
+            if (tunnelData.socket_name) {
+                document.getElementById('tunnel-socket-name').textContent = tunnelData.socket_name;
+                socketNameSection.style.display = 'block';
+            } else {
+                socketNameSection.style.display = 'none';
+            }
+
+            // Update connect button and error display
+            const connectBtn = document.getElementById('tunnel-connect-btn');
+            const errorSection = document.getElementById('tunnel-error');
+            const urlList = document.getElementById('url-list');
+
+            if (tunnelData.connected) {
+                connectBtn.textContent = 'Disconnect';
+                connectBtn.disabled = false;
+                errorSection.style.display = 'none';
+
+                // Add tunnel URL to main URL list if not already present
+                if (tunnelData.url && !document.getElementById('tunnel-url-item')) {
+                    const tunnelUrlItem = document.createElement('div');
+                    tunnelUrlItem.id = 'tunnel-url-item';
+                    tunnelUrlItem.className = 'url-item';
+                    tunnelUrlItem.style.backgroundColor = '#e8f5e9';
+                    tunnelUrlItem.style.borderColor = '#81c784';
+                    tunnelUrlItem.innerHTML = `
+                        <div class="label">
+                            <strong>🌐 Public Tunnel URL:</strong>
+                            <a href="${tunnelData.url}" target="_blank">${tunnelData.url}</a>
+                        </div>
+                    `;
+                    urlList.insertBefore(tunnelUrlItem, urlList.firstChild);
+                }
+            } else {
+                connectBtn.textContent = 'Connect';
+                connectBtn.disabled = tunnelData.keys_status !== 'ok';
+
+                // Remove tunnel URL from main URL list
+                const existingTunnelItem = document.getElementById('tunnel-url-item');
+                if (existingTunnelItem) {
+                    existingTunnelItem.remove();
+                }
+
+                if (tunnelData.error) {
+                    errorSection.textContent = 'Error: ' + tunnelData.error;
+                    errorSection.style.display = 'block';
+                } else {
+                    errorSection.style.display = 'none';
+                }
+            }
+        }
+
+        async function toggleTunnel() {
+            const connectBtn = document.getElementById('tunnel-connect-btn');
+            const isConnected = connectBtn.textContent === 'Disconnect';
+
+            try {
+                connectBtn.disabled = true;
+
+                const endpoint = isConnected ? '/api/admin/tunnel/disconnect' : '/api/admin/tunnel/connect';
+
+                const response = await fetch(endpoint, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-Master-Key': currentMasterKey
+                    }
+                });
+
+                const data = await response.json();
+
+                if (!response.ok) {
+                    throw new Error(data.error || 'Operation failed');
+                }
+
+                if (isConnected) {
+                    showMessage('Tunnel disconnected', 'success');
+                } else {
+                    showMessage('Tunnel connected! Public URL: ' + data.url, 'success');
+                }
+
+            } catch (error) {
+                showMessage('Tunnel operation failed: ' + error.message, 'error');
+                connectBtn.disabled = false;
             }
         }
 

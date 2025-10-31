@@ -38,6 +38,8 @@ aiohttp = "^3.12.13"
 PyYAML = "^6.0.2"
 aiofiles = "^24.1.0"
 httpx = "^0.28.1"
+asyncssh = "^2.14.0"
+cryptography = "^41.0.0"
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^8.3.3"
