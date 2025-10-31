@@ -694,21 +694,11 @@
                 <div class="info-section">
                     <strong>Server:</strong> <span id="tunnel-server"></span>
                 </div>
-                <div id="tunnel-keys-status" class="info-section"></div>
-                <div id="tunnel-public-key-section" class="info-section" style="display: none;">
-                    <strong>Public Key:</strong>
-                    <button class="copy-button" onclick="copyTunnelPublicKey()">Copy to Clipboard</button>
-                    <div class="tunnel-public-key" id="tunnel-public-key"></div>
-                    <small style="color: #666;">Add this public key to ~/.ssh/authorized_keys on the tunnel server</small>
+                <div id="tunnel-socket-name-section" class="info-section" style="display: none;">
+                    <strong>Socket Name:</strong> <span id="tunnel-socket-name"></span>
                 </div>
                 <div class="info-section">
                     <button id="tunnel-connect-btn" onclick="toggleTunnel()" style="margin-top: 10px;">Connect</button>
-                </div>
-                <div id="tunnel-url-section" class="info-section" style="display: none;">
-                    <strong>Public URL:</strong>
-                    <div class="tunnel-url">
-                        <a id="tunnel-url" href="#" target="_blank"></a>
-                    </div>
                 </div>
                 <div id="tunnel-error" class="tunnel-error" style="display: none;"></div>
             </div>
@@ -2134,71 +2124,26 @@
                 document.getElementById('tunnel-server').textContent = tunnelData.server;
             }
 
-            // Update keys status
-            const keysStatusEl = document.getElementById('tunnel-keys-status');
-            const publicKeySection = document.getElementById('tunnel-public-key-section');
-
-            if (tunnelData.keys_status === 'ok') {
-                keysStatusEl.innerHTML = '<span style="color: var(--success-color);">✓ SSH Keys Ready</span>';
-                if (tunnelData.public_key_content) {
-                    document.getElementById('tunnel-public-key').textContent = tunnelData.public_key_content;
-                    publicKeySection.style.display = 'block';
-                }
-            } else if (tunnelData.keys_status === 'partial') {
-                keysStatusEl.innerHTML = '<span style="color: var(--error-color);">⚠ Keys Error: ' + (tunnelData.error || 'Key mismatch') + '</span>';
-                publicKeySection.style.display = 'none';
-            } else if (tunnelData.keys_status === 'not_configured') {
-                keysStatusEl.innerHTML = '<span style="color: var(--warning-color);">⚠ Keys not configured</span>';
-                publicKeySection.style.display = 'none';
+            // Update socket name if provided
+            const socketNameSection = document.getElementById('tunnel-socket-name-section');
+            if (tunnelData.socket_name) {
+                document.getElementById('tunnel-socket-name').textContent = tunnelData.socket_name;
+                socketNameSection.style.display = 'block';
             } else {
-                keysStatusEl.innerHTML = '<span style="color: var(--text-muted);">Checking keys...</span>';
-                publicKeySection.style.display = 'none';
+                socketNameSection.style.display = 'none';
             }
 
-            // Update connect button
+            // Update connect button and error display
             const connectBtn = document.getElementById('tunnel-connect-btn');
-            const urlSection = document.getElementById('tunnel-url-section');
             const errorSection = document.getElementById('tunnel-error');
-            const urlList = document.getElementById('url-list');
 
             if (tunnelData.connected) {
                 connectBtn.textContent = 'Disconnect';
                 connectBtn.disabled = false;
-
-                if (tunnelData.url) {
-                    const urlLink = document.getElementById('tunnel-url');
-                    urlLink.href = tunnelData.url;
-                    urlLink.textContent = tunnelData.url;
-                    urlSection.style.display = 'block';
-
-                    // Add tunnel URL to main URL list if not already present
-                    if (!document.getElementById('tunnel-url-item')) {
-                        const tunnelUrlItem = document.createElement('div');
-                        tunnelUrlItem.id = 'tunnel-url-item';
-                        tunnelUrlItem.className = 'url-item';
-                        tunnelUrlItem.style.backgroundColor = '#e8f5e9';
-                        tunnelUrlItem.style.borderColor = '#81c784';
-                        tunnelUrlItem.innerHTML = `
-                            <div class="label">
-                                <strong>🌐 Public Tunnel URL:</strong>
-                                <a href="${tunnelData.url}" target="_blank">${tunnelData.url}</a>
-                            </div>
-                        `;
-                        urlList.insertBefore(tunnelUrlItem, urlList.firstChild);
-                    }
-                }
-
                 errorSection.style.display = 'none';
             } else {
                 connectBtn.textContent = 'Connect';
                 connectBtn.disabled = tunnelData.keys_status !== 'ok';
-                urlSection.style.display = 'none';
-
-                // Remove tunnel URL from main URL list
-                const existingTunnelItem = document.getElementById('tunnel-url-item');
-                if (existingTunnelItem) {
-                    existingTunnelItem.remove();
-                }
 
                 if (tunnelData.error) {
                     errorSection.textContent = 'Error: ' + tunnelData.error;
@@ -2241,31 +2186,6 @@
             } catch (error) {
                 showMessage('Tunnel operation failed: ' + error.message, 'error');
                 connectBtn.disabled = false;
-            }
-        }
-
-        async function copyTunnelPublicKey() {
-            const publicKeyEl = document.getElementById('tunnel-public-key');
-            const publicKey = publicKeyEl.textContent;
-
-            try {
-                await navigator.clipboard.writeText(publicKey);
-                showMessage('Public key copied to clipboard!', 'success');
-            } catch (error) {
-                // Fallback for older browsers
-                const textArea = document.createElement('textarea');
-                textArea.value = publicKey;
-                textArea.style.position = 'fixed';
-                textArea.style.left = '-999999px';
-                document.body.appendChild(textArea);
-                textArea.select();
-                try {
-                    document.execCommand('copy');
-                    showMessage('Public key copied to clipboard!', 'success');
-                } catch (err) {
-                    showMessage('Failed to copy public key', 'error');
-                }
-                document.body.removeChild(textArea);
             }
         }
 

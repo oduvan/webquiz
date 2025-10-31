@@ -135,6 +135,7 @@ webquiz-stress-test -c 50
   - `tunnel.server` - SSH tunnel server hostname (e.g., "tunnel.example.com")
   - `tunnel.public_key` - Path to SSH public key file (auto-generated if missing)
   - `tunnel.private_key` - Path to SSH private key file (auto-generated if missing)
+  - `tunnel.socket_name` - Optional fixed socket name instead of random generation (default: random 6-8 hex chars)
   - `tunnel.config` - Optional nested config subsection (username, socket_directory, base_url) - bypasses server fetch when provided
 - Questions use **0-indexed** `correct_answer` field
 - Usernames unique per quiz session

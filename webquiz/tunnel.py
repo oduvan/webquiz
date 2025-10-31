@@ -243,8 +243,8 @@ class TunnelManager:
         if not tunnel_config:
             return False, self.status.get("error", "Failed to fetch tunnel config")
 
-        # Generate socket ID
-        self.socket_id = self._generate_socket_id()
+        # Use custom socket name if provided, otherwise generate random ID
+        self.socket_id = self.config.socket_name if self.config.socket_name else self._generate_socket_id()
 
         try:
             # Establish SSH connection

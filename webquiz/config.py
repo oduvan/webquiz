@@ -124,6 +124,7 @@ class TunnelConfig:
     server: Optional[str] = None
     public_key: Optional[str] = None
     private_key: Optional[str] = None
+    socket_name: Optional[str] = None
     config: Optional[TunnelServerConfig] = None
 
     def __post_init__(self):

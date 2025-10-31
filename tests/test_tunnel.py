@@ -36,6 +36,18 @@ def test_tunnel_config_with_values():
     assert tunnel.private_key == "/path/to/private"
 
 
+def test_tunnel_config_with_socket_name():
+    """Test TunnelConfig with custom socket_name."""
+    tunnel = TunnelConfig(
+        server="example.com",
+        public_key="/path/to/public",
+        private_key="/path/to/private",
+        socket_name="my-custom-socket",
+    )
+    assert tunnel.server == "example.com"
+    assert tunnel.socket_name == "my-custom-socket"
+
+
 def test_tunnel_config_path_resolution():
     """Test that TunnelConfig resolves relative paths when running as binary."""
     # Set WEBQUIZ_BINARY_DIR
@@ -84,6 +96,31 @@ def test_load_config_with_tunnel():
         assert config.tunnel.server == "tunnel.example.com"
         assert config.tunnel.public_key == "keys/id_ed25519.pub"
         assert config.tunnel.private_key == "keys/id_ed25519"
+    finally:
+        os.unlink(config_path)
+
+
+def test_load_config_with_tunnel_socket_name():
+    """Test loading config with tunnel settings including socket_name."""
+    config_data = {
+        "tunnel": {
+            "server": "tunnel.example.com",
+            "public_key": "keys/id_ed25519.pub",
+            "private_key": "keys/id_ed25519",
+            "socket_name": "my-custom-socket",
+        }
+    }
+
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
+        yaml.dump(config_data, f)
+        config_path = f.name
+
+    try:
+        config = load_config_from_yaml(config_path)
+        assert config.tunnel.server == "tunnel.example.com"
+        assert config.tunnel.public_key == "keys/id_ed25519.pub"
+        assert config.tunnel.private_key == "keys/id_ed25519"
+        assert config.tunnel.socket_name == "my-custom-socket"
     finally:
         os.unlink(config_path)
 
@@ -529,6 +566,75 @@ async def test_connect_success():
             assert manager.status["connected"] is True
             assert manager.status["url"] == result
             assert manager.socket_id is not None
+
+            # Verify SSH connection was called correctly
+            mock_connect.assert_called_once()
+            call_kwargs = mock_connect.call_args.kwargs
+            assert call_kwargs["username"] == "tunneluser"
+            assert private_key_path in call_kwargs["client_keys"]
+
+
+@pytest.mark.asyncio
+async def test_connect_with_custom_socket_name():
+    """Test successful tunnel connection with custom socket_name."""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        public_key_path = os.path.join(tmpdir, "id_ed25519.pub")
+        private_key_path = os.path.join(tmpdir, "id_ed25519")
+
+        config = TunnelConfig(
+            server="example.com",
+            public_key=public_key_path,
+            private_key=private_key_path,
+            socket_name="my-custom-socket",
+        )
+        manager = TunnelManager(config, local_port=8080)
+
+        # Generate keys first
+        await manager.ensure_keys_exist()
+
+        # Mock tunnel config fetch
+        tunnel_config_data = {
+            "username": "tunneluser",
+            "socket_directory": "/var/run/tunnels",
+            "base_url": "https://example.com/tests",
+        }
+
+        # Mock SSH connection
+        mock_connection = AsyncMock()
+        mock_listener = AsyncMock()
+
+        # Make forward method async and return the listener
+        async def forward_mock(remote_socket, *_args, **_kwargs):
+            # Verify custom socket name is used in remote socket path
+            assert remote_socket == "/var/run/tunnels/my-custom-socket"
+            return mock_listener
+
+        mock_connection.forward_remote_path_to_port = forward_mock
+
+        with (
+            patch("webquiz.tunnel.httpx.AsyncClient") as mock_client_class,
+            patch(
+                "webquiz.tunnel.asyncssh.connect", new_callable=AsyncMock, return_value=mock_connection
+            ) as mock_connect,
+        ):
+
+            # Setup HTTP client mock
+            mock_response = Mock()
+            mock_response.text = yaml.dump(tunnel_config_data)
+            mock_response.raise_for_status = Mock()
+
+            mock_client = AsyncMock()
+            mock_client.__aenter__.return_value = mock_client
+            mock_client.get.return_value = mock_response
+            mock_client_class.return_value = mock_client
+
+            success, result = await manager.connect()
+
+            assert success is True
+            assert result == "https://example.com/tests/my-custom-socket/"
+            assert manager.status["connected"] is True
+            assert manager.status["url"] == result
+            assert manager.socket_id == "my-custom-socket"
 
             # Verify SSH connection was called correctly
             mock_connect.assert_called_once()

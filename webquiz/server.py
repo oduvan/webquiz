@@ -545,6 +545,7 @@ class TestingServer:
                 tunnel_update = {
                     "configured": True,
                     "server": self.config.tunnel.server,
+                    "socket_name": self.config.tunnel.socket_name,
                     **status,
                 }
                 await self.broadcast_to_admin_websockets({"type": "tunnel_status", "tunnel": tunnel_update})
@@ -2924,6 +2925,7 @@ class TestingServer:
             tunnel_info = {
                 "configured": True,
                 "server": self.config.tunnel.server,
+                "socket_name": self.config.tunnel.socket_name,
                 **tunnel_status,
             }
 
