@@ -2136,14 +2136,37 @@
             // Update connect button and error display
             const connectBtn = document.getElementById('tunnel-connect-btn');
             const errorSection = document.getElementById('tunnel-error');
+            const urlList = document.getElementById('url-list');
 
             if (tunnelData.connected) {
                 connectBtn.textContent = 'Disconnect';
                 connectBtn.disabled = false;
                 errorSection.style.display = 'none';
+
+                // Add tunnel URL to main URL list if not already present
+                if (tunnelData.url && !document.getElementById('tunnel-url-item')) {
+                    const tunnelUrlItem = document.createElement('div');
+                    tunnelUrlItem.id = 'tunnel-url-item';
+                    tunnelUrlItem.className = 'url-item';
+                    tunnelUrlItem.style.backgroundColor = '#e8f5e9';
+                    tunnelUrlItem.style.borderColor = '#81c784';
+                    tunnelUrlItem.innerHTML = `
+                        <div class="label">
+                            <strong>🌐 Public Tunnel URL:</strong>
+                            <a href="${tunnelData.url}" target="_blank">${tunnelData.url}</a>
+                        </div>
+                    `;
+                    urlList.insertBefore(tunnelUrlItem, urlList.firstChild);
+                }
             } else {
                 connectBtn.textContent = 'Connect';
                 connectBtn.disabled = tunnelData.keys_status !== 'ok';
+
+                // Remove tunnel URL from main URL list
+                const existingTunnelItem = document.getElementById('tunnel-url-item');
+                if (existingTunnelItem) {
+                    existingTunnelItem.remove();
+                }
 
                 if (tunnelData.error) {
                     errorSection.textContent = 'Error: ' + tunnelData.error;
