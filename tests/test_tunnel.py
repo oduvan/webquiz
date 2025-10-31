@@ -301,7 +301,7 @@ async def test_fetch_tunnel_config_no_server():
 
 @pytest.mark.asyncio
 async def test_fetch_tunnel_config_success():
-    """Test successful tunnel config fetch."""
+    """Test successful tunnel config fetch from domain (uses HTTPS)."""
     config = TunnelConfig(server="example.com")
     manager = TunnelManager(config)
 
@@ -328,6 +328,74 @@ async def test_fetch_tunnel_config_success():
         assert result["username"] == "tunneluser"
         assert result["socket_directory"] == "/var/run/tunnels"
         assert result["base_url"] == "https://example.com/tests"
+
+        # Verify HTTPS was used for domain name
+        mock_client.get.assert_called_once_with("https://example.com/tunnel_config.yaml")
+
+
+@pytest.mark.asyncio
+async def test_fetch_tunnel_config_from_ip_address():
+    """Test that IP address uses HTTP instead of HTTPS."""
+    config = TunnelConfig(server="192.168.1.100")
+    manager = TunnelManager(config)
+
+    tunnel_config_data = {
+        "username": "tunneluser",
+        "socket_directory": "/var/run/tunnels",
+        "base_url": "http://192.168.1.100/tests",
+    }
+
+    # Mock httpx client
+    with patch("webquiz.tunnel.httpx.AsyncClient") as mock_client_class:
+        mock_response = Mock()
+        mock_response.text = yaml.dump(tunnel_config_data)
+        mock_response.raise_for_status = Mock()
+
+        mock_client = AsyncMock()
+        mock_client.__aenter__.return_value = mock_client
+        mock_client.get.return_value = mock_response
+        mock_client_class.return_value = mock_client
+
+        result = await manager.fetch_tunnel_config()
+
+        assert result is not None
+        assert result["username"] == "tunneluser"
+        assert result["socket_directory"] == "/var/run/tunnels"
+        assert result["base_url"] == "http://192.168.1.100/tests"
+
+        # Verify HTTP was used for IP address
+        mock_client.get.assert_called_once_with("http://192.168.1.100/tunnel_config.yaml")
+
+
+@pytest.mark.asyncio
+async def test_fetch_tunnel_config_from_ipv6_address():
+    """Test that IPv6 address uses HTTP instead of HTTPS."""
+    config = TunnelConfig(server="2001:db8::1")
+    manager = TunnelManager(config)
+
+    tunnel_config_data = {
+        "username": "tunneluser",
+        "socket_directory": "/var/run/tunnels",
+        "base_url": "http://[2001:db8::1]/tests",
+    }
+
+    # Mock httpx client
+    with patch("webquiz.tunnel.httpx.AsyncClient") as mock_client_class:
+        mock_response = Mock()
+        mock_response.text = yaml.dump(tunnel_config_data)
+        mock_response.raise_for_status = Mock()
+
+        mock_client = AsyncMock()
+        mock_client.__aenter__.return_value = mock_client
+        mock_client.get.return_value = mock_response
+        mock_client_class.return_value = mock_client
+
+        result = await manager.fetch_tunnel_config()
+
+        assert result is not None
+
+        # Verify HTTP was used for IPv6 address
+        mock_client.get.assert_called_once_with("http://2001:db8::1/tunnel_config.yaml")
 
 
 @pytest.mark.asyncio

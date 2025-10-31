@@ -111,6 +111,7 @@ webquiz-stress-test -c 50
 - **WebSocket tunnel status** - Real-time updates broadcast to admin clients, no polling needed
 - **Admin-triggered connection** - No auto-connect on startup, admin clicks button to establish tunnel
 - **Tunnel URL in access list** - Public tunnel URL automatically added to "URL для доступу з інших пристроїв:" list with green background when connected
+- **IP address detection** - Automatically uses HTTP for IP addresses (IPv4/IPv6) and HTTPS for domain names when fetching tunnel_config.yaml
 
 ## Key Flows
 

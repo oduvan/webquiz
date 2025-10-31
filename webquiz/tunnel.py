@@ -8,6 +8,7 @@ import asyncio
 import asyncssh
 import logging
 import secrets
+import ipaddress
 from pathlib import Path
 from typing import Optional, Dict, Any, Callable
 from cryptography.hazmat.primitives import serialization
@@ -179,7 +180,17 @@ class TunnelManager:
         if not self.config.server:
             return None
 
-        url = f"https://{self.config.server}/tunnel_config.yaml"
+        # Determine protocol based on whether server is an IP address
+        protocol = "http"
+        try:
+            # Try to parse as IP address
+            ipaddress.ip_address(self.config.server)
+            protocol = "http"  # Use HTTP for IP addresses
+        except ValueError:
+            # Not an IP address, assume it's a domain name
+            protocol = "https"  # Use HTTPS for domain names
+
+        url = f"{protocol}://{self.config.server}/tunnel_config.yaml"
         try:
             async with httpx.AsyncClient(timeout=30.0) as client:
                 response = await client.get(url)
