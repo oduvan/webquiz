@@ -71,6 +71,55 @@
             color: #856404;
         }
 
+        .filter-bar {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+            flex-shrink: 0;
+        }
+
+        .filter-button {
+            padding: 10px 20px;
+            border: 2px solid var(--border-color);
+            background: var(--container-bg);
+            color: var(--text-color);
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: bold;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .filter-button:hover {
+            background: #f0f0f0;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+        }
+
+        .filter-button.active {
+            background: var(--header-bg);
+            color: var(--header-color);
+            border-color: var(--header-bg);
+        }
+
+        .filter-badge {
+            background: rgba(0, 0, 0, 0.2);
+            padding: 2px 8px;
+            border-radius: 10px;
+            font-size: 12px;
+            min-width: 20px;
+            text-align: center;
+        }
+
+        .filter-button.active .filter-badge {
+            background: rgba(255, 255, 255, 0.3);
+        }
+
         .stats-container {
             background: var(--container-bg);
             border-radius: 10px;
@@ -80,33 +129,13 @@
             display: flex;
             flex-direction: column;
             min-height: 0;
-            gap: 20px;
-            padding: 10px;
         }
 
         .group-section {
             display: flex;
             flex-direction: column;
             min-height: 0;
-        }
-
-        .group-header {
-            background: var(--header-bg);
-            color: var(--header-color);
-            padding: 12px 20px;
-            border-radius: 8px 8px 0 0;
-            font-weight: bold;
-            font-size: 16px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-
-        .group-count {
-            background: rgba(255, 255, 255, 0.2);
-            padding: 4px 12px;
-            border-radius: 12px;
-            font-size: 14px;
+            flex: 1;
         }
 
         .stats-table {
@@ -371,40 +400,33 @@
         <div class="legend-item state-empty">⚪ Not Started</div>
     </div>
 
-    <div class="stats-container">
-        <!-- In Progress Group -->
-        <div id="inProgressSection" class="group-section" style="display: none;">
-            <div class="group-header">
-                <span>🔄 In Progress</span>
-                <span class="group-count" id="inProgressCount">0</span>
-            </div>
-            <div class="table-wrapper">
-                <table class="stats-table" id="inProgressTable">
-                    <thead>
-                        <tr id="inProgressHeader">
-                            <th class="username-header">User</th>
-                        </tr>
-                    </thead>
-                    <tbody id="inProgressBody">
-                    </tbody>
-                </table>
-            </div>
-        </div>
+    <!-- Filter Bar -->
+    <div class="filter-bar">
+        <button class="filter-button active" id="filterAll" onclick="window.liveStatsClient.setFilter('all')">
+            <span>All</span>
+            <span class="filter-badge" id="countAll">0</span>
+        </button>
+        <button class="filter-button" id="filterInProgress" onclick="window.liveStatsClient.setFilter('inProgress')">
+            <span>🔄 In Progress</span>
+            <span class="filter-badge" id="countInProgress">0</span>
+        </button>
+        <button class="filter-button" id="filterCompleted" onclick="window.liveStatsClient.setFilter('completed')">
+            <span>✅ Completed</span>
+            <span class="filter-badge" id="countCompleted">0</span>
+        </button>
+    </div>
 
-        <!-- Completed Group -->
-        <div id="completedSection" class="group-section" style="display: none;">
-            <div class="group-header">
-                <span>✅ Completed</span>
-                <span class="group-count" id="completedCount">0</span>
-            </div>
+    <div class="stats-container">
+        <!-- Single table that shows filtered users -->
+        <div id="statsSection" class="group-section" style="display: none;">
             <div class="table-wrapper">
-                <table class="stats-table" id="completedTable">
+                <table class="stats-table" id="statsTable">
                     <thead>
-                        <tr id="completedHeader">
+                        <tr id="statsHeader">
                             <th class="username-header">User</th>
                         </tr>
                     </thead>
-                    <tbody id="completedBody">
+                    <tbody id="statsBody">
                     </tbody>
                 </table>
             </div>
@@ -431,6 +453,7 @@
                 this.reconnectAttempts = 0;
                 this.maxReconnectAttempts = 5;
                 this.reconnectDelay = 1000;
+                this.currentFilter = 'all';  // 'all', 'inProgress', 'completed'
 
                 this.statusElement = document.getElementById('connectionStatus');
                 this.quizInfoElement = document.getElementById('quizInfo');
@@ -438,22 +461,46 @@
                 this.totalQuestionsElement = document.getElementById('totalQuestions');
                 this.activeUsersElement = document.getElementById('activeUsers');
                 
-                // In Progress group elements
-                this.inProgressSection = document.getElementById('inProgressSection');
-                this.inProgressHeader = document.getElementById('inProgressHeader');
-                this.inProgressBody = document.getElementById('inProgressBody');
-                this.inProgressCount = document.getElementById('inProgressCount');
+                // Single table elements
+                this.statsSection = document.getElementById('statsSection');
+                this.statsHeader = document.getElementById('statsHeader');
+                this.statsBody = document.getElementById('statsBody');
                 
-                // Completed group elements
-                this.completedSection = document.getElementById('completedSection');
-                this.completedHeader = document.getElementById('completedHeader');
-                this.completedBody = document.getElementById('completedBody');
-                this.completedCount = document.getElementById('completedCount');
+                // Filter elements
+                this.filterAll = document.getElementById('filterAll');
+                this.filterInProgress = document.getElementById('filterInProgress');
+                this.filterCompleted = document.getElementById('filterCompleted');
+                this.countAll = document.getElementById('countAll');
+                this.countInProgress = document.getElementById('countInProgress');
+                this.countCompleted = document.getElementById('countCompleted');
                 
                 // No data message
                 this.noDataMessage = document.getElementById('noDataMessage');
 
+                // Make this instance globally accessible for onclick handlers
+                window.liveStatsClient = this;
+
                 this.connect();
+            }
+
+            setFilter(filter) {
+                this.currentFilter = filter;
+                
+                // Update active button state
+                this.filterAll.classList.remove('active');
+                this.filterInProgress.classList.remove('active');
+                this.filterCompleted.classList.remove('active');
+                
+                if (filter === 'all') {
+                    this.filterAll.classList.add('active');
+                } else if (filter === 'inProgress') {
+                    this.filterInProgress.classList.add('active');
+                } else if (filter === 'completed') {
+                    this.filterCompleted.classList.add('active');
+                }
+                
+                // Rebuild table with current filter
+                this.buildTable();
             }
 
             connect() {
@@ -557,7 +604,7 @@
                 this.calculateStatistics();
 
                 this.updateQuizInfo();
-                this.buildTables();
+                this.buildTable();
             }
 
             normalizeStatsData(liveStats) {
@@ -599,7 +646,7 @@
                 this.calculateStatistics();
 
                 this.updateQuizInfo();
-                this.buildTables();
+                this.buildTable();
             }
 
             handleStateUpdate(data) {
@@ -635,7 +682,7 @@
 
                 // If user moved groups, rebuild tables completely
                 if (!wasCompleted && isNowCompleted) {
-                    this.buildTables();
+                    this.buildTable();
                 } else {
                     // Update only the affected cell
                     this.updateCell(userId, questionId, newState, timeTaken);
@@ -658,7 +705,7 @@
                 this.calculateStatistics();
 
                 this.updateQuizInfo();
-                this.buildTables();
+                this.buildTable();
             }
 
             calculateStatistics() {
@@ -744,18 +791,8 @@
                 this.quizInfoElement.style.display = 'block';
             }
 
-            buildTables() {
+            buildTable() {
                 const userIds = Object.keys(this.users);
-                
-                // If no users, show no-data message
-                if (userIds.length === 0) {
-                    this.noDataMessage.style.display = 'block';
-                    this.inProgressSection.style.display = 'none';
-                    this.completedSection.style.display = 'none';
-                    return;
-                }
-                
-                this.noDataMessage.style.display = 'none';
                 
                 // Separate users into two groups
                 const inProgressUsers = [];
@@ -769,28 +806,40 @@
                     }
                 });
                 
-                // Build headers for both tables (same headers)
-                const headerHtml = this.buildTableHeader();
-                this.inProgressHeader.innerHTML = headerHtml;
-                this.completedHeader.innerHTML = headerHtml;
+                // Update filter counts
+                this.countAll.textContent = userIds.length;
+                this.countInProgress.textContent = inProgressUsers.length;
+                this.countCompleted.textContent = completedUsers.length;
                 
-                // Build in-progress table
-                if (inProgressUsers.length > 0) {
-                    this.inProgressSection.style.display = 'flex';
-                    this.inProgressBody.innerHTML = this.buildTableRows(inProgressUsers);
-                    this.inProgressCount.textContent = inProgressUsers.length;
-                } else {
-                    this.inProgressSection.style.display = 'none';
+                // Determine which users to display based on filter
+                let displayUsers = [];
+                if (this.currentFilter === 'all') {
+                    displayUsers = userIds;
+                } else if (this.currentFilter === 'inProgress') {
+                    displayUsers = inProgressUsers;
+                } else if (this.currentFilter === 'completed') {
+                    displayUsers = completedUsers;
                 }
                 
-                // Build completed table
-                if (completedUsers.length > 0) {
-                    this.completedSection.style.display = 'flex';
-                    this.completedBody.innerHTML = this.buildTableRows(completedUsers);
-                    this.completedCount.textContent = completedUsers.length;
-                } else {
-                    this.completedSection.style.display = 'none';
+                // If no users or no users in filtered view, show no-data message
+                if (userIds.length === 0 || displayUsers.length === 0) {
+                    this.noDataMessage.style.display = 'block';
+                    this.statsSection.style.display = 'none';
+                    
+                    if (userIds.length === 0) {
+                        this.noDataMessage.textContent = 'Waiting for users to join the quiz...';
+                    } else {
+                        this.noDataMessage.textContent = `No users in this category yet.`;
+                    }
+                    return;
                 }
+                
+                this.noDataMessage.style.display = 'none';
+                this.statsSection.style.display = 'flex';
+                
+                // Build table
+                this.statsHeader.innerHTML = this.buildTableHeader();
+                this.statsBody.innerHTML = this.buildTableRows(displayUsers);
             }
             
             buildTableHeader() {
@@ -890,17 +939,14 @@
                 const questionStats = this.questionStatistics[questionId] || { correct_count: 0, total_attempts: 0 };
                 const statsText = `${questionStats.correct_count}/${questionStats.total_attempts}`;
 
-                // Update header in both tables
-                const headers = [this.inProgressHeader, this.completedHeader];
-                headers.forEach(headerElement => {
-                    const headerCell = headerElement.children[questionId];
-                    if (headerCell) {
-                        const statsElement = headerCell.querySelector('.question-stats');
-                        if (statsElement) {
-                            statsElement.textContent = statsText;
-                        }
+                // Update header in the single table
+                const headerCell = this.statsHeader.children[questionId];
+                if (headerCell) {
+                    const statsElement = headerCell.querySelector('.question-stats');
+                    if (statsElement) {
+                        statsElement.textContent = statsText;
                     }
-                });
+                }
             }
 
             updateUserStats(userId) {
