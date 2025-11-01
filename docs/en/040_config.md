@@ -134,6 +134,7 @@ tunnel:
   server: "tunnel.example.com"
   public_key: "keys/id_ed25519.pub"
   private_key: "keys/id_ed25519"
+  socket_name: "my-quiz-socket"  # Optional: Fixed socket name (default: random 6-8 chars)
   # Config will be fetched from https://tunnel.example.com/tunnel_config.yaml
 ```
 
@@ -166,6 +167,11 @@ The `tunnel` section allows you to configure an SSH tunnel for public access to 
 - **private_key** — path to the SSH private key file.
   Used for authentication on the tunnel server.
   Example: `"keys/id_ed25519"`
+
+- **socket_name** (optional) — fixed socket name instead of random generation.
+  Allows having a predictable URL for public access through the tunnel.
+  If not specified, a random identifier of 6-8 characters is generated.
+  Example: `"my-quiz-socket"`
 
 - **config** (optional subsection) — local tunnel configuration.
   If provided, WebQuiz will use this configuration instead of fetching from the server.

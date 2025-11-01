@@ -405,6 +405,7 @@ tunnel:
   server: "tunnel.example.com"
   public_key: "keys/id_ed25519.pub"
   private_key: "keys/id_ed25519"
+  socket_name: "my-quiz-socket"      # Optional: Fixed socket name (default: random 6-8 chars)
   config:  # Optional: Provide locally to skip fetching from server
     username: "tunneluser"
     socket_directory: "/var/run/tunnels"
