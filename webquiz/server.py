@@ -1411,7 +1411,18 @@ class TestingServer:
         state = "ok" if is_correct else "fail"
         self.update_live_stats(user_id, question_id, state, time_taken)
 
-        # Broadcast current question result
+        # Check if this was the last question and calculate final stats
+        # Use the number of answers instead of question_id to support randomization
+        test_completed = len(self.user_answers.get(user_id, [])) == len(self.questions)
+        completion_time = None
+        if test_completed:
+            # Test completed - calculate and store final stats
+            self.calculate_and_store_user_stats(user_id)
+            # Get completion time from stored stats
+            completion_time = self.user_stats.get(user_id, {}).get("completed_at")
+            logger.info(f"Test completed for user {user_id} - final stats calculated")
+
+        # Broadcast current question result with completion status
         await self.broadcast_to_websockets(
             {
                 "type": "state_update",
@@ -1421,15 +1432,10 @@ class TestingServer:
                 "state": state,
                 "time_taken": time_taken,
                 "total_questions": len(self.questions),
+                "completed": test_completed,
+                "completed_at": completion_time,
             }
         )
-
-        # Check if this was the last question and calculate final stats
-        # Use the number of answers instead of question_id to support randomization
-        if len(self.user_answers.get(user_id, [])) == len(self.questions):
-            # Test completed - calculate and store final stats
-            self.calculate_and_store_user_stats(user_id)
-            logger.info(f"Test completed for user {user_id} - final stats calculated")
 
         logger.info(
             f"Answer submitted by {username} (ID: {user_id}) for question {question_id}: {'Correct' if is_correct else 'Incorrect'} (took {time_taken}s)"
@@ -2939,10 +2945,25 @@ class TestingServer:
             user_id: stats for user_id, stats in self.live_stats.items() if user_id in approved_users
         }
 
+        # Build completion status for approved users
+        completed_users = {
+            user_id: (len(self.user_answers.get(user_id, [])) == len(self.questions))
+            for user_id in approved_users.keys()
+        }
+        
+        # Build completion timestamps for approved users
+        completion_times = {
+            user_id: self.user_stats.get(user_id, {}).get("completed_at")
+            for user_id in approved_users.keys()
+            if user_id in self.user_stats
+        }
+
         initial_data = {
             "type": "initial_state",
             "live_stats": approved_live_stats,
             "users": approved_users,
+            "completed_users": completed_users,
+            "completion_times": completion_times,
             "questions": self.questions,
             "total_questions": len(self.questions),
             "current_quiz": os.path.basename(self.current_quiz_file) if self.current_quiz_file else None,
