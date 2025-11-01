@@ -17,7 +17,7 @@ WebQuiz - Python/aiohttp quiz system with multi-quiz management, real-time WebSo
 - **Backend**: aiohttp + middleware + WebSocket
 - **Frontend**: Vanilla HTML/JS (mobile-responsive @media ≤768px)
 - **Storage**: In-memory → CSV (30s flush), YAML configs, quiz state resets on switch
-- **Auth**: Master key decorator for admin endpoints
+- **Auth**: Master key decorator for admin endpoints with automatic local network restriction
 - **Testing**: Integration + unit test
 
 ## Key Files
@@ -35,14 +35,19 @@ WebQuiz - Python/aiohttp quiz system with multi-quiz management, real-time WebSo
 **Public:**
 - `POST /api/register`, `PUT /api/update-registration`, `POST /api/submit-answer`, `GET /api/verify-user/{user_id}`
 
-**Admin (master key required):**
+**Admin (master key required, local network only):**
 - `GET /admin`, `POST /api/admin/auth`, `PUT /api/admin/approve-user`, `GET /api/admin/list-quizzes`, `POST /api/admin/switch-quiz`, `PUT /api/admin/config`
 - Quiz management: `GET /api/admin/quiz/{filename}`, `POST /api/admin/create-quiz`, `PUT /api/admin/quiz/{filename}`, `DELETE /api/admin/quiz/{filename}`
 - File management: `GET /api/files/list`, `GET /api/files/{type}/view/{filename}`, `GET /api/files/{type}/download/{filename}`, `PUT /api/files/quizzes/save/{filename}`
 - Tunnel management: `POST /api/admin/tunnel/connect`, `POST /api/admin/tunnel/disconnect`
 
+**Admin Pages (local network only):**
+- `GET /admin/` - Admin interface page
+- `GET /live-stats/` - Live stats page
+- `GET /files/` - File manager page
+
 **WebSockets:**
-- `WS /ws/live-stats` (public), `WS /ws/admin` (admin approval + tunnel status notifications)
+- `WS /ws/live-stats` (local network only), `WS /ws/admin` (local network only, admin approval + tunnel status notifications)
 
 ## Dev Commands
 
@@ -86,7 +91,7 @@ webquiz-stress-test -c 50
 - **6 digits user ID** stored by user_id as key
 - **Server-side timing** for accuracy (starts on admin approval if required)
 - **Multi-file quiz system** in `quizzes/` dir, auto-created if missing
-- **Master key decorator** for admin authentication
+- **Master key decorator** for admin authentication with built-in local network restriction
 - **Config validation** with comprehensive structure/type checks before save
 - **Smart CSV naming** with quiz prefix + unique suffixes (no overwrites)
 - **Quiz state reset** on switch for complete isolation
@@ -112,6 +117,7 @@ webquiz-stress-test -c 50
 - **Admin-triggered connection** - No auto-connect on startup, admin clicks button to establish tunnel
 - **Tunnel URL in access list** - Public tunnel URL automatically added to "URL для доступу з інших пристроїв:" list with green background when connected
 - **IP address detection** - Automatically uses HTTP for IP addresses (IPv4/IPv6) and HTTPS for domain names when fetching tunnel_config.yaml
+- **Local network restriction** - All admin functionality (API endpoints via @admin_auth_required, HTML pages, WebSockets) automatically restricted to private networks (RFC 1918: 127.0.0.0/8, 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16) with no configuration needed
 
 ## Key Flows
 

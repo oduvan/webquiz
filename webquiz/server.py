@@ -16,6 +16,7 @@ from aiohttp import web, WSMsgType
 import aiofiles
 import logging
 from io import StringIO
+import ipaddress
 
 from .config import WebQuizConfig, load_config_from_yaml
 from .tunnel import TunnelManager
@@ -232,6 +233,7 @@ def get_network_interfaces():
 def admin_auth_required(func):
     """Decorator to require master key authentication for admin endpoints.
 
+    Restricts access to local/private networks only.
     Bypasses authentication for requests from trusted IPs.
     Checks for master key in X-Master-Key header or request body.
 
@@ -244,8 +246,19 @@ def admin_auth_required(func):
 
     async def wrapper(self, request):
 
-        # Get client IP and check if it's in trusted list (bypass authentication)
+        # Get client IP
         client_ip = get_client_ip(request)
+
+        # Check if IP is from local/private network
+        try:
+            ip_obj = ipaddress.ip_address(client_ip)
+            if not ip_obj.is_private:
+                return web.json_response({"error": "Доступ заборонено: тільки для локальної мережі"}, status=403)
+        except ValueError:
+            # Invalid IP format - deny access
+            return web.json_response({"error": "Доступ заборонено: невірна IP адреса"}, status=403)
+
+        # Check if it's in trusted list (bypass authentication)
         if hasattr(self, "admin_config") and client_ip in self.admin_config.trusted_ips:
             return await func(self, request)
 
@@ -264,6 +277,38 @@ def admin_auth_required(func):
 
         if not provided_key or provided_key != self.master_key:
             return web.json_response({"error": "Недійсний або відсутній головний ключ"}, status=401)
+
+        return await func(self, request)
+
+    return wrapper
+
+
+def local_network_only(func):
+    """Decorator to restrict access to local/private networks only.
+
+    Automatically detects private IP addresses (RFC 1918) and blocks public IPs.
+    Private ranges: 127.0.0.0/8, 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16
+    Also supports IPv6 private ranges (::1, fc00::/7, fe80::/10).
+
+    Args:
+        func: Async function to wrap
+
+    Returns:
+        Wrapped function with network check
+    """
+
+    async def wrapper(self, request):
+        client_ip = get_client_ip(request)
+
+        try:
+            ip_obj = ipaddress.ip_address(client_ip)
+
+            # Check if IP is private/local
+            if not ip_obj.is_private:
+                return web.json_response({"error": "Доступ заборонено: тільки для локальної мережі"}, status=403)
+        except ValueError:
+            # Invalid IP format - deny access
+            return web.json_response({"error": "Доступ заборонено: невірна IP адреса"}, status=403)
 
         return await func(self, request)
 
@@ -2450,6 +2495,7 @@ class TestingServer:
             logger.error(f"Error disconnecting tunnel: {e}")
             return web.json_response({"error": str(e)}, status=500)
 
+    @local_network_only
     async def serve_files_page(self, request):
         """Serve the files management page.
 
@@ -2757,6 +2803,7 @@ class TestingServer:
         index_path = f"{self.static_dir}/index.html"
         return web.FileResponse(index_path, headers={"Content-Type": "text/html; charset=utf-8"})
 
+    @local_network_only
     async def serve_admin_page(self, request):
         """Serve the admin interface page.
 
@@ -2806,6 +2853,7 @@ class TestingServer:
             logger.error(f"Error serving admin page: {e}")
             return web.Response(text="<h1>Admin page not found</h1>", content_type="text/html", status=404)
 
+    @local_network_only
     async def serve_live_stats_page(self, request):
         """Serve the live stats page.
 
@@ -2870,6 +2918,7 @@ class TestingServer:
 
         return ws
 
+    @local_network_only
     async def websocket_live_stats(self, request):
         """WebSocket endpoint for live stats updates.
 
@@ -2900,6 +2949,7 @@ class TestingServer:
         }
         return await self._handle_websocket_connection(request, self.websocket_clients, initial_data, "WebSocket")
 
+    @local_network_only
     async def websocket_admin(self, request):
         """WebSocket endpoint for admin real-time notifications.
 
