@@ -791,10 +791,18 @@
             }
 
             updateQuizInfo() {
-                this.currentQuizElement.textContent = this.currentQuiz;
-                this.totalQuestionsElement.textContent = this.totalQuestions;
-                this.activeUsersElement.textContent = Object.keys(this.users).length;
-                this.quizInfoElement.style.display = 'block';
+                if (this.currentQuizElement) {
+                    this.currentQuizElement.textContent = this.currentQuiz;
+                }
+                if (this.totalQuestionsElement) {
+                    this.totalQuestionsElement.textContent = this.totalQuestions;
+                }
+                if (this.activeUsersElement) {
+                    this.activeUsersElement.textContent = Object.keys(this.users).length;
+                }
+                if (this.quizInfoElement) {
+                    this.quizInfoElement.style.display = 'block';
+                }
             }
 
             buildTable() {
