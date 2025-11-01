@@ -697,6 +697,13 @@
                 <div id="tunnel-socket-name-section" class="info-section" style="display: none;">
                     <strong>Socket Name:</strong> <span id="tunnel-socket-name"></span>
                 </div>
+                <div id="tunnel-public-key-section" class="info-section" style="display: none;">
+                    <strong>Public Key:</strong>
+                    <div style="display: flex; align-items: center; gap: 10px; margin-top: 5px;">
+                        <textarea id="tunnel-public-key" readonly style="flex: 1; font-family: monospace; font-size: 12px; padding: 8px; min-height: 30px; resize: vertical; background: #f5f5f5; border: 1px solid #ddd; border-radius: 4px;"></textarea>
+                        <button id="copy-public-key-btn" onclick="copyPublicKey()" style="align-self: flex-start; padding: 8px 12px; white-space: nowrap;">📋 Copy</button>
+                    </div>
+                </div>
                 <div class="info-section">
                     <button id="tunnel-connect-btn" onclick="toggleTunnel()" style="margin-top: 10px;">Connect</button>
                 </div>
@@ -2133,6 +2140,15 @@
                 socketNameSection.style.display = 'none';
             }
 
+            // Display public key if tunnel is configured
+            const publicKeySection = document.getElementById('tunnel-public-key-section');
+            if (tunnelData.configured && tunnelData.keys_status === 'ok' && typeof TUNNEL_PUBLIC_KEY !== 'undefined') {
+                document.getElementById('tunnel-public-key').value = TUNNEL_PUBLIC_KEY;
+                publicKeySection.style.display = 'block';
+            } else {
+                publicKeySection.style.display = 'none';
+            }
+
             // Update connect button and error display
             const connectBtn = document.getElementById('tunnel-connect-btn');
             const errorSection = document.getElementById('tunnel-error');
@@ -2174,6 +2190,29 @@
                 } else {
                     errorSection.style.display = 'none';
                 }
+            }
+        }
+
+        async function copyPublicKey() {
+            const textarea = document.getElementById('tunnel-public-key');
+            const copyBtn = document.getElementById('copy-public-key-btn');
+
+            try {
+                await navigator.clipboard.writeText(textarea.value);
+
+                // Visual feedback
+                const originalText = copyBtn.textContent;
+                copyBtn.textContent = '✅ Copied!';
+                copyBtn.style.background = '#4CAF50';
+                copyBtn.style.color = 'white';
+
+                setTimeout(() => {
+                    copyBtn.textContent = originalText;
+                    copyBtn.style.background = '';
+                    copyBtn.style.color = '';
+                }, 2000);
+            } catch (error) {
+                showMessage('Failed to copy: ' + error.message, 'error');
             }
         }
 

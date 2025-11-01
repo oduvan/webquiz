@@ -2845,12 +2845,31 @@ class TestingServer:
                         {"name": quiz.name, "download_path": quiz.download_path, "folder": quiz.folder}
                     )
 
+            # Read SSH public key if tunnel is configured
+            tunnel_public_key = ""
+            if self.tunnel_manager and self.tunnel_manager.config and self.tunnel_manager.config.public_key:
+                try:
+                    public_key_path = self.tunnel_manager.config.public_key
+
+                    # Resolve path relative to binary directory if needed
+                    if not os.path.isabs(public_key_path):
+                        binary_dir = os.environ.get("WEBQUIZ_BINARY_DIR")
+                        if binary_dir:
+                            public_key_path = os.path.join(binary_dir, public_key_path)
+
+                    if os.path.exists(public_key_path):
+                        with open(public_key_path, "r") as f:
+                            tunnel_public_key = f.read().strip()
+                except Exception as e:
+                    logger.error(f"Error reading tunnel public key: {e}")
+
             # Inject trusted IP status, network info, downloadable quizzes, and version into the template
             server_data_script = f"""
         const IS_TRUSTED_IP = {str(is_trusted_ip).lower()};
         const NETWORK_INFO = {json.dumps(network_info)};
         const DOWNLOADABLE_QUIZZES = {json.dumps(downloadable_quizzes)};
-        const WEBQUIZ_VERSION = {json.dumps(package_version)};"""
+        const WEBQUIZ_VERSION = {json.dumps(package_version)};
+        const TUNNEL_PUBLIC_KEY = {json.dumps(tunnel_public_key)};"""
 
             template_content = template_content.replace("<script>", f"<script>{server_data_script}\n")
 
@@ -2950,7 +2969,7 @@ class TestingServer:
             user_id: (len(self.user_answers.get(user_id, [])) == len(self.questions))
             for user_id in approved_users.keys()
         }
-        
+
         # Build completion timestamps for approved users
         completion_times = {
             user_id: self.user_stats.get(user_id, {}).get("completed_at")
