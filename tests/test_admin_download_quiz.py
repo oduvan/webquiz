@@ -30,7 +30,6 @@ questions:
             import socketserver
             import threading
 
-            file_port = 9999
             os.chdir(os.path.dirname(zip_path))
 
             class QuietHTTPRequestHandler(http.server.SimpleHTTPRequestHandler):
@@ -38,7 +37,10 @@ questions:
                     pass  # Suppress logging
 
             handler = QuietHTTPRequestHandler
-            httpd = socketserver.TCPServer(("", file_port), handler)
+            # Use port 0 to let the OS assign a free port
+            httpd = socketserver.TCPServer(("", 0), handler)
+            httpd.allow_reuse_address = True
+            file_port = httpd.server_address[1]  # Get the assigned port
 
             server_thread = threading.Thread(target=httpd.serve_forever)
             server_thread.daemon = True
@@ -61,8 +63,9 @@ questions:
             # Should succeed with valid subfolder path
             assert response.status_code == 200
             data = response.json()
+            assert data["success"] is True
             assert "message" in data
-            assert "extracted_files" in data
+            assert "Test Quiz" in data["message"]
 
         finally:
             # Clean up
@@ -154,7 +157,6 @@ questions:
             import socketserver
             import threading
 
-            file_port = 9998
             os.chdir(os.path.dirname(zip_path))
 
             class QuietHTTPRequestHandler(http.server.SimpleHTTPRequestHandler):
@@ -162,7 +164,10 @@ questions:
                     pass
 
             handler = QuietHTTPRequestHandler
-            httpd = socketserver.TCPServer(("", file_port), handler)
+            # Use port 0 to let the OS assign a free port
+            httpd = socketserver.TCPServer(("", 0), handler)
+            httpd.allow_reuse_address = True
+            file_port = httpd.server_address[1]  # Get the assigned port
 
             server_thread = threading.Thread(target=httpd.serve_forever)
             server_thread.daemon = True
