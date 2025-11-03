@@ -9,6 +9,7 @@ import subprocess
 import platform
 import zipfile
 import tempfile
+import shutil
 from datetime import datetime
 from pathlib import Path
 from typing import Dict, List, Any, Optional
@@ -2346,56 +2347,94 @@ class TestingServer:
         data = await request.json()
         name = data.get("name")
         download_path = data.get("download_path")
-        folder = data.get("folder", "")
+        folder = data.get("folder")
 
         if not name or not download_path:
             return web.json_response({"error": "Name and download_path are required"}, status=400)
 
-        # Validate folder path (prevent traversal)
-        if folder and (".." in folder or "/" in folder or "\\" in folder):
-            return web.json_response({"error": "Invalid folder path"}, status=400)
+        # Check for absolute paths (Unix-style or Windows-style)
+        if os.path.isabs(folder) or (len(folder) >= 2 and folder[1] == ":"):
+            return web.json_response({"error": "Invalid folder path: absolute paths not allowed"}, status=400)
 
-        # Default to empty folder (no subfolder)
-        if not folder:
-            folder = ""
+        # Check for path traversal attempts before normalization
+        if ".." in folder:
+            return web.json_response({"error": "Invalid folder path: parent directory access not allowed"}, status=400)
 
-        # Full path where the quiz will be extracted
-        extract_path = os.path.join(self.quizzes_dir, folder)
+        # Normalize the path to handle different separators
+        normalized_folder = os.path.normpath(folder)
 
-        # Create extract directory if it doesn't exist
-        ensure_directory_exists(extract_path)
+        # Double-check after normalization
+        if ".." in normalized_folder:
+            return web.json_response({"error": "Invalid folder path: parent directory access not allowed"}, status=400)
 
-        # Download and extract the ZIP file
+        # Ensure the normalized path doesn't escape the quizzes directory
+        test_path = os.path.normpath(os.path.join(self.quizzes_dir, normalized_folder))
+        quizzes_dir_normalized = os.path.normpath(self.quizzes_dir) + os.sep
+        test_path_normalized = test_path + os.sep
+
+        if not test_path_normalized.startswith(quizzes_dir_normalized):
+            return web.json_response({"error": "Invalid folder path: path traversal detected"}, status=400)
+
+        folder = normalized_folder
+
+        # Download and extract the ZIP file using temporary directory
         try:
             # Download the ZIP file
-            async with httpx.AsyncClient() as client:
+            logger.info(f"Downloading quiz from {download_path}")
+            async with httpx.AsyncClient(follow_redirects=True, timeout=30.0) as client:
                 response = await client.get(download_path)
-                response.raise_for_status()  # Raise an error for bad responses
+                response.raise_for_status()
 
-                # Save the ZIP file temporarily
-                zip_filename = f"{name}.zip"
-                zip_path = os.path.join(tempfile.gettempdir(), zip_filename)
+                # Use temporary directory for extraction (auto-cleanup)
+                with tempfile.TemporaryDirectory() as temp_dir:
+                    # Save ZIP file
+                    zip_path = os.path.join(temp_dir, f"{name.replace(' ', '_')}.zip")
+                    async with aiofiles.open(zip_path, "wb") as zip_file:
+                        await zip_file.write(response.content)
 
-                async with aiofiles.open(zip_path, "wb") as zip_file:
-                    await zip_file.write(response.content)
+                    # Extract ZIP
+                    logger.info(f"Extracting ZIP to {temp_dir}")
+                    with zipfile.ZipFile(zip_path, "r") as zip_ref:
+                        file_list = zip_ref.namelist()
+                        logger.info(f"ZIP contains {len(file_list)} files")
+                        zip_ref.extractall(temp_dir)
 
-            # Extract the ZIP file
-            with zipfile.ZipFile(zip_path, "r") as zip_ref:
-                zip_ref.extractall(extract_path)
+                    source_path = os.path.join(temp_dir, folder)
 
-            logger.info(f"Downloaded and extracted quiz {name} to {extract_path}")
+                    # Verify source path exists
+                    if not os.path.exists(source_path):
+                        raise ValueError(
+                            f"Folder '{folder}' not found in ZIP archive. Available paths: {os.listdir(temp_dir)}"
+                        )
 
-            # Optionally, remove the ZIP file after extraction
-            os.remove(zip_path)
+                    # Move everything from source to quizzes directory
+                    logger.info(f"Moving contents from {source_path} to {self.quizzes_dir}")
+                    shutil.copytree(source_path, self.quizzes_dir, dirs_exist_ok=True)
 
-            # Update the quiz list and switch to the new quiz
-            await self.list_available_quizzes()
-            await self.switch_quiz(name)
+                    # Update the quiz list
+                    await self.list_available_quizzes()
 
-            return web.json_response({"success": True, "message": "Quiz downloaded and extracted", "quiz_name": name})
+                    return web.json_response({"success": True, "message": f"Quiz '{name}' downloaded successfully"})
+
+        except httpx.HTTPStatusError as e:
+            logger.error(f"HTTP error downloading quiz: {e.response.status_code} - {e}")
+            return web.json_response({"error": f"Failed to download quiz: HTTP {e.response.status_code}"}, status=500)
+
+        except httpx.RequestError as e:
+            logger.error(f"Network error downloading quiz: {e}")
+            return web.json_response({"error": f"Network error: {str(e)}"}, status=500)
+
+        except zipfile.BadZipFile as e:
+            logger.error(f"Invalid ZIP file: {e}")
+            return web.json_response({"error": "Downloaded file is not a valid ZIP archive"}, status=500)
+
+        except ValueError as e:
+            logger.error(f"Validation error: {e}")
+            return web.json_response({"error": str(e)}, status=400)
+
         except Exception as e:
-            logger.error(f"Error downloading or extracting quiz: {e}")
-            return web.json_response({"error": "Failed to download or extract quiz"}, status=500)
+            logger.error(f"Unexpected error downloading or extracting quiz: {e}", exc_info=True)
+            return web.json_response({"error": f"Failed to download or extract quiz: {str(e)}"}, status=500)
 
     @admin_auth_required
     async def admin_update_config(self, request):

@@ -1831,9 +1831,20 @@
             }
         }
 
-        async function downloadQuiz(quizIndex) {
+        function downloadQuiz(quizIndex) {
+            // Validate inputs
+            if (typeof DOWNLOADABLE_QUIZZES === 'undefined' || !DOWNLOADABLE_QUIZZES[quizIndex]) {
+                showMessage('❌ Quiz не знайдено', 'error');
+                return;
+            }
+
             const quiz = DOWNLOADABLE_QUIZZES[quizIndex];
             const button = document.getElementById(`download-btn-${quizIndex}`);
+
+            if (!button) {
+                showMessage('❌ Кнопка не знайдена', 'error');
+                return;
+            }
 
             // Show confirmation
             const confirmed = confirm(`Завантажити quiz "${quiz.name}"?\n\nЦе завантажить та розпакує файли з:\n${quiz.download_path}\n\nФайли будуть перезаписані в директорії quizzes.`);
@@ -1845,36 +1856,40 @@
             button.disabled = true;
             button.innerHTML = '⏳ Завантаження...';
 
-            try {
-                const response = await fetch('/api/admin/download-quiz', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'X-Admin-Key': currentMasterKey
-                    },
-                    body: JSON.stringify({
-                        name: quiz.name,
-                        download_path: quiz.download_path,
-                        folder: quiz.folder
-                    })
-                });
+            // Use async IIFE to handle async operations
+            (async () => {
+                try {
+                    const response = await fetch('/api/admin/download-quiz', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-Admin-Key': currentMasterKey
+                        },
+                        body: JSON.stringify({
+                            name: quiz.name,
+                            download_path: quiz.download_path,
+                            folder: quiz.folder
+                        })
+                    });
 
-                const data = await response.json();
+                    const data = await response.json();
 
-                if (response.ok) {
-                    showMessage(`✅ ${data.message} (Витягнуто файлів: ${data.extracted_files})`, 'success');
-                    // Refresh quiz list to show newly downloaded quizzes
-                    await loadQuizzes();
-                } else {
-                    showMessage(`❌ Помилка завантаження: ${data.error}`, 'error');
+                    if (response.ok && data.success) {
+                        showMessage(`✅ ${data.message}`, 'success');
+                        // Refresh quiz list to show newly downloaded quizzes
+                        await loadQuizzes();
+                    } else {
+                        showMessage(`❌ Помилка завантаження: ${data.error}`, 'error');
+                    }
+                } catch (error) {
+                    console.error('Download quiz error:', error);
+                    showMessage(`❌ Помилка мережі: ${error.message}`, 'error');
+                } finally {
+                    // Re-enable button
+                    button.disabled = false;
+                    button.innerHTML = '📥 Завантажити';
                 }
-            } catch (error) {
-                showMessage(`❌ Помилка мережі: ${error.message}`, 'error');
-            } finally {
-                // Re-enable button
-                button.disabled = false;
-                button.innerHTML = '📥 Завантажити';
-            }
+            })();
         }
 
         // Admin WebSocket for Pending Approvals
@@ -2207,24 +2222,54 @@
             }
         }
 
-        async function copyPublicKey() {
+        function copyPublicKey() {
             const textarea = document.getElementById('tunnel-public-key');
             const copyBtn = document.getElementById('copy-public-key-btn');
 
             try {
-                await navigator.clipboard.writeText(textarea.value);
+                // Try modern clipboard API first (works on HTTPS/localhost)
+                if (navigator.clipboard && window.isSecureContext) {
+                    navigator.clipboard.writeText(textarea.value).then(() => {
+                        // Visual feedback
+                        const originalText = copyBtn.textContent;
+                        copyBtn.textContent = '✅ Copied!';
+                        copyBtn.style.background = '#4CAF50';
+                        copyBtn.style.color = 'white';
 
-                // Visual feedback
-                const originalText = copyBtn.textContent;
-                copyBtn.textContent = '✅ Copied!';
-                copyBtn.style.background = '#4CAF50';
-                copyBtn.style.color = 'white';
+                        setTimeout(() => {
+                            copyBtn.textContent = originalText;
+                            copyBtn.style.background = '';
+                            copyBtn.style.color = '';
+                        }, 2000);
+                    }).catch(error => {
+                        showMessage('Failed to copy: ' + error.message, 'error');
+                    });
+                } else {
+                    // Fallback for non-secure contexts (HTTP over IP)
+                    textarea.select();
+                    textarea.setSelectionRange(0, 99999); // For mobile devices
 
-                setTimeout(() => {
-                    copyBtn.textContent = originalText;
-                    copyBtn.style.background = '';
-                    copyBtn.style.color = '';
-                }, 2000);
+                    const successful = document.execCommand('copy');
+
+                    if (successful) {
+                        // Visual feedback
+                        const originalText = copyBtn.textContent;
+                        copyBtn.textContent = '✅ Copied!';
+                        copyBtn.style.background = '#4CAF50';
+                        copyBtn.style.color = 'white';
+
+                        setTimeout(() => {
+                            copyBtn.textContent = originalText;
+                            copyBtn.style.background = '';
+                            copyBtn.style.color = '';
+                        }, 2000);
+
+                        // Deselect
+                        window.getSelection().removeAllRanges();
+                    } else {
+                        showMessage('Failed to copy to clipboard. Please copy manually.', 'error');
+                    }
+                }
             } catch (error) {
                 showMessage('Failed to copy: ' + error.message, 'error');
             }
