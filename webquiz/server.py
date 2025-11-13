@@ -822,7 +822,7 @@ class TestingServer:
         """Flush in-memory responses to CSV file.
 
         Writes accumulated responses to CSV, creating file with headers if needed.
-        Clears in-memory responses after writing.
+        Clears in-memory responses only after successful write to prevent data loss.
         """
         if not self.user_responses:
             return
@@ -858,30 +858,30 @@ class TestingServer:
             csv_content = csv_buffer.getvalue()
             csv_buffer.close()
             total_responses = len(self.user_responses)
-            self.user_responses.clear()
 
             mode = "w" if not file_exists else "a"
             async with aiofiles.open(self.csv_file, mode) as f:
                 await f.write(csv_content)
 
+            # Only clear in-memory data after successful write to prevent data loss
+            self.user_responses.clear()
+
             action = "Created" if not file_exists else "Updated"
             logger.info(f"{action} CSV file with {total_responses} responses: {self.csv_file}")
         except Exception as e:
-            logger.error(f"Error flushing responses to CSV: {e}")
+            # Keep data in memory if write fails - will retry on next flush
+            logger.error(f"Error flushing responses to CSV (data preserved for retry): {e}")
 
     async def flush_users_to_csv(self):
         """Flush user registration data to separate CSV file.
 
-        Writes all user data including statistics to CSV, always overwriting
-        the file with current data.
+        Writes all user data including statistics to CSV using atomic write
+        (write to temp file, then rename) to prevent data loss.
         """
         if not self.users or not self.user_csv_file:
             return
 
         try:
-            # Check if CSV file exists
-            file_exists = os.path.exists(self.user_csv_file)
-
             # Use StringIO buffer to write CSV data
             csv_buffer = StringIO()
             csv_writer = csv.writer(csv_buffer)
@@ -922,11 +922,25 @@ class TestingServer:
             csv_buffer.close()
             total_users = len(self.users)
 
-            # Always overwrite the file (users don't accumulate like responses do)
-            async with aiofiles.open(self.user_csv_file, "w") as f:
+            # Use atomic write: write to temp file, then rename
+            # This prevents data loss if write is interrupted
+            temp_file = self.user_csv_file + ".tmp"
+            async with aiofiles.open(temp_file, "w") as f:
                 await f.write(csv_content)
 
+            # Atomic rename - overwrites existing file atomically on POSIX systems
+            os.replace(temp_file, self.user_csv_file)
+
+            logger.info(f"Updated user CSV file with {total_users} users: {self.user_csv_file}")
+
         except Exception as e:
+            # Clean up temp file if it exists
+            temp_file = self.user_csv_file + ".tmp"
+            if os.path.exists(temp_file):
+                try:
+                    os.remove(temp_file)
+                except:
+                    pass
             logger.error(f"Error flushing users to CSV: {e}")
 
     async def periodic_flush(self):
