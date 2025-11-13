@@ -96,6 +96,7 @@ webquiz-stress-test -c 50
 - **Smart CSV naming** with quiz prefix + unique suffixes (no overwrites)
 - **Quiz state reset** on switch for complete isolation
 - **In-memory → CSV** with 30s periodic flush using CSV module
+- **Safe CSV writes** - Data cleared from memory only AFTER successful write; users CSV uses atomic write (temp file + rename) to prevent data loss on interruption
 - **Cookie-based session** persistence (user_id)
 - **WebSocket live stats** with automatic client cleanup and **two-group display** (in-progress/completed)
 - **Auto-advance UI** when `show_right_answer: false`
