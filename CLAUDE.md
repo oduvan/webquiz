@@ -16,7 +16,7 @@ WebQuiz - Python/aiohttp quiz system with multi-quiz management, real-time WebSo
 ## Architecture
 - **Backend**: aiohttp + middleware + WebSocket
 - **Frontend**: Vanilla HTML/JS (mobile-responsive @media ≤768px)
-- **Storage**: In-memory → CSV (30s flush), YAML configs, quiz state resets on switch
+- **Storage**: In-memory → CSV (5s flush), YAML configs, quiz state resets on switch
 - **Auth**: Master key decorator for admin endpoints with automatic local network restriction
 - **Testing**: Integration + unit test
 
@@ -95,7 +95,7 @@ webquiz-stress-test -c 50
 - **Config validation** with comprehensive structure/type checks before save
 - **Smart CSV naming** with quiz prefix + unique suffixes (no overwrites)
 - **Quiz state reset** on switch for complete isolation
-- **In-memory → CSV** with 30s periodic flush using CSV module
+- **In-memory → CSV** with 5s periodic flush using CSV module (no test-specific flush endpoint)
 - **Cookie-based session** persistence (user_id)
 - **WebSocket live stats** with automatic client cleanup and **two-group display** (in-progress/completed)
 - **Auto-advance UI** when `show_right_answer: false`

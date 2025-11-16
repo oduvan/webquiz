@@ -2,6 +2,7 @@ import pytest
 import requests
 import csv
 import os
+import time
 from conftest import custom_webquiz_server
 
 
@@ -82,8 +83,8 @@ def test_user_csv_creation(temp_dir):
         )
         assert response.status_code == 200
 
-        # Manually trigger CSV flush
-        requests.post(f"{base_url}/api/test/flush")
+        # Wait for periodic CSV flush (runs every 5 seconds)
+        time.sleep(6)
 
         # Find and read the user CSV file
         import glob
@@ -116,8 +117,8 @@ def test_user_csv_content(temp_dir):
         assert response.status_code == 200
         user_id = response.json()["user_id"]
 
-        # Manually trigger CSV flush
-        requests.post(f"{base_url}/api/test/flush")
+        # Wait for periodic CSV flush (runs every 5 seconds)
+        time.sleep(6)
 
         # Read user CSV
         import glob
@@ -152,8 +153,8 @@ def test_answers_csv_uses_user_id(temp_dir):
         )
         assert answer_response.status_code == 200
 
-        # Manually trigger CSV flush
-        requests.post(f"{base_url}/api/test/flush")
+        # Wait for periodic CSV flush (runs every 5 seconds)
+        time.sleep(6)
 
         # Read answers CSV
         import glob
@@ -191,8 +192,8 @@ def test_csv_naming_convention(temp_dir):
             f"{base_url}/api/submit-answer", json={"user_id": user_id, "question_id": 1, "selected_answer": 1}
         )
 
-        # Manually trigger CSV flush
-        requests.post(f"{base_url}/api/test/flush")
+        # Wait for periodic CSV flush (runs every 5 seconds)
+        time.sleep(6)
 
         # Check that both files exist with same number
         import glob
@@ -260,8 +261,8 @@ def test_registration_with_cyrillic_field_labels(temp_dir):
         assert response.status_code == 200
         user_id = response.json()["user_id"]
 
-        # Manually trigger CSV flush
-        requests.post(f"{base_url}/api/test/flush")
+        # Wait for periodic CSV flush (runs every 5 seconds)
+        time.sleep(6)
 
         # Read user CSV
         import glob
@@ -323,8 +324,8 @@ def test_user_csv_statistics(temp_dir):
         )
         assert response.status_code == 200
 
-        # Manually trigger CSV flush
-        requests.post(f"{base_url}/api/test/flush")
+        # Wait for periodic CSV flush (runs every 5 seconds)
+        time.sleep(6)
 
         # Read user CSV
         import glob

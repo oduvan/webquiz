@@ -3104,14 +3104,6 @@ async def create_app(config: WebQuizConfig):
     app.router.add_post("/api/question-start", server.question_start)
     app.router.add_get("/api/verify-user/{user_id}", server.verify_user_id)
 
-    # Test endpoint for manual CSV flush (only for testing)
-    async def manual_flush(request):
-        await server.flush_responses_to_csv()
-        await server.flush_users_to_csv()
-        return web.json_response({"status": "flushed"})
-
-    app.router.add_post("/api/test/flush", manual_flush)
-
     # Admin routes
     app.router.add_get("/admin/", server.serve_admin_page)
     app.router.add_post("/api/admin/auth", server.admin_auth_test)
