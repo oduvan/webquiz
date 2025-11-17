@@ -923,7 +923,7 @@ class TestingServer:
             total_users = len(self.users)
 
             # Always overwrite the file (users don't accumulate like responses do)
-            async with aiofiles.open(self.user_csv_file, "w") as f:
+            async with aiofiles.open(self.user_csv_file, "w", encoding="utf-8") as f:
                 await f.write(csv_content)
 
         except Exception as e:
