@@ -384,6 +384,30 @@
 
         /* Mobile responsive table */
         @media screen and (max-width: 768px) {
+            /* Reduce side padding on mobile for more content space */
+            body {
+                padding: 8px !important;
+            }
+
+            .container {
+                padding: 12px !important;
+                border-radius: 8px;
+            }
+
+            .current-question {
+                padding: 15px !important;
+                margin: 10px 0 !important;
+            }
+
+            .question {
+                padding: 12px !important;
+                margin: 10px 0 !important;
+            }
+
+            .option {
+                padding: 12px 10px !important;
+            }
+
             .results-table {
                 font-size: 12px;
                 overflow-x: auto;
