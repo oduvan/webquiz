@@ -384,28 +384,40 @@
 
         /* Mobile responsive table */
         @media screen and (max-width: 768px) {
-            /* Reduce side padding on mobile for more content space */
+            /* Full width mobile layout - no side margins */
             body {
-                padding: 8px !important;
+                padding: 0 !important;
+                margin: 0 !important;
             }
 
             .container {
-                padding: 12px !important;
-                border-radius: 8px;
+                padding: 10px 8px !important;
+                border-radius: 0 !important;
+                box-shadow: none !important;
             }
 
             .current-question {
-                padding: 15px !important;
-                margin: 10px 0 !important;
+                padding: 10px 4px !important;
+                margin: 8px 0 !important;
+                border-radius: 6px;
+                border-left: none !important;
+                border-right: none !important;
             }
 
             .question {
-                padding: 12px !important;
-                margin: 10px 0 !important;
+                padding: 10px 4px !important;
+                margin: 8px 0 !important;
             }
 
             .option {
-                padding: 12px 10px !important;
+                padding: 12px 8px !important;
+                margin: 4px 0 !important;
+            }
+
+            .progress {
+                border-radius: 0 !important;
+                margin: 10px -8px !important;
+                width: calc(100% + 16px) !important;
             }
 
             .results-table {
