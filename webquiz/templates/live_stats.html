@@ -440,7 +440,10 @@
                 const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
                 const wsUrl = `${protocol}//${window.location.host}/ws/live-stats`;
 
-                this.hideStatus();
+                // Show connecting status if this is a reconnection attempt
+                if (this.reconnectAttempts > 0) {
+                    this.updateStatus('connecting', '🔄 Connecting...');
+                }
 
                 try {
                     this.ws = new WebSocket(wsUrl);
@@ -449,6 +452,8 @@
                         this.hideStatus();
                         this.reconnectAttempts = 0;
                         console.log('WebSocket connected');
+                        // Clear old state to ensure fresh data on reconnection
+                        this.clearState();
                     };
 
                     this.ws.onmessage = (event) => {
@@ -503,6 +508,20 @@
                 this.statusElement.style.display = 'none';
             }
 
+            clearState() {
+                // Clear all state data to prepare for fresh data from server
+                this.users = {};
+                this.liveStats = {};
+                this.completedUsers = {};
+                this.completionTimes = {};
+                this.questions = [];
+                this.totalQuestions = 0;
+                this.currentQuiz = null;
+                this.userStatistics = {};
+                this.questionStatistics = {};
+                console.log('State cleared, waiting for initial_state from server');
+            }
+
             handleMessage(data) {
                 switch (data.type) {
                     case 'initial_state':
@@ -526,18 +545,29 @@
             }
 
             handleInitialState(data) {
-                this.users = data.users || {};
-                this.liveStats = this.normalizeStatsData(data.live_stats || {});
-                this.completedUsers = data.completed_users || {};
-                this.completionTimes = data.completion_times || {};
-                this.questions = data.questions || [];
-                this.totalQuestions = data.total_questions || 0;
-                this.currentQuiz = data.current_quiz || 'No quiz selected';
+                try {
+                    console.log('Received initial_state with', Object.keys(data.users || {}).length, 'users');
 
-                // Calculate statistics client-side
-                this.calculateStatistics();
+                    this.users = data.users || {};
+                    this.liveStats = this.normalizeStatsData(data.live_stats || {});
+                    this.completedUsers = data.completed_users || {};
+                    this.completionTimes = data.completion_times || {};
+                    this.questions = data.questions || [];
+                    this.totalQuestions = data.total_questions || 0;
+                    this.currentQuiz = data.current_quiz || 'No quiz selected';
 
-                this.buildTable();
+                    // Calculate statistics client-side
+                    this.calculateStatistics();
+
+                    // Rebuild the entire UI with fresh data
+                    this.buildTable();
+
+                    console.log('Initial state processed successfully');
+                } catch (error) {
+                    console.error('Error processing initial_state:', error);
+                    // Show error to user so they know to refresh
+                    this.updateStatus('disconnected', '⚠️ Error loading data. Please refresh the page.');
+                }
             }
 
             normalizeStatsData(liveStats) {
