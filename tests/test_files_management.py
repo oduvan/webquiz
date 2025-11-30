@@ -1,5 +1,5 @@
 import requests
-from conftest import custom_webquiz_server
+from conftest import custom_webquiz_server, get_admin_session
 
 
 # Authentication & Authorization Tests
@@ -38,8 +38,8 @@ def test_files_trusted_ip_access():
 
         # Might still need auth header even for trusted IPs based on implementation
         if response.status_code == 401:
-            headers = {"X-Master-Key": "test123"}
-            response = requests.get(f"http://localhost:{port}/api/files/list", headers=headers)
+            cookies = get_admin_session(port)
+            response = requests.get(f"http://localhost:{port}/api/files/list", cookies=cookies)
 
         assert response.status_code == 200
         data = response.json()
@@ -48,10 +48,11 @@ def test_files_trusted_ip_access():
 
 
 def test_files_invalid_master_key_rejection():
-    """Verify rejection with wrong/missing master key."""
+    """Verify rejection with invalid/missing session cookie."""
     with custom_webquiz_server() as (proc, port):
-        headers = {"X-Master-Key": "wrong_key"}
-        response = requests.get(f"http://localhost:{port}/api/files/list", headers=headers)
+        # Test with invalid session cookie
+        invalid_cookies = {"admin_session": "invalid_token_12345"}
+        response = requests.get(f"http://localhost:{port}/api/files/list", cookies=invalid_cookies)
 
         assert response.status_code == 401
         data = response.json()
@@ -74,8 +75,8 @@ def test_files_api_without_master_key_disabled():
 def test_files_page_renders_with_auth():
     """Verify files page loads correctly after authentication."""
     with custom_webquiz_server() as (proc, port):
-        headers = {"X-Master-Key": "test123"}
-        response = requests.get(f"http://localhost:{port}/files/", headers=headers)
+        cookies = get_admin_session(port)
+        response = requests.get(f"http://localhost:{port}/files/", cookies=cookies)
 
         assert response.status_code == 200
         assert "text/html" in response.headers["content-type"]
@@ -88,8 +89,8 @@ def test_files_page_renders_with_auth():
 def test_list_files_empty_directories():
     """Test response when logs_dir and csv_dir are empty."""
     with custom_webquiz_server() as (proc, port):
-        headers = {"X-Master-Key": "test123"}
-        response = requests.get(f"http://localhost:{port}/api/files/list", headers=headers)
+        cookies = get_admin_session(port)
+        response = requests.get(f"http://localhost:{port}/api/files/list", cookies=cookies)
 
         assert response.status_code == 200
         data = response.json()
@@ -107,8 +108,8 @@ def test_list_files_with_log_files():
 
         time.sleep(1)
 
-        headers = {"X-Master-Key": "test123"}
-        response = requests.get(f"http://localhost:{port}/api/files/list", headers=headers)
+        cookies = get_admin_session(port)
+        response = requests.get(f"http://localhost:{port}/api/files/list", cookies=cookies)
 
         assert response.status_code == 200
         data = response.json()
@@ -145,8 +146,8 @@ def test_list_files_with_csv_files():
 
         time.sleep(1)
 
-        headers = {"X-Master-Key": "test123"}
-        response = requests.get(f"http://localhost:{port}/api/files/list", headers=headers)
+        cookies = get_admin_session(port)
+        response = requests.get(f"http://localhost:{port}/api/files/list", cookies=cookies)
 
         assert response.status_code == 200
         data = response.json()
@@ -175,8 +176,8 @@ def test_list_files_mixed_content():
 
         time.sleep(0.5)
 
-        headers = {"X-Master-Key": "test123"}
-        response = requests.get(f"http://localhost:{port}/api/files/list", headers=headers)
+        cookies = get_admin_session(port)
+        response = requests.get(f"http://localhost:{port}/api/files/list", cookies=cookies)
 
         assert response.status_code == 200
         data = response.json()
@@ -193,8 +194,8 @@ def test_list_files_metadata_accuracy():
 
         time.sleep(1)  # Allow log file creation
 
-        headers = {"X-Master-Key": "test123"}
-        response = requests.get(f"http://localhost:{port}/api/files/list", headers=headers)
+        cookies = get_admin_session(port)
+        response = requests.get(f"http://localhost:{port}/api/files/list", cookies=cookies)
 
         assert response.status_code == 200
         data = response.json()
@@ -214,8 +215,8 @@ def test_list_files_ignores_subdirectories():
     with custom_webquiz_server() as (proc, port):
         # Note: This test would require creating subdirectories in the test environment
         # For now, just verify the basic structure works
-        headers = {"X-Master-Key": "test123"}
-        response = requests.get(f"http://localhost:{port}/api/files/list", headers=headers)
+        cookies = get_admin_session(port)
+        response = requests.get(f"http://localhost:{port}/api/files/list", cookies=cookies)
 
         assert response.status_code == 200
         data = response.json()
@@ -233,8 +234,8 @@ def test_list_files_handles_special_characters():
     # This test is limited by what files the server actually creates
     # But we can verify the listing handles whatever files exist
     with custom_webquiz_server() as (proc, port):
-        headers = {"X-Master-Key": "test123"}
-        response = requests.get(f"http://localhost:{port}/api/files/list", headers=headers)
+        cookies = get_admin_session(port)
+        response = requests.get(f"http://localhost:{port}/api/files/list", cookies=cookies)
 
         assert response.status_code == 200
         data = response.json()
@@ -258,8 +259,8 @@ def test_view_log_file_success():
         time.sleep(1)  # Allow log file creation
 
         # Get list of files first
-        headers = {"X-Master-Key": "test123"}
-        list_response = requests.get(f"http://localhost:{port}/api/files/list", headers=headers)
+        cookies = get_admin_session(port)
+        list_response = requests.get(f"http://localhost:{port}/api/files/list", cookies=cookies)
         assert list_response.status_code == 200
 
         data = list_response.json()
@@ -267,7 +268,7 @@ def test_view_log_file_success():
             log_filename = data["logs"][0]["name"]
 
             # Try to view the log file
-            view_response = requests.get(f"http://localhost:{port}/api/files/logs/view/{log_filename}", headers=headers)
+            view_response = requests.get(f"http://localhost:{port}/api/files/logs/view/{log_filename}", cookies=cookies)
 
             # Should be successful if file exists and is readable
             if view_response.status_code == 200:
@@ -300,8 +301,8 @@ def test_view_csv_file_success():
             time.sleep(1)  # Allow CSV flush
 
             # Get list of CSV files
-            headers = {"X-Master-Key": "test123"}
-            list_response = requests.get(f"http://localhost:{port}/api/files/list", headers=headers)
+            cookies = get_admin_session(port)
+            list_response = requests.get(f"http://localhost:{port}/api/files/list", cookies=cookies)
 
             if list_response.status_code == 200:
                 data = list_response.json()
@@ -310,8 +311,7 @@ def test_view_csv_file_success():
 
                     # Try to view the CSV file
                     view_response = requests.get(
-                        f"http://localhost:{port}/api/files/csv/view/{csv_filename}", headers=headers
-                    )
+                        f"http://localhost:{port}/api/files/csv/view/{csv_filename}", cookies=cookies)
 
                     if view_response.status_code == 200:
                         assert "text/plain" in view_response.headers["content-type"]
@@ -322,8 +322,8 @@ def test_view_csv_file_success():
 def test_view_file_not_found():
     """Test 404 response for non-existent files."""
     with custom_webquiz_server() as (proc, port):
-        headers = {"X-Master-Key": "test123"}
-        response = requests.get(f"http://localhost:{port}/api/files/logs/view/nonexistent.log", headers=headers)
+        cookies = get_admin_session(port)
+        response = requests.get(f"http://localhost:{port}/api/files/logs/view/nonexistent.log", cookies=cookies)
 
         assert response.status_code == 404
         data = response.json()
@@ -336,8 +336,8 @@ def test_view_empty_file():
     # This test is limited by what files the server creates
     # Empty files are rare in normal operation, but we test the handling
     with custom_webquiz_server() as (proc, port):
-        headers = {"X-Master-Key": "test123"}
-        response = requests.get(f"http://localhost:{port}/api/files/logs/view/empty.log", headers=headers)
+        cookies = get_admin_session(port)
+        response = requests.get(f"http://localhost:{port}/api/files/logs/view/empty.log", cookies=cookies)
 
         # Should get 404 for non-existent file, which is expected
         assert response.status_code == 404
@@ -350,8 +350,8 @@ def test_view_file_content_type_headers():
 
         time.sleep(1)
 
-        headers = {"X-Master-Key": "test123"}
-        list_response = requests.get(f"http://localhost:{port}/api/files/list", headers=headers)
+        cookies = get_admin_session(port)
+        list_response = requests.get(f"http://localhost:{port}/api/files/list", cookies=cookies)
 
         if list_response.status_code == 200:
             data = list_response.json()
@@ -359,8 +359,7 @@ def test_view_file_content_type_headers():
                 log_filename = data["logs"][0]["name"]
 
                 view_response = requests.get(
-                    f"http://localhost:{port}/api/files/logs/view/{log_filename}", headers=headers
-                )
+                    f"http://localhost:{port}/api/files/logs/view/{log_filename}", cookies=cookies)
 
                 if view_response.status_code == 200:
                     assert "content-type" in view_response.headers
@@ -378,8 +377,8 @@ def test_download_log_file_success():
 
         time.sleep(1)
 
-        headers = {"X-Master-Key": "test123"}
-        list_response = requests.get(f"http://localhost:{port}/api/files/list", headers=headers)
+        cookies = get_admin_session(port)
+        list_response = requests.get(f"http://localhost:{port}/api/files/list", cookies=cookies)
 
         if list_response.status_code == 200:
             data = list_response.json()
@@ -387,8 +386,7 @@ def test_download_log_file_success():
                 log_filename = data["logs"][0]["name"]
 
                 download_response = requests.get(
-                    f"http://localhost:{port}/api/files/logs/download/{log_filename}", headers=headers
-                )
+                    f"http://localhost:{port}/api/files/logs/download/{log_filename}", cookies=cookies)
 
                 assert download_response.status_code == 200
                 assert len(download_response.content) > 0
@@ -412,8 +410,8 @@ def test_download_csv_file_success():
 
             time.sleep(1)
 
-            headers = {"X-Master-Key": "test123"}
-            list_response = requests.get(f"http://localhost:{port}/api/files/list", headers=headers)
+            cookies = get_admin_session(port)
+            list_response = requests.get(f"http://localhost:{port}/api/files/list", cookies=cookies)
 
             if list_response.status_code == 200:
                 data = list_response.json()
@@ -421,8 +419,7 @@ def test_download_csv_file_success():
                     csv_filename = data["csv"][0]["name"]
 
                     download_response = requests.get(
-                        f"http://localhost:{port}/api/files/csv/download/{csv_filename}", headers=headers
-                    )
+                        f"http://localhost:{port}/api/files/csv/download/{csv_filename}", cookies=cookies)
 
                     if download_response.status_code == 200:
                         assert len(download_response.content) > 0
@@ -431,8 +428,8 @@ def test_download_csv_file_success():
 def test_download_file_not_found():
     """Test 404 response for non-existent downloads."""
     with custom_webquiz_server() as (proc, port):
-        headers = {"X-Master-Key": "test123"}
-        response = requests.get(f"http://localhost:{port}/api/files/logs/download/nonexistent.log", headers=headers)
+        cookies = get_admin_session(port)
+        response = requests.get(f"http://localhost:{port}/api/files/logs/download/nonexistent.log", cookies=cookies)
 
         assert response.status_code == 404
 
@@ -444,8 +441,8 @@ def test_download_headers_correct():
 
         time.sleep(1)
 
-        headers = {"X-Master-Key": "test123"}
-        list_response = requests.get(f"http://localhost:{port}/api/files/list", headers=headers)
+        cookies = get_admin_session(port)
+        list_response = requests.get(f"http://localhost:{port}/api/files/list", cookies=cookies)
 
         if list_response.status_code == 200:
             data = list_response.json()
@@ -453,8 +450,7 @@ def test_download_headers_correct():
                 log_filename = data["logs"][0]["name"]
 
                 download_response = requests.get(
-                    f"http://localhost:{port}/api/files/logs/download/{log_filename}", headers=headers
-                )
+                    f"http://localhost:{port}/api/files/logs/download/{log_filename}", cookies=cookies)
 
                 if download_response.status_code == 200:
                     assert "content-disposition" in download_response.headers
@@ -469,12 +465,12 @@ def test_download_headers_correct():
 def test_path_traversal_prevention_logs():
     """Test rejection of '../' in log file paths."""
     with custom_webquiz_server() as (proc, port):
-        headers = {"X-Master-Key": "test123"}
+        cookies = get_admin_session(port)
 
         malicious_paths = ["../../../etc/passwd", "logs/../../../sensitive.txt"]
 
         for malicious_path in malicious_paths:
-            response = requests.get(f"http://localhost:{port}/api/files/logs/view/{malicious_path}", headers=headers)
+            response = requests.get(f"http://localhost:{port}/api/files/logs/view/{malicious_path}", cookies=cookies)
 
             # Should be either 400 (caught by validation) or 404 (file doesn't exist after path resolution)
             assert response.status_code in [400, 404]
@@ -486,13 +482,13 @@ def test_path_traversal_prevention_logs():
 def test_null_byte_injection_prevention():
     """Test rejection of null bytes in filenames."""
     with custom_webquiz_server() as (proc, port):
-        headers = {"X-Master-Key": "test123"}
+        cookies = get_admin_session(port)
 
         # Null byte injection attempts
         malicious_filenames = ["test.log\x00.txt", "safe.txt\x00../../etc/passwd"]
 
         for filename in malicious_filenames:
-            response = requests.get(f"http://localhost:{port}/api/files/logs/view/{filename}", headers=headers)
+            response = requests.get(f"http://localhost:{port}/api/files/logs/view/{filename}", cookies=cookies)
 
             # Should be rejected
             assert response.status_code in [400, 404]
@@ -501,12 +497,12 @@ def test_null_byte_injection_prevention():
 def test_special_filename_handling():
     """Test handling of files with special names."""
     with custom_webquiz_server() as (proc, port):
-        headers = {"X-Master-Key": "test123"}
+        cookies = get_admin_session(port)
 
         special_names = [".", "..", "con", "prn", "aux"]
 
         for special_name in special_names:
-            response = requests.get(f"http://localhost:{port}/api/files/logs/view/{special_name}", headers=headers)
+            response = requests.get(f"http://localhost:{port}/api/files/logs/view/{special_name}", cookies=cookies)
 
             # Should reject special names or return 404
             assert response.status_code in [400, 404]
@@ -518,15 +514,15 @@ def test_special_filename_handling():
 def test_files_page_admin_panel_integration():
     """Test navigation link from admin panel works."""
     with custom_webquiz_server() as (proc, port):
-        headers = {"X-Master-Key": "test123"}
+        cookies = get_admin_session(port)
 
         # First check admin panel has the link
-        admin_response = requests.get(f"http://localhost:{port}/admin/", headers=headers)
+        admin_response = requests.get(f"http://localhost:{port}/admin/", cookies=cookies)
         assert admin_response.status_code == 200
         assert "File Manager" in admin_response.text
 
         # Then check files page works
-        files_response = requests.get(f"http://localhost:{port}/files/", headers=headers)
+        files_response = requests.get(f"http://localhost:{port}/files/", cookies=cookies)
         assert files_response.status_code == 200
         assert "File Manager" in files_response.text
 
@@ -541,8 +537,8 @@ def test_files_functionality_with_real_server_logs():
 
         time.sleep(1)
 
-        headers = {"X-Master-Key": "test123"}
-        response = requests.get(f"http://localhost:{port}/api/files/list", headers=headers)
+        cookies = get_admin_session(port)
+        response = requests.get(f"http://localhost:{port}/api/files/list", cookies=cookies)
 
         assert response.status_code == 200
         data = response.json()
@@ -579,8 +575,8 @@ def test_files_functionality_with_real_csv_data():
 
             time.sleep(5)
 
-            headers = {"X-Master-Key": "test123"}
-            response = requests.get(f"http://localhost:{port}/api/files/list", headers=headers)
+            cookies = get_admin_session(port)
+            response = requests.get(f"http://localhost:{port}/api/files/list", cookies=cookies)
 
             if response.status_code == 200:
                 data = response.json()
@@ -592,8 +588,7 @@ def test_files_functionality_with_real_csv_data():
 
                     # Try to view the CSV content
                     view_response = requests.get(
-                        f'http://localhost:{port}/api/files/csv/view/{users_csv_file["name"]}', headers=headers
-                    )
+                        f'http://localhost:{port}/api/files/csv/view/{users_csv_file["name"]}', cookies=cookies)
 
                     if view_response.status_code == 200:
                         content = view_response.text
@@ -608,12 +603,12 @@ def test_concurrent_file_access():
 
         time.sleep(1)  # Let server create some files
 
-        headers = {"X-Master-Key": "test123"}
+        cookies = get_admin_session(port)
         results = []
 
         def list_files():
             try:
-                response = requests.get(f"http://localhost:{port}/api/files/list", headers=headers)
+                response = requests.get(f"http://localhost:{port}/api/files/list", cookies=cookies)
                 results.append(response.status_code)
             except Exception:
                 results.append(500)
@@ -644,7 +639,7 @@ def test_files_during_active_quiz_session():
             user_id = user_data["user_id"]
 
             # Start submitting answers while checking files
-            headers = {"X-Master-Key": "test123"}
+            cookies = get_admin_session(port)
 
             # Submit answer
             requests.post(
@@ -653,7 +648,7 @@ def test_files_during_active_quiz_session():
             )
 
             # Check files while quiz is active
-            files_response = requests.get(f"http://localhost:{port}/api/files/list", headers=headers)
+            files_response = requests.get(f"http://localhost:{port}/api/files/list", cookies=cookies)
             assert files_response.status_code == 200
 
             # Continue quiz activity
@@ -663,7 +658,7 @@ def test_files_during_active_quiz_session():
             )
 
             # Files should still be accessible
-            files_response2 = requests.get(f"http://localhost:{port}/api/files/list", headers=headers)
+            files_response2 = requests.get(f"http://localhost:{port}/api/files/list", cookies=cookies)
             assert files_response2.status_code == 200
 
 
@@ -675,10 +670,10 @@ def test_corrupted_file_handling():
     # This is difficult to test without actually corrupting files
     # But we can test the error handling mechanism
     with custom_webquiz_server() as (proc, port):
-        headers = {"X-Master-Key": "test123"}
+        cookies = get_admin_session(port)
 
         # Try to access a file that doesn't exist (simulates corruption)
-        response = requests.get(f"http://localhost:{port}/api/files/logs/view/corrupted.log", headers=headers)
+        response = requests.get(f"http://localhost:{port}/api/files/logs/view/corrupted.log", cookies=cookies)
 
         assert response.status_code == 404
 
@@ -690,10 +685,10 @@ def test_network_interruption_resilience():
 
         time.sleep(1)
 
-        headers = {"X-Master-Key": "test123"}
+        cookies = get_admin_session(port)
 
         # Start a request and ensure it completes normally
-        response = requests.get(f"http://localhost:{port}/api/files/list", headers=headers)
+        response = requests.get(f"http://localhost:{port}/api/files/list", cookies=cookies)
 
         # Should complete successfully under normal conditions
         assert response.status_code == 200

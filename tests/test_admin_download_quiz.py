@@ -3,7 +3,7 @@ import json
 import requests
 import tempfile
 import zipfile
-from conftest import custom_webquiz_server
+from conftest import custom_webquiz_server, get_admin_session
 
 
 def test_download_quiz_path_validation_valid_subfolder(temp_dir):
@@ -47,7 +47,7 @@ questions:
             server_thread.start()
 
             # Test the download endpoint with a valid subfolder path
-            headers = {"X-Master-Key": "test123", "Content-Type": "application/json"}
+            cookies = get_admin_session(port)
             download_data = {
                 "name": "Test Quiz",
                 "download_path": f"http://localhost:{file_port}/{os.path.basename(zip_path)}",
@@ -55,7 +55,7 @@ questions:
             }
 
             response = requests.post(
-                f"http://localhost:{port}/api/admin/download-quiz", headers=headers, json=download_data
+                f"http://localhost:{port}/api/admin/download-quiz", cookies=cookies, json=download_data
             )
 
             httpd.shutdown()
@@ -76,7 +76,7 @@ questions:
 def test_download_quiz_path_validation_parent_directory_blocked():
     """Test that parent directory traversal is blocked."""
     with custom_webquiz_server() as (proc, port):
-        headers = {"X-Master-Key": "test123", "Content-Type": "application/json"}
+        cookies = get_admin_session(port)
 
         # Test various path traversal attempts
         malicious_paths = [
@@ -93,7 +93,7 @@ def test_download_quiz_path_validation_parent_directory_blocked():
             }
 
             response = requests.post(
-                f"http://localhost:{port}/api/admin/download-quiz", headers=headers, json=download_data
+                f"http://localhost:{port}/api/admin/download-quiz", cookies=cookies, json=download_data
             )
 
             # Should be blocked
@@ -106,7 +106,7 @@ def test_download_quiz_path_validation_parent_directory_blocked():
 def test_download_quiz_path_validation_absolute_path_blocked():
     """Test that absolute paths are blocked."""
     with custom_webquiz_server() as (proc, port):
-        headers = {"X-Master-Key": "test123", "Content-Type": "application/json"}
+        cookies = get_admin_session(port)
 
         # Test absolute path attempts
         absolute_paths = [
@@ -123,7 +123,7 @@ def test_download_quiz_path_validation_absolute_path_blocked():
             }
 
             response = requests.post(
-                f"http://localhost:{port}/api/admin/download-quiz", headers=headers, json=download_data
+                f"http://localhost:{port}/api/admin/download-quiz", cookies=cookies, json=download_data
             )
 
             # Should be blocked
@@ -174,7 +174,7 @@ questions:
             server_thread.start()
 
             # Test with empty folder path
-            headers = {"X-Master-Key": "test123", "Content-Type": "application/json"}
+            cookies = get_admin_session(port)
             download_data = {
                 "name": "Root Quiz",
                 "download_path": f"http://localhost:{file_port}/{os.path.basename(zip_path)}",
@@ -182,7 +182,7 @@ questions:
             }
 
             response = requests.post(
-                f"http://localhost:{port}/api/admin/download-quiz", headers=headers, json=download_data
+                f"http://localhost:{port}/api/admin/download-quiz", cookies=cookies, json=download_data
             )
 
             httpd.shutdown()
@@ -200,12 +200,12 @@ questions:
 def test_download_quiz_missing_parameters():
     """Test that missing required parameters are rejected."""
     with custom_webquiz_server() as (proc, port):
-        headers = {"X-Master-Key": "test123", "Content-Type": "application/json"}
+        cookies = get_admin_session(port)
 
         # Test missing name
         response = requests.post(
             f"http://localhost:{port}/api/admin/download-quiz",
-            headers=headers,
+            cookies=cookies,
             json={"download_path": "http://example.com/quiz.zip"},
         )
         assert response.status_code == 400
@@ -214,7 +214,7 @@ def test_download_quiz_missing_parameters():
 
         # Test missing download_path
         response = requests.post(
-            f"http://localhost:{port}/api/admin/download-quiz", headers=headers, json={"name": "Test Quiz"}
+            f"http://localhost:{port}/api/admin/download-quiz", cookies=cookies, json={"name": "Test Quiz"}
         )
         assert response.status_code == 400
         data = response.json()

@@ -2,12 +2,13 @@ import os
 import json
 import requests
 import yaml
-from conftest import custom_webquiz_server
+from conftest import custom_webquiz_server, get_admin_session
 
 
 def test_admin_create_quiz_wizard_mode(temp_dir):
     """Test creating a quiz using wizard mode with structured data."""
     with custom_webquiz_server() as (proc, port):
+        cookies = get_admin_session(port)
         quiz_data = {
             "title": "Math Basics",
             "description": "Basic mathematics quiz",
@@ -19,8 +20,7 @@ def test_admin_create_quiz_wizard_mode(temp_dir):
 
         create_data = {"filename": "math_basics", "mode": "wizard", "quiz_data": quiz_data}
 
-        headers = {"X-Master-Key": "test123"}
-        response = requests.post(f"http://localhost:{port}/api/admin/create-quiz", headers=headers, json=create_data)
+        response = requests.post(f"http://localhost:{port}/api/admin/create-quiz", cookies=cookies, json=create_data)
 
         assert response.status_code == 200
         data = response.json()
@@ -51,10 +51,10 @@ questions:
 """
 
     with custom_webquiz_server() as (proc, port):
+        cookies = get_admin_session(port)
         create_data = {"filename": "science_quiz", "mode": "text", "content": quiz_yaml}
 
-        headers = {"X-Master-Key": "test123"}
-        response = requests.post(f"http://localhost:{port}/api/admin/create-quiz", headers=headers, json=create_data)
+        response = requests.post(f"http://localhost:{port}/api/admin/create-quiz", cookies=cookies, json=create_data)
 
         assert response.status_code == 200
         data = response.json()
@@ -72,6 +72,7 @@ def test_admin_create_quiz_already_exists(temp_dir):
     }
 
     with custom_webquiz_server(quizzes=existing_quiz) as (proc, port):
+        cookies = get_admin_session(port)
         create_data = {
             "filename": "existing_quiz",
             "mode": "wizard",
@@ -81,8 +82,7 @@ def test_admin_create_quiz_already_exists(temp_dir):
             },
         }
 
-        headers = {"X-Master-Key": "test123"}
-        response = requests.post(f"http://localhost:{port}/api/admin/create-quiz", headers=headers, json=create_data)
+        response = requests.post(f"http://localhost:{port}/api/admin/create-quiz", cookies=cookies, json=create_data)
 
         assert response.status_code == 409
         data = response.json()
@@ -101,8 +101,8 @@ def test_admin_get_quiz_content(temp_dir):
     quizzes = {"geography.yaml": quiz_data}
 
     with custom_webquiz_server(quizzes=quizzes) as (proc, port):
-        headers = {"X-Master-Key": "test123"}
-        response = requests.get(f"http://localhost:{port}/api/admin/quiz/geography.yaml", headers=headers)
+        cookies = get_admin_session(port)
+        response = requests.get(f"http://localhost:{port}/api/admin/quiz/geography.yaml", cookies=cookies)
 
         assert response.status_code == 200
         data = response.json()
@@ -119,8 +119,8 @@ def test_admin_get_quiz_content(temp_dir):
 def test_admin_get_nonexistent_quiz(temp_dir):
     """Test 404 when retrieving non-existent quiz."""
     with custom_webquiz_server() as (proc, port):
-        headers = {"X-Master-Key": "test123"}
-        response = requests.get(f"http://localhost:{port}/api/admin/quiz/nonexistent.yaml", headers=headers)
+        cookies = get_admin_session(port)
+        response = requests.get(f"http://localhost:{port}/api/admin/quiz/nonexistent.yaml", cookies=cookies)
 
         assert response.status_code == 404
         data = response.json()
@@ -137,6 +137,7 @@ def test_admin_update_quiz_wizard_mode(temp_dir):
     quizzes = {"update_test.yaml": original_quiz}
 
     with custom_webquiz_server(quizzes=quizzes) as (proc, port):
+        cookies = get_admin_session(port)
         updated_quiz_data = {
             "title": "Updated Quiz",
             "questions": [{"question": "Updated question?", "options": ["X", "Y", "Z"], "correct_answer": 1}],
@@ -144,9 +145,8 @@ def test_admin_update_quiz_wizard_mode(temp_dir):
 
         update_data = {"mode": "wizard", "quiz_data": updated_quiz_data}
 
-        headers = {"X-Master-Key": "test123"}
         response = requests.put(
-            f"http://localhost:{port}/api/admin/quiz/update_test.yaml", headers=headers, json=update_data
+            f"http://localhost:{port}/api/admin/quiz/update_test.yaml", cookies=cookies, json=update_data
         )
 
         assert response.status_code == 200
@@ -156,7 +156,7 @@ def test_admin_update_quiz_wizard_mode(temp_dir):
         assert "backup_created" in data
 
         # Verify the file was actually updated by retrieving it
-        get_response = requests.get(f"http://localhost:{port}/api/admin/quiz/update_test.yaml", headers=headers)
+        get_response = requests.get(f"http://localhost:{port}/api/admin/quiz/update_test.yaml", cookies=cookies)
         assert get_response.status_code == 200
 
         updated_content = get_response.json()
@@ -190,11 +190,11 @@ questions:
 """
 
     with custom_webquiz_server(quizzes=quizzes) as (proc, port):
+        cookies = get_admin_session(port)
         update_data = {"mode": "text", "content": updated_yaml}
 
-        headers = {"X-Master-Key": "test123"}
         response = requests.put(
-            f"http://localhost:{port}/api/admin/quiz/text_update.yaml", headers=headers, json=update_data
+            f"http://localhost:{port}/api/admin/quiz/text_update.yaml", cookies=cookies, json=update_data
         )
 
         assert response.status_code == 200
@@ -203,7 +203,7 @@ questions:
         assert "backup_created" in data
 
         # Verify the file was actually updated by retrieving it
-        get_response = requests.get(f"http://localhost:{port}/api/admin/quiz/text_update.yaml", headers=headers)
+        get_response = requests.get(f"http://localhost:{port}/api/admin/quiz/text_update.yaml", cookies=cookies)
         assert get_response.status_code == 200
 
         updated_content = get_response.json()
@@ -234,8 +234,8 @@ def test_admin_delete_quiz(temp_dir):
     }
 
     with custom_webquiz_server(quizzes=quiz_to_delete) as (proc, port):
-        headers = {"X-Master-Key": "test123"}
-        response = requests.delete(f"http://localhost:{port}/api/admin/quiz/delete_me.yaml", headers=headers)
+        cookies = get_admin_session(port)
+        response = requests.delete(f"http://localhost:{port}/api/admin/quiz/delete_me.yaml", cookies=cookies)
 
         assert response.status_code == 200
         data = response.json()
@@ -255,8 +255,8 @@ def test_admin_delete_active_quiz(temp_dir):
     }
 
     with custom_webquiz_server(quizzes=active_quiz) as (proc, port):
-        headers = {"X-Master-Key": "test123"}
-        response = requests.delete(f"http://localhost:{port}/api/admin/quiz/active_quiz.yaml", headers=headers)
+        cookies = get_admin_session(port)
+        response = requests.delete(f"http://localhost:{port}/api/admin/quiz/active_quiz.yaml", cookies=cookies)
 
         assert response.status_code == 400
         data = response.json()
@@ -266,8 +266,8 @@ def test_admin_delete_active_quiz(temp_dir):
 def test_admin_delete_nonexistent_quiz(temp_dir):
     """Test 404 when deleting non-existent quiz."""
     with custom_webquiz_server() as (proc, port):
-        headers = {"X-Master-Key": "test123"}
-        response = requests.delete(f"http://localhost:{port}/api/admin/quiz/nonexistent.yaml", headers=headers)
+        cookies = get_admin_session(port)
+        response = requests.delete(f"http://localhost:{port}/api/admin/quiz/nonexistent.yaml", cookies=cookies)
 
         assert response.status_code == 404
         data = response.json()
@@ -287,9 +287,9 @@ questions:
 """
 
     with custom_webquiz_server() as (proc, port):
-        headers = {"X-Master-Key": "test123"}
+        cookies = get_admin_session(port)
         response = requests.post(
-            f"http://localhost:{port}/api/admin/validate-quiz", headers=headers, json={"content": valid_quiz_yaml}
+            f"http://localhost:{port}/api/admin/validate-quiz", cookies=cookies, json={"content": valid_quiz_yaml}
         )
 
         assert response.status_code == 200
@@ -312,12 +312,12 @@ questions: []
 """
 
     with custom_webquiz_server() as (proc, port):
-        headers = {"X-Master-Key": "test123"}
+        cookies = get_admin_session(port)
 
         # Test missing questions array
         response1 = requests.post(
             f"http://localhost:{port}/api/admin/validate-quiz",
-            headers=headers,
+            cookies=cookies,
             json={"content": missing_questions_yaml},
         )
         assert response1.status_code == 200
@@ -328,7 +328,7 @@ questions: []
 
         # Test empty questions array
         response2 = requests.post(
-            f"http://localhost:{port}/api/admin/validate-quiz", headers=headers, json={"content": empty_questions_yaml}
+            f"http://localhost:{port}/api/admin/validate-quiz", cookies=cookies, json={"content": empty_questions_yaml}
         )
         assert response2.status_code == 200
         data2 = response2.json()
@@ -346,9 +346,9 @@ questions:
 """
 
     with custom_webquiz_server() as (proc, port):
-        headers = {"X-Master-Key": "test123"}
+        cookies = get_admin_session(port)
         response = requests.post(
-            f"http://localhost:{port}/api/admin/validate-quiz", headers=headers, json={"content": invalid_yaml}
+            f"http://localhost:{port}/api/admin/validate-quiz", cookies=cookies, json={"content": invalid_yaml}
         )
 
         assert response.status_code == 200
@@ -378,11 +378,11 @@ questions:
 """
 
     with custom_webquiz_server() as (proc, port):
-        headers = {"X-Master-Key": "test123"}
+        cookies = get_admin_session(port)
 
         # Test missing required fields
         response1 = requests.post(
-            f"http://localhost:{port}/api/admin/validate-quiz", headers=headers, json={"content": incomplete_quiz_yaml}
+            f"http://localhost:{port}/api/admin/validate-quiz", cookies=cookies, json={"content": incomplete_quiz_yaml}
         )
         assert response1.status_code == 200
         data1 = response1.json()
@@ -391,7 +391,7 @@ questions:
 
         # Test invalid correct answer index
         response2 = requests.post(
-            f"http://localhost:{port}/api/admin/validate-quiz", headers=headers, json={"content": invalid_index_yaml}
+            f"http://localhost:{port}/api/admin/validate-quiz", cookies=cookies, json={"content": invalid_index_yaml}
         )
         assert response2.status_code == 200
         data2 = response2.json()
@@ -412,9 +412,9 @@ questions:
 """
 
     with custom_webquiz_server() as (proc, port):
-        headers = {"X-Master-Key": "test123"}
+        cookies = get_admin_session(port)
         response = requests.post(
-            f"http://localhost:{port}/api/admin/validate-quiz", headers=headers, json={"content": image_quiz_yaml}
+            f"http://localhost:{port}/api/admin/validate-quiz", cookies=cookies, json={"content": image_quiz_yaml}
         )
 
         assert response.status_code == 200
@@ -434,10 +434,10 @@ def test_update_active_quiz_affects_server_state(temp_dir):
     quizzes = {"active_quiz.yaml": original_quiz}
 
     with custom_webquiz_server(quizzes=quizzes) as (proc, port):
-        headers = {"X-Master-Key": "test123"}
+        cookies = get_admin_session(port)
 
         # Verify the current quiz is active
-        list_response = requests.get(f"http://localhost:{port}/api/admin/list-quizzes", headers=headers)
+        list_response = requests.get(f"http://localhost:{port}/api/admin/list-quizzes", cookies=cookies)
         assert list_response.status_code == 200
         assert list_response.json()["current_quiz"] == "active_quiz.yaml"
 
@@ -452,14 +452,14 @@ def test_update_active_quiz_affects_server_state(temp_dir):
         update_data = {"mode": "wizard", "quiz_data": updated_quiz_data}
 
         update_response = requests.put(
-            f"http://localhost:{port}/api/admin/quiz/active_quiz.yaml", headers=headers, json=update_data
+            f"http://localhost:{port}/api/admin/quiz/active_quiz.yaml", cookies=cookies, json=update_data
         )
 
         assert update_response.status_code == 200
         assert update_response.json()["success"] is True
 
         # Verify the quiz was actually updated on the server by retrieving it
-        get_response = requests.get(f"http://localhost:{port}/api/admin/quiz/active_quiz.yaml", headers=headers)
+        get_response = requests.get(f"http://localhost:{port}/api/admin/quiz/active_quiz.yaml", cookies=cookies)
         assert get_response.status_code == 200
 
         updated_content = get_response.json()
@@ -474,6 +474,7 @@ def test_update_active_quiz_affects_server_state(temp_dir):
 def test_create_then_switch_to_new_quiz(temp_dir):
     """Test creating a quiz and immediately switching to it."""
     with custom_webquiz_server() as (proc, port):
+        cookies = get_admin_session(port)
         # Create a new quiz
         quiz_data = {
             "title": "New Quiz for Switch",
@@ -482,18 +483,16 @@ def test_create_then_switch_to_new_quiz(temp_dir):
 
         create_data = {"filename": "switch_target", "mode": "wizard", "quiz_data": quiz_data}
 
-        headers = {"X-Master-Key": "test123"}
-
         # Create the quiz
         create_response = requests.post(
-            f"http://localhost:{port}/api/admin/create-quiz", headers=headers, json=create_data
+            f"http://localhost:{port}/api/admin/create-quiz", cookies=cookies, json=create_data
         )
         assert create_response.status_code == 200
 
         # Switch to the new quiz
         switch_data = {"quiz_filename": "switch_target.yaml"}
         switch_response = requests.post(
-            f"http://localhost:{port}/api/admin/switch-quiz", headers=headers, json=switch_data
+            f"http://localhost:{port}/api/admin/switch-quiz", cookies=cookies, json=switch_data
         )
 
         assert switch_response.status_code == 200
@@ -533,8 +532,8 @@ def test_quiz_operations_without_auth(temp_dir):
 def test_admin_list_images_empty_directory(temp_dir):
     """Test listing images when imgs directory doesn't exist."""
     with custom_webquiz_server() as (proc, port):
-        headers = {"X-Master-Key": "test123"}
-        response = requests.get(f"http://localhost:{port}/api/admin/list-images", headers=headers)
+        cookies = get_admin_session(port)
+        response = requests.get(f"http://localhost:{port}/api/admin/list-images", cookies=cookies)
 
         assert response.status_code == 200
         data = response.json()
@@ -545,6 +544,7 @@ def test_admin_list_images_empty_directory(temp_dir):
 def test_admin_list_images_with_files(temp_dir):
     """Test listing images when imgs directory contains image files."""
     with custom_webquiz_server() as (proc, port):
+        cookies = get_admin_session(port)
         # Create imgs directory with test images
         imgs_dir = f"quizzes_{port}/imgs"
         os.makedirs(imgs_dir, exist_ok=True)
@@ -559,8 +559,7 @@ def test_admin_list_images_with_files(temp_dir):
         with open(os.path.join(imgs_dir, "notes.txt"), "w") as f:
             f.write("not an image")
 
-        headers = {"X-Master-Key": "test123"}
-        response = requests.get(f"http://localhost:{port}/api/admin/list-images", headers=headers)
+        response = requests.get(f"http://localhost:{port}/api/admin/list-images", cookies=cookies)
 
         assert response.status_code == 200
         data = response.json()

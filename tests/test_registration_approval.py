@@ -4,7 +4,7 @@ import json
 import time
 import websocket
 
-from conftest import custom_webquiz_server
+from conftest import custom_webquiz_server, get_admin_session
 
 
 # Test POST /api/register modifications (4 tests)
@@ -100,7 +100,7 @@ def test_verify_user_approved():
     config = {"registration": {"approve": True}}
 
     with custom_webquiz_server(config=config) as (proc, port):
-        headers = {"X-Master-Key": "test123"}
+        cookies = get_admin_session(port)
 
         # Register user
         reg_response = requests.post(f"http://localhost:{port}/api/register", json={"username": "TestUser"})
@@ -108,7 +108,7 @@ def test_verify_user_approved():
 
         # Approve user
         approve_response = requests.put(
-            f"http://localhost:{port}/api/admin/approve-user", headers=headers, json={"user_id": user_id}
+            f"http://localhost:{port}/api/admin/approve-user", cookies=cookies, json={"user_id": user_id}
         )
         assert approve_response.status_code == 200
 
@@ -126,7 +126,7 @@ def test_verify_user_approved_after_approval():
     config = {"registration": {"approve": True}}
 
     with custom_webquiz_server(config=config) as (proc, port):
-        headers = {"X-Master-Key": "test123"}
+        cookies = get_admin_session(port)
 
         # Register user
         reg_response = requests.post(f"http://localhost:{port}/api/register", json={"username": "TestUser"})
@@ -137,7 +137,7 @@ def test_verify_user_approved_after_approval():
         assert verify1.json()["approved"] is False
 
         # Approve user
-        requests.put(f"http://localhost:{port}/api/admin/approve-user", headers=headers, json={"user_id": user_id})
+        requests.put(f"http://localhost:{port}/api/admin/approve-user", cookies=cookies, json={"user_id": user_id})
 
         # Check approved state
         verify2 = requests.get(f"http://localhost:{port}/api/verify-user/{user_id}")
@@ -176,14 +176,14 @@ def test_update_registration_after_approval():
     config = {"registration": {"approve": True}}
 
     with custom_webquiz_server(config=config) as (proc, port):
-        headers = {"X-Master-Key": "test123"}
+        cookies = get_admin_session(port)
 
         # Register user
         reg_response = requests.post(f"http://localhost:{port}/api/register", json={"username": "TestUser"})
         user_id = reg_response.json()["user_id"]
 
         # Approve user
-        requests.put(f"http://localhost:{port}/api/admin/approve-user", headers=headers, json={"user_id": user_id})
+        requests.put(f"http://localhost:{port}/api/admin/approve-user", cookies=cookies, json={"user_id": user_id})
 
         # Try to update registration after approval
         response = requests.put(
@@ -268,7 +268,7 @@ def test_approve_user_successfully():
     config = {"registration": {"approve": True}}
 
     with custom_webquiz_server(config=config) as (proc, port):
-        headers = {"X-Master-Key": "test123"}
+        cookies = get_admin_session(port)
 
         # Register user
         reg_response = requests.post(f"http://localhost:{port}/api/register", json={"username": "TestUser"})
@@ -276,7 +276,7 @@ def test_approve_user_successfully():
 
         # Approve user
         response = requests.put(
-            f"http://localhost:{port}/api/admin/approve-user", headers=headers, json={"user_id": user_id}
+            f"http://localhost:{port}/api/admin/approve-user", cookies=cookies, json={"user_id": user_id}
         )
 
         assert response.status_code == 200
@@ -290,7 +290,7 @@ def test_approve_user_starts_timing():
     config = {"registration": {"approve": True}}
 
     with custom_webquiz_server(config=config) as (proc, port):
-        headers = {"X-Master-Key": "test123"}
+        cookies = get_admin_session(port)
 
         # Register user
         reg_response = requests.post(f"http://localhost:{port}/api/register", json={"username": "TestUser"})
@@ -299,7 +299,7 @@ def test_approve_user_starts_timing():
         # Approve user
         time.sleep(0.1)  # Small delay to ensure timing difference
         approve_response = requests.put(
-            f"http://localhost:{port}/api/admin/approve-user", headers=headers, json={"user_id": user_id}
+            f"http://localhost:{port}/api/admin/approve-user", cookies=cookies, json={"user_id": user_id}
         )
 
         assert approve_response.status_code == 200
@@ -321,7 +321,7 @@ def test_approve_user_initializes_live_stats():
     config = {"registration": {"approve": True}}
 
     with custom_webquiz_server(config=config) as (proc, port):
-        headers = {"X-Master-Key": "test123"}
+        cookies = get_admin_session(port)
 
         # Register user
         reg_response = requests.post(f"http://localhost:{port}/api/register", json={"username": "TestUser"})
@@ -329,7 +329,7 @@ def test_approve_user_initializes_live_stats():
 
         # Approve user
         response = requests.put(
-            f"http://localhost:{port}/api/admin/approve-user", headers=headers, json={"user_id": user_id}
+            f"http://localhost:{port}/api/admin/approve-user", cookies=cookies, json={"user_id": user_id}
         )
 
         assert response.status_code == 200
@@ -340,10 +340,10 @@ def test_approve_user_initializes_live_stats():
 def test_approve_user_invalid_user_id():
     """Test approval with non-existent user ID"""
     with custom_webquiz_server() as (proc, port):
-        headers = {"X-Master-Key": "test123"}
+        cookies = get_admin_session(port)
 
         response = requests.put(
-            f"http://localhost:{port}/api/admin/approve-user", headers=headers, json={"user_id": "999999"}
+            f"http://localhost:{port}/api/admin/approve-user", cookies=cookies, json={"user_id": "999999"}
         )
 
         assert response.status_code == 404
@@ -355,7 +355,7 @@ def test_approve_user_broadcasts_websocket():
     config = {"registration": {"approve": True}}
 
     with custom_webquiz_server(config=config) as (proc, port):
-        headers = {"X-Master-Key": "test123"}
+        cookies = get_admin_session(port)
 
         # Register user
         reg_response = requests.post(f"http://localhost:{port}/api/register", json={"username": "TestUser"})
@@ -363,7 +363,7 @@ def test_approve_user_broadcasts_websocket():
 
         # Approve user
         response = requests.put(
-            f"http://localhost:{port}/api/admin/approve-user", headers=headers, json={"user_id": user_id}
+            f"http://localhost:{port}/api/admin/approve-user", cookies=cookies, json={"user_id": user_id}
         )
 
         assert response.status_code == 200
@@ -401,7 +401,7 @@ def test_timing_starts_on_approval_when_approve_true():
     config = {"registration": {"approve": True}}
 
     with custom_webquiz_server(config=config) as (proc, port):
-        headers = {"X-Master-Key": "test123"}
+        cookies = get_admin_session(port)
 
         # Register user
         reg_response = requests.post(f"http://localhost:{port}/api/register", json={"username": "TestUser"})
@@ -412,7 +412,7 @@ def test_timing_starts_on_approval_when_approve_true():
 
         # Approve user
         approve_response = requests.put(
-            f"http://localhost:{port}/api/admin/approve-user", headers=headers, json={"user_id": user_id}
+            f"http://localhost:{port}/api/admin/approve-user", cookies=cookies, json={"user_id": user_id}
         )
         assert approve_response.status_code == 200
 

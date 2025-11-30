@@ -1,13 +1,13 @@
 import requests
 import yaml
 
-from conftest import custom_webquiz_server
+from conftest import custom_webquiz_server, get_admin_session
 
 
 def test_update_config_with_valid_data():
     """Test updating config with all sections valid."""
     with custom_webquiz_server() as (proc, port):
-        headers = {"X-Master-Key": "test123"}
+        cookies = get_admin_session(port)
 
         # Valid config with all sections
         config_content = """server:
@@ -35,7 +35,7 @@ registration:
 """
 
         response = requests.put(
-            f"http://localhost:{port}/api/admin/config", headers=headers, json={"content": config_content}
+            f"http://localhost:{port}/api/admin/config", cookies=cookies, json={"content": config_content}
         )
 
         assert response.status_code == 200
@@ -48,9 +48,9 @@ registration:
 def test_update_config_with_empty_content():
     """Test updating config with empty content (valid - uses defaults)."""
     with custom_webquiz_server() as (proc, port):
-        headers = {"X-Master-Key": "test123"}
+        cookies = get_admin_session(port)
 
-        response = requests.put(f"http://localhost:{port}/api/admin/config", headers=headers, json={"content": ""})
+        response = requests.put(f"http://localhost:{port}/api/admin/config", cookies=cookies, json={"content": ""})
 
         assert response.status_code == 200
         data = response.json()
@@ -60,7 +60,7 @@ def test_update_config_with_empty_content():
 def test_update_config_with_only_some_sections():
     """Test updating config with only some sections (others use defaults)."""
     with custom_webquiz_server() as (proc, port):
-        headers = {"X-Master-Key": "test123"}
+        cookies = get_admin_session(port)
 
         # Config with only server section
         config_content = """server:
@@ -68,7 +68,7 @@ def test_update_config_with_only_some_sections():
 """
 
         response = requests.put(
-            f"http://localhost:{port}/api/admin/config", headers=headers, json={"content": config_content}
+            f"http://localhost:{port}/api/admin/config", cookies=cookies, json={"content": config_content}
         )
 
         assert response.status_code == 200
@@ -79,13 +79,13 @@ def test_update_config_with_only_some_sections():
 def test_reject_invalid_yaml_syntax():
     """Test rejecting invalid YAML syntax."""
     with custom_webquiz_server() as (proc, port):
-        headers = {"X-Master-Key": "test123"}
+        cookies = get_admin_session(port)
 
         # Invalid YAML - unclosed quote
         config_content = 'server:\n  host: "unclosed'
 
         response = requests.put(
-            f"http://localhost:{port}/api/admin/config", headers=headers, json={"content": config_content}
+            f"http://localhost:{port}/api/admin/config", cookies=cookies, json={"content": config_content}
         )
 
         assert response.status_code == 400
@@ -96,7 +96,7 @@ def test_reject_invalid_yaml_syntax():
 def test_reject_invalid_port_out_of_range():
     """Test rejecting port numbers out of valid range."""
     with custom_webquiz_server() as (proc, port):
-        headers = {"X-Master-Key": "test123"}
+        cookies = get_admin_session(port)
 
         # Port too high
         config_content = """server:
@@ -104,7 +104,7 @@ def test_reject_invalid_port_out_of_range():
 """
 
         response = requests.put(
-            f"http://localhost:{port}/api/admin/config", headers=headers, json={"content": config_content}
+            f"http://localhost:{port}/api/admin/config", cookies=cookies, json={"content": config_content}
         )
 
         assert response.status_code == 400
@@ -116,7 +116,7 @@ def test_reject_invalid_port_out_of_range():
 def test_reject_invalid_port_type():
     """Test rejecting non-integer port."""
     with custom_webquiz_server() as (proc, port):
-        headers = {"X-Master-Key": "test123"}
+        cookies = get_admin_session(port)
 
         # Port as string
         config_content = """server:
@@ -124,7 +124,7 @@ def test_reject_invalid_port_type():
 """
 
         response = requests.put(
-            f"http://localhost:{port}/api/admin/config", headers=headers, json={"content": config_content}
+            f"http://localhost:{port}/api/admin/config", cookies=cookies, json={"content": config_content}
         )
 
         assert response.status_code == 400
@@ -137,7 +137,7 @@ def test_reject_invalid_port_type():
 def test_reject_server_section_as_list():
     """Test rejecting wrong type for server section (list instead of dict)."""
     with custom_webquiz_server() as (proc, port):
-        headers = {"X-Master-Key": "test123"}
+        cookies = get_admin_session(port)
 
         config_content = """server:
   - host: "0.0.0.0"
@@ -145,7 +145,7 @@ def test_reject_server_section_as_list():
 """
 
         response = requests.put(
-            f"http://localhost:{port}/api/admin/config", headers=headers, json={"content": config_content}
+            f"http://localhost:{port}/api/admin/config", cookies=cookies, json={"content": config_content}
         )
 
         assert response.status_code == 400
@@ -158,14 +158,14 @@ def test_reject_server_section_as_list():
 def test_reject_invalid_trusted_ips_not_list():
     """Test rejecting trusted_ips that's not a list."""
     with custom_webquiz_server() as (proc, port):
-        headers = {"X-Master-Key": "test123"}
+        cookies = get_admin_session(port)
 
         config_content = """admin:
   trusted_ips: "127.0.0.1"
 """
 
         response = requests.put(
-            f"http://localhost:{port}/api/admin/config", headers=headers, json={"content": config_content}
+            f"http://localhost:{port}/api/admin/config", cookies=cookies, json={"content": config_content}
         )
 
         assert response.status_code == 400
@@ -178,7 +178,7 @@ def test_reject_invalid_trusted_ips_not_list():
 def test_reject_invalid_quizzes_missing_fields():
     """Test rejecting quizzes with missing required fields."""
     with custom_webquiz_server() as (proc, port):
-        headers = {"X-Master-Key": "test123"}
+        cookies = get_admin_session(port)
 
         # Quiz missing 'folder' field
         config_content = """quizzes:
@@ -187,7 +187,7 @@ def test_reject_invalid_quizzes_missing_fields():
 """
 
         response = requests.put(
-            f"http://localhost:{port}/api/admin/config", headers=headers, json={"content": config_content}
+            f"http://localhost:{port}/api/admin/config", cookies=cookies, json={"content": config_content}
         )
 
         assert response.status_code == 400
@@ -208,7 +208,7 @@ def test_config_requires_authentication():
 def test_config_with_registration_fields():
     """Test config with registration fields."""
     with custom_webquiz_server() as (proc, port):
-        headers = {"X-Master-Key": "test123"}
+        cookies = get_admin_session(port)
 
         config_content = """registration:
   fields:
@@ -218,7 +218,7 @@ def test_config_with_registration_fields():
 """
 
         response = requests.put(
-            f"http://localhost:{port}/api/admin/config", headers=headers, json={"content": config_content}
+            f"http://localhost:{port}/api/admin/config", cookies=cookies, json={"content": config_content}
         )
 
         assert response.status_code == 200
@@ -229,7 +229,7 @@ def test_config_with_registration_fields():
 def test_config_with_quizzes():
     """Test config with downloadable quizzes."""
     with custom_webquiz_server() as (proc, port):
-        headers = {"X-Master-Key": "test123"}
+        cookies = get_admin_session(port)
 
         config_content = """quizzes:
   - name: "Math Quiz"
@@ -241,7 +241,7 @@ def test_config_with_quizzes():
 """
 
         response = requests.put(
-            f"http://localhost:{port}/api/admin/config", headers=headers, json={"content": config_content}
+            f"http://localhost:{port}/api/admin/config", cookies=cookies, json={"content": config_content}
         )
 
         assert response.status_code == 200
@@ -252,14 +252,14 @@ def test_config_with_quizzes():
 def test_reject_negative_port():
     """Test rejecting negative port number."""
     with custom_webquiz_server() as (proc, port):
-        headers = {"X-Master-Key": "test123"}
+        cookies = get_admin_session(port)
 
         config_content = """server:
   port: -1
 """
 
         response = requests.put(
-            f"http://localhost:{port}/api/admin/config", headers=headers, json={"content": config_content}
+            f"http://localhost:{port}/api/admin/config", cookies=cookies, json={"content": config_content}
         )
 
         assert response.status_code == 400
@@ -271,14 +271,14 @@ def test_reject_negative_port():
 def test_config_master_key_can_be_null():
     """Test that master_key can be null."""
     with custom_webquiz_server() as (proc, port):
-        headers = {"X-Master-Key": "test123"}
+        cookies = get_admin_session(port)
 
         config_content = """admin:
   master_key: null
 """
 
         response = requests.put(
-            f"http://localhost:{port}/api/admin/config", headers=headers, json={"content": config_content}
+            f"http://localhost:{port}/api/admin/config", cookies=cookies, json={"content": config_content}
         )
 
         assert response.status_code == 200

@@ -2,7 +2,7 @@
 
 import pytest
 import requests
-from tests.conftest import custom_webquiz_server
+from conftest import custom_webquiz_server, get_admin_session
 
 
 def test_create_quiz_with_randomize_questions_via_wizard(temp_dir):
@@ -24,7 +24,7 @@ def test_create_quiz_with_randomize_questions_via_wizard(temp_dir):
         response = requests.post(
             f"http://localhost:{port}/api/admin/create-quiz",
             json={"filename": "test_randomized", "mode": "wizard", "quiz_data": quiz_data},
-            headers={"X-Master-Key": "test123"},
+            cookies = get_admin_session(port),
         )
 
         assert response.status_code == 200
@@ -33,7 +33,7 @@ def test_create_quiz_with_randomize_questions_via_wizard(temp_dir):
 
         # Verify quiz was created with randomize_questions
         response = requests.get(
-            f"http://localhost:{port}/api/admin/quiz/test_randomized.yaml", headers={"X-Master-Key": "test123"}
+            f"http://localhost:{port}/api/admin/quiz/test_randomized.yaml", cookies = get_admin_session(port)
         )
 
         assert response.status_code == 200
@@ -58,14 +58,14 @@ def test_create_quiz_without_randomize_questions_defaults_false(temp_dir):
         response = requests.post(
             f"http://localhost:{port}/api/admin/create-quiz",
             json={"filename": "test_no_randomize", "mode": "wizard", "quiz_data": quiz_data},
-            headers={"X-Master-Key": "test123"},
+            cookies = get_admin_session(port),
         )
 
         assert response.status_code == 200
 
         # Verify quiz was created with randomize_questions as false
         response = requests.get(
-            f"http://localhost:{port}/api/admin/quiz/test_no_randomize.yaml", headers={"X-Master-Key": "test123"}
+            f"http://localhost:{port}/api/admin/quiz/test_no_randomize.yaml", cookies = get_admin_session(port)
         )
 
         assert response.status_code == 200
@@ -89,7 +89,7 @@ def test_edit_quiz_to_add_randomize_questions(temp_dir):
     with custom_webquiz_server(config=config, quizzes={"editable.yaml": quiz_data}) as (proc, port):
         # First, verify the quiz doesn't have randomize_questions
         response = requests.get(
-            f"http://localhost:{port}/api/admin/quiz/editable.yaml", headers={"X-Master-Key": "test123"}
+            f"http://localhost:{port}/api/admin/quiz/editable.yaml", cookies = get_admin_session(port)
         )
         assert response.status_code == 200
         data = response.json()
@@ -109,14 +109,14 @@ def test_edit_quiz_to_add_randomize_questions(temp_dir):
         response = requests.put(
             f"http://localhost:{port}/api/admin/quiz/editable.yaml",
             json={"mode": "wizard", "quiz_data": updated_data},
-            headers={"X-Master-Key": "test123"},
+            cookies = get_admin_session(port),
         )
 
         assert response.status_code == 200
 
         # Verify randomize_questions was added
         response = requests.get(
-            f"http://localhost:{port}/api/admin/quiz/editable.yaml", headers={"X-Master-Key": "test123"}
+            f"http://localhost:{port}/api/admin/quiz/editable.yaml", cookies = get_admin_session(port)
         )
 
         assert response.status_code == 200
@@ -138,7 +138,7 @@ def test_randomize_questions_preserved_after_edit(temp_dir):
     with custom_webquiz_server(config=config, quizzes={"randomized.yaml": quiz_data}) as (proc, port):
         # Get the quiz
         response = requests.get(
-            f"http://localhost:{port}/api/admin/quiz/randomized.yaml", headers={"X-Master-Key": "test123"}
+            f"http://localhost:{port}/api/admin/quiz/randomized.yaml", cookies = get_admin_session(port)
         )
         assert response.status_code == 200
         original_data = response.json()["parsed"]
@@ -153,14 +153,14 @@ def test_randomize_questions_preserved_after_edit(temp_dir):
         response = requests.put(
             f"http://localhost:{port}/api/admin/quiz/randomized.yaml",
             json={"mode": "wizard", "quiz_data": updated_data},
-            headers={"X-Master-Key": "test123"},
+            cookies = get_admin_session(port),
         )
 
         assert response.status_code == 200
 
         # Verify randomize_questions is still True
         response = requests.get(
-            f"http://localhost:{port}/api/admin/quiz/randomized.yaml", headers={"X-Master-Key": "test123"}
+            f"http://localhost:{port}/api/admin/quiz/randomized.yaml", cookies = get_admin_session(port)
         )
 
         assert response.status_code == 200
@@ -182,7 +182,7 @@ def test_disable_randomize_questions_via_edit(temp_dir):
     with custom_webquiz_server(config=config, quizzes={"to_disable.yaml": quiz_data}) as (proc, port):
         # Verify it starts with randomize_questions enabled
         response = requests.get(
-            f"http://localhost:{port}/api/admin/quiz/to_disable.yaml", headers={"X-Master-Key": "test123"}
+            f"http://localhost:{port}/api/admin/quiz/to_disable.yaml", cookies = get_admin_session(port)
         )
         assert response.status_code == 200
         assert response.json()["parsed"]["randomize_questions"] is True
@@ -197,14 +197,14 @@ def test_disable_randomize_questions_via_edit(temp_dir):
         response = requests.put(
             f"http://localhost:{port}/api/admin/quiz/to_disable.yaml",
             json={"mode": "wizard", "quiz_data": updated_data},
-            headers={"X-Master-Key": "test123"},
+            cookies = get_admin_session(port),
         )
 
         assert response.status_code == 200
 
         # Verify randomize_questions is now False
         response = requests.get(
-            f"http://localhost:{port}/api/admin/quiz/to_disable.yaml", headers={"X-Master-Key": "test123"}
+            f"http://localhost:{port}/api/admin/quiz/to_disable.yaml", cookies = get_admin_session(port)
         )
 
         assert response.status_code == 200
@@ -232,7 +232,7 @@ def test_create_quiz_with_show_answers_on_completion(temp_dir):
         response = requests.post(
             f"http://localhost:{port}/api/admin/create-quiz",
             json={"filename": "test_completion_answers", "mode": "wizard", "quiz_data": quiz_data},
-            headers={"X-Master-Key": "test123"},
+            cookies = get_admin_session(port),
         )
 
         assert response.status_code == 200
@@ -241,7 +241,7 @@ def test_create_quiz_with_show_answers_on_completion(temp_dir):
 
         # Verify quiz was created with show_answers_on_completion
         response = requests.get(
-            f"http://localhost:{port}/api/admin/quiz/test_completion_answers.yaml", headers={"X-Master-Key": "test123"}
+            f"http://localhost:{port}/api/admin/quiz/test_completion_answers.yaml", cookies = get_admin_session(port)
         )
 
         assert response.status_code == 200
@@ -263,7 +263,7 @@ def test_edit_quiz_to_enable_show_answers_on_completion(temp_dir):
     with custom_webquiz_server(config=config, quizzes={"enable_completion.yaml": quiz_data}) as (proc, port):
         # First, verify the quiz doesn't have show_answers_on_completion
         response = requests.get(
-            f"http://localhost:{port}/api/admin/quiz/enable_completion.yaml", headers={"X-Master-Key": "test123"}
+            f"http://localhost:{port}/api/admin/quiz/enable_completion.yaml", cookies = get_admin_session(port)
         )
         assert response.status_code == 200
         data = response.json()
@@ -280,14 +280,14 @@ def test_edit_quiz_to_enable_show_answers_on_completion(temp_dir):
         response = requests.put(
             f"http://localhost:{port}/api/admin/quiz/enable_completion.yaml",
             json={"mode": "wizard", "quiz_data": updated_data},
-            headers={"X-Master-Key": "test123"},
+            cookies = get_admin_session(port),
         )
 
         assert response.status_code == 200
 
         # Verify show_answers_on_completion was added
         response = requests.get(
-            f"http://localhost:{port}/api/admin/quiz/enable_completion.yaml", headers={"X-Master-Key": "test123"}
+            f"http://localhost:{port}/api/admin/quiz/enable_completion.yaml", cookies = get_admin_session(port)
         )
 
         assert response.status_code == 200

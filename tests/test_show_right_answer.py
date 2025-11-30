@@ -3,7 +3,7 @@ import yaml
 import requests
 import json
 from pathlib import Path
-from tests.conftest import custom_webquiz_server
+from conftest import custom_webquiz_server, get_admin_session
 
 
 def test_show_right_answer_true_explicit():
@@ -200,14 +200,14 @@ def test_show_right_answer_admin_quiz_update():
 
         update_data = {"mode": "wizard", "quiz_data": updated_quiz_data}
 
-        headers = {"X-Master-Key": "test123"}
+        cookies = get_admin_session(port)
         response = requests.put(
-            f"http://localhost:{port}/api/admin/quiz/update_test.yaml", headers=headers, json=update_data
+            f"http://localhost:{port}/api/admin/quiz/update_test.yaml", cookies=cookies, json=update_data
         )
         assert response.status_code == 200
 
         # Verify the file was actually updated
-        get_response = requests.get(f"http://localhost:{port}/api/admin/quiz/update_test.yaml", headers=headers)
+        get_response = requests.get(f"http://localhost:{port}/api/admin/quiz/update_test.yaml", cookies=cookies)
         assert get_response.status_code == 200
         updated_content = get_response.json()
         updated_quiz = yaml.safe_load(updated_content["content"])

@@ -3,7 +3,7 @@ import json
 import re
 import requests
 from pathlib import Path
-from conftest import custom_webquiz_server
+from conftest import custom_webquiz_server, get_admin_session
 
 
 def test_questions_data_embedded_correctly(temp_dir):
@@ -301,9 +301,9 @@ def test_regeneration_on_quiz_switch(temp_dir):
         assert "Question 1?" in initial_html
 
         # Switch to second quiz
-        headers = {"X-Master-Key": "test123"}
+        cookies = get_admin_session(port)
         switch_response = requests.post(
-            f"http://localhost:{port}/api/admin/switch-quiz", headers=headers, json={"quiz_filename": "quiz2.yaml"}
+            f"http://localhost:{port}/api/admin/switch-quiz", cookies=cookies, json={"quiz_filename": "quiz2.yaml"}
         )
         assert switch_response.status_code == 200
 

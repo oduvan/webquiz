@@ -186,3 +186,22 @@ def custom_webquiz_server(config=None, quizzes=None):
         except Exception as e:
             # Log cleanup errors but don't fail the test
             print(f"Warning: Cleanup error: {e}")
+
+
+def get_admin_session(port, master_key="test123"):
+    """Authenticate with admin API and return session cookies.
+
+    Args:
+        port: Server port
+        master_key: Master key for authentication (default: "test123")
+
+    Returns:
+        requests.cookies.RequestsCookieJar with admin_session cookie
+    """
+    import requests
+
+    headers = {"X-Master-Key": master_key}
+    response = requests.post(f"http://localhost:{port}/api/admin/auth", headers=headers)
+    if response.status_code != 200:
+        raise Exception(f"Failed to authenticate: {response.status_code} - {response.text}")
+    return response.cookies

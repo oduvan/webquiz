@@ -3,7 +3,7 @@ import yaml
 import requests
 import json
 from pathlib import Path
-from tests.conftest import custom_webquiz_server
+from conftest import custom_webquiz_server, get_admin_session
 
 
 def test_basic_functionality_answers_hidden_until_all_complete():
@@ -215,15 +215,13 @@ def test_approval_mode_counts_only_approved():
         user3_id = user3_response.json()["user_id"]
 
         # Admin approves only user1 and user2
-        headers = {"X-Master-Key": "test123"}
+        cookies = get_admin_session(port)
         requests.put(
-            f"http://localhost:{port}/api/admin/approve-user",
-            headers=headers,
+            f"http://localhost:{port}/api/admin/approve-user", cookies=cookies,
             json={"user_id": user1_id, "approved": True},
         )
         requests.put(
-            f"http://localhost:{port}/api/admin/approve-user",
-            headers=headers,
+            f"http://localhost:{port}/api/admin/approve-user", cookies=cookies,
             json={"user_id": user2_id, "approved": True},
         )
 
