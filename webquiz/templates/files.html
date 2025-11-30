@@ -866,6 +866,7 @@
 
         function closeFileViewer() {
             document.getElementById('file-viewer-modal').style.display = 'none';
+            document.getElementById('file-content-table').innerHTML = '';
             currentCsvContent = '';
             currentCsvView = 'text';
             currentViewingFileType = '';
