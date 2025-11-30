@@ -2933,7 +2933,7 @@ class TestingServer:
             return web.Response(text="<h1>Live stats page not found</h1>", content_type="text/html", status=404)
 
     async def _handle_websocket_connection(
-        self, request, client_list: List[web.WebSocketResponse], initial_state_data: dict, client_type: str
+        self, request, client_list: List[web.WebSocketResponse], initial_state_builder, client_type: str
     ):
         """Generic WebSocket connection handler.
 
@@ -2943,7 +2943,7 @@ class TestingServer:
         Args:
             request: aiohttp request object
             client_list: List to manage connected clients
-            initial_state_data: Initial data to send on connection
+            initial_state_builder: Callable that returns initial data dict, called AFTER client is added to list
             client_type: Description for logging
 
         Returns:
@@ -2952,12 +2952,15 @@ class TestingServer:
         ws = web.WebSocketResponse()
         await ws.prepare(request)
 
-        # Add to connected clients
+        # Add to connected clients BEFORE building initial state
+        # This prevents race conditions where updates during state building are missed
         client_list.append(ws)
         logger.info(f"New {client_type} client connected. Total clients: {len(client_list)}")
 
-        # Send initial state
+        # Build and send initial state AFTER client is in the list
+        # Any broadcasts that happen after this point will be received by this client
         try:
+            initial_state_data = initial_state_builder()
             await ws.send_str(json.dumps(initial_state_data))
         except Exception as e:
             logger.error(f"Error sending initial state to {client_type} client: {e}")
@@ -2991,42 +2994,47 @@ class TestingServer:
         Returns:
             WebSocket connection with live stats updates
         """
-        # Filter out unapproved users from live stats
-        approved_users = {
-            user_id: user_data["username"]
-            for user_id, user_data in self.users.items()
-            if user_data.get("approved", True)  # Include if approved or no approval field (backward compatibility)
-        }
 
-        # Filter live stats to only include approved users
-        approved_live_stats = {
-            user_id: stats for user_id, stats in self.live_stats.items() if user_id in approved_users
-        }
+        def build_initial_state():
+            # Filter out unapproved users from live stats
+            approved_users = {
+                user_id: user_data["username"]
+                for user_id, user_data in self.users.items()
+                if user_data.get("approved", True)  # Include if approved or no approval field (backward compatibility)
+            }
 
-        # Build completion status for approved users
-        completed_users = {
-            user_id: (len(self.user_answers.get(user_id, [])) == len(self.questions))
-            for user_id in approved_users.keys()
-        }
+            # Filter live stats to only include approved users
+            approved_live_stats = {
+                user_id: stats for user_id, stats in self.live_stats.items() if user_id in approved_users
+            }
 
-        # Build completion timestamps for approved users
-        completion_times = {
-            user_id: self.user_stats.get(user_id, {}).get("completed_at")
-            for user_id in approved_users.keys()
-            if user_id in self.user_stats
-        }
+            # Build completion status for approved users
+            completed_users = {
+                user_id: (len(self.user_answers.get(user_id, [])) == len(self.questions))
+                for user_id in approved_users.keys()
+            }
 
-        initial_data = {
-            "type": "initial_state",
-            "live_stats": approved_live_stats,
-            "users": approved_users,
-            "completed_users": completed_users,
-            "completion_times": completion_times,
-            "questions": self.questions,
-            "total_questions": len(self.questions),
-            "current_quiz": os.path.basename(self.current_quiz_file) if self.current_quiz_file else None,
-        }
-        return await self._handle_websocket_connection(request, self.websocket_clients, initial_data, "WebSocket")
+            # Build completion timestamps for approved users
+            completion_times = {
+                user_id: self.user_stats.get(user_id, {}).get("completed_at")
+                for user_id in approved_users.keys()
+                if user_id in self.user_stats
+            }
+
+            return {
+                "type": "initial_state",
+                "live_stats": approved_live_stats,
+                "users": approved_users,
+                "completed_users": completed_users,
+                "completion_times": completion_times,
+                "questions": self.questions,
+                "total_questions": len(self.questions),
+                "current_quiz": os.path.basename(self.current_quiz_file) if self.current_quiz_file else None,
+            }
+
+        return await self._handle_websocket_connection(
+            request, self.websocket_clients, build_initial_state, "WebSocket"
+        )
 
     @local_network_only
     async def websocket_admin(self, request):
@@ -3037,35 +3045,38 @@ class TestingServer:
         Returns:
             WebSocket connection with admin notifications
         """
-        # Filter users waiting for approval and extract only registration fields
-        pending_users = {}
-        if hasattr(self.config, "registration") and self.config.registration.approve:
-            for user_id, user_data in self.users.items():
-                if not user_data.get("approved", True):
-                    pending_users[user_id] = {
-                        "username": user_data["username"],
-                        "registration_fields": self._extract_registration_fields(user_data),
-                    }
 
-        # Get tunnel status if configured
-        tunnel_info = None
-        if self.tunnel_manager:
-            tunnel_status = self.tunnel_manager.get_status()
-            tunnel_info = {
-                "configured": True,
-                "server": self.config.tunnel.server,
-                "socket_name": self.config.tunnel.socket_name,
-                **tunnel_status,
+        def build_initial_state():
+            # Filter users waiting for approval and extract only registration fields
+            pending_users = {}
+            if hasattr(self.config, "registration") and self.config.registration.approve:
+                for user_id, user_data in self.users.items():
+                    if not user_data.get("approved", True):
+                        pending_users[user_id] = {
+                            "username": user_data["username"],
+                            "registration_fields": self._extract_registration_fields(user_data),
+                        }
+
+            # Get tunnel status if configured
+            tunnel_info = None
+            if self.tunnel_manager:
+                tunnel_status = self.tunnel_manager.get_status()
+                tunnel_info = {
+                    "configured": True,
+                    "server": self.config.tunnel.server,
+                    "socket_name": self.config.tunnel.socket_name,
+                    **tunnel_status,
+                }
+
+            return {
+                "type": "initial_state",
+                "pending_users": pending_users,
+                "requires_approval": hasattr(self.config, "registration") and self.config.registration.approve,
+                "tunnel": tunnel_info,
             }
 
-        initial_data = {
-            "type": "initial_state",
-            "pending_users": pending_users,
-            "requires_approval": hasattr(self.config, "registration") and self.config.registration.approve,
-            "tunnel": tunnel_info,
-        }
         return await self._handle_websocket_connection(
-            request, self.admin_websocket_clients, initial_data, "admin WebSocket"
+            request, self.admin_websocket_clients, build_initial_state, "admin WebSocket"
         )
 
 
