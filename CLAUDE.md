@@ -35,8 +35,9 @@ WebQuiz - Python/aiohttp quiz system with multi-quiz management, real-time WebSo
 **Public:**
 - `POST /api/register`, `PUT /api/update-registration`, `POST /api/submit-answer`, `GET /api/verify-user/{user_id}`
 
-**Admin (master key or session cookie required, local network only):**
-- `GET /admin`, `POST /api/admin/auth`, `GET /api/admin/check-session`, `PUT /api/admin/approve-user`, `GET /api/admin/list-quizzes`, `POST /api/admin/switch-quiz`, `PUT /api/admin/config`
+**Admin (session cookie required, local network only):**
+- `POST /api/admin/auth` - Authenticate with master key in request body (`{"master_key": "..."}`)
+- `GET /api/admin/check-session`, `PUT /api/admin/approve-user`, `GET /api/admin/list-quizzes`, `POST /api/admin/switch-quiz`, `PUT /api/admin/config`
 - Quiz management: `GET /api/admin/quiz/{filename}`, `POST /api/admin/create-quiz`, `PUT /api/admin/quiz/{filename}`, `DELETE /api/admin/quiz/{filename}`, `POST /api/admin/download-quiz`
 - File management: `GET /api/files/list`, `GET /api/files/{type}/view/{filename}`, `GET /api/files/{type}/download/{filename}`, `PUT /api/files/quizzes/save/{filename}`
 - Tunnel management: `POST /api/admin/tunnel/connect`, `POST /api/admin/tunnel/disconnect`, `GET /api/admin/tunnel/public-key`
@@ -91,7 +92,7 @@ webquiz-stress-test -c 50
 - **6 digits user ID** stored by user_id as key
 - **Server-side timing** for accuracy (starts on admin approval if required)
 - **Multi-file quiz system** in `quizzes/` dir, auto-created if missing
-- **Session-based admin auth** - Master key validates once via `/api/admin/auth`, returns session cookie for subsequent requests
+- **Session-based admin auth** - Master key sent in request body to `/api/admin/auth`, returns session cookie for subsequent requests (no header-based auth)
 - **Config validation** with comprehensive structure/type checks before save
 - **Smart CSV naming** with quiz prefix + unique suffixes (no overwrites)
 - **Quiz state reset** on switch for complete isolation

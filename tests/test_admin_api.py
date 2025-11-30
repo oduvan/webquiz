@@ -7,8 +7,10 @@ from conftest import custom_webquiz_server
 def test_admin_auth_endpoint_with_valid_key():
     """Test admin authentication with valid master key."""
     with custom_webquiz_server() as (proc, port):
-        headers = {"X-Master-Key": "test123"}
-        response = requests.post(f"http://localhost:{port}/api/admin/auth", headers=headers)
+        response = requests.post(
+            f"http://localhost:{port}/api/admin/auth",
+            json={"master_key": "test123"}
+        )
 
         assert response.status_code == 200
         data = response.json()
@@ -29,8 +31,10 @@ def test_admin_auth_endpoint_without_key():
 def test_admin_auth_endpoint_with_invalid_key():
     """Test admin authentication with invalid master key."""
     with custom_webquiz_server() as (proc, port):
-        headers = {"X-Master-Key": "wrong_key"}
-        response = requests.post(f"http://localhost:{port}/api/admin/auth", headers=headers)
+        response = requests.post(
+            f"http://localhost:{port}/api/admin/auth",
+            json={"master_key": "wrong_key"}
+        )
 
         assert response.status_code == 401
         data = response.json()
@@ -41,8 +45,10 @@ def test_admin_list_quizzes_endpoint():
     """Test listing available quizzes via admin API."""
     with custom_webquiz_server() as (proc, port):
         # First authenticate to get session cookie
-        headers = {"X-Master-Key": "test123"}
-        auth_response = requests.post(f"http://localhost:{port}/api/admin/auth", headers=headers)
+        auth_response = requests.post(
+            f"http://localhost:{port}/api/admin/auth",
+            json={"master_key": "test123"}
+        )
         assert auth_response.status_code == 200
         cookies = auth_response.cookies
 
@@ -70,8 +76,10 @@ def test_admin_switch_quiz_endpoint():
     """Test switching quiz via admin API."""
     with custom_webquiz_server() as (proc, port):
         # First authenticate to get session cookie
-        headers = {"X-Master-Key": "test123"}
-        auth_response = requests.post(f"http://localhost:{port}/api/admin/auth", headers=headers)
+        auth_response = requests.post(
+            f"http://localhost:{port}/api/admin/auth",
+            json={"master_key": "test123"}
+        )
         assert auth_response.status_code == 200
         cookies = auth_response.cookies
 
@@ -94,8 +102,10 @@ def test_admin_switch_quiz_nonexistent_file():
     """Test switching to non-existent quiz file."""
     with custom_webquiz_server() as (proc, port):
         # First authenticate to get session cookie
-        headers = {"X-Master-Key": "test123"}
-        auth_response = requests.post(f"http://localhost:{port}/api/admin/auth", headers=headers)
+        auth_response = requests.post(
+            f"http://localhost:{port}/api/admin/auth",
+            json={"master_key": "test123"}
+        )
         assert auth_response.status_code == 200
         cookies = auth_response.cookies
 
@@ -169,9 +179,11 @@ def test_non_trusted_ip_requires_authentication():
         response = requests.post(f"http://localhost:{port}/api/admin/auth")
         assert response.status_code == 401  # Should fail without master key
 
-        # But should work with master key
-        headers = {"X-Master-Key": "test123"}
-        response = requests.post(f"http://localhost:{port}/api/admin/auth", headers=headers)
+        # But should work with master key in body
+        response = requests.post(
+            f"http://localhost:{port}/api/admin/auth",
+            json={"master_key": "test123"}
+        )
         assert response.status_code == 200
         data = response.json()
         assert data["authenticated"] is True

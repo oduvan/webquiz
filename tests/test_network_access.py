@@ -172,8 +172,10 @@ def test_quiz_page_not_restricted():
 def test_admin_api_from_local_ip():
     """Test admin API access from local IP."""
     with custom_webquiz_server() as (proc, port):
-        headers = {"X-Master-Key": "test123"}
-        response = requests.post(f"http://localhost:{port}/api/admin/auth", headers=headers)
+        response = requests.post(
+            f"http://localhost:{port}/api/admin/auth",
+            json={"master_key": "test123"}
+        )
 
         # Should allow access from localhost
         assert response.status_code == 200
@@ -184,11 +186,13 @@ def test_admin_api_from_local_ip():
 def test_admin_api_from_public_ip():
     """Test admin API access from public IP (should be blocked)."""
     with custom_webquiz_server() as (proc, port):
-        headers = {
-            "X-Forwarded-For": "8.8.8.8",
-            "X-Master-Key": "test123",  # Even with valid key, should be blocked by network check
-        }
-        response = requests.post(f"http://localhost:{port}/api/admin/auth", headers=headers)
+        # Even with valid key in body, should be blocked by network check
+        headers = {"X-Forwarded-For": "8.8.8.8"}
+        response = requests.post(
+            f"http://localhost:{port}/api/admin/auth",
+            headers=headers,
+            json={"master_key": "test123"}
+        )
 
         # Should deny access from public IP (network restriction comes before auth)
         assert response.status_code == 403
@@ -200,7 +204,7 @@ def test_admin_api_from_public_ip():
 def test_admin_list_quizzes_from_public_ip():
     """Test admin list quizzes API from public IP (should be blocked)."""
     with custom_webquiz_server() as (proc, port):
-        headers = {"X-Forwarded-For": "1.1.1.1", "X-Master-Key": "test123"}
+        headers = {"X-Forwarded-For": "1.1.1.1"}
         response = requests.get(f"http://localhost:{port}/api/admin/list-quizzes", headers=headers)
 
         # Should deny access from public IP
@@ -212,7 +216,7 @@ def test_admin_list_quizzes_from_public_ip():
 def test_admin_approve_user_from_public_ip():
     """Test admin approve user API from public IP (should be blocked)."""
     with custom_webquiz_server() as (proc, port):
-        headers = {"X-Forwarded-For": "93.184.216.34", "X-Master-Key": "test123"}
+        headers = {"X-Forwarded-For": "93.184.216.34"}
         response = requests.put(
             f"http://localhost:{port}/api/admin/approve-user", headers=headers, json={"user_id": "123456"}
         )

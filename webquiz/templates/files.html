@@ -593,10 +593,9 @@
                 const response = await fetch('/api/admin/auth', {
                     method: 'POST',
                     headers: {
-                        'Content-Type': 'application/json',
-                        'X-Master-Key': masterKey
+                        'Content-Type': 'application/json'
                     },
-                    body: JSON.stringify({}),
+                    body: JSON.stringify({master_key: masterKey}),
                     credentials: 'same-origin'  // Include cookies for session
                 });
 
@@ -619,9 +618,6 @@
         async function loadFiles() {
             try {
                 const response = await fetch('/api/files/list', {
-                    headers: {
-                        'X-Master-Key': currentMasterKey
-                    },
                     credentials: 'same-origin'
                 });
 
@@ -720,9 +716,6 @@
                 }
 
                 const response = await fetch(`/api/files/${type}/view/${encodeURIComponent(filename)}`, {
-                    headers: {
-                        'X-Master-Key': currentMasterKey
-                    },
                     credentials: 'same-origin'
                 });
 
@@ -842,9 +835,6 @@
         async function downloadFile(type, filename) {
             try {
                 const response = await fetch(`/api/files/${type}/download/${encodeURIComponent(filename)}`, {
-                    headers: {
-                        'X-Master-Key': currentMasterKey
-                    },
                     credentials: 'same-origin'
                 });
 
@@ -953,8 +943,7 @@
                 const response = await fetch('/api/admin/config', {
                     method: 'PUT',
                     headers: {
-                        'Content-Type': 'application/json',
-                        'X-Master-Key': currentMasterKey
+                        'Content-Type': 'application/json'
                     },
                     body: JSON.stringify({ content }),
                     credentials: 'same-origin'
@@ -1033,9 +1022,6 @@
                 document.getElementById('quiz-editor-modal').style.display = 'block';
 
                 const response = await fetch(`/api/files/quizzes/view/${encodeURIComponent(filename)}`, {
-                    headers: {
-                        'X-Master-Key': currentMasterKey
-                    },
                     credentials: 'same-origin'
                 });
 
@@ -1064,8 +1050,7 @@
                 const response = await fetch('/api/admin/validate-quiz', {
                     method: 'POST',
                     headers: {
-                        'Content-Type': 'application/json',
-                        'X-Master-Key': currentMasterKey
+                        'Content-Type': 'application/json'
                     },
                     body: JSON.stringify({ content }),
                     credentials: 'same-origin'
@@ -1105,8 +1090,7 @@
                 const response = await fetch(`/api/files/quizzes/save/${encodeURIComponent(currentEditingQuiz)}`, {
                     method: 'PUT',
                     headers: {
-                        'Content-Type': 'application/json',
-                        'X-Master-Key': currentMasterKey
+                        'Content-Type': 'application/json'
                     },
                     body: JSON.stringify({ content }),
                     credentials: 'same-origin'

@@ -950,10 +950,9 @@
                 const response = await fetch('/api/admin/auth', {
                     method: 'POST',
                     headers: {
-                        'Content-Type': 'application/json',
-                        'X-Master-Key': masterKey
+                        'Content-Type': 'application/json'
                     },
-                    body: JSON.stringify({}),
+                    body: JSON.stringify({master_key: masterKey}),
                     credentials: 'same-origin'  // Include cookies for session
                 });
 
@@ -981,9 +980,6 @@
         async function loadQuizzes() {
             try {
                 const response = await fetch('/api/admin/list-quizzes', {
-                    headers: {
-                        'X-Master-Key': currentMasterKey
-                    },
                     credentials: 'same-origin'
                 });
 
@@ -1064,8 +1060,7 @@
                 const response = await fetch('/api/admin/switch-quiz', {
                     method: 'POST',
                     headers: {
-                        'Content-Type': 'application/json',
-                        'X-Master-Key': currentMasterKey
+                        'Content-Type': 'application/json'
                     },
                     body: JSON.stringify({
                         quiz_filename: selectedQuiz
@@ -1156,9 +1151,7 @@
 
             try {
                 const response = await fetch(`/api/admin/quiz/${selectedQuiz}`, {
-                    headers: {
-                        'X-Master-Key': currentMasterKey
-                    }
+                    credentials: 'same-origin'
                 });
 
                 const data = await response.json();
@@ -1191,9 +1184,6 @@
             try {
                 // First get the original quiz content
                 const getResponse = await fetch(`/api/admin/quiz/${selectedQuiz}`, {
-                    headers: {
-                        'X-Master-Key': currentMasterKey
-                    },
                     credentials: 'same-origin'
                 });
 
@@ -1208,8 +1198,7 @@
                 const createResponse = await fetch('/api/admin/create-quiz', {
                     method: 'POST',
                     headers: {
-                        'Content-Type': 'application/json',
-                        'X-Master-Key': currentMasterKey
+                        'Content-Type': 'application/json'
                     },
                     body: JSON.stringify({
                         filename: newFilename,
@@ -1250,9 +1239,7 @@
             try {
                 const response = await fetch(`/api/admin/quiz/${selectedQuiz}`, {
                     method: 'DELETE',
-                    headers: {
-                        'X-Master-Key': currentMasterKey
-                    }
+                    credentials: 'same-origin'
                 });
 
                 const data = await response.json();
@@ -1753,8 +1740,7 @@
                 const response = await fetch(url, {
                     method,
                     headers: {
-                        'Content-Type': 'application/json',
-                        'X-Master-Key': currentMasterKey
+                        'Content-Type': 'application/json'
                     },
                     body: JSON.stringify({
                         filename,
@@ -1820,9 +1806,6 @@
 
                 // Load images from server
                 const response = await fetch('/api/admin/list-images', {
-                    headers: {
-                        'X-Master-Key': currentMasterKey
-                    },
                     credentials: 'same-origin'
                 });
 
@@ -2199,8 +2182,7 @@
                 const response = await fetch('/api/admin/approve-user', {
                     method: 'PUT',
                     headers: {
-                        'Content-Type': 'application/json',
-                        'X-Master-Key': currentMasterKey
+                        'Content-Type': 'application/json'
                     },
                     body: JSON.stringify({ user_id: userId }),
                     credentials: 'same-origin'
@@ -2495,10 +2477,7 @@
 
                 const response = await fetch(endpoint, {
                     method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'X-Master-Key': currentMasterKey
-                    }
+                    credentials: 'same-origin'
                 });
 
                 const data = await response.json();

@@ -200,8 +200,10 @@ def get_admin_session(port, master_key="test123"):
     """
     import requests
 
-    headers = {"X-Master-Key": master_key}
-    response = requests.post(f"http://localhost:{port}/api/admin/auth", headers=headers)
+    response = requests.post(
+        f"http://localhost:{port}/api/admin/auth",
+        json={"master_key": master_key}
+    )
     if response.status_code != 200:
         raise Exception(f"Failed to authenticate: {response.status_code} - {response.text}")
     return response.cookies

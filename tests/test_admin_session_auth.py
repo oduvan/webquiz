@@ -6,8 +6,10 @@ from conftest import custom_webquiz_server
 def test_admin_auth_sets_session_cookie():
     """Test that admin authentication sets a session cookie."""
     with custom_webquiz_server() as (proc, port):
-        headers = {"X-Master-Key": "test123"}
-        response = requests.post(f"http://localhost:{port}/api/admin/auth", headers=headers)
+        response = requests.post(
+            f"http://localhost:{port}/api/admin/auth",
+            json={"master_key": "test123"}
+        )
 
         assert response.status_code == 200
         assert "admin_session" in response.cookies
@@ -18,8 +20,10 @@ def test_check_session_valid_cookie():
     """Test check-session endpoint with valid session cookie."""
     with custom_webquiz_server() as (proc, port):
         # First authenticate to get a session cookie
-        headers = {"X-Master-Key": "test123"}
-        auth_response = requests.post(f"http://localhost:{port}/api/admin/auth", headers=headers)
+        auth_response = requests.post(
+            f"http://localhost:{port}/api/admin/auth",
+            json={"master_key": "test123"}
+        )
         assert auth_response.status_code == 200
 
         # Use the session cookie to check session validity
@@ -56,8 +60,10 @@ def test_admin_endpoint_with_session_cookie():
     """Test admin endpoint works with valid session cookie instead of master key."""
     with custom_webquiz_server() as (proc, port):
         # First authenticate to get a session cookie
-        headers = {"X-Master-Key": "test123"}
-        auth_response = requests.post(f"http://localhost:{port}/api/admin/auth", headers=headers)
+        auth_response = requests.post(
+            f"http://localhost:{port}/api/admin/auth",
+            json={"master_key": "test123"}
+        )
         assert auth_response.status_code == 200
 
         # Use the session cookie to access admin endpoint without master key header
@@ -73,8 +79,10 @@ def test_session_persists_across_requests():
     """Test that session persists across multiple requests."""
     with custom_webquiz_server() as (proc, port):
         # First authenticate to get a session cookie
-        headers = {"X-Master-Key": "test123"}
-        auth_response = requests.post(f"http://localhost:{port}/api/admin/auth", headers=headers)
+        auth_response = requests.post(
+            f"http://localhost:{port}/api/admin/auth",
+            json={"master_key": "test123"}
+        )
         assert auth_response.status_code == 200
         cookies = auth_response.cookies
 
@@ -91,15 +99,19 @@ def test_session_persists_across_requests():
 def test_multiple_sessions():
     """Test that multiple authentication creates separate sessions."""
     with custom_webquiz_server() as (proc, port):
-        headers = {"X-Master-Key": "test123"}
-
         # Create first session
-        auth1 = requests.post(f"http://localhost:{port}/api/admin/auth", headers=headers)
+        auth1 = requests.post(
+            f"http://localhost:{port}/api/admin/auth",
+            json={"master_key": "test123"}
+        )
         assert auth1.status_code == 200
         session1 = auth1.cookies["admin_session"]
 
         # Create second session
-        auth2 = requests.post(f"http://localhost:{port}/api/admin/auth", headers=headers)
+        auth2 = requests.post(
+            f"http://localhost:{port}/api/admin/auth",
+            json={"master_key": "test123"}
+        )
         assert auth2.status_code == 200
         session2 = auth2.cookies["admin_session"]
 
@@ -124,8 +136,10 @@ def test_session_cookie_for_files_endpoint():
     """Test that session cookie works for files endpoint."""
     with custom_webquiz_server() as (proc, port):
         # First authenticate to get a session cookie
-        headers = {"X-Master-Key": "test123"}
-        auth_response = requests.post(f"http://localhost:{port}/api/admin/auth", headers=headers)
+        auth_response = requests.post(
+            f"http://localhost:{port}/api/admin/auth",
+            json={"master_key": "test123"}
+        )
         assert auth_response.status_code == 200
 
         # Use the session cookie to access files endpoint

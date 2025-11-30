@@ -1717,7 +1717,7 @@ class TestingServer:
     async def admin_auth(self, request):
         """Authenticate admin with master key and create session.
 
-        Validates master key from X-Master-Key header or request body,
+        Validates master key from request body,
         creates a new session token, and sets it as a cookie.
         Trusted IPs bypass master key validation.
 
@@ -1733,16 +1733,15 @@ class TestingServer:
             if not self.master_key:
                 return web.json_response({"error": "Admin functionality disabled - no master key set"}, status=403)
 
-            # Get master key from request (header or body)
-            provided_key = request.headers.get("X-Master-Key")
-            if not provided_key:
-                try:
-                    data = await request.json()
-                    provided_key = data.get("master_key")
-                except (json.JSONDecodeError, UnicodeDecodeError):
-                    pass
-                except Exception as e:
-                    logger.exception(f"Unexpected error reading admin auth request body: {e}")
+            # Get master key from request body only
+            provided_key = None
+            try:
+                data = await request.json()
+                provided_key = data.get("master_key")
+            except (json.JSONDecodeError, UnicodeDecodeError):
+                pass
+            except Exception as e:
+                logger.exception(f"Unexpected error reading admin auth request body: {e}")
 
             if not provided_key or provided_key != self.master_key:
                 return web.json_response({"error": "Недійсний або відсутній головний ключ"}, status=401)
