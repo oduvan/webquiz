@@ -412,11 +412,16 @@
             }
 
             .option {
-                padding: 8px 0 !important;
+                padding: 12px 10px !important;
                 margin: 4px 0 !important;
                 border-radius: 0 !important;
                 border-left: none !important;
                 border-right: none !important;
+            }
+
+            /* Image options: remove padding so images go edge-to-edge */
+            .option:has(.option-image) {
+                padding: 8px 0 !important;
             }
 
             .option-image {
