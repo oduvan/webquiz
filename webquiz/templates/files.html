@@ -354,6 +354,78 @@
             color: var(--text-muted);
         }
 
+        /* CSV Table Styles */
+        .view-toggle {
+            display: flex;
+            gap: 5px;
+            margin-left: auto;
+            margin-right: 20px;
+        }
+
+        .view-toggle button {
+            padding: 6px 12px;
+            font-size: 14px;
+            background: var(--muted-gray);
+            border: none;
+            cursor: pointer;
+            margin: 0;
+        }
+
+        .view-toggle button.active {
+            background: var(--button-bg);
+        }
+
+        .view-toggle button:first-child {
+            border-radius: 5px 0 0 5px;
+        }
+
+        .view-toggle button:last-child {
+            border-radius: 0 5px 5px 0;
+        }
+
+        .csv-table-container {
+            flex: 1;
+            overflow: auto;
+            background: var(--white);
+            border: 1px solid var(--border-color);
+        }
+
+        .csv-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 14px;
+        }
+
+        .csv-table th,
+        .csv-table td {
+            border: 1px solid var(--border-color);
+            padding: 8px 12px;
+            text-align: left;
+            white-space: nowrap;
+        }
+
+        .csv-table th {
+            background: var(--button-bg);
+            color: var(--white);
+            position: sticky;
+            top: 0;
+            font-weight: bold;
+        }
+
+        .csv-table tr:nth-child(even) {
+            background: var(--light-bg);
+        }
+
+        .csv-table tr:hover {
+            background: #e8f4ff;
+        }
+
+        .csv-table td {
+            max-width: 300px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
         @media (max-width: 768px) {
             .file-item {
                 grid-template-columns: 1fr;
@@ -375,6 +447,29 @@
 
             .tabs {
                 overflow-x: auto;
+            }
+
+            .modal-header {
+                flex-wrap: wrap;
+                gap: 10px;
+            }
+
+            .view-toggle {
+                margin-left: 0;
+                margin-right: 0;
+                order: 3;
+                width: 100%;
+                justify-content: center;
+            }
+
+            .csv-table th,
+            .csv-table td {
+                padding: 6px 8px;
+                font-size: 12px;
+            }
+
+            .csv-table td {
+                max-width: 150px;
             }
         }
     </style>
@@ -469,11 +564,17 @@
         <div class="modal-content">
             <div class="modal-header">
                 <h2 id="file-viewer-title">File Viewer</h2>
+                <div id="csv-view-toggle" class="view-toggle hidden">
+                    <button id="btn-text-view" class="active" onclick="switchCsvView('text')">📄 Text</button>
+                    <button id="btn-table-view" onclick="switchCsvView('table')">📊 Table</button>
+                </div>
                 <span class="close" onclick="closeFileViewer()">&times;</span>
             </div>
             <div class="modal-body">
                 <div id="file-content" class="file-content">
                     <div class="loading">Loading file content...</div>
+                </div>
+                <div id="file-content-table" class="csv-table-container hidden">
                 </div>
             </div>
         </div>
@@ -509,6 +610,9 @@
         let allFiles = { logs: [], csv: [], quizzes: [] };
         let currentTab = 'csv';
         let currentEditingQuiz = '';
+        let currentCsvContent = '';
+        let currentCsvView = 'text';
+        let currentViewingFileType = '';
 
         function switchTab(tabName) {
             currentTab = tabName;
@@ -638,9 +742,26 @@
 
         async function viewFile(type, filename) {
             try {
+                currentViewingFileType = type;
+                currentCsvContent = '';
+                currentCsvView = 'text';
+
                 document.getElementById('file-viewer-title').textContent = `${filename}`;
                 document.getElementById('file-content').innerHTML = '<div class="loading">Loading file content...</div>';
+                document.getElementById('file-content').classList.remove('hidden');
+                document.getElementById('file-content-table').classList.add('hidden');
+                document.getElementById('file-content-table').innerHTML = '';
                 document.getElementById('file-viewer-modal').style.display = 'block';
+
+                // Show/hide CSV view toggle based on file type
+                const csvToggle = document.getElementById('csv-view-toggle');
+                if (type === 'csv') {
+                    csvToggle.classList.remove('hidden');
+                    document.getElementById('btn-text-view').classList.add('active');
+                    document.getElementById('btn-table-view').classList.remove('active');
+                } else {
+                    csvToggle.classList.add('hidden');
+                }
 
                 const response = await fetch(`/api/files/${type}/view/${encodeURIComponent(filename)}`, {
                     headers: {
@@ -651,12 +772,127 @@
                 if (response.ok) {
                     const content = await response.text();
                     document.getElementById('file-content').textContent = content;
+
+                    // Store CSV content for table view
+                    if (type === 'csv') {
+                        currentCsvContent = content;
+                    }
                 } else {
                     const data = await response.json();
                     document.getElementById('file-content').innerHTML = `<div class="error">Error: ${data.error}</div>`;
                 }
             } catch (error) {
                 document.getElementById('file-content').innerHTML = `<div class="error">Error loading file: ${error.message}</div>`;
+            }
+        }
+
+        function parseCSV(text) {
+            const lines = text.split('\n');
+            const result = [];
+
+            for (let i = 0; i < lines.length; i++) {
+                const line = lines[i].trim();
+                if (!line) continue;
+
+                const row = [];
+                let inQuotes = false;
+                let currentField = '';
+
+                for (let j = 0; j < line.length; j++) {
+                    const char = line[j];
+                    const nextChar = line[j + 1];
+
+                    if (inQuotes) {
+                        if (char === '"' && nextChar === '"') {
+                            // Escaped quote
+                            currentField += '"';
+                            j++;
+                        } else if (char === '"') {
+                            // End of quoted field
+                            inQuotes = false;
+                        } else {
+                            currentField += char;
+                        }
+                    } else {
+                        if (char === '"') {
+                            // Start of quoted field
+                            inQuotes = true;
+                        } else if (char === ',') {
+                            // Field separator
+                            row.push(currentField);
+                            currentField = '';
+                        } else {
+                            currentField += char;
+                        }
+                    }
+                }
+
+                // Add the last field
+                row.push(currentField);
+                result.push(row);
+            }
+
+            return result;
+        }
+
+        function renderCsvTable(data) {
+            if (data.length === 0) {
+                return '<div class="empty-state"><div class="icon">📊</div><div>No data to display</div></div>';
+            }
+
+            let html = '<table class="csv-table">';
+
+            // Header row
+            html += '<thead><tr>';
+            data[0].forEach(cell => {
+                html += `<th>${escapeHtml(cell)}</th>`;
+            });
+            html += '</tr></thead>';
+
+            // Data rows
+            html += '<tbody>';
+            for (let i = 1; i < data.length; i++) {
+                html += '<tr>';
+                data[i].forEach(cell => {
+                    html += `<td title="${escapeHtml(cell)}">${escapeHtml(cell)}</td>`;
+                });
+                html += '</tr>';
+            }
+            html += '</tbody></table>';
+
+            return html;
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        function switchCsvView(view) {
+            currentCsvView = view;
+
+            const textBtn = document.getElementById('btn-text-view');
+            const tableBtn = document.getElementById('btn-table-view');
+            const textContent = document.getElementById('file-content');
+            const tableContent = document.getElementById('file-content-table');
+
+            if (view === 'text') {
+                textBtn.classList.add('active');
+                tableBtn.classList.remove('active');
+                textContent.classList.remove('hidden');
+                tableContent.classList.add('hidden');
+            } else {
+                textBtn.classList.remove('active');
+                tableBtn.classList.add('active');
+                textContent.classList.add('hidden');
+                tableContent.classList.remove('hidden');
+
+                // Parse and render table if not already done
+                if (tableContent.innerHTML === '' && currentCsvContent) {
+                    const parsedData = parseCSV(currentCsvContent);
+                    tableContent.innerHTML = renderCsvTable(parsedData);
+                }
             }
         }
 
@@ -690,6 +926,9 @@
 
         function closeFileViewer() {
             document.getElementById('file-viewer-modal').style.display = 'none';
+            currentCsvContent = '';
+            currentCsvView = 'text';
+            currentViewingFileType = '';
         }
 
         function filterFiles() {
