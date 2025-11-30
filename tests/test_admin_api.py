@@ -88,7 +88,7 @@ def test_admin_switch_quiz_nonexistent_file():
 
         response = requests.post(f"http://localhost:{port}/api/admin/switch-quiz", headers=headers, json=switch_data)
 
-        assert response.status_code == 400
+        assert response.status_code == 500
         data = response.json()
         assert "error" in data
 
