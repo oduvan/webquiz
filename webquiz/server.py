@@ -758,7 +758,7 @@ class TestingServer:
 
             # Generate registration fields HTML as a table (always include username)
             registration_fields_html = (
-                '<table style="margin: 10px auto; border-collapse: collapse; max-width: 500px; width: 100%;">'
+                '<table class="registration-table">'
             )
 
             # Get username label from config
@@ -769,9 +769,9 @@ class TestingServer:
             # Add username field as first row
             registration_fields_html += f"""
                 <tr>
-                    <td style="padding: 5px 10px; text-align: right; font-weight: bold;">{username_label}:</td>
-                    <td style="padding: 5px 10px;">
-                        <input type="text" id="username" style="padding: 8px; width: 100%; max-width: 250px; box-sizing: border-box;">
+                    <td class="registration-label">{username_label}:</td>
+                    <td class="registration-input">
+                        <input type="text" id="username">
                     </td>
                 </tr>"""
 
@@ -781,9 +781,9 @@ class TestingServer:
                     field_name = field_label.lower().replace(" ", "_")
                     registration_fields_html += f"""
                 <tr>
-                    <td style="padding: 5px 10px; text-align: right; font-weight: bold;">{field_label}:</td>
-                    <td style="padding: 5px 10px;">
-                        <input type="text" class="registration-field" data-field-name="{field_name}" style="padding: 8px; width: 100%; max-width: 250px; box-sizing: border-box;">
+                    <td class="registration-label">{field_label}:</td>
+                    <td class="registration-input">
+                        <input type="text" class="registration-field" data-field-name="{field_name}">
                     </td>
                 </tr>"""
 

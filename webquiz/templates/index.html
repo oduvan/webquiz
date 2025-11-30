@@ -382,6 +382,32 @@
             background-color: var(--option-hover);
         }
 
+        /* Registration form styles */
+        .registration-table {
+            margin: 10px auto;
+            border-collapse: collapse;
+            max-width: 500px;
+            width: 100%;
+        }
+        .registration-label {
+            padding: 5px 10px;
+            text-align: right;
+            font-weight: bold;
+        }
+        .registration-input {
+            padding: 5px 10px;
+        }
+        .registration-input input {
+            padding: 8px;
+            width: 100%;
+            max-width: 250px;
+            box-sizing: border-box;
+            border: 1px solid var(--border-color);
+            border-radius: 5px;
+            background: var(--option-bg);
+            color: var(--text-color);
+        }
+
         /* Mobile responsive styles */
         @media screen and (max-width: 768px) {
             /* Full width mobile layout - no side margins */
@@ -489,19 +515,41 @@
                 padding: 0 10px;
             }
 
-            #registration table, #waiting-registration-fields table {
+            .registration-table {
                 width: 100%;
                 max-width: 100%;
             }
 
-            #registration table td, #waiting-registration-fields table td {
+            .registration-table tr {
+                display: block;
+                margin-bottom: 10px;
+            }
+
+            .registration-label,
+            .registration-input {
                 display: block;
                 width: 100%;
                 text-align: left;
                 padding: 5px 0;
             }
 
-            #registration table td:first-child, #waiting-registration-fields table td:first-child {
+            .registration-input input {
+                max-width: 100%;
+            }
+
+            #waiting-registration-fields table {
+                width: 100%;
+                max-width: 100%;
+            }
+
+            #waiting-registration-fields table td {
+                display: block;
+                width: 100%;
+                text-align: left;
+                padding: 5px 0;
+            }
+
+            #waiting-registration-fields table td:first-child {
                 font-weight: bold;
                 margin-top: 10px;
             }
