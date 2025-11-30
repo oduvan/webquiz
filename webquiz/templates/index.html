@@ -382,8 +382,106 @@
             background-color: var(--option-hover);
         }
 
-        /* Mobile responsive table */
+        /* Registration form styles */
+        .registration-table {
+            margin: 10px auto;
+            border-collapse: collapse;
+            max-width: 500px;
+            width: 100%;
+        }
+        .registration-label {
+            padding: 5px 10px;
+            text-align: right;
+            font-weight: bold;
+        }
+        .registration-input {
+            padding: 5px 10px;
+        }
+        .registration-input input {
+            padding: 8px;
+            width: 100%;
+            max-width: 250px;
+            box-sizing: border-box;
+            border: 1px solid var(--border-color);
+            border-radius: 5px;
+            background: var(--option-bg);
+            color: var(--text-color);
+        }
+
+        /* Mobile responsive styles */
         @media screen and (max-width: 768px) {
+            /* Full width mobile layout - no side margins */
+            body {
+                padding: 0;
+                margin: 0;
+            }
+
+            .container {
+                padding: 10px 0;
+                border-radius: 0;
+                box-shadow: none;
+            }
+
+            .current-question {
+                padding: 10px 0;
+                margin: 8px 0;
+                border-radius: 0;
+                border: none;
+            }
+
+            .question {
+                padding: 10px 0;
+                margin: 8px 0;
+                border-radius: 0;
+                border-left: none;
+                border-right: none;
+            }
+
+            .option {
+                padding: 12px 10px;
+                margin: 4px 0;
+                border-radius: 0;
+                border-left: none;
+                border-right: none;
+            }
+
+            /* Image options: remove padding so images go edge-to-edge */
+            .option:has(.option-image) {
+                padding: 8px 0;
+            }
+
+            .option-image {
+                max-width: 100%;
+                width: 100%;
+                margin: 0;
+            }
+
+            .option-content {
+                width: 100%;
+            }
+
+            .question-image {
+                border-radius: 0;
+            }
+
+            .progress {
+                border-radius: 0;
+                margin: 10px 0;
+            }
+
+            h1 {
+                padding: 0 10px;
+                margin-top: 60px;
+            }
+
+            .question-text, h3 {
+                padding: 0 10px;
+            }
+
+            .multiple-choice-hint {
+                padding: 0 10px;
+            }
+
             .results-table {
                 font-size: 12px;
                 overflow-x: auto;
@@ -393,46 +491,71 @@
 
             /* Mobile responsive input */
             #username {
-                width: 100% !important;
-                max-width: 100% !important;
-                box-sizing: border-box !important;
+                width: 100%;
+                max-width: 100%;
+                box-sizing: border-box;
             }
 
             /* Mobile responsive registration fields */
             .registration-field {
-                width: 100% !important;
-                max-width: 100% !important;
-                box-sizing: border-box !important;
+                width: 100%;
+                max-width: 100%;
+                box-sizing: border-box;
             }
 
             /* Mobile responsive waiting approval fields */
             .waiting-field, #waiting-username {
-                width: 100% !important;
-                max-width: 100% !important;
-                box-sizing: border-box !important;
+                width: 100%;
+                max-width: 100%;
+                box-sizing: border-box;
             }
 
             /* Make registration tables responsive on mobile */
-            #registration table, #waiting-registration-fields table {
-                width: 100% !important;
-                max-width: 100% !important;
+            #registration, #waiting-approval {
+                padding: 0 10px;
             }
 
-            #registration table td, #waiting-registration-fields table td {
-                display: block !important;
-                width: 100% !important;
-                text-align: left !important;
-                padding: 5px 0 !important;
+            .registration-table {
+                width: 100%;
+                max-width: 100%;
             }
 
-            #registration table td:first-child, #waiting-registration-fields table td:first-child {
+            .registration-table tr {
+                display: block;
+                margin-bottom: 10px;
+            }
+
+            .registration-label,
+            .registration-input {
+                display: block;
+                width: 100%;
+                text-align: left;
+                padding: 5px 0;
+            }
+
+            .registration-input input {
+                max-width: 100%;
+            }
+
+            #waiting-registration-fields table {
+                width: 100%;
+                max-width: 100%;
+            }
+
+            #waiting-registration-fields table td {
+                display: block;
+                width: 100%;
+                text-align: left;
+                padding: 5px 0;
+            }
+
+            #waiting-registration-fields table td:first-child {
                 font-weight: bold;
                 margin-top: 10px;
             }
 
-            /* Mobile spacing between top controls and H1 */
-            h1 {
-                margin-top: 60px !important;
+            h2 {
+                padding: 0 10px;
             }
             .results-table thead,
             .results-table tbody,

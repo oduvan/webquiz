@@ -734,7 +734,7 @@ class TestingServer:
 
         # Generate registration fields HTML as a table (always include username)
         registration_fields_html = (
-            '<table style="margin: 10px auto; border-collapse: collapse; max-width: 500px; width: 100%;">'
+            '<table class="registration-table">'
         )
 
         # Get username label from config
