@@ -134,7 +134,7 @@ webquiz-stress-test -c 50
 **Setup**: Parallel testing with ports 8080-8087, `custom_webquiz_server` fixture auto-cleans directories, `conftest.py` for shared fixtures
 
 ## Important Notes
-- **CSV files** (2 per session): `{quiz_name}_user_responses.csv` (submissions) + `{quiz_name}_user_responses.users.csv` (user stats)
+- **CSV files** (2 per session): `{quiz_name}_user_responses.csv` (submissions) + `{quiz_name}_user_responses.users.csv` (user stats with total_time in MM:SS format)
 - **Config** (`webquiz.yaml`): All sections optional, editable via `/files/`, requires restart, UTF-8 charset header
 - **Config options**:
   - `registration.approve: true` - Admin approval required, timing starts on approval (default: false)

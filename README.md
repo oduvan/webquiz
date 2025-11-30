@@ -448,7 +448,16 @@ user_id,question,selected_answer,correct_answer,is_correct,time_taken_seconds
 123456,"What is 5 × 3?","15","15",True,2.87
 ```
 
-CSV files are created with proper escaping and include all user response data. Files are flushed periodically (every 30 seconds) to ensure data persistence.
+A second file with `.users.csv` suffix contains user statistics:
+
+```csv
+user_id,username,registered_at,total_questions_asked,correct_answers,total_time
+123456,student1,2025-01-15T10:30:00,5,4,12:46
+```
+
+The `total_time` column shows the total quiz completion time in `MM:SS` format (minutes:seconds).
+
+CSV files are created with proper escaping and include all user response data. Files are flushed periodically (every 5 seconds) to ensure data persistence.
 
 ## 🎨 Customization
 
