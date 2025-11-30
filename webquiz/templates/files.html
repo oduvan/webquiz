@@ -355,34 +355,6 @@
         }
 
         /* CSV Table Styles */
-        .view-toggle {
-            display: flex;
-            gap: 5px;
-            margin-left: auto;
-            margin-right: 20px;
-        }
-
-        .view-toggle button {
-            padding: 6px 12px;
-            font-size: 14px;
-            background: var(--muted-gray);
-            border: none;
-            cursor: pointer;
-            margin: 0;
-        }
-
-        .view-toggle button.active {
-            background: var(--button-bg);
-        }
-
-        .view-toggle button:first-child {
-            border-radius: 5px 0 0 5px;
-        }
-
-        .view-toggle button:last-child {
-            border-radius: 0 5px 5px 0;
-        }
-
         .csv-table-container {
             flex: 1;
             overflow: auto;
@@ -420,12 +392,6 @@
             background: #e8f4ff;
         }
 
-        .csv-table td {
-            max-width: 300px;
-            overflow: hidden;
-            text-overflow: ellipsis;
-        }
-
         @media (max-width: 768px) {
             .file-item {
                 grid-template-columns: 1fr;
@@ -449,27 +415,10 @@
                 overflow-x: auto;
             }
 
-            .modal-header {
-                flex-wrap: wrap;
-                gap: 10px;
-            }
-
-            .view-toggle {
-                margin-left: 0;
-                margin-right: 0;
-                order: 3;
-                width: 100%;
-                justify-content: center;
-            }
-
             .csv-table th,
             .csv-table td {
                 padding: 6px 8px;
                 font-size: 12px;
-            }
-
-            .csv-table td {
-                max-width: 150px;
             }
         }
     </style>
@@ -564,10 +513,6 @@
         <div class="modal-content">
             <div class="modal-header">
                 <h2 id="file-viewer-title">File Viewer</h2>
-                <div id="csv-view-toggle" class="view-toggle hidden">
-                    <button id="btn-text-view" class="active" onclick="switchCsvView('text')">📄 Text</button>
-                    <button id="btn-table-view" onclick="switchCsvView('table')">📊 Table</button>
-                </div>
                 <span class="close" onclick="closeFileViewer()">&times;</span>
             </div>
             <div class="modal-body">
@@ -717,12 +662,20 @@
                 const size = formatFileSize(file.size);
                 const date = formatDate(file.modified);
 
-                // Quiz files get Edit button, others get View button
-                const actionButtons = type === 'quizzes'
-                    ? `<button class="btn-small btn-view" onclick="editQuizFile('${file.name}')">✏️ Edit</button>
-                       <button class="btn-small btn-download" onclick="downloadFile('${type}', '${file.name}')">💾 Download</button>`
-                    : `<button class="btn-small btn-view" onclick="viewFile('${type}', '${file.name}')">👁️ View</button>
+                // Different buttons based on file type
+                let actionButtons;
+                if (type === 'quizzes') {
+                    actionButtons = `<button class="btn-small btn-view" onclick="editQuizFile('${file.name}')">✏️ Edit</button>
                        <button class="btn-small btn-download" onclick="downloadFile('${type}', '${file.name}')">💾 Download</button>`;
+                } else if (type === 'csv') {
+                    // CSV files get Text and Table view buttons
+                    actionButtons = `<button class="btn-small btn-view" onclick="viewFile('${type}', '${file.name}', 'text')">📄 Text</button>
+                       <button class="btn-small btn-view" onclick="viewFile('${type}', '${file.name}', 'table')">📊 Table</button>
+                       <button class="btn-small btn-download" onclick="downloadFile('${type}', '${file.name}')">💾 Download</button>`;
+                } else {
+                    actionButtons = `<button class="btn-small btn-view" onclick="viewFile('${type}', '${file.name}', 'text')">👁️ View</button>
+                       <button class="btn-small btn-download" onclick="downloadFile('${type}', '${file.name}')">💾 Download</button>`;
+                }
 
                 html += `
                     <div class="file-item" data-filename="${file.name.toLowerCase()}">
@@ -740,27 +693,28 @@
             container.innerHTML = html;
         }
 
-        async function viewFile(type, filename) {
+        async function viewFile(type, filename, viewMode = 'text') {
             try {
                 currentViewingFileType = type;
                 currentCsvContent = '';
-                currentCsvView = 'text';
+                currentCsvView = viewMode;
+
+                const textContent = document.getElementById('file-content');
+                const tableContent = document.getElementById('file-content-table');
 
                 document.getElementById('file-viewer-title').textContent = `${filename}`;
-                document.getElementById('file-content').innerHTML = '<div class="loading">Loading file content...</div>';
-                document.getElementById('file-content').classList.remove('hidden');
-                document.getElementById('file-content-table').classList.add('hidden');
-                document.getElementById('file-content-table').innerHTML = '';
+                textContent.innerHTML = '<div class="loading">Loading file content...</div>';
+                tableContent.innerHTML = '';
                 document.getElementById('file-viewer-modal').style.display = 'block';
 
-                // Show/hide CSV view toggle based on file type
-                const csvToggle = document.getElementById('csv-view-toggle');
-                if (type === 'csv') {
-                    csvToggle.classList.remove('hidden');
-                    document.getElementById('btn-text-view').classList.add('active');
-                    document.getElementById('btn-table-view').classList.remove('active');
+                // Show appropriate view based on viewMode
+                if (viewMode === 'table') {
+                    textContent.classList.add('hidden');
+                    tableContent.classList.remove('hidden');
+                    tableContent.innerHTML = '<div class="loading">Loading file content...</div>';
                 } else {
-                    csvToggle.classList.add('hidden');
+                    textContent.classList.remove('hidden');
+                    tableContent.classList.add('hidden');
                 }
 
                 const response = await fetch(`/api/files/${type}/view/${encodeURIComponent(filename)}`, {
@@ -771,18 +725,31 @@
 
                 if (response.ok) {
                     const content = await response.text();
-                    document.getElementById('file-content').textContent = content;
 
-                    // Store CSV content for table view
-                    if (type === 'csv') {
-                        currentCsvContent = content;
+                    if (viewMode === 'table' && type === 'csv') {
+                        // Parse and render as table
+                        const parsedData = parseCSV(content);
+                        tableContent.innerHTML = renderCsvTable(parsedData);
+                    } else {
+                        // Show as text
+                        textContent.textContent = content;
                     }
                 } else {
                     const data = await response.json();
-                    document.getElementById('file-content').innerHTML = `<div class="error">Error: ${data.error}</div>`;
+                    const errorHtml = `<div class="error">Error: ${data.error}</div>`;
+                    if (viewMode === 'table') {
+                        tableContent.innerHTML = errorHtml;
+                    } else {
+                        textContent.innerHTML = errorHtml;
+                    }
                 }
             } catch (error) {
-                document.getElementById('file-content').innerHTML = `<div class="error">Error loading file: ${error.message}</div>`;
+                const errorHtml = `<div class="error">Error loading file: ${error.message}</div>`;
+                if (currentCsvView === 'table') {
+                    document.getElementById('file-content-table').innerHTML = errorHtml;
+                } else {
+                    document.getElementById('file-content').innerHTML = errorHtml;
+                }
             }
         }
 
@@ -867,33 +834,6 @@
             const div = document.createElement('div');
             div.textContent = text;
             return div.innerHTML;
-        }
-
-        function switchCsvView(view) {
-            currentCsvView = view;
-
-            const textBtn = document.getElementById('btn-text-view');
-            const tableBtn = document.getElementById('btn-table-view');
-            const textContent = document.getElementById('file-content');
-            const tableContent = document.getElementById('file-content-table');
-
-            if (view === 'text') {
-                textBtn.classList.add('active');
-                tableBtn.classList.remove('active');
-                textContent.classList.remove('hidden');
-                tableContent.classList.add('hidden');
-            } else {
-                textBtn.classList.remove('active');
-                tableBtn.classList.add('active');
-                textContent.classList.add('hidden');
-                tableContent.classList.remove('hidden');
-
-                // Parse and render table if not already done
-                if (tableContent.innerHTML === '' && currentCsvContent) {
-                    const parsedData = parseCSV(currentCsvContent);
-                    tableContent.innerHTML = renderCsvTable(parsedData);
-                }
-            }
         }
 
         async function downloadFile(type, filename) {
