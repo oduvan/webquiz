@@ -547,13 +547,14 @@
                         'Content-Type': 'application/json',
                         'X-Master-Key': masterKey
                     },
-                    body: JSON.stringify({})
+                    body: JSON.stringify({}),
+                    credentials: 'same-origin'  // Include cookies for session
                 });
 
                 const data = await response.json();
 
                 if (response.ok) {
-                    currentMasterKey = masterKey;
+                    currentMasterKey = 'session';  // Session is now managed by cookie
                     document.getElementById('auth-section').style.display = 'none';
                     document.getElementById('files-panel').classList.remove('hidden');
                     showMessage('Authentication successful!', 'success');
@@ -571,7 +572,8 @@
                 const response = await fetch('/api/files/list', {
                     headers: {
                         'X-Master-Key': currentMasterKey
-                    }
+                    },
+                    credentials: 'same-origin'
                 });
 
                 const data = await response.json();
@@ -645,7 +647,8 @@
                 const response = await fetch(`/api/files/${type}/view/${encodeURIComponent(filename)}`, {
                     headers: {
                         'X-Master-Key': currentMasterKey
-                    }
+                    },
+                    credentials: 'same-origin'
                 });
 
                 if (response.ok) {
@@ -665,7 +668,8 @@
                 const response = await fetch(`/api/files/${type}/download/${encodeURIComponent(filename)}`, {
                     headers: {
                         'X-Master-Key': currentMasterKey
-                    }
+                    },
+                    credentials: 'same-origin'
                 });
 
                 if (response.ok) {
@@ -772,7 +776,8 @@
                         'Content-Type': 'application/json',
                         'X-Master-Key': currentMasterKey
                     },
-                    body: JSON.stringify({ content })
+                    body: JSON.stringify({ content }),
+                    credentials: 'same-origin'
                 });
 
                 const data = await response.json();
@@ -797,15 +802,46 @@
             initializeConfigEditor();
         }
 
-        // Auto-authenticate for trusted IPs
-        if (typeof IS_TRUSTED_IP !== 'undefined' && IS_TRUSTED_IP) {
-            // Hide auth section and show files panel immediately
+        // Auto-authenticate function that shows files panel
+        function showFilesPanel(message) {
             document.getElementById('auth-section').style.display = 'none';
             document.getElementById('files-panel').classList.remove('hidden');
-            currentMasterKey = 'trusted-ip'; // Set a placeholder key for API calls
-            showMessage('Auto-authenticated from trusted IP', 'success');
+            showMessage(message, 'success');
             initializePanelData();
         }
+
+        // Check for existing session cookie on page load
+        async function checkExistingSession() {
+            try {
+                const response = await fetch('/api/admin/check-session', {
+                    method: 'GET',
+                    credentials: 'same-origin'
+                });
+
+                if (response.ok) {
+                    // Valid session found - auto-authenticate
+                    currentMasterKey = 'session'; // Placeholder, actual auth is via cookie
+                    showFilesPanel('Session restored');
+                    return true;
+                }
+            } catch (error) {
+                // Session check failed, fall through to other auth methods
+            }
+            return false;
+        }
+
+        // Initialize authentication
+        (async function initAuth() {
+            // First, try to restore existing session
+            const hasSession = await checkExistingSession();
+            if (hasSession) return;
+
+            // Fall back to trusted IP auto-authentication
+            if (typeof IS_TRUSTED_IP !== 'undefined' && IS_TRUSTED_IP) {
+                currentMasterKey = 'trusted-ip';
+                showFilesPanel('Auto-authenticated from trusted IP');
+            }
+        })();
 
         // Quiz Editor Functions
         async function editQuizFile(filename) {
@@ -819,7 +855,8 @@
                 const response = await fetch(`/api/files/quizzes/view/${encodeURIComponent(filename)}`, {
                     headers: {
                         'X-Master-Key': currentMasterKey
-                    }
+                    },
+                    credentials: 'same-origin'
                 });
 
                 if (response.ok) {
@@ -850,7 +887,8 @@
                         'Content-Type': 'application/json',
                         'X-Master-Key': currentMasterKey
                     },
-                    body: JSON.stringify({ content })
+                    body: JSON.stringify({ content }),
+                    credentials: 'same-origin'
                 });
 
                 const data = await response.json();
@@ -890,7 +928,8 @@
                         'Content-Type': 'application/json',
                         'X-Master-Key': currentMasterKey
                     },
-                    body: JSON.stringify({ content })
+                    body: JSON.stringify({ content }),
+                    credentials: 'same-origin'
                 });
 
                 const data = await response.json();

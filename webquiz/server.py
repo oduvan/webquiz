@@ -11,6 +11,7 @@ import zipfile
 import tempfile
 import shutil
 import random
+import secrets
 from datetime import datetime
 from pathlib import Path
 from typing import Dict, List, Any, Optional
@@ -235,7 +236,7 @@ def admin_auth_required(func):
 
     Restricts access to local/private networks only.
     Bypasses authentication for requests from trusted IPs.
-    Checks for master key in X-Master-Key header or request body.
+    Checks for valid session cookie, master key in X-Master-Key header, or request body.
 
     Args:
         func: Async function to wrap
@@ -265,6 +266,12 @@ def admin_auth_required(func):
         # Check if master key is provided
         if not self.master_key:
             return web.json_response({"error": "Admin functionality disabled - no master key set"}, status=403)
+
+        # Check for valid session cookie first
+        session_token = request.cookies.get("admin_session")
+        if session_token and hasattr(self, "admin_sessions") and session_token in self.admin_sessions:
+            # Valid session found - allow access
+            return await func(self, request)
 
         # Get master key from request (header or body)
         provided_key = request.headers.get("X-Master-Key")
@@ -377,6 +384,9 @@ class TestingServer:
 
         # SSH Tunnel infrastructure
         self.tunnel_manager = None  # Will be initialized if tunnel is configured
+
+        # Admin session storage for cookie-based authentication
+        self.admin_sessions: Dict[str, datetime] = {}  # session_token -> creation_time
 
         # Preload templates
         self.templates = self._load_templates()
@@ -1715,12 +1725,47 @@ class TestingServer:
 
     @admin_auth_required
     async def admin_auth_test(self, request):
-        """Test admin authentication.
+        """Test admin authentication and create session.
+
+        Creates a new session token on successful authentication
+        and sets it as a cookie for subsequent requests.
 
         Returns:
-            JSON response confirming authentication succeeded
+            JSON response confirming authentication succeeded with session cookie
         """
-        return web.json_response({"authenticated": True, "message": "Admin authentication successful"})
+        # Generate a new session token
+        session_token = secrets.token_urlsafe(32)
+        self.admin_sessions[session_token] = datetime.now()
+
+        # Create response with session cookie
+        response = web.json_response({"authenticated": True, "message": "Admin authentication successful"})
+        response.set_cookie(
+            "admin_session",
+            session_token,
+            httponly=True,
+            samesite="Strict",
+            path="/",
+        )
+        return response
+
+    @local_network_only
+    async def admin_check_session(self, request):
+        """Check if admin session cookie is valid.
+
+        Used for auto-authentication on page load without requiring master key.
+
+        Returns:
+            JSON response with session validity status
+        """
+        session_token = request.cookies.get("admin_session")
+
+        if not session_token:
+            return web.json_response({"valid": False, "reason": "No session cookie"}, status=401)
+
+        if session_token not in self.admin_sessions:
+            return web.json_response({"valid": False, "reason": "Invalid session"}, status=401)
+
+        return web.json_response({"valid": True, "message": "Session is valid"})
 
     @admin_auth_required
     async def admin_approve_user(self, request):
@@ -2980,6 +3025,7 @@ async def create_app(config: WebQuizConfig):
     # Admin routes
     app.router.add_get("/admin/", server.serve_admin_page)
     app.router.add_post("/api/admin/auth", server.admin_auth_test)
+    app.router.add_get("/api/admin/check-session", server.admin_check_session)
     app.router.add_put("/api/admin/approve-user", server.admin_approve_user)
     app.router.add_get("/api/admin/list-quizzes", server.admin_list_quizzes)
     app.router.add_post("/api/admin/switch-quiz", server.admin_switch_quiz)

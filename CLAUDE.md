@@ -35,8 +35,8 @@ WebQuiz - Python/aiohttp quiz system with multi-quiz management, real-time WebSo
 **Public:**
 - `POST /api/register`, `PUT /api/update-registration`, `POST /api/submit-answer`, `GET /api/verify-user/{user_id}`
 
-**Admin (master key required, local network only):**
-- `GET /admin`, `POST /api/admin/auth`, `PUT /api/admin/approve-user`, `GET /api/admin/list-quizzes`, `POST /api/admin/switch-quiz`, `PUT /api/admin/config`
+**Admin (master key or session cookie required, local network only):**
+- `GET /admin`, `POST /api/admin/auth`, `GET /api/admin/check-session`, `PUT /api/admin/approve-user`, `GET /api/admin/list-quizzes`, `POST /api/admin/switch-quiz`, `PUT /api/admin/config`
 - Quiz management: `GET /api/admin/quiz/{filename}`, `POST /api/admin/create-quiz`, `PUT /api/admin/quiz/{filename}`, `DELETE /api/admin/quiz/{filename}`, `POST /api/admin/download-quiz`
 - File management: `GET /api/files/list`, `GET /api/files/{type}/view/{filename}`, `GET /api/files/{type}/download/{filename}`, `PUT /api/files/quizzes/save/{filename}`
 - Tunnel management: `POST /api/admin/tunnel/connect`, `POST /api/admin/tunnel/disconnect`, `GET /api/admin/tunnel/public-key`
@@ -96,7 +96,8 @@ webquiz-stress-test -c 50
 - **Smart CSV naming** with quiz prefix + unique suffixes (no overwrites)
 - **Quiz state reset** on switch for complete isolation
 - **In-memory → CSV** with 5s periodic flush using CSV module (no test-specific flush endpoint)
-- **Cookie-based session** persistence (user_id)
+- **Cookie-based session** persistence (user_id for quiz users, admin_session for admin authentication)
+- **Admin session cookies** - Secure httponly cookies set on successful master key authentication, persisted across page refreshes and navigation between admin/files pages
 - **WebSocket live stats** with automatic client cleanup and **two-group display** (in-progress/completed)
 - **Auto-advance UI** when `show_right_answer: false`
 - **Mobile-first** with `width: 100%; max-width: [size]` and @media ≤768px
