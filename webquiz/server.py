@@ -845,7 +845,7 @@ class TestingServer:
             for field_label in self.config.registration.fields:
                 field_name = field_label.lower().replace(" ", "_")
                 headers.append(field_name)
-        headers.extend(["registered_at", "total_questions_asked", "correct_answers"])
+        headers.extend(["registered_at", "total_questions_asked", "correct_answers", "total_time"])
 
         # Always write headers (we always overwrite the file)
         csv_writer.writerow(headers)
@@ -866,7 +866,12 @@ class TestingServer:
             user_answer_list = self.user_answers.get(user_id, [])
             total_questions_asked = len(user_answer_list)
             correct_answers = sum(answer["is_correct"] for answer in user_answer_list)
-            row.extend([total_questions_asked, correct_answers])
+            total_time_seconds = sum(answer.get("time_taken", 0) for answer in user_answer_list)
+            # Format total_time as MM:SS
+            minutes = int(total_time_seconds // 60)
+            seconds = int(total_time_seconds % 60)
+            total_time_formatted = f"{minutes}:{seconds:02d}"
+            row.extend([total_questions_asked, correct_answers, total_time_formatted])
 
             csv_writer.writerow(row)
 

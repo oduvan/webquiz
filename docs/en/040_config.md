@@ -44,7 +44,7 @@ The `paths` section defines the location of service folders. If the specified di
   Directory where quiz results are stored in CSV format.
   For each quiz, two files are created:
   - `default_0001.csv` — user answers without personal data;
-  - `default_0001.users.csv` — user data with registration fields.
+  - `default_0001.users.csv` — user data with registration fields, including total quiz completion time in `MM:SS` format (minutes:seconds).
   Both files can be opened in any spreadsheet editor (Excel, Google Sheets).
 
 - **static_dir: "static"**

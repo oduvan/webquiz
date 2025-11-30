@@ -103,6 +103,7 @@ def test_user_csv_creation(temp_dir):
             assert "registered_at" in headers
             assert "total_questions_asked" in headers
             assert "correct_answers" in headers
+            assert "total_time" in headers
 
 
 def test_user_csv_content(temp_dir):
@@ -135,6 +136,61 @@ def test_user_csv_content(temp_dir):
             assert rows[0]["grade"] == "9"
             assert rows[0]["total_questions_asked"] == "0"
             assert rows[0]["correct_answers"] == "0"
+            assert rows[0]["total_time"] == "0:00"
+
+
+def test_user_csv_total_time_format(temp_dir):
+    """Test that total_time is formatted as MM:SS in users CSV"""
+    # Create a quiz with multiple questions
+    quiz_data = {
+        "test_quiz.yaml": {
+            "title": "Time Test Quiz",
+            "description": "Quiz for testing time format",
+            "questions": [
+                {"question": "Q1?", "options": ["A", "B", "C", "D"], "correct_answer": 0},
+                {"question": "Q2?", "options": ["A", "B", "C", "D"], "correct_answer": 1},
+                {"question": "Q3?", "options": ["A", "B", "C", "D"], "correct_answer": 2},
+            ],
+        }
+    }
+    with custom_webquiz_server(quizzes=quiz_data) as (proc, port):
+        base_url = f"http://localhost:{port}"
+
+        # Register a user
+        reg_response = requests.post(f"{base_url}/api/register", json={"username": "timeuser"})
+        assert reg_response.status_code == 200
+        user_id = reg_response.json()["user_id"]
+
+        # Submit multiple answers (each has time_taken recorded)
+        # Question IDs are 1-indexed
+        for q_id in range(1, 4):
+            answer_response = requests.post(
+                f"{base_url}/api/submit-answer", json={"user_id": user_id, "question_id": q_id, "selected_answer": 1}
+            )
+            assert answer_response.status_code == 200
+
+        # Wait for periodic CSV flush (runs every 5 seconds)
+        time.sleep(6)
+
+        # Read user CSV
+        import glob
+
+        user_csv_files = glob.glob(f"{temp_dir}/data_*/test_quiz_*.users.csv")
+        assert len(user_csv_files) > 0
+
+        with open(user_csv_files[0], "r") as f:
+            reader = csv.DictReader(f)
+            rows = list(reader)
+            assert len(rows) == 1
+            # Check total_time format is MM:SS (e.g., "0:03" or "1:45")
+            total_time = rows[0]["total_time"]
+            assert ":" in total_time, f"total_time should be in MM:SS format, got: {total_time}"
+            parts = total_time.split(":")
+            assert len(parts) == 2, f"total_time should have exactly one colon, got: {total_time}"
+            minutes, seconds = parts
+            assert minutes.isdigit(), f"Minutes should be numeric, got: {minutes}"
+            assert seconds.isdigit() and len(seconds) == 2, f"Seconds should be 2 digits, got: {seconds}"
+            assert 0 <= int(seconds) < 60, f"Seconds should be 0-59, got: {seconds}"
 
 
 def test_answers_csv_uses_user_id(temp_dir):

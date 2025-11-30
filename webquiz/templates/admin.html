@@ -513,6 +513,87 @@
             margin: 10px 0;
         }
 
+        /* Image preview styles in quiz editor */
+        .image-preview-container {
+            margin-top: 8px;
+            display: none;
+        }
+
+        .image-preview-container.has-image {
+            display: block;
+        }
+
+        .image-preview {
+            max-width: 200px;
+            max-height: 150px;
+            border-radius: 8px;
+            border: 2px solid var(--border-color);
+            object-fit: contain;
+            background: var(--light-bg);
+            cursor: pointer;
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+        }
+
+        .image-preview:hover {
+            transform: scale(1.02);
+            box-shadow: 0 4px 12px var(--shadow);
+            border-color: var(--button-bg);
+        }
+
+        .option-image-preview {
+            max-width: 80px;
+            max-height: 60px;
+            border-radius: 4px;
+            border: 1px solid var(--border-color);
+            object-fit: contain;
+            background: var(--light-bg);
+            margin-left: 5px;
+            cursor: pointer;
+            vertical-align: middle;
+        }
+
+        .option-image-preview:hover {
+            border-color: var(--button-bg);
+        }
+
+        /* Full-size image preview modal */
+        .image-fullscreen-modal {
+            display: none;
+            position: fixed;
+            z-index: 2000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.9);
+            cursor: pointer;
+        }
+
+        .image-fullscreen-modal img {
+            max-width: 90%;
+            max-height: 90%;
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            border-radius: 8px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+        }
+
+        .image-fullscreen-close {
+            position: absolute;
+            top: 20px;
+            right: 30px;
+            color: white;
+            font-size: 40px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+
+        .image-fullscreen-close:hover {
+            color: var(--button-bg);
+        }
+
         /* Pending Approvals Section */
         .pending-approvals {
             margin-top: 30px;
@@ -815,6 +896,12 @@
                 </div>
             </div>
         </div>
+    </div>
+
+    <!-- Fullscreen Image Preview Modal -->
+    <div id="image-fullscreen-modal" class="image-fullscreen-modal" onclick="closeFullscreenPreview()">
+        <span class="image-fullscreen-close">&times;</span>
+        <img id="fullscreen-image" src="" alt="Full size preview">
     </div>
 
     <script>
@@ -1219,8 +1306,11 @@
                 <div class="form-group">
                     <label>Зображення Питання (необов'язково, якщо є текст):</label>
                     <div style="display: flex; align-items: center; gap: 5px;">
-                        <input type="text" class="question-image" placeholder="напр., /imgs/diagram.png" style="width: 100%;">
+                        <input type="text" class="question-image" placeholder="напр., /imgs/diagram.png" style="width: 100%;" oninput="updateQuestionImagePreview(this)">
                         <button type="button" onclick="openImagePicker('question-image', ${questionCounter})" style="padding: 5px 8px; font-size: 16px;" title="Select image">📷</button>
+                    </div>
+                    <div class="image-preview-container">
+                        <img class="image-preview" src="" alt="Preview" onclick="openFullscreenPreview(this.src)" title="Click to enlarge">
                     </div>
                 </div>
                 <div class="form-group">
@@ -1235,13 +1325,13 @@
                     <div class="options-container">
                         <div class="option-item">
                             <input type="radio" name="correct-${questionCounter}" value="0" checked>
-                            <input type="text" class="option-text" placeholder="Варіант 1">
+                            <input type="text" class="option-text" placeholder="Варіант 1" oninput="updateOptionImagePreview(this)">
                             <button type="button" onclick="openImagePicker('option-text', ${questionCounter}, 0)" style="padding: 2px 5px; font-size: 12px;" title="Select image">📷</button>
                             <button type="button" onclick="removeOption(this)">×</button>
                         </div>
                         <div class="option-item">
                             <input type="radio" name="correct-${questionCounter}" value="1">
-                            <input type="text" class="option-text" placeholder="Варіант 2">
+                            <input type="text" class="option-text" placeholder="Варіант 2" oninput="updateOptionImagePreview(this)">
                             <button type="button" onclick="openImagePicker('option-text', ${questionCounter}, 1)" style="padding: 2px 5px; font-size: 12px;" title="Select image">📷</button>
                             <button type="button" onclick="removeOption(this)">×</button>
                         </div>
@@ -1437,7 +1527,7 @@
             optionDiv.className = 'option-item';
             optionDiv.innerHTML = `
                 <input type="${inputType}" name="${inputName}" value="${optionIndex}">
-                <input type="text" class="option-text" placeholder="Варіант ${optionIndex + 1}">
+                <input type="text" class="option-text" placeholder="Варіант ${optionIndex + 1}" oninput="updateOptionImagePreview(this)">
                 <button type="button" onclick="openImagePicker('option-text', ${questionId}, ${optionIndex})" style="padding: 2px 5px; font-size: 12px;" title="Select image">📷</button>
                 <button type="button" onclick="removeOption(this)">×</button>
             `;
@@ -1496,10 +1586,12 @@
                     let optionsHtml = '';
                     question.options.forEach((option, index) => {
                         const isCorrect = correctAnswers.includes(index);
+                        const isImageOption = option && option.startsWith('/imgs/');
                         optionsHtml += `
                             <div class="option-item">
                                 <input type="${inputType}" name="${inputName}" value="${index}" ${isCorrect ? 'checked' : ''}>
-                                <input type="text" class="option-text" value="${escapeHtml(option)}" placeholder="Варіант ${index + 1}">
+                                <input type="text" class="option-text" value="${escapeHtml(option)}" placeholder="Варіант ${index + 1}" oninput="updateOptionImagePreview(this)">
+                                ${isImageOption ? `<img class="option-image-preview" src="${option}" alt="Option preview" title="Click to enlarge" onclick="openFullscreenPreview(this.src)">` : ''}
                                 <button type="button" onclick="openImagePicker('option-text', ${questionCounter}, ${index})" style="padding: 2px 5px; font-size: 12px;" title="Select image">📷</button>
                                 <button type="button" onclick="removeOption(this)">×</button>
                             </div>
@@ -1525,8 +1617,11 @@
                         <div class="form-group">
                             <label>Зображення Питання (необов'язково, якщо є текст):</label>
                             <div style="display: flex; align-items: center; gap: 5px;">
-                                <input type="text" class="question-image" value="${escapeHtml(question.image || '')}" placeholder="напр., /imgs/diagram.png" style="width: 100%;">
+                                <input type="text" class="question-image" value="${escapeHtml(question.image || '')}" placeholder="напр., /imgs/diagram.png" style="width: 100%;" oninput="updateQuestionImagePreview(this)">
                                 <button type="button" onclick="openImagePicker('question-image', ${questionCounter})" style="padding: 5px 8px; font-size: 16px;" title="Select image">📷</button>
+                            </div>
+                            <div class="image-preview-container${question.image ? ' has-image' : ''}">
+                                <img class="image-preview" src="${question.image || ''}" alt="Preview" onclick="openFullscreenPreview(this.src)" title="Click to enlarge">
                             </div>
                         </div>
                         <div class="form-group">
@@ -1798,6 +1893,12 @@
 
             if (targetInput) {
                 targetInput.value = imagePath;
+                // Trigger preview update
+                if (currentImageTarget.fieldType === 'question-image') {
+                    updateQuestionImagePreview(targetInput);
+                } else if (currentImageTarget.fieldType === 'option-text') {
+                    updateOptionImagePreview(targetInput);
+                }
                 closeImagePicker();
                 showMessage(`Зображення вибрано: ${imagePath}`, 'success');
             } else {
@@ -1809,6 +1910,75 @@
             document.getElementById('image-picker-modal').style.display = 'none';
             currentImageTarget = null;
         }
+
+        // Image preview functions
+        function updateQuestionImagePreview(input) {
+            const imagePath = input.value.trim();
+            const previewContainer = input.closest('.form-group').querySelector('.image-preview-container');
+            const previewImg = previewContainer.querySelector('.image-preview');
+
+            if (imagePath && imagePath.startsWith('/imgs/')) {
+                previewImg.src = imagePath;
+                previewImg.onerror = function() {
+                    previewContainer.classList.remove('has-image');
+                };
+                previewImg.onload = function() {
+                    previewContainer.classList.add('has-image');
+                };
+            } else {
+                previewContainer.classList.remove('has-image');
+                previewImg.src = '';
+            }
+        }
+
+        function updateOptionImagePreview(input) {
+            const imagePath = input.value.trim();
+            const optionItem = input.closest('.option-item');
+            let previewImg = optionItem.querySelector('.option-image-preview');
+
+            if (imagePath && imagePath.startsWith('/imgs/')) {
+                if (!previewImg) {
+                    // Create preview image if it doesn't exist
+                    previewImg = document.createElement('img');
+                    previewImg.className = 'option-image-preview';
+                    previewImg.alt = 'Option preview';
+                    previewImg.title = 'Click to enlarge';
+                    previewImg.onclick = function() { openFullscreenPreview(this.src); };
+                    // Insert after the input field
+                    input.parentNode.insertBefore(previewImg, input.nextSibling);
+                }
+                previewImg.src = imagePath;
+                previewImg.style.display = 'inline-block';
+                previewImg.onerror = function() {
+                    this.style.display = 'none';
+                };
+            } else if (previewImg) {
+                previewImg.style.display = 'none';
+            }
+        }
+
+        function openFullscreenPreview(src) {
+            if (!src) return;
+            const modal = document.getElementById('image-fullscreen-modal');
+            const fullscreenImg = document.getElementById('fullscreen-image');
+            fullscreenImg.src = src;
+            modal.style.display = 'block';
+            // Prevent body scroll
+            document.body.style.overflow = 'hidden';
+        }
+
+        function closeFullscreenPreview() {
+            const modal = document.getElementById('image-fullscreen-modal');
+            modal.style.display = 'none';
+            document.body.style.overflow = '';
+        }
+
+        // Close fullscreen preview on Escape key
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape') {
+                closeFullscreenPreview();
+            }
+        });
 
         // Downloadable Quizzes Functions
         function displayDownloadableQuizzes() {
