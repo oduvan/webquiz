@@ -697,3 +697,89 @@ def test_network_interruption_resilience():
 
         # Should complete successfully under normal conditions
         assert response.status_code == 200
+
+
+# CSV Table Preview Tests
+
+
+def test_files_page_has_csv_table_container():
+    """Verify /files/ page includes the table container for CSV preview."""
+    with custom_webquiz_server() as (proc, port):
+        headers = {"X-Master-Key": "test123"}
+        response = requests.get(f"http://localhost:{port}/files/", headers=headers)
+
+        assert response.status_code == 200
+        # Check for table container element
+        assert 'id="file-content-table"' in response.text
+        assert "csv-table-container" in response.text
+
+
+def test_files_page_has_csv_table_styles():
+    """Verify /files/ page includes CSS styles for CSV table."""
+    with custom_webquiz_server() as (proc, port):
+        headers = {"X-Master-Key": "test123"}
+        response = requests.get(f"http://localhost:{port}/files/", headers=headers)
+
+        assert response.status_code == 200
+        # Check for table CSS styles
+        assert ".csv-table" in response.text
+        assert ".csv-table-container" in response.text
+        assert ".csv-table th" in response.text
+        assert ".csv-table td" in response.text
+
+
+def test_files_page_has_csv_parsing_function():
+    """Verify /files/ page includes JavaScript CSV parsing function."""
+    with custom_webquiz_server() as (proc, port):
+        headers = {"X-Master-Key": "test123"}
+        response = requests.get(f"http://localhost:{port}/files/", headers=headers)
+
+        assert response.status_code == 200
+        # Check for parseCSV function
+        assert "function parseCSV" in response.text
+        # Check for renderCsvTable function
+        assert "function renderCsvTable" in response.text
+        # Check for escapeHtml function
+        assert "function escapeHtml" in response.text
+
+
+def test_files_page_viewfile_accepts_viewmode():
+    """Verify viewFile function accepts viewMode parameter."""
+    with custom_webquiz_server() as (proc, port):
+        headers = {"X-Master-Key": "test123"}
+        response = requests.get(f"http://localhost:{port}/files/", headers=headers)
+
+        assert response.status_code == 200
+        # Check viewFile function signature includes viewMode parameter
+        assert "viewFile(type, filename, viewMode" in response.text
+        # Check for table view mode handling
+        assert "viewMode === 'table'" in response.text
+
+
+def test_files_page_csv_text_table_buttons():
+    """Verify CSV files display Text and Table buttons in template."""
+    with custom_webquiz_server() as (proc, port):
+        headers = {"X-Master-Key": "test123"}
+        response = requests.get(f"http://localhost:{port}/files/", headers=headers)
+
+        assert response.status_code == 200
+        # Check for Text button with 'text' viewMode
+        assert "viewFile('${type}', '${file.name}', 'text')" in response.text
+        # Check for Table button with 'table' viewMode
+        assert "viewFile('${type}', '${file.name}', 'table')" in response.text
+        # Check for button labels
+        assert "📄 Text" in response.text
+        assert "📊 Table" in response.text
+
+
+def test_files_page_csv_specific_buttons():
+    """Verify CSV file type gets Text/Table buttons while others don't."""
+    with custom_webquiz_server() as (proc, port):
+        headers = {"X-Master-Key": "test123"}
+        response = requests.get(f"http://localhost:{port}/files/", headers=headers)
+
+        assert response.status_code == 200
+        # Check that CSV type has special handling
+        assert "type === 'csv'" in response.text or "else if (type === 'csv')" in response.text
+        # Check that non-CSV files get regular View button
+        assert "👁️ View" in response.text
