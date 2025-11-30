@@ -10,6 +10,7 @@ import platform
 import zipfile
 import tempfile
 import shutil
+import random
 from datetime import datetime
 from pathlib import Path
 from typing import Dict, List, Any, Optional
@@ -60,7 +61,8 @@ def get_package_version() -> str:
     """
     try:
         return package_version
-    except Exception:
+    except Exception as e:
+        logger.exception(f"Failed to retrieve package version: {e}")
         return "unknown"
 
 
@@ -203,30 +205,27 @@ def get_network_interfaces():
         List of IP address strings (excludes 127.0.0.1)
     """
     interfaces = []
-    try:
-        # Get hostname
-        hostname = socket.gethostname()
+    # Get hostname
+    hostname = socket.gethostname()
 
-        # Get all IP addresses associated with the hostname
-        ip_addresses = socket.getaddrinfo(hostname, None, socket.AF_INET)
-        for ip_info in ip_addresses:
-            ip = ip_info[4][0]
-            if ip != "127.0.0.1":  # Skip localhost
-                interfaces.append(ip)
+    # Get all IP addresses associated with the hostname
+    ip_addresses = socket.getaddrinfo(hostname, None, socket.AF_INET)
+    for ip_info in ip_addresses:
+        ip = ip_info[4][0]
+        if ip != "127.0.0.1":  # Skip localhost
+            interfaces.append(ip)
 
-        # Also try to get more interface info on Unix systems
-        if platform.system() != "Windows":
-            try:
-                result = subprocess.run(["hostname", "-I"], capture_output=True, text=True, timeout=5)
-                if result.returncode == 0:
-                    ips = result.stdout.strip().split()
-                    for ip in ips:
-                        if ip not in interfaces and ip != "127.0.0.1":
-                            interfaces.append(ip)
-            except (subprocess.TimeoutExpired, subprocess.CalledProcessError, FileNotFoundError):
-                pass
-    except Exception:
-        pass
+    # Also try to get more interface info on Unix systems
+    if platform.system() != "Windows":
+        try:
+            result = subprocess.run(["hostname", "-I"], capture_output=True, text=True, timeout=5)
+            if result.returncode == 0:
+                ips = result.stdout.strip().split()
+                for ip in ips:
+                    if ip not in interfaces and ip != "127.0.0.1":
+                        interfaces.append(ip)
+        except (subprocess.TimeoutExpired, subprocess.CalledProcessError, FileNotFoundError):
+            pass
 
     return list(set(interfaces))  # Remove duplicates
 
@@ -273,8 +272,10 @@ def admin_auth_required(func):
             try:
                 data = await request.json()
                 provided_key = data.get("master_key")
-            except:
-                pass
+            except (json.JSONDecodeError, UnicodeDecodeError) as e:
+                logger.warning(f"Failed to parse admin auth request body as JSON: {e}")
+            except Exception as e:
+                logger.exception(f"Unexpected error reading admin auth request body: {e}")
 
         if not provided_key or provided_key != self.master_key:
             return web.json_response({"error": "Недійсний або відсутній головний ключ"}, status=401)
@@ -320,8 +321,8 @@ def local_network_only(func):
 async def error_middleware(request, handler):
     """Global error handling middleware.
 
-    Catches and formats ValueError as 400 responses.
-    Allows HTTPException to pass through.
+    Catches all unexpected exceptions, logs them with full traceback, and returns 500 error.
+    Allows HTTPException to pass through for proper HTTP status codes.
 
     Args:
         request: aiohttp request object
@@ -334,9 +335,11 @@ async def error_middleware(request, handler):
         return await handler(request)
     except web.HTTPException:
         raise
-    except ValueError as e:
-        logger.error(f"Validation error: {e}")
-        return web.json_response({"error": str(e)}, status=400)
+    except Exception as e:
+        logger.exception(
+            f"Error handling {request.method} {request.path} from {request.remote}: {type(e).__name__}: {e}"
+        )
+        return web.json_response({"error": str(e)}, status=500)
 
 
 class TestingServer:
@@ -474,16 +477,12 @@ class TestingServer:
         Returns:
             Sorted list of quiz filenames (.yaml and .yml files)
         """
-        try:
-            quiz_files = []
-            if os.path.exists(self.quizzes_dir):
-                for filename in os.listdir(self.quizzes_dir):
-                    if filename.endswith((".yaml", ".yml")):
-                        quiz_files.append(filename)
-            return sorted(quiz_files)
-        except Exception as e:
-            logger.error(f"Error listing quiz files: {e}")
-            return []
+        quiz_files = []
+        if os.path.exists(self.quizzes_dir):
+            for filename in os.listdir(self.quizzes_dir):
+                if filename.endswith((".yaml", ".yml")):
+                    quiz_files.append(filename)
+        return sorted(quiz_files)
 
     async def switch_quiz(self, quiz_filename: str):
         """Switch to a different quiz file and reset server state.
@@ -547,27 +546,22 @@ class TestingServer:
         template_content = self.templates.get("quiz_selection_required.html", "")
         selection_html = template_content.replace("{{QUIZ_LIST}}", quiz_list_html)
 
-        try:
-            async with aiofiles.open(index_path, "w", encoding="utf-8") as f:
-                await f.write(selection_html)
-            logger.info(f"Created admin selection page: {index_path}")
-        except Exception as e:
-            logger.error(f"Error creating admin selection page: {e}")
+        async with aiofiles.open(index_path, "w", encoding="utf-8") as f:
+            await f.write(selection_html)
+        logger.info(f"Created admin selection page: {index_path}")
 
     async def initialize_log_file(self):
         """Initialize new log file with unique suffix in logs directory.
 
         Creates the log file and logs initial server start message.
         """
-        try:
-            # Generate log file path
-            self.log_file = self.generate_log_path()
-            # Create the new log file
-            with open(self.log_file, "w") as f:
-                f.write("")
-            logger.info(f"=== Server Started - New Log File Created: {self.log_file} ===")
-        except Exception as e:
-            print(f"Error initializing log file {self.log_file}: {e}")
+
+        # Generate log file path
+        self.log_file = self.generate_log_path()
+        # Create the new log file
+        with open(self.log_file, "w") as f:
+            f.write("")
+        logger.info(f"=== Server Started - New Log File Created: {self.log_file} ===")
 
     async def initialize_tunnel(self):
         """Initialize SSH tunnel if configured.
@@ -579,35 +573,31 @@ class TestingServer:
             logger.info("SSH tunnel not configured, skipping initialization")
             return
 
-        try:
-            logger.info(f"Initializing SSH tunnel for server: {self.config.tunnel.server}")
+        logger.info(f"Initializing SSH tunnel for server: {self.config.tunnel.server}")
 
-            # Create tunnel manager
-            self.tunnel_manager = TunnelManager(self.config.tunnel, local_port=self.config.server.port)
+        # Create tunnel manager
+        self.tunnel_manager = TunnelManager(self.config.tunnel, local_port=self.config.server.port)
 
-            # Set up status callback to broadcast changes to admin clients
-            async def tunnel_status_callback(status):
-                # Include configured and server fields in status updates
-                tunnel_update = {
-                    "configured": True,
-                    "server": self.config.tunnel.server,
-                    "socket_name": self.config.tunnel.socket_name,
-                    **status,
-                }
-                await self.broadcast_to_admin_websockets({"type": "tunnel_status", "tunnel": tunnel_update})
+        # Set up status callback to broadcast changes to admin clients
+        async def tunnel_status_callback(status):
+            # Include configured and server fields in status updates
+            tunnel_update = {
+                "configured": True,
+                "server": self.config.tunnel.server,
+                "socket_name": self.config.tunnel.socket_name,
+                **status,
+            }
+            await self.broadcast_to_admin_websockets({"type": "tunnel_status", "tunnel": tunnel_update})
 
-            self.tunnel_manager.set_status_callback(tunnel_status_callback)
+        self.tunnel_manager.set_status_callback(tunnel_status_callback)
 
-            # Ensure keys exist (generate if needed), but don't connect yet
-            success, message = await self.tunnel_manager.ensure_keys_exist()
+        # Ensure keys exist (generate if needed), but don't connect yet
+        success, message = await self.tunnel_manager.ensure_keys_exist()
 
-            if success:
-                logger.info(f"SSH tunnel initialized successfully: {message}")
-            else:
-                logger.warning(f"SSH tunnel keys not ready: {message}")
-
-        except Exception as e:
-            logger.error(f"Error initializing SSH tunnel: {e}")
+        if success:
+            logger.info(f"SSH tunnel initialized successfully: {message}")
+        else:
+            logger.warning(f"SSH tunnel keys not ready: {message}")
 
     async def create_default_config_yaml(self, file_path: str = None):
         """Create default quiz YAML file with example questions.
@@ -630,12 +620,9 @@ class TestingServer:
             ],
         }
 
-        try:
-            async with aiofiles.open(file_path, "w", encoding="utf-8") as f:
-                await f.write(yaml.dump(default_questions, default_flow_style=False, allow_unicode=True))
-            logger.info(f"Created default config file: {file_path}")
-        except Exception as e:
-            logger.error(f"Error creating default config file {file_path}: {e}")
+        async with aiofiles.open(file_path, "w", encoding="utf-8") as f:
+            await f.write(yaml.dump(default_questions, default_flow_style=False, allow_unicode=True))
+        logger.info(f"Created default config file: {file_path}")
 
     async def load_questions_from_file(self, quiz_file_path: str):
         """Load questions from specific quiz file for quiz execution.
@@ -648,36 +635,32 @@ class TestingServer:
         Raises:
             Various exceptions if file cannot be read or parsed
         """
-        try:
-            async with aiofiles.open(quiz_file_path, "r") as f:
-                content = await f.read()
-                data = yaml.safe_load(content)
-                self.questions = data["questions"]
+        async with aiofiles.open(quiz_file_path, "r") as f:
+            content = await f.read()
+            data = yaml.safe_load(content)
+            self.questions = data["questions"]
 
-                # Store quiz title or use default
-                self.quiz_title = data.get("title", "Система Тестування")
+            # Store quiz title or use default
+            self.quiz_title = data.get("title", "Система Тестування")
 
-                # Store show_right_answer setting (default: True)
-                self.show_right_answer = data.get("show_right_answer", True)
+            # Store show_right_answer setting (default: True)
+            self.show_right_answer = data.get("show_right_answer", True)
 
-                # Store randomize_questions setting (default: False)
-                self.randomize_questions = data.get("randomize_questions", False)
+            # Store randomize_questions setting (default: False)
+            self.randomize_questions = data.get("randomize_questions", False)
 
-                # Store show_answers_on_completion setting (default: False)
-                self.show_answers_on_completion = data.get("show_answers_on_completion", False)
+            # Store show_answers_on_completion setting (default: False)
+            self.show_answers_on_completion = data.get("show_answers_on_completion", False)
 
-                # Add automatic IDs based on array index (for quiz execution only)
-                for i, question in enumerate(self.questions):
-                    question["id"] = i + 1
+            # Add automatic IDs based on array index (for quiz execution only)
+            for i, question in enumerate(self.questions):
+                question["id"] = i + 1
 
-                logger.info(
-                    f"Loaded {len(self.questions)} questions from {quiz_file_path}, "
-                    f"show_right_answer: {self.show_right_answer}, randomize_questions: {self.randomize_questions}, "
-                    f"show_answers_on_completion: {self.show_answers_on_completion}"
-                )
-        except Exception as e:
-            logger.error(f"Error loading questions from {quiz_file_path}: {e}")
-            raise
+            logger.info(
+                f"Loaded {len(self.questions)} questions from {quiz_file_path}, "
+                f"show_right_answer: {self.show_right_answer}, randomize_questions: {self.randomize_questions}, "
+                f"show_answers_on_completion: {self.show_answers_on_completion}"
+            )
 
     async def load_questions(self):
         """Load questions based on available quiz files.
@@ -688,38 +671,33 @@ class TestingServer:
         - Multiple files with default.yaml: uses default.yaml
         - Multiple files without default.yaml: requires admin selection
         """
-        try:
-            # Check if quizzes directory exists
-            if not os.path.exists(self.quizzes_dir):
-                os.makedirs(self.quizzes_dir)
-                logger.info(f"Created quizzes directory: {self.quizzes_dir}")
+        # Check if quizzes directory exists
+        if not os.path.exists(self.quizzes_dir):
+            os.makedirs(self.quizzes_dir)
+            logger.info(f"Created quizzes directory: {self.quizzes_dir}")
 
-            # Get available quiz files
-            available_quizzes = await self.list_available_quizzes()
+        # Get available quiz files
+        available_quizzes = await self.list_available_quizzes()
 
-            if not available_quizzes:
-                # No quiz files found, create default
-                default_path = os.path.join(self.quizzes_dir, "default.yaml")
-                await self.create_default_config_yaml(default_path)
-                available_quizzes = ["default.yaml"]
-                await self.switch_quiz("default.yaml")
-            elif len(available_quizzes) == 1:
-                # Only one quiz file - use it as default
-                await self.switch_quiz(available_quizzes[0])
-                logger.info(f"Using single quiz file as default: {available_quizzes[0]}")
-            elif "default.yaml" in available_quizzes or "default.yml" in available_quizzes:
-                # Multiple files but default.yaml exists - use it
-                default_file = "default.yaml" if "default.yaml" in available_quizzes else "default.yml"
-                await self.switch_quiz(default_file)
-                logger.info(f"Using explicit default file: {default_file}")
-            else:
-                # Multiple files but no default.yaml - don't load any quiz
-                logger.info(f"Multiple quiz files found but no default.yaml - admin must select quiz first")
-                await self.create_admin_selection_page()
-
-        except Exception as e:
-            logger.error(f"Error in load_questions: {e}")
-            raise
+        if not available_quizzes:
+            # No quiz files found, create default
+            default_path = os.path.join(self.quizzes_dir, "default.yaml")
+            await self.create_default_config_yaml(default_path)
+            available_quizzes = ["default.yaml"]
+            await self.switch_quiz("default.yaml")
+        elif len(available_quizzes) == 1:
+            # Only one quiz file - use it as default
+            await self.switch_quiz(available_quizzes[0])
+            logger.info(f"Using single quiz file as default: {available_quizzes[0]}")
+        elif "default.yaml" in available_quizzes or "default.yml" in available_quizzes:
+            # Multiple files but default.yaml exists - use it
+            default_file = "default.yaml" if "default.yaml" in available_quizzes else "default.yml"
+            await self.switch_quiz(default_file)
+            logger.info(f"Using explicit default file: {default_file}")
+        else:
+            # Multiple files but no default.yaml - don't load any quiz
+            logger.info(f"Multiple quiz files found but no default.yaml - admin must select quiz first")
+            await self.create_admin_selection_page()
 
     async def create_default_index_html(self):
         """Create default index.html file with embedded questions data.
@@ -752,71 +730,52 @@ class TestingServer:
         # Convert questions to JSON string for embedding
         questions_json = json.dumps(questions_for_client, indent=2)
 
-        # Copy template from package
-        try:
-            template_content = self.templates.get("index.html", "")
+        template_content = self.templates.get("index.html", "")
 
-            # Generate registration fields HTML as a table (always include username)
-            registration_fields_html = (
-                '<table class="registration-table">'
-            )
+        # Generate registration fields HTML as a table (always include username)
+        registration_fields_html = (
+            '<table class="registration-table">'
+        )
 
-            # Get username label from config
-            username_label = "Ім'я користувача"
-            if hasattr(self.config, "registration") and hasattr(self.config.registration, "username_label"):
-                username_label = self.config.registration.username_label
+        # Get username label from config
+        username_label = "Ім'я користувача"
+        if hasattr(self.config, "registration") and hasattr(self.config.registration, "username_label"):
+            username_label = self.config.registration.username_label
 
-            # Add username field as first row
-            registration_fields_html += f"""
-                <tr>
-                    <td class="registration-label">{username_label}:</td>
-                    <td class="registration-input">
-                        <input type="text" id="username">
-                    </td>
-                </tr>"""
+        # Add username field as first row
+        registration_fields_html += f"""
+            <tr>
+                <td style="padding: 5px 10px; text-align: right; font-weight: bold;">{username_label}:</td>
+                <td style="padding: 5px 10px;">
+                    <input type="text" id="username" style="padding: 8px; width: 100%; max-width: 250px; box-sizing: border-box;">
+                </td>
+            </tr>"""
 
-            # Add additional registration fields if configured
-            if hasattr(self.config, "registration") and self.config.registration.fields:
-                for field_label in self.config.registration.fields:
-                    field_name = field_label.lower().replace(" ", "_")
-                    registration_fields_html += f"""
-                <tr>
-                    <td class="registration-label">{field_label}:</td>
-                    <td class="registration-input">
-                        <input type="text" class="registration-field" data-field-name="{field_name}">
-                    </td>
-                </tr>"""
+        # Add additional registration fields if configured
+        if hasattr(self.config, "registration") and self.config.registration.fields:
+            for field_label in self.config.registration.fields:
+                field_name = field_label.lower().replace(" ", "_")
+                registration_fields_html += f"""
+            <tr>
+                <td style="padding: 5px 10px; text-align: right; font-weight: bold;">{field_label}:</td>
+                <td style="padding: 5px 10px;">
+                    <input type="text" class="registration-field" data-field-name="{field_name}" style="padding: 8px; width: 100%; max-width: 250px; box-sizing: border-box;">
+                </td>
+            </tr>"""
 
-            registration_fields_html += "</table>"
+        registration_fields_html += "</table>"
 
-            # Inject questions data, title, version, registration fields, username label, and show_right_answer setting into template
-            html_content = template_content.replace("{{QUESTIONS_DATA}}", questions_json)
-            html_content = html_content.replace("{{QUIZ_TITLE}}", self.quiz_title)
-            html_content = html_content.replace("{{REGISTRATION_FIELDS}}", registration_fields_html)
-            html_content = html_content.replace("{{USERNAME_LABEL}}", username_label)
-            html_content = html_content.replace("{{SHOW_RIGHT_ANSWER}}", "true" if self.show_right_answer else "false")
-            html_content = html_content.replace("{{WEBQUIZ_VERSION}}", get_package_version())
+        # Inject questions data, title, version, registration fields, username label, and show_right_answer setting into template
+        html_content = template_content.replace("{{QUESTIONS_DATA}}", questions_json)
+        html_content = html_content.replace("{{QUIZ_TITLE}}", self.quiz_title)
+        html_content = html_content.replace("{{REGISTRATION_FIELDS}}", registration_fields_html)
+        html_content = html_content.replace("{{USERNAME_LABEL}}", username_label)
+        html_content = html_content.replace("{{SHOW_RIGHT_ANSWER}}", "true" if self.show_right_answer else "false")
+        html_content = html_content.replace("{{WEBQUIZ_VERSION}}", get_package_version())
 
-            # Write to destination
-            async with aiofiles.open(index_path, "w", encoding="utf-8") as f:
-                await f.write(html_content)
-
-            logger.info(f"Created index.html file with embedded questions data: {index_path}")
-            return
-        except Exception as e:
-            logger.error(f"Error copying template index.html: {e}")
-            # Continue to fallback
-
-        # Fallback: create minimal HTML if template is not available
-        try:
-            fallback_html = self.templates.get(
-                "template_error.html", "<html><body><h1>Template Error</h1></body></html>"
-            )
-            async with aiofiles.open(index_path, "w", encoding="utf-8") as f:
-                await f.write(fallback_html)
-            logger.warning(f"Created fallback index.html file: {index_path}")
-        except Exception as e:
-            logger.error(f"Error creating fallback index.html: {e}")
+        # Write to destination
+        async with aiofiles.open(index_path, "w", encoding="utf-8") as f:
+            await f.write(html_content)
 
     async def flush_responses_to_csv(self):
         """Flush in-memory responses to CSV file.
@@ -878,63 +837,66 @@ class TestingServer:
         if not self.users or not self.user_csv_file:
             return
 
-        try:
-            # Check if CSV file exists
-            file_exists = os.path.exists(self.user_csv_file)
+        # Check if CSV file exists
+        file_exists = os.path.exists(self.user_csv_file)
 
-            # Use StringIO buffer to write CSV data
-            csv_buffer = StringIO()
-            csv_writer = csv.writer(csv_buffer)
+        # Use StringIO buffer to write CSV data
+        csv_buffer = StringIO()
+        csv_writer = csv.writer(csv_buffer)
 
-            # Determine headers based on registration fields
-            headers = ["user_id", "username"]
+        # Determine headers based on registration fields
+        headers = ["user_id", "username"]
+        if hasattr(self.config, "registration") and self.config.registration.fields:
+            for field_label in self.config.registration.fields:
+                field_name = field_label.lower().replace(" ", "_")
+                headers.append(field_name)
+        headers.extend(["registered_at", "total_questions_asked", "correct_answers"])
+
+        # Always write headers (we always overwrite the file)
+        csv_writer.writerow(headers)
+
+        # Write all user data to buffer
+        for user_id, user_data in self.users.items():
+            row = [user_id, user_data["username"]]
+
+            # Add additional registration fields in order
             if hasattr(self.config, "registration") and self.config.registration.fields:
                 for field_label in self.config.registration.fields:
                     field_name = field_label.lower().replace(" ", "_")
-                    headers.append(field_name)
-            headers.extend(["registered_at", "total_questions_asked", "correct_answers"])
+                    row.append(user_data.get(field_name, ""))
 
-            # Always write headers (we always overwrite the file)
-            csv_writer.writerow(headers)
+            row.append(user_data.get("registered_at", ""))
 
-            # Write all user data to buffer
-            for user_id, user_data in self.users.items():
-                row = [user_id, user_data["username"]]
+            # Calculate and add user statistics
+            user_answer_list = self.user_answers.get(user_id, [])
+            total_questions_asked = len(user_answer_list)
+            correct_answers = sum(answer["is_correct"] for answer in user_answer_list)
+            row.extend([total_questions_asked, correct_answers])
 
-                # Add additional registration fields in order
-                if hasattr(self.config, "registration") and self.config.registration.fields:
-                    for field_label in self.config.registration.fields:
-                        field_name = field_label.lower().replace(" ", "_")
-                        row.append(user_data.get(field_name, ""))
+            csv_writer.writerow(row)
 
-                row.append(user_data.get("registered_at", ""))
+        # Write buffer content to file
+        csv_content = csv_buffer.getvalue()
+        csv_buffer.close()
+        total_users = len(self.users)
 
-                # Calculate and add user statistics
-                user_answer_list = self.user_answers.get(user_id, [])
-                total_questions_asked = len(user_answer_list)
-                correct_answers = sum(answer["is_correct"] for answer in user_answer_list)
-                row.extend([total_questions_asked, correct_answers])
-
-                csv_writer.writerow(row)
-
-            # Write buffer content to file
-            csv_content = csv_buffer.getvalue()
-            csv_buffer.close()
-            total_users = len(self.users)
-
-            # Always overwrite the file (users don't accumulate like responses do)
-            async with aiofiles.open(self.user_csv_file, "w", encoding="utf-8") as f:
-                await f.write(csv_content)
-
-        except Exception as e:
-            logger.error(f"Error flushing users to CSV: {e}")
+        # Always overwrite the file (users don't accumulate like responses do)
+        async with aiofiles.open(self.user_csv_file, "w", encoding="utf-8") as f:
+            await f.write(csv_content)
 
     async def periodic_flush(self):
         """Periodically flush responses and users to CSV every 5 seconds."""
         while True:
             await asyncio.sleep(5)  # Flush every 30 seconds
-            await self.flush_responses_to_csv()
-            await self.flush_users_to_csv()
+            try:
+                await self.flush_responses_to_csv()
+            except Exception as e:
+                logger.exception(f"Error during flush_responses_to_csv: {e}")
+
+            try:
+                await self.flush_users_to_csv()
+            except Exception as e:
+                logger.exception(f"Error during flush_users_to_csv: {e}")
 
     async def _broadcast_to_websocket_list(
         self, clients_list: List[web.WebSocketResponse], message: dict, client_type: str = "WebSocket"
@@ -1129,31 +1091,26 @@ class TestingServer:
 
         Returns:
             JSON response with user_id and registration status
-
-        Raises:
-            ValueError: If username is empty, exists, or required fields missing
         """
         data = await request.json()
         username = data["username"].strip()
 
         if not username:
-            raise ValueError("Ім'я користувача не може бути порожнім")
+            return web.json_response({"error": "Ім'я користувача не може бути порожнім"}, status=400)
 
         # Check if username already exists
         for existing_user in self.users.values():
             if existing_user["username"] == username:
-                raise ValueError("Ім'я користувача вже існує")
+                return web.json_response({"error": "Ім'я користувача вже існує"}, status=400)
 
         # Generate unique 6-digit user ID
-        import random
-
         max_attempts = 100
         for _ in range(max_attempts):
             user_id = str(random.randint(100000, 999999))
             if user_id not in self.users:
                 break
         else:
-            raise ValueError("Could not generate unique user ID")
+            return web.json_response({"error": "Could not generate unique user ID"}, status=500)
 
         # Check if approval is required
         requires_approval = hasattr(self.config, "registration") and self.config.registration.approve
@@ -1174,7 +1131,7 @@ class TestingServer:
                 # Get value from request data
                 field_value = data.get(field_name, "").strip()
                 if not field_value:
-                    raise ValueError(f'Поле "{field_label}" не може бути порожнім')
+                    return web.json_response({"error": f'Поле "{field_label}" не може бути порожнім'}, status=400)
                 user_data[field_name] = field_value
 
         # Generate random question order if randomization is enabled
@@ -1249,7 +1206,7 @@ class TestingServer:
         user_id = data.get("user_id")
 
         if not user_id:
-            raise ValueError("User ID is required")
+            return web.json_response({"error": "User ID is required"}, status=400)
 
         # Check if user exists
         if user_id not in self.users:
@@ -1267,7 +1224,7 @@ class TestingServer:
             # Check if new username already exists (exclude current user)
             for existing_user_id, existing_user in self.users.items():
                 if existing_user_id != user_id and existing_user["username"] == username:
-                    raise ValueError("Ім'я користувача вже існує")
+                    return web.json_response({"error": "Ім'я користувача вже існує"}, status=400)
             user_data["username"] = username
 
         # Update additional registration fields if configured
@@ -1465,37 +1422,32 @@ class TestingServer:
         Returns:
             JSON response with success status
         """
-        try:
-            data = await request.json()
-            user_id = data["user_id"]
-            question_id = data["question_id"]
-            username = self.users[user_id]["username"]
+        data = await request.json()
+        user_id = data["user_id"]
+        question_id = data["question_id"]
+        username = self.users[user_id]["username"]
 
-            # Verify user exists
-            if user_id not in self.users:
-                return web.json_response({"error": "Користувача не знайдено"}, status=404)
+        # Verify user exists
+        if user_id not in self.users:
+            return web.json_response({"error": "Користувача не знайдено"}, status=404)
 
-            if user_id not in self.question_start_times:
-                self.question_start_times[user_id] = datetime.now()
-            self.update_live_stats(user_id, question_id, "think")
+        if user_id not in self.question_start_times:
+            self.question_start_times[user_id] = datetime.now()
+        self.update_live_stats(user_id, question_id, "think")
 
-            await self.broadcast_to_websockets(
-                {
-                    "type": "state_update",
-                    "user_id": user_id,
-                    "username": username,
-                    "question_id": question_id,
-                    "state": "think",
-                    "time_taken": None,
-                    "total_questions": len(self.questions),
-                }
-            )
+        await self.broadcast_to_websockets(
+            {
+                "type": "state_update",
+                "user_id": user_id,
+                "username": username,
+                "question_id": question_id,
+                "state": "think",
+                "time_taken": None,
+                "total_questions": len(self.questions),
+            }
+        )
 
-            return web.json_response({"status": "success"})
-
-        except Exception as e:
-            logger.error(f"Error in question_start: {e}")
-            return web.json_response({"error": "Помилка сервера"}, status=500)
+        return web.json_response({"status": "success"})
 
     def calculate_and_store_user_stats(self, user_id):
         """Calculate and store final stats for a completed user.
@@ -1747,23 +1699,19 @@ class TestingServer:
         Returns:
             JSON response with success status and new quiz info
         """
-        try:
-            data = await request.json()
-            quiz_filename = data["quiz_filename"]
+        data = await request.json()
+        quiz_filename = data["quiz_filename"]
 
-            await self.switch_quiz(quiz_filename)
+        await self.switch_quiz(quiz_filename)
 
-            return web.json_response(
-                {
-                    "success": True,
-                    "message": f"Switched to quiz: {quiz_filename}",
-                    "current_quiz": quiz_filename,
-                    "csv_file": os.path.basename(self.csv_file),
-                }
-            )
-        except Exception as e:
-            logger.error(f"Error switching quiz: {e}")
-            return web.json_response({"error": str(e)}, status=400)
+        return web.json_response(
+            {
+                "success": True,
+                "message": f"Switched to quiz: {quiz_filename}",
+                "current_quiz": quiz_filename,
+                "csv_file": os.path.basename(self.csv_file),
+            }
+        )
 
     @admin_auth_required
     async def admin_auth_test(self, request):
@@ -1852,29 +1800,25 @@ class TestingServer:
         Returns:
             JSON response with quiz content (raw YAML and parsed)
         """
+        filename = request.match_info["filename"]
+        quiz_path = os.path.join(self.quizzes_dir, filename)
+
+        if not os.path.exists(quiz_path):
+            return web.json_response({"error": "Quiz file not found"}, status=404)
+
+        with open(quiz_path, "r", encoding="utf-8") as f:
+            quiz_content = f.read()
+
+        # Also return parsed YAML for wizard mode
         try:
-            filename = request.match_info["filename"]
-            quiz_path = os.path.join(self.quizzes_dir, filename)
+            import yaml
 
-            if not os.path.exists(quiz_path):
-                return web.json_response({"error": "Quiz file not found"}, status=404)
-
-            with open(quiz_path, "r", encoding="utf-8") as f:
-                quiz_content = f.read()
-
-            # Also return parsed YAML for wizard mode
-            try:
-                import yaml
-
-                parsed_quiz = yaml.safe_load(quiz_content)
-                return web.json_response({"filename": filename, "content": quiz_content, "parsed": parsed_quiz})
-            except yaml.YAMLError as e:
-                return web.json_response(
-                    {"filename": filename, "content": quiz_content, "parsed": None, "yaml_error": str(e)}
-                )
-        except Exception as e:
-            logger.error(f"Error getting quiz: {e}")
-            return web.json_response({"error": str(e)}, status=500)
+            parsed_quiz = yaml.safe_load(quiz_content)
+            return web.json_response({"filename": filename, "content": quiz_content, "parsed": parsed_quiz})
+        except yaml.YAMLError as e:
+            return web.json_response(
+                {"filename": filename, "content": quiz_content, "parsed": None, "yaml_error": str(e)}
+            )
 
     @admin_auth_required
     async def admin_create_quiz(self, request):
@@ -1886,58 +1830,54 @@ class TestingServer:
         Returns:
             JSON response with success status
         """
-        try:
-            data = await request.json()
-            filename = data.get("filename", "").strip()
-            mode = data.get("mode", "wizard")  # 'wizard' or 'text'
+        data = await request.json()
+        filename = data.get("filename", "").strip()
+        mode = data.get("mode", "wizard")  # 'wizard' or 'text'
 
-            if not filename:
-                return web.json_response({"error": "Filename is required"}, status=400)
+        if not filename:
+            return web.json_response({"error": "Filename is required"}, status=400)
 
-            if not filename.endswith(".yaml"):
-                filename += ".yaml"
+        if not filename.endswith(".yaml"):
+            filename += ".yaml"
 
-            quiz_path = os.path.join(self.quizzes_dir, filename)
+        quiz_path = os.path.join(self.quizzes_dir, filename)
 
-            # Check if file already exists
-            if os.path.exists(quiz_path):
-                return web.json_response({"error": "Quiz file already exists"}, status=409)
+        # Check if file already exists
+        if os.path.exists(quiz_path):
+            return web.json_response({"error": "Quiz file already exists"}, status=409)
 
-            # Validate and create quiz content
-            if mode == "wizard":
-                quiz_data = data.get("quiz_data", {})
-                if not self._validate_quiz_data(quiz_data):
-                    return web.json_response({"error": "Неправильна структура даних квізу"}, status=400)
+        # Validate and create quiz content
+        if mode == "wizard":
+            quiz_data = data.get("quiz_data", {})
+            if not self._validate_quiz_data(quiz_data):
+                return web.json_response({"error": "Неправильна структура даних квізу"}, status=400)
 
+            import yaml
+
+            quiz_content = yaml.dump(quiz_data, default_flow_style=False, allow_unicode=True)
+        else:  # text mode
+            quiz_content = data.get("content", "").strip()
+            if not quiz_content:
+                return web.json_response({"error": "Quiz content is required"}, status=400)
+
+            # Validate YAML
+            try:
                 import yaml
 
-                quiz_content = yaml.dump(quiz_data, default_flow_style=False, allow_unicode=True)
-            else:  # text mode
-                quiz_content = data.get("content", "").strip()
-                if not quiz_content:
-                    return web.json_response({"error": "Quiz content is required"}, status=400)
+                parsed = yaml.safe_load(quiz_content)
+                if not self._validate_quiz_data(parsed):
+                    return web.json_response({"error": "Неправильна структура даних квізу"}, status=400)
+            except yaml.YAMLError as e:
+                return web.json_response({"error": f"Неправильний YAML: {str(e)}"}, status=400)
 
-                # Validate YAML
-                try:
-                    import yaml
+        # Write the quiz file
+        with open(quiz_path, "w", encoding="utf-8") as f:
+            f.write(quiz_content)
 
-                    parsed = yaml.safe_load(quiz_content)
-                    if not self._validate_quiz_data(parsed):
-                        return web.json_response({"error": "Неправильна структура даних квізу"}, status=400)
-                except yaml.YAMLError as e:
-                    return web.json_response({"error": f"Неправильний YAML: {str(e)}"}, status=400)
-
-            # Write the quiz file
-            with open(quiz_path, "w", encoding="utf-8") as f:
-                f.write(quiz_content)
-
-            logger.info(f"Created new quiz: {filename}")
-            return web.json_response(
-                {"success": True, "message": f'Quiz "{filename}" created successfully', "filename": filename}
-            )
-        except Exception as e:
-            logger.error(f"Error creating quiz: {e}")
-            return web.json_response({"error": str(e)}, status=500)
+        logger.info(f"Created new quiz: {filename}")
+        return web.json_response(
+            {"success": True, "message": f'Quiz "{filename}" created successfully', "filename": filename}
+        )
 
     @admin_auth_required
     async def admin_update_quiz(self, request):
@@ -1951,65 +1891,56 @@ class TestingServer:
         Returns:
             JSON response with success status and backup filename
         """
-        try:
-            filename = request.match_info["filename"]
-            data = await request.json()
-            mode = data.get("mode", "wizard")
+        filename = request.match_info["filename"]
+        data = await request.json()
+        mode = data.get("mode", "wizard")
 
-            quiz_path = os.path.join(self.quizzes_dir, filename)
+        quiz_path = os.path.join(self.quizzes_dir, filename)
 
-            if not os.path.exists(quiz_path):
-                return web.json_response({"error": "Quiz file not found"}, status=404)
+        if not os.path.exists(quiz_path):
+            return web.json_response({"error": "Quiz file not found"}, status=404)
 
-            # Create backup
-            backup_path = quiz_path + ".backup"
-            import shutil
+        # Create backup
+        backup_path = quiz_path + ".backup"
 
-            shutil.copy2(quiz_path, backup_path)
+        shutil.copy2(quiz_path, backup_path)
 
-            # Prepare new content
-            if mode == "wizard":
-                quiz_data = data.get("quiz_data", {})
-                if not self._validate_quiz_data(quiz_data):
+        # Prepare new content
+        if mode == "wizard":
+            quiz_data = data.get("quiz_data", {})
+            if not self._validate_quiz_data(quiz_data):
+                return web.json_response({"error": "Неправильна структура даних квізу"}, status=400)
+
+            quiz_content = yaml.dump(quiz_data, default_flow_style=False, allow_unicode=True)
+        else:  # text mode
+            quiz_content = data.get("content", "").strip()
+            if not quiz_content:
+                return web.json_response({"error": "Quiz content is required"}, status=400)
+
+            # Validate YAML
+            try:
+                parsed = yaml.safe_load(quiz_content)
+                if not self._validate_quiz_data(parsed):
                     return web.json_response({"error": "Неправильна структура даних квізу"}, status=400)
+            except yaml.YAMLError as e:
+                return web.json_response({"error": f"Неправильний YAML: {str(e)}"}, status=400)
 
-                import yaml
+        # Write updated content
+        with open(quiz_path, "w", encoding="utf-8") as f:
+            f.write(quiz_content)
 
-                quiz_content = yaml.dump(quiz_data, default_flow_style=False, allow_unicode=True)
-            else:  # text mode
-                quiz_content = data.get("content", "").strip()
-                if not quiz_content:
-                    return web.json_response({"error": "Quiz content is required"}, status=400)
+        # If this is the current quiz, reload it
+        if self.current_quiz_file and os.path.basename(self.current_quiz_file) == filename:
+            await self.switch_quiz(filename)
 
-                # Validate YAML
-                try:
-                    import yaml
-
-                    parsed = yaml.safe_load(quiz_content)
-                    if not self._validate_quiz_data(parsed):
-                        return web.json_response({"error": "Неправильна структура даних квізу"}, status=400)
-                except yaml.YAMLError as e:
-                    return web.json_response({"error": f"Неправильний YAML: {str(e)}"}, status=400)
-
-            # Write updated content
-            with open(quiz_path, "w", encoding="utf-8") as f:
-                f.write(quiz_content)
-
-            # If this is the current quiz, reload it
-            if self.current_quiz_file and os.path.basename(self.current_quiz_file) == filename:
-                await self.switch_quiz(filename)
-
-            logger.info(f"Updated quiz: {filename}")
-            return web.json_response(
-                {
-                    "success": True,
-                    "message": f'Quiz "{filename}" updated successfully',
-                    "backup_created": os.path.basename(backup_path),
-                }
-            )
-        except Exception as e:
-            logger.error(f"Error updating quiz: {e}")
-            return web.json_response({"error": str(e)}, status=500)
+        logger.info(f"Updated quiz: {filename}")
+        return web.json_response(
+            {
+                "success": True,
+                "message": f'Quiz "{filename}" updated successfully',
+                "backup_created": os.path.basename(backup_path),
+            }
+        )
 
     @admin_auth_required
     async def admin_delete_quiz(self, request):
@@ -2023,37 +1954,33 @@ class TestingServer:
         Returns:
             JSON response with success status and backup filename
         """
-        try:
-            filename = request.match_info["filename"]
-            quiz_path = os.path.join(self.quizzes_dir, filename)
+        filename = request.match_info["filename"]
+        quiz_path = os.path.join(self.quizzes_dir, filename)
 
-            if not os.path.exists(quiz_path):
-                return web.json_response({"error": "Quiz file not found"}, status=404)
+        if not os.path.exists(quiz_path):
+            return web.json_response({"error": "Quiz file not found"}, status=404)
 
-            # Don't allow deleting the current quiz
-            if self.current_quiz_file and os.path.basename(self.current_quiz_file) == filename:
-                return web.json_response({"error": "Cannot delete the currently active quiz"}, status=400)
+        # Don't allow deleting the current quiz
+        if self.current_quiz_file and os.path.basename(self.current_quiz_file) == filename:
+            return web.json_response({"error": "Cannot delete the currently active quiz"}, status=400)
 
-            # Create backup before deletion
-            backup_path = quiz_path + ".deleted_backup"
-            import shutil
+        # Create backup before deletion
+        backup_path = quiz_path + ".deleted_backup"
+        import shutil
 
-            shutil.copy2(quiz_path, backup_path)
+        shutil.copy2(quiz_path, backup_path)
 
-            # Delete the file
-            os.remove(quiz_path)
+        # Delete the file
+        os.remove(quiz_path)
 
-            logger.info(f"Deleted quiz: {filename} (backup: {backup_path})")
-            return web.json_response(
-                {
-                    "success": True,
-                    "message": f'Quiz "{filename}" deleted successfully',
-                    "backup_created": os.path.basename(backup_path),
-                }
-            )
-        except Exception as e:
-            logger.error(f"Error deleting quiz: {e}")
-            return web.json_response({"error": str(e)}, status=500)
+        logger.info(f"Deleted quiz: {filename} (backup: {backup_path})")
+        return web.json_response(
+            {
+                "success": True,
+                "message": f'Quiz "{filename}" deleted successfully',
+                "backup_created": os.path.basename(backup_path),
+            }
+        )
 
     @admin_auth_required
     async def admin_validate_quiz(self, request):
@@ -2065,31 +1992,27 @@ class TestingServer:
         Returns:
             JSON response with validation result and errors if any
         """
+        data = await request.json()
+        content = data.get("content", "").strip()
+
+        if not content:
+            return web.json_response({"valid": False, "errors": ["Content is empty"]})
+
         try:
-            data = await request.json()
-            content = data.get("content", "").strip()
+            import yaml
 
-            if not content:
-                return web.json_response({"valid": False, "errors": ["Content is empty"]})
+            parsed = yaml.safe_load(content)
 
-            try:
-                import yaml
+            # Validate structure
+            errors = []
+            if not self._validate_quiz_data(parsed, errors):
+                return web.json_response({"valid": False, "errors": errors})
 
-                parsed = yaml.safe_load(content)
-
-                # Validate structure
-                errors = []
-                if not self._validate_quiz_data(parsed, errors):
-                    return web.json_response({"valid": False, "errors": errors})
-
-                return web.json_response(
-                    {"valid": True, "parsed": parsed, "question_count": len(parsed.get("questions", []))}
-                )
-            except yaml.YAMLError as e:
-                return web.json_response({"valid": False, "errors": [f"YAML syntax error: {str(e)}"]})
-        except Exception as e:
-            logger.error(f"Error validating quiz: {e}")
-            return web.json_response({"error": str(e)}, status=500)
+            return web.json_response(
+                {"valid": True, "parsed": parsed, "question_count": len(parsed.get("questions", []))}
+            )
+        except yaml.YAMLError as e:
+            return web.json_response({"valid": False, "errors": [f"YAML syntax error: {str(e)}"]})
 
     def _validate_quiz_data(self, data, errors=None):
         """Validate quiz data structure.
@@ -2309,28 +2232,24 @@ class TestingServer:
         Returns:
             JSON response with list of image files and their paths
         """
-        try:
-            imgs_dir = os.path.join(self.quizzes_dir, "imgs")
-            if not os.path.exists(imgs_dir):
-                return web.json_response({"images": []})
+        imgs_dir = os.path.join(self.quizzes_dir, "imgs")
+        if not os.path.exists(imgs_dir):
+            return web.json_response({"images": []})
 
-            image_files = []
-            for filename in os.listdir(imgs_dir):
-                if filename.lower().endswith((".png", ".jpg", ".jpeg", ".gif", ".bmp", ".svg")):
-                    image_files.append(
-                        {
-                            "filename": filename,
-                            "path": f"/imgs/{filename}",
-                        }
-                    )
+        image_files = []
+        for filename in os.listdir(imgs_dir):
+            if filename.lower().endswith((".png", ".jpg", ".jpeg", ".gif", ".bmp", ".svg")):
+                image_files.append(
+                    {
+                        "filename": filename,
+                        "path": f"/imgs/{filename}",
+                    }
+                )
 
-            # Sort alphabetically by filename (case-insensitive)
-            image_files.sort(key=lambda x: x["filename"].lower())
+        # Sort alphabetically by filename (case-insensitive)
+        image_files.sort(key=lambda x: x["filename"].lower())
 
-            return web.json_response({"images": image_files})
-        except Exception as e:
-            logger.error(f"Error listing image files: {e}")
-            return web.json_response({"error": "Failed to list image files"}, status=500)
+        return web.json_response({"images": image_files})
 
     @admin_auth_required
     async def admin_download_quiz(self, request):
@@ -2432,10 +2351,6 @@ class TestingServer:
             logger.error(f"Validation error: {e}")
             return web.json_response({"error": str(e)}, status=400)
 
-        except Exception as e:
-            logger.error(f"Unexpected error downloading or extracting quiz: {e}", exc_info=True)
-            return web.json_response({"error": f"Failed to download or extract quiz: {str(e)}"}, status=500)
-
     @admin_auth_required
     async def admin_update_config(self, request):
         """Update server configuration file.
@@ -2448,48 +2363,39 @@ class TestingServer:
         Returns:
             JSON response with success status (requires server restart)
         """
+        data = await request.json()
+        content = data.get("content", "").strip()
+
+        # Get config file path (use the actual path that was loaded)
+        config_path = self.config.config_path
+        if not config_path:
+            return web.json_response(
+                {"error": "No config file was specified. Server started without --config parameter."}, status=400
+            )
+
+        # Validate YAML syntax
         try:
-            data = await request.json()
-            content = data.get("content", "").strip()
+            parsed_config = yaml.safe_load(content) if content else {}
+        except yaml.YAMLError as e:
+            return web.json_response({"error": f"Invalid YAML syntax: {str(e)}"}, status=400)
 
-            # Get config file path (use the actual path that was loaded)
-            config_path = self.config.config_path
-            if not config_path:
-                return web.json_response(
-                    {"error": "No config file was specified. Server started without --config parameter."}, status=400
-                )
+        # Validate config structure
+        errors = []
+        if not self._validate_config_data(parsed_config, errors):
+            return web.json_response({"error": "Configuration validation failed", "errors": errors}, status=400)
 
-            # Validate YAML syntax
-            try:
-                parsed_config = yaml.safe_load(content) if content else {}
-            except yaml.YAMLError as e:
-                return web.json_response({"error": f"Invalid YAML syntax: {str(e)}"}, status=400)
+        # Write to config file
+        async with aiofiles.open(config_path, "w", encoding="utf-8") as f:
+            await f.write(content if content else "")
 
-            # Validate config structure
-            errors = []
-            if not self._validate_config_data(parsed_config, errors):
-                return web.json_response({"error": "Configuration validation failed", "errors": errors}, status=400)
-
-            # Write to config file
-            try:
-                async with aiofiles.open(config_path, "w", encoding="utf-8") as f:
-                    await f.write(content if content else "")
-
-                logger.info(f"Configuration file updated: {config_path}")
-                return web.json_response(
-                    {
-                        "success": True,
-                        "message": "Configuration saved successfully. Restart server to apply changes.",
-                        "config_path": config_path,
-                    }
-                )
-            except Exception as e:
-                logger.error(f"Error writing config file: {e}")
-                return web.json_response({"error": f"Failed to write config file: {str(e)}"}, status=500)
-
-        except Exception as e:
-            logger.error(f"Error updating config: {e}")
-            return web.json_response({"error": str(e)}, status=500)
+        logger.info(f"Configuration file updated: {config_path}")
+        return web.json_response(
+            {
+                "success": True,
+                "message": "Configuration saved successfully. Restart server to apply changes.",
+                "config_path": config_path,
+            }
+        )
 
     @admin_auth_required
     async def tunnel_connect(self, request):
@@ -2501,22 +2407,17 @@ class TestingServer:
         Returns:
             JSON response with success status and URL or error
         """
-        try:
-            if not self.tunnel_manager:
-                return web.json_response({"error": "Tunnel not configured"}, status=400)
+        if not self.tunnel_manager:
+            return web.json_response({"error": "Tunnel not configured"}, status=400)
 
-            success, result = await self.tunnel_manager.connect()
+        success, result = await self.tunnel_manager.connect()
 
-            if success:
-                logger.info(f"Tunnel connected: {result}")
-                return web.json_response({"success": True, "url": result})
-            else:
-                logger.error(f"Tunnel connection failed: {result}")
-                return web.json_response({"error": result}, status=500)
-
-        except Exception as e:
-            logger.error(f"Error connecting tunnel: {e}")
-            return web.json_response({"error": str(e)}, status=500)
+        if success:
+            logger.info(f"Tunnel connected: {result}")
+            return web.json_response({"success": True, "url": result})
+        else:
+            logger.error(f"Tunnel connection failed: {result}")
+            return web.json_response({"error": result}, status=500)
 
     @admin_auth_required
     async def tunnel_disconnect(self, request):
@@ -2528,17 +2429,12 @@ class TestingServer:
         Returns:
             JSON response with success status
         """
-        try:
-            if not self.tunnel_manager:
-                return web.json_response({"error": "Tunnel not configured"}, status=400)
+        if not self.tunnel_manager:
+            return web.json_response({"error": "Tunnel not configured"}, status=400)
 
-            await self.tunnel_manager.disconnect()
-            logger.info("Tunnel disconnected")
-            return web.json_response({"success": True})
-
-        except Exception as e:
-            logger.error(f"Error disconnecting tunnel: {e}")
-            return web.json_response({"error": str(e)}, status=500)
+        await self.tunnel_manager.disconnect()
+        logger.info("Tunnel disconnected")
+        return web.json_response({"success": True})
 
     @local_network_only
     async def serve_files_page(self, request):
@@ -2549,37 +2445,33 @@ class TestingServer:
         Returns:
             HTML response with files management interface
         """
-        try:
-            template_content = self.templates.get("files.html", "")
+        template_content = self.templates.get("files.html", "")
 
-            # Check if client IP is trusted and inject auto-auth flag
-            client_ip = get_client_ip(request)
-            is_trusted_ip = client_ip in self.admin_config.trusted_ips if hasattr(self, "admin_config") else False
+        # Check if client IP is trusted and inject auto-auth flag
+        client_ip = get_client_ip(request)
+        is_trusted_ip = client_ip in self.admin_config.trusted_ips if hasattr(self, "admin_config") else False
 
-            # Read config file content (only if config file was provided)
-            config_path = self.config.config_path
-            config_content = ""
-            if config_path and os.path.exists(config_path):
-                try:
-                    with open(config_path, "r", encoding="utf-8") as f:
-                        config_content = f.read()
-                except Exception as e:
-                    logger.warning(f"Could not read config file: {e}")
+        # Read config file content (only if config file was provided)
+        config_path = self.config.config_path
+        config_content = ""
+        if config_path and os.path.exists(config_path):
+            try:
+                with open(config_path, "r", encoding="utf-8") as f:
+                    config_content = f.read()
+            except Exception as e:
+                logger.warning(f"Could not read config file: {e}")
 
-            # Inject JavaScript variables for trusted IP auto-auth and config
-            js_variables = f"""
-                const IS_TRUSTED_IP = {str(is_trusted_ip).lower()};
-                const CONFIG_CONTENT = {json.dumps(config_content) if config_path else 'null'};
-                const CONFIG_PATH = {json.dumps(config_path) if config_path else 'null'};
-            """
+        # Inject JavaScript variables for trusted IP auto-auth and config
+        js_variables = f"""
+            const IS_TRUSTED_IP = {str(is_trusted_ip).lower()};
+            const CONFIG_CONTENT = {json.dumps(config_content) if config_path else 'null'};
+            const CONFIG_PATH = {json.dumps(config_path) if config_path else 'null'};
+        """
 
-            # Inject the JavaScript variables before </head>
-            template_content = template_content.replace("</head>", f"<script>{js_variables}</script>\n    </head>")
+        # Inject the JavaScript variables before </head>
+        template_content = template_content.replace("</head>", f"<script>{js_variables}</script>\n    </head>")
 
-            return web.Response(text=template_content, content_type="text/html")
-        except Exception as e:
-            logger.error(f"Error serving files page: {e}")
-            return web.json_response({"error": "Failed to load files page"}, status=500)
+        return web.Response(text=template_content, content_type="text/html")
 
     def _list_files_in_directory(self, directory, file_type):
         """Helper to list files in a directory with metadata.
@@ -2712,32 +2604,27 @@ class TestingServer:
         Returns:
             File response with appropriate content-type and disposition headers
         """
-        try:
-            file_type = request.match_info["type"]
-            filename = request.match_info["filename"]
+        file_type = request.match_info["type"]
+        filename = request.match_info["filename"]
 
-            # Validate and get file path
-            file_path, error = self._get_file_path_and_validate(file_type, filename)
-            if error:
-                return error
+        # Validate and get file path
+        file_path, error = self._get_file_path_and_validate(file_type, filename)
+        if error:
+            return error
 
-            # Determine content type
-            if file_type == "csv":
-                content_type = "text/csv"
-            elif file_type == "quizzes":
-                content_type = "text/yaml"
-            else:
-                content_type = "text/plain"
+        # Determine content type
+        if file_type == "csv":
+            content_type = "text/csv"
+        elif file_type == "quizzes":
+            content_type = "text/yaml"
+        else:
+            content_type = "text/plain"
 
-            # Return file response with proper headers
-            return web.FileResponse(
-                file_path,
-                headers={"Content-Disposition": f'attachment; filename="{filename}"', "Content-Type": content_type},
-            )
-
-        except Exception as e:
-            logger.error(f"Error downloading file: {e}")
-            return web.json_response({"error": "Failed to download file"}, status=500)
+        # Return file response with proper headers
+        return web.FileResponse(
+            file_path,
+            headers={"Content-Disposition": f'attachment; filename="{filename}"', "Content-Type": content_type},
+        )
 
     @admin_auth_required
     async def files_save_quiz(self, request):
@@ -2749,63 +2636,53 @@ class TestingServer:
         Returns:
             JSON response with success status and backup filename
         """
+        filename = request.match_info["filename"]
+        data = await request.json()
+        content = data.get("content", "").strip()
+
+        if not content:
+            return web.json_response({"error": "Content is required"}, status=400)
+
+        # Validate filename
+        if not self._is_safe_filename(filename):
+            return web.json_response({"error": "Invalid filename"}, status=400)
+
+        quiz_path = os.path.join(self.quizzes_dir, filename)
+
+        if not os.path.exists(quiz_path):
+            return web.json_response({"error": "Quiz file not found"}, status=404)
+
+        # Validate YAML
         try:
-            filename = request.match_info["filename"]
-            data = await request.json()
-            content = data.get("content", "").strip()
+            parsed = yaml.safe_load(content)
+            errors = []
+            if not self._validate_quiz_data(parsed, errors):
+                return web.json_response({"error": "Неправильна структура даних квізу", "errors": errors}, status=400)
+        except yaml.YAMLError as e:
+            return web.json_response({"error": f"Неправильний YAML: {str(e)}"}, status=400)
 
-            if not content:
-                return web.json_response({"error": "Content is required"}, status=400)
+        # Create backup
+        backup_path = quiz_path + ".backup"
 
-            # Validate filename
-            if not self._is_safe_filename(filename):
-                return web.json_response({"error": "Invalid filename"}, status=400)
+        shutil.copy2(quiz_path, backup_path)
 
-            quiz_path = os.path.join(self.quizzes_dir, filename)
+        # Write the updated content
+        with open(quiz_path, "w", encoding="utf-8") as f:
+            f.write(content)
 
-            if not os.path.exists(quiz_path):
-                return web.json_response({"error": "Quiz file not found"}, status=404)
+        # If this is the currently active quiz, reload it
+        if filename == self.current_quiz_file:
+            logger.info(f"Reloading active quiz after edit: {filename}")
+            await self.load_questions()
 
-            # Validate YAML
-            try:
-                import yaml
-
-                parsed = yaml.safe_load(content)
-                errors = []
-                if not self._validate_quiz_data(parsed, errors):
-                    return web.json_response(
-                        {"error": "Неправильна структура даних квізу", "errors": errors}, status=400
-                    )
-            except yaml.YAMLError as e:
-                return web.json_response({"error": f"Неправильний YAML: {str(e)}"}, status=400)
-
-            # Create backup
-            backup_path = quiz_path + ".backup"
-            import shutil
-
-            shutil.copy2(quiz_path, backup_path)
-
-            # Write the updated content
-            with open(quiz_path, "w", encoding="utf-8") as f:
-                f.write(content)
-
-            # If this is the currently active quiz, reload it
-            if filename == self.current_quiz_file:
-                logger.info(f"Reloading active quiz after edit: {filename}")
-                await self.load_questions()
-
-            logger.info(f"Saved quiz file: {filename}")
-            return web.json_response(
-                {
-                    "success": True,
-                    "message": f'Quiz "{filename}" saved successfully (backup created)',
-                    "backup": backup_path,
-                }
-            )
-
-        except Exception as e:
-            logger.error(f"Error saving quiz file: {e}")
-            return web.json_response({"error": str(e)}, status=500)
+        logger.info(f"Saved quiz file: {filename}")
+        return web.json_response(
+            {
+                "success": True,
+                "message": f'Quiz "{filename}" saved successfully (backup created)',
+                "backup": backup_path,
+            }
+        )
 
     def _is_safe_filename(self, filename):
         """Check if filename is safe (no path traversal attempts).
@@ -2857,65 +2734,61 @@ class TestingServer:
         Returns:
             HTML response with admin interface
         """
-        try:
-            template_content = self.templates.get("admin.html", "")
+        template_content = self.templates.get("admin.html", "")
 
-            # Check if client IP is trusted and inject auto-auth flag
-            client_ip = get_client_ip(request)
-            is_trusted_ip = client_ip in self.admin_config.trusted_ips if hasattr(self, "admin_config") else False
+        # Check if client IP is trusted and inject auto-auth flag
+        client_ip = get_client_ip(request)
+        is_trusted_ip = client_ip in self.admin_config.trusted_ips if hasattr(self, "admin_config") else False
 
-            # Get network information (external interfaces only)
-            interfaces = get_network_interfaces()  # This already excludes localhost
-            port = self.config.server.port
+        # Get network information (external interfaces only)
+        interfaces = get_network_interfaces()  # This already excludes localhost
+        port = self.config.server.port
 
-            # Generate URLs for external network interfaces only
-            urls = []
-            for ip in interfaces:
-                urls.append({"label": f"Network Access ({ip})", "quiz_url": f"http://{ip}:{port}/"})
+        # Generate URLs for external network interfaces only
+        urls = []
+        for ip in interfaces:
+            urls.append({"label": f"Network Access ({ip})", "quiz_url": f"http://{ip}:{port}/"})
 
-            # Prepare network info for JavaScript (only what's actually used)
-            network_info = {"urls": urls}
+        # Prepare network info for JavaScript (only what's actually used)
+        network_info = {"urls": urls}
 
-            # Get downloadable quizzes configuration
-            downloadable_quizzes = []
-            if hasattr(self.config, "quizzes") and self.config.quizzes and self.config.quizzes.quizzes:
-                for quiz in self.config.quizzes.quizzes:
-                    downloadable_quizzes.append(
-                        {"name": quiz.name, "download_path": quiz.download_path, "folder": quiz.folder}
-                    )
+        # Get downloadable quizzes configuration
+        downloadable_quizzes = []
+        if hasattr(self.config, "quizzes") and self.config.quizzes and self.config.quizzes.quizzes:
+            for quiz in self.config.quizzes.quizzes:
+                downloadable_quizzes.append(
+                    {"name": quiz.name, "download_path": quiz.download_path, "folder": quiz.folder}
+                )
 
-            # Read SSH public key if tunnel is configured
-            tunnel_public_key = ""
-            if self.tunnel_manager and self.tunnel_manager.config and self.tunnel_manager.config.public_key:
-                try:
-                    public_key_path = self.tunnel_manager.config.public_key
+        # Read SSH public key if tunnel is configured
+        tunnel_public_key = ""
+        if self.tunnel_manager and self.tunnel_manager.config and self.tunnel_manager.config.public_key:
+            try:
+                public_key_path = self.tunnel_manager.config.public_key
 
-                    # Resolve path relative to binary directory if needed
-                    if not os.path.isabs(public_key_path):
-                        binary_dir = os.environ.get("WEBQUIZ_BINARY_DIR")
-                        if binary_dir:
-                            public_key_path = os.path.join(binary_dir, public_key_path)
+                # Resolve path relative to binary directory if needed
+                if not os.path.isabs(public_key_path):
+                    binary_dir = os.environ.get("WEBQUIZ_BINARY_DIR")
+                    if binary_dir:
+                        public_key_path = os.path.join(binary_dir, public_key_path)
 
-                    if os.path.exists(public_key_path):
-                        with open(public_key_path, "r") as f:
-                            tunnel_public_key = f.read().strip()
-                except Exception as e:
-                    logger.error(f"Error reading tunnel public key: {e}")
+                if os.path.exists(public_key_path):
+                    with open(public_key_path, "r") as f:
+                        tunnel_public_key = f.read().strip()
+            except Exception as e:
+                logger.error(f"Error reading tunnel public key: {e}")
 
-            # Inject trusted IP status, network info, downloadable quizzes, and version into the template
-            server_data_script = f"""
-        const IS_TRUSTED_IP = {str(is_trusted_ip).lower()};
-        const NETWORK_INFO = {json.dumps(network_info)};
-        const DOWNLOADABLE_QUIZZES = {json.dumps(downloadable_quizzes)};
-        const WEBQUIZ_VERSION = {json.dumps(package_version)};
-        const TUNNEL_PUBLIC_KEY = {json.dumps(tunnel_public_key)};"""
+        # Inject trusted IP status, network info, downloadable quizzes, and version into the template
+        server_data_script = f"""
+    const IS_TRUSTED_IP = {str(is_trusted_ip).lower()};
+    const NETWORK_INFO = {json.dumps(network_info)};
+    const DOWNLOADABLE_QUIZZES = {json.dumps(downloadable_quizzes)};
+    const WEBQUIZ_VERSION = {json.dumps(package_version)};
+    const TUNNEL_PUBLIC_KEY = {json.dumps(tunnel_public_key)};"""
 
-            template_content = template_content.replace("<script>", f"<script>{server_data_script}\n")
+        template_content = template_content.replace("<script>", f"<script>{server_data_script}\n")
 
-            return web.Response(text=template_content, content_type="text/html")
-        except Exception as e:
-            logger.error(f"Error serving admin page: {e}")
-            return web.Response(text="<h1>Admin page not found</h1>", content_type="text/html", status=404)
+        return web.Response(text=template_content, content_type="text/html")
 
     @local_network_only
     async def serve_live_stats_page(self, request):
