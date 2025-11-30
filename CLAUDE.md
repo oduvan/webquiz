@@ -17,7 +17,7 @@ WebQuiz - Python/aiohttp quiz system with multi-quiz management, real-time WebSo
 - **Backend**: aiohttp + middleware + WebSocket
 - **Frontend**: Vanilla HTML/JS (mobile-responsive @media ≤768px)
 - **Storage**: In-memory → CSV (5s flush), YAML configs, quiz state resets on switch
-- **Auth**: Master key decorator for admin endpoints with automatic local network restriction
+- **Auth**: Session cookies for admin (master key at login), automatic local network restriction
 - **Testing**: Integration + unit test
 
 ## Key Files
@@ -91,7 +91,7 @@ webquiz-stress-test -c 50
 - **6 digits user ID** stored by user_id as key
 - **Server-side timing** for accuracy (starts on admin approval if required)
 - **Multi-file quiz system** in `quizzes/` dir, auto-created if missing
-- **Master key decorator** for admin authentication with built-in local network restriction
+- **Session-based admin auth** - Master key validates once via `/api/admin/auth`, returns session cookie for subsequent requests
 - **Config validation** with comprehensive structure/type checks before save
 - **Smart CSV naming** with quiz prefix + unique suffixes (no overwrites)
 - **Quiz state reset** on switch for complete isolation

@@ -232,11 +232,11 @@ def get_network_interfaces():
 
 
 def admin_auth_required(func):
-    """Decorator to require master key authentication for admin endpoints.
+    """Decorator to require session cookie authentication for admin endpoints.
 
     Restricts access to local/private networks only.
     Bypasses authentication for requests from trusted IPs.
-    Checks for valid session cookie, master key in X-Master-Key header, or request body.
+    Requires valid session cookie (obtained via /api/admin/auth).
 
     Args:
         func: Async function to wrap
@@ -263,31 +263,16 @@ def admin_auth_required(func):
         if hasattr(self, "admin_config") and client_ip in self.admin_config.trusted_ips:
             return await func(self, request)
 
-        # Check if master key is provided
+        # Check if master key is configured
         if not self.master_key:
             return web.json_response({"error": "Admin functionality disabled - no master key set"}, status=403)
 
-        # Check for valid session cookie first
+        # Check for valid session cookie
         session_token = request.cookies.get("admin_session")
         if session_token and hasattr(self, "admin_sessions") and session_token in self.admin_sessions:
-            # Valid session found - allow access
             return await func(self, request)
 
-        # Get master key from request (header or body)
-        provided_key = request.headers.get("X-Master-Key")
-        if not provided_key:
-            try:
-                data = await request.json()
-                provided_key = data.get("master_key")
-            except (json.JSONDecodeError, UnicodeDecodeError) as e:
-                logger.warning(f"Failed to parse admin auth request body as JSON: {e}")
-            except Exception as e:
-                logger.exception(f"Unexpected error reading admin auth request body: {e}")
-
-        if not provided_key or provided_key != self.master_key:
-            return web.json_response({"error": "Недійсний або відсутній головний ключ"}, status=401)
-
-        return await func(self, request)
+        return web.json_response({"error": "Недійсний або відсутній сеанс"}, status=401)
 
     return wrapper
 
@@ -1723,16 +1708,40 @@ class TestingServer:
             }
         )
 
-    @admin_auth_required
-    async def admin_auth_test(self, request):
-        """Test admin authentication and create session.
+    @local_network_only
+    async def admin_auth(self, request):
+        """Authenticate admin with master key and create session.
 
-        Creates a new session token on successful authentication
-        and sets it as a cookie for subsequent requests.
+        Validates master key from X-Master-Key header or request body,
+        creates a new session token, and sets it as a cookie.
+        Trusted IPs bypass master key validation.
 
         Returns:
             JSON response confirming authentication succeeded with session cookie
         """
+        # Check if it's in trusted list (bypass master key validation)
+        client_ip = get_client_ip(request)
+        is_trusted = hasattr(self, "admin_config") and client_ip in self.admin_config.trusted_ips
+
+        if not is_trusted:
+            # Check if master key is configured
+            if not self.master_key:
+                return web.json_response({"error": "Admin functionality disabled - no master key set"}, status=403)
+
+            # Get master key from request (header or body)
+            provided_key = request.headers.get("X-Master-Key")
+            if not provided_key:
+                try:
+                    data = await request.json()
+                    provided_key = data.get("master_key")
+                except (json.JSONDecodeError, UnicodeDecodeError):
+                    pass
+                except Exception as e:
+                    logger.exception(f"Unexpected error reading admin auth request body: {e}")
+
+            if not provided_key or provided_key != self.master_key:
+                return web.json_response({"error": "Недійсний або відсутній головний ключ"}, status=401)
+
         # Generate a new session token
         session_token = secrets.token_urlsafe(32)
         self.admin_sessions[session_token] = datetime.now()
@@ -3024,7 +3033,7 @@ async def create_app(config: WebQuizConfig):
 
     # Admin routes
     app.router.add_get("/admin/", server.serve_admin_page)
-    app.router.add_post("/api/admin/auth", server.admin_auth_test)
+    app.router.add_post("/api/admin/auth", server.admin_auth)
     app.router.add_get("/api/admin/check-session", server.admin_check_session)
     app.router.add_put("/api/admin/approve-user", server.admin_approve_user)
     app.router.add_get("/api/admin/list-quizzes", server.admin_list_quizzes)

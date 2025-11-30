@@ -40,8 +40,14 @@ def test_admin_auth_endpoint_with_invalid_key():
 def test_admin_list_quizzes_endpoint():
     """Test listing available quizzes via admin API."""
     with custom_webquiz_server() as (proc, port):
+        # First authenticate to get session cookie
         headers = {"X-Master-Key": "test123"}
-        response = requests.get(f"http://localhost:{port}/api/admin/list-quizzes", headers=headers)
+        auth_response = requests.post(f"http://localhost:{port}/api/admin/auth", headers=headers)
+        assert auth_response.status_code == 200
+        cookies = auth_response.cookies
+
+        # Use session cookie to access admin endpoint
+        response = requests.get(f"http://localhost:{port}/api/admin/list-quizzes", cookies=cookies)
 
         assert response.status_code == 200
         data = response.json()
@@ -63,16 +69,20 @@ def test_admin_list_quizzes_without_auth():
 def test_admin_switch_quiz_endpoint():
     """Test switching quiz via admin API."""
     with custom_webquiz_server() as (proc, port):
+        # First authenticate to get session cookie
         headers = {"X-Master-Key": "test123"}
+        auth_response = requests.post(f"http://localhost:{port}/api/admin/auth", headers=headers)
+        assert auth_response.status_code == 200
+        cookies = auth_response.cookies
 
         # First get current quiz list
-        list_response = requests.get(f"http://localhost:{port}/api/admin/list-quizzes", headers=headers)
+        list_response = requests.get(f"http://localhost:{port}/api/admin/list-quizzes", cookies=cookies)
         assert list_response.status_code == 200
         _ = list_response.json()["quizzes"]
 
         # Switch to test_quiz.yaml
         switch_data = {"quiz_filename": "test_quiz.yaml"}
-        response = requests.post(f"http://localhost:{port}/api/admin/switch-quiz", headers=headers, json=switch_data)
+        response = requests.post(f"http://localhost:{port}/api/admin/switch-quiz", cookies=cookies, json=switch_data)
 
         assert response.status_code == 200
         data = response.json()
@@ -83,10 +93,14 @@ def test_admin_switch_quiz_endpoint():
 def test_admin_switch_quiz_nonexistent_file():
     """Test switching to non-existent quiz file."""
     with custom_webquiz_server() as (proc, port):
+        # First authenticate to get session cookie
         headers = {"X-Master-Key": "test123"}
-        switch_data = {"quiz_filename": "nonexistent.yaml"}
+        auth_response = requests.post(f"http://localhost:{port}/api/admin/auth", headers=headers)
+        assert auth_response.status_code == 200
+        cookies = auth_response.cookies
 
-        response = requests.post(f"http://localhost:{port}/api/admin/switch-quiz", headers=headers, json=switch_data)
+        switch_data = {"quiz_filename": "nonexistent.yaml"}
+        response = requests.post(f"http://localhost:{port}/api/admin/switch-quiz", cookies=cookies, json=switch_data)
 
         assert response.status_code == 500
         data = response.json()
@@ -132,15 +146,16 @@ def test_trusted_ip_bypass_authentication():
     config = {"admin": {"trusted_ips": ["127.0.0.1"]}}
 
     with custom_webquiz_server(config=config) as (proc, port):
-        # Access admin endpoint from localhost (trusted IP) without providing master key
-        response = requests.post(f"http://localhost:{port}/api/admin/auth")
-        assert response.status_code == 200  # Should succeed without master key
-        data = response.json()
+        # Access admin auth from localhost (trusted IP) without providing master key
+        auth_response = requests.post(f"http://localhost:{port}/api/admin/auth")
+        assert auth_response.status_code == 200  # Should succeed without master key
+        data = auth_response.json()
         assert data["authenticated"] is True
+        cookies = auth_response.cookies
 
-        # Test another admin endpoint
-        response = requests.get(f"http://localhost:{port}/api/admin/list-quizzes")
-        assert response.status_code == 200  # Should also succeed without master key
+        # Test another admin endpoint with session cookie
+        response = requests.get(f"http://localhost:{port}/api/admin/list-quizzes", cookies=cookies)
+        assert response.status_code == 200
         data = response.json()
         assert "quizzes" in data
 
