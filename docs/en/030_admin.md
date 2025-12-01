@@ -102,5 +102,16 @@ At the bottom of each admin interface page, there are convenient links:
 
 ---
 
+### Package Version Check
+
+The admin panel automatically checks if the WebQuiz package has been updated while the server is running.
+If a new version is detected (for example, after updating via `pip install --upgrade webquiz`), a notification will appear at the bottom of the panel:
+
+- **"New version installed (vX.Y)" + "Restart Required"** — means a new version of the package has been installed, but the server is still running the old version.
+
+To apply the update, you need to restart the WebQuiz server.
+
+---
+
 This panel provides a complete **WebQuiz** management cycle — from creating quizzes and approving users to monitoring results and downloading reports.
 It is designed for local operation, so all information remains on your network without being transmitted to the internet.

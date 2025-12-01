@@ -67,6 +67,34 @@ def get_package_version() -> str:
         return "unknown"
 
 
+def get_file_version() -> str:
+    """Read the webquiz package version directly from the __init__.py file.
+
+    This evaluates the file to extract the __version__ variable, detecting if
+    the package was updated while the server is running.
+
+    Returns:
+        Package version string from file or "unknown" if cannot be read
+    """
+    try:
+        import importlib.resources as pkg_resources
+
+        # Get the path to the webquiz package's __init__.py
+        init_file = pkg_resources.files("webquiz") / "__init__.py"
+        content = init_file.read_text(encoding="utf-8")
+
+        # Execute the file content to extract __version__
+        namespace = {}
+        exec(content, namespace)
+
+        if "__version__" in namespace:
+            return namespace["__version__"]
+        return "unknown"
+    except Exception as e:
+        logger.debug(f"Failed to read version from file: {e}")
+        return "unknown"
+
+
 def ensure_directory_exists(path: str) -> str:
     """Create directory if it doesn't exist and return the path.
 
@@ -1801,6 +1829,31 @@ class TestingServer:
 
         return web.json_response({"valid": True, "message": "Session is valid"})
 
+    @local_network_only
+    async def admin_version_check(self, request):
+        """Check if a newer package version is available on disk.
+
+        Compares the in-memory package version with the version from the
+        __init__.py file to detect if the package was updated while running.
+
+        Returns:
+            JSON response with version info and restart_required flag
+        """
+        running_version = get_package_version()
+        file_version = get_file_version()
+
+        restart_required = (
+            running_version != "unknown"
+            and file_version != "unknown"
+            and running_version != file_version
+        )
+
+        return web.json_response({
+            "running_version": running_version,
+            "file_version": file_version,
+            "restart_required": restart_required
+        })
+
     @admin_auth_required
     async def admin_approve_user(self, request):
         """Approve a user for testing.
@@ -3060,6 +3113,7 @@ async def create_app(config: WebQuizConfig):
     app.router.add_get("/admin/", server.serve_admin_page)
     app.router.add_post("/api/admin/auth", server.admin_auth)
     app.router.add_get("/api/admin/check-session", server.admin_check_session)
+    app.router.add_get("/api/admin/version-check", server.admin_version_check)
     app.router.add_put("/api/admin/approve-user", server.admin_approve_user)
     app.router.add_get("/api/admin/list-quizzes", server.admin_list_quizzes)
     app.router.add_post("/api/admin/switch-quiz", server.admin_switch_quiz)

@@ -717,6 +717,31 @@
         .footer-update.hidden {
             display: none;
         }
+
+        .footer-restart {
+            background: var(--error-bg);
+            border: 1px solid var(--error-border);
+            color: var(--error-color);
+            padding: 10px 15px;
+            border-radius: 5px;
+            margin-top: 10px;
+            display: inline-block;
+        }
+
+        .footer-restart.hidden {
+            display: none;
+        }
+
+        .footer-restart button {
+            background: var(--danger-red);
+            color: var(--white);
+            border: none;
+            padding: 5px 15px;
+            border-radius: 3px;
+            cursor: default;
+            margin-left: 10px;
+            font-size: 14px;
+        }
     </style>
 </head>
 <body>
@@ -821,6 +846,10 @@
                     <span id="footer-docs-link" style="margin-left: 15px;"></span>
                 </div>
                 <div id="footer-update" class="footer-update hidden"></div>
+                <div id="footer-restart" class="footer-restart hidden">
+                    New version installed (v<span id="new-version-number"></span>)
+                    <button disabled>Restart Required</button>
+                </div>
             </div>
         </div>
 
@@ -2326,6 +2355,33 @@
                 return;
             }
         }
+
+        // Package version check (file vs memory)
+        async function checkPackageVersionMismatch() {
+            try {
+                const response = await fetch('/api/admin/version-check');
+                if (!response.ok) {
+                    return;
+                }
+
+                const data = await response.json();
+                if (data.restart_required) {
+                    const restartElement = document.getElementById('footer-restart');
+                    const newVersionSpan = document.getElementById('new-version-number');
+                    newVersionSpan.textContent = data.file_version;
+                    restartElement.classList.remove('hidden');
+                }
+            } catch (error) {
+                // Silently fail
+                return;
+            }
+        }
+
+        // Periodically check for package version mismatch (every 30 seconds)
+        setInterval(checkPackageVersionMismatch, 30000);
+
+        // Initial check after page load
+        setTimeout(checkPackageVersionMismatch, 2000);
 
         // Tunnel Management Functions
         function updateTunnelUI(tunnelData) {
