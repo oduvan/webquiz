@@ -766,6 +766,12 @@ class TestingServer:
             # Include optional image attribute if present
             if "image" in q and q["image"]:
                 client_question["image"] = q["image"]
+            # Include optional file attribute if present (prepend /files/ if not already there)
+            if "file" in q and q["file"]:
+                file_path = q["file"]
+                if not file_path.startswith("/files/"):
+                    file_path = f"/files/{file_path}"
+                client_question["file"] = file_path
             # Include min_correct for multiple choice questions
             if isinstance(q["correct_answer"], list):
                 client_question["min_correct"] = q.get("min_correct", len(q["correct_answer"]))
@@ -1401,9 +1407,15 @@ class TestingServer:
         if user_id not in self.user_answers:
             self.user_answers[user_id] = []
 
+        # Normalize file path for results (prepend /files/ if needed)
+        file_value = question.get("file")
+        if file_value and not file_value.startswith("/files/"):
+            file_value = f"/files/{file_value}"
+
         answer_data = {
             "question": question.get("question", ""),  # Handle image-only questions
             "image": question.get("image"),
+            "file": file_value,
             "selected_answer": self._format_answer_text(selected_answer, question["options"]),
             "correct_answer": self._format_answer_text(question["correct_answer"], question["options"]),
             "is_correct": is_correct,
@@ -2384,6 +2396,70 @@ class TestingServer:
         return web.json_response({"images": image_files})
 
     @admin_auth_required
+    async def admin_list_files(self, request):
+        """List all files in quizzes/files directory.
+
+        Returns:
+            JSON response with list of files (filename, path, size)
+        """
+        files_dir = os.path.join(self.quizzes_dir, "files")
+        if not os.path.exists(files_dir):
+            return web.json_response({"files": []})
+
+        file_list = []
+        for filename in os.listdir(files_dir):
+            file_path = os.path.join(files_dir, filename)
+            if os.path.isfile(file_path):
+                file_size = os.path.getsize(file_path)
+                file_list.append(
+                    {
+                        "filename": filename,
+                        "path": f"/files/{filename}",
+                        "size": file_size,
+                    }
+                )
+
+        # Sort alphabetically by filename (case-insensitive)
+        file_list.sort(key=lambda x: x["filename"].lower())
+
+        return web.json_response({"files": file_list})
+
+    async def serve_quiz_file(self, request):
+        """Serve quiz file for download.
+
+        Serves files from quizzes/files directory with Content-Disposition: attachment
+        to force browser download.
+
+        Args:
+            request: aiohttp request with filename in path
+
+        Returns:
+            File response with attachment disposition header
+        """
+        filename = request.match_info["filename"]
+
+        # Validate filename (prevent path traversal)
+        if not self._is_safe_filename(filename):
+            return web.json_response({"error": "Invalid filename"}, status=400)
+
+        files_dir = os.path.join(self.quizzes_dir, "files")
+        file_path = os.path.join(files_dir, filename)
+
+        # Check if file exists
+        if not os.path.exists(file_path):
+            return web.json_response({"error": "File not found"}, status=404)
+
+        # Check if it's actually a file (not directory)
+        if not os.path.isfile(file_path):
+            return web.json_response({"error": "Not a file"}, status=400)
+
+        # Return file response with attachment disposition to force download
+        return web.FileResponse(
+            file_path,
+            headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+        )
+
+    @admin_auth_required
     async def admin_download_quiz(self, request):
         """Download and extract quiz from ZIP file.
 
@@ -3123,6 +3199,7 @@ async def create_app(config: WebQuizConfig):
     app.router.add_delete("/api/admin/quiz/{filename}", server.admin_delete_quiz)
     app.router.add_post("/api/admin/validate-quiz", server.admin_validate_quiz)
     app.router.add_get("/api/admin/list-images", server.admin_list_images)
+    app.router.add_get("/api/admin/list-files", server.admin_list_files)
     app.router.add_post("/api/admin/download-quiz", server.admin_download_quiz)
     app.router.add_put("/api/admin/config", server.admin_update_config)
 
@@ -3134,6 +3211,8 @@ async def create_app(config: WebQuizConfig):
 
     # File management routes (admin access)
     app.router.add_get("/files/", server.serve_files_page)
+    # Quiz file download route (must be after /files/ to avoid conflict)
+    app.router.add_get("/files/{filename}", server.serve_quiz_file)
     app.router.add_get("/api/files/list", server.files_list)
     app.router.add_get("/api/files/{type}/view/{filename}", server.files_view)
     app.router.add_get("/api/files/{type}/download/{filename}", server.files_download)
@@ -3146,8 +3225,9 @@ async def create_app(config: WebQuizConfig):
     # Serve index.html at root path
     app.router.add_get("/", server.serve_index_page)
 
-    # Ensure imgs directory exists before serving static files
+    # Ensure imgs and files directories exist
     ensure_directory_exists(os.path.join(config.paths.quizzes_dir, "imgs"))
+    ensure_directory_exists(os.path.join(config.paths.quizzes_dir, "files"))
     app.router.add_static(
         "/imgs/",
         path=os.path.join(config.paths.quizzes_dir, "imgs"),

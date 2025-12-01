@@ -220,6 +220,37 @@ You can combine an image in the question with text answer options:
 
 ---
 
+#### Question with Downloadable File
+
+You can add a downloadable file to a question using the **`file`** parameter.
+Files should be stored in the **`quizzes/files/`** folder.
+
+```
+- question: "Analyze the data from the file and find the average"
+  file: "data.xlsx"
+  options: ["42", "56", "78", "91"]
+  correct_answer: 1
+```
+
+Students will see a download button next to the question text.
+Clicking it will automatically download the file to the student's device.
+
+---
+
+#### Combined Question: Image + File
+
+You can combine an image and a file in the same question:
+
+```
+- question: "Compare the diagram with the data in the file"
+  image: "/imgs/diagram.png"
+  file: "analysis.csv"
+  options: ["Data matches", "Data differs", "Insufficient data"]
+  correct_answer: 0
+```
+
+---
+
 ### Complete Test File Example
 
 Below is an example of a complete test file with different types of questions:
@@ -265,6 +296,12 @@ questions:
       - "/imgs/flag_poland.png"
       - "/imgs/flag_ukraine.png"
       - "/imgs/flag_russia.png"
+    correct_answer: 1
+
+  # Question with downloadable file
+  - question: "Analyze the data from the spreadsheet"
+    file: "sales_data.xlsx"
+    options: ["Growth 15%", "Growth 25%", "Decline 10%"]
     correct_answer: 1
 ```
 

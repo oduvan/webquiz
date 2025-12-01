@@ -301,6 +301,11 @@
             -webkit-box-orient: vertical;
         }
 
+        .file-indicator {
+            margin-left: 4px;
+            cursor: help;
+        }
+
         @media (max-width: 768px) {
             body {
                 padding: 10px;
@@ -797,6 +802,9 @@
                     const questionStats = this.questionStatistics[questionId] || { correct_count: 0, total_attempts: 0 };
                     const statsText = `${questionStats.correct_count}/${questionStats.total_attempts}`;
 
+                    // Build file indicator if question has a file attachment
+                    const fileIndicator = question.file ? `<span class="file-indicator" title="${question.file.split('/').pop()}">📎</span>` : '';
+
                     if (question.image && !question.question) {
                         // Image-only question: show filename and small image
                         const imagePath = question.image;
@@ -804,7 +812,7 @@
                         headerHtml += `<th title="${filename} - Correct: ${statsText}">
                             <div class="image-header">
                                 <img src="${imagePath}" alt="${filename}" class="header-image">
-                                <div class="image-filename">${filename}</div>
+                                <div class="image-filename">${filename}${fileIndicator}</div>
                                 <div class="question-stats">${statsText}</div>
                             </div>
                         </th>`;
@@ -813,7 +821,7 @@
                         const questionText = question.question || `Q${i + 1}`;
                         headerHtml += `<th title="${questionText} - Correct: ${statsText}">
                             <div class="question-header">
-                                <div class="question-text">${questionText}</div>
+                                <div class="question-text">${questionText}${fileIndicator}</div>
                                 <div class="question-stats">${statsText}</div>
                             </div>
                         </th>`;

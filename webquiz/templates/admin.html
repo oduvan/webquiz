@@ -499,6 +499,53 @@
             width: 90%;
         }
 
+        /* File picker styles */
+        .file-list {
+            padding: 15px;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+
+        .file-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 12px 15px;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            margin-bottom: 8px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            background: var(--container-bg);
+        }
+
+        .file-item:hover {
+            border-color: var(--button-bg);
+            background: var(--stats-bg);
+        }
+
+        .file-item-info {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .file-item-icon {
+            font-size: 20px;
+        }
+
+        .file-item-name {
+            font-size: 14px;
+            color: var(--text-color);
+            word-break: break-word;
+        }
+
+        .file-item-size {
+            font-size: 12px;
+            color: var(--text-muted);
+            white-space: nowrap;
+        }
+
         /* Quiz Editor Form Styles */
         .question-text, .question-image, .option-text {
             width: 100%;
@@ -933,6 +980,22 @@
         <img id="fullscreen-image" src="" alt="Full size preview">
     </div>
 
+    <!-- File Picker Modal -->
+    <div id="file-picker-modal" class="modal">
+        <div class="modal-content" style="max-width: 600px;">
+            <div class="modal-header">
+                <h2>📎 Вибрати Файл</h2>
+                <span class="close" onclick="closeFilePicker()">&times;</span>
+            </div>
+
+            <div id="file-picker-content">
+                <div id="file-list" class="file-list">
+                    Завантаження файлів...
+                </div>
+            </div>
+        </div>
+    </div>
+
     <script>
         let currentMasterKey = '';
         let selectedQuiz = '';
@@ -1330,6 +1393,13 @@
                     </div>
                 </div>
                 <div class="form-group">
+                    <label>Файл для Завантаження (необов'язково):</label>
+                    <div style="display: flex; align-items: center; gap: 5px;">
+                        <input type="text" class="question-file" placeholder="напр., data.xlsx" style="width: 100%;">
+                        <button type="button" onclick="openFilePicker(${questionCounter})" style="padding: 5px 8px; font-size: 16px;" title="Select file">📎</button>
+                    </div>
+                </div>
+                <div class="form-group">
                     <label>Тип Питання:</label>
                     <div style="margin: 10px 0;">
                         <button type="button" class="question-type-toggle active" data-type="single" onclick="toggleQuestionType(${questionCounter}, 'single')">📝 Одна правильна відповідь</button>
@@ -1641,6 +1711,13 @@
                             </div>
                         </div>
                         <div class="form-group">
+                            <label>Файл для Завантаження (необов'язково):</label>
+                            <div style="display: flex; align-items: center; gap: 5px;">
+                                <input type="text" class="question-file" value="${escapeHtml(question.file || '')}" placeholder="напр., data.xlsx" style="width: 100%;">
+                                <button type="button" onclick="openFilePicker(${questionCounter})" style="padding: 5px 8px; font-size: 16px;" title="Select file">📎</button>
+                            </div>
+                        </div>
+                        <div class="form-group">
                             <label>Тип Питання:</label>
                             <div style="margin: 10px 0;">
                                 <button type="button" class="question-type-toggle ${!isMultipleChoice ? 'active' : ''}" data-type="single" onclick="toggleQuestionType(${questionCounter}, 'single')">📝 Одна правильна відповідь</button>
@@ -1674,6 +1751,7 @@
             questionDivs.forEach((div, index) => {
                 const questionText = div.querySelector('.question-text').value.trim();
                 const questionImage = div.querySelector('.question-image').value.trim();
+                const questionFile = div.querySelector('.question-file').value.trim();
                 const options = Array.from(div.querySelectorAll('.option-text')).map(input => input.value.trim());
 
                 // Either question text OR image must be provided
@@ -1722,6 +1800,11 @@
                     // Include image if provided
                     if (questionImage) {
                         questionData.image = questionImage;
+                    }
+
+                    // Include file if provided
+                    if (questionFile) {
+                        questionData.file = questionFile;
                     }
 
                     questions.push(questionData);
@@ -1921,6 +2004,98 @@
         function closeImagePicker() {
             document.getElementById('image-picker-modal').style.display = 'none';
             currentImageTarget = null;
+        }
+
+        // File picker functionality
+        let currentFileQuestionId = null;
+
+        async function openFilePicker(questionId) {
+            try {
+                currentFileQuestionId = questionId;
+
+                // Load files from server
+                const response = await fetch('/api/admin/list-files', {
+                    credentials: 'same-origin'
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    displayFileList(data.files);
+                    document.getElementById('file-picker-modal').style.display = 'block';
+                } else {
+                    showMessage(data.error || 'Не вдалося завантажити файли', 'error');
+                }
+            } catch (error) {
+                showMessage('Помилка завантаження файлів: ' + error.message, 'error');
+            }
+        }
+
+        function formatFileSize(bytes) {
+            if (bytes === 0) return '0 B';
+            const k = 1024;
+            const sizes = ['B', 'KB', 'MB', 'GB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
+        }
+
+        function displayFileList(files) {
+            const listContainer = document.getElementById('file-list');
+
+            if (!files || files.length === 0) {
+                listContainer.innerHTML = `
+                    <div style="text-align: center; padding: 40px; color: var(--text-muted);">
+                        <p>Файли не знайдені в директорії quizzes/files</p>
+                        <small>Додайте файли до директорії quizzes/files, щоб побачити їх тут</small>
+                    </div>
+                `;
+                return;
+            }
+
+            let listHtml = '';
+            files.forEach(file => {
+                listHtml += `
+                    <div class="file-item" onclick="selectFile('${file.path}')" title="${file.filename}">
+                        <div class="file-item-info">
+                            <span class="file-item-icon">📄</span>
+                            <span class="file-item-name">${file.filename}</span>
+                        </div>
+                        <span class="file-item-size">${formatFileSize(file.size)}</span>
+                    </div>
+                `;
+            });
+
+            listContainer.innerHTML = listHtml;
+        }
+
+        function selectFile(filePath) {
+            if (currentFileQuestionId === null) {
+                showMessage('Питання не вибрано', 'error');
+                return;
+            }
+
+            // Extract just the filename from the path (remove /files/ prefix)
+            const filename = filePath.replace(/^\/files\//, '');
+
+            // Find the question div by question ID
+            const questionDiv = document.querySelector(`[data-question-id="${currentFileQuestionId}"]`);
+            if (questionDiv) {
+                const fileInput = questionDiv.querySelector('.question-file');
+                if (fileInput) {
+                    fileInput.value = filename;
+                    closeFilePicker();
+                    showMessage(`Файл вибрано: ${filename}`, 'success');
+                } else {
+                    showMessage('Поле вводу файлу не знайдено', 'error');
+                }
+            } else {
+                showMessage('Питання не знайдено', 'error');
+            }
+        }
+
+        function closeFilePicker() {
+            document.getElementById('file-picker-modal').style.display = 'none';
+            currentFileQuestionId = null;
         }
 
         // Image preview functions
