@@ -70,8 +70,8 @@ def get_package_version() -> str:
 def get_file_version() -> str:
     """Read the webquiz package version directly from the __init__.py file.
 
-    This reads the version from disk, not from memory, to detect if the package
-    was updated while the server is running.
+    This evaluates the file to extract the __version__ variable, detecting if
+    the package was updated while the server is running.
 
     Returns:
         Package version string from file or "unknown" if cannot be read
@@ -83,12 +83,12 @@ def get_file_version() -> str:
         init_file = pkg_resources.files("webquiz") / "__init__.py"
         content = init_file.read_text(encoding="utf-8")
 
-        # Parse the version from the file content
-        import re
+        # Execute the file content to extract __version__
+        namespace = {}
+        exec(content, namespace)
 
-        match = re.search(r'^__version__\s*=\s*["\']([^"\']+)["\']', content, re.MULTILINE)
-        if match:
-            return match.group(1)
+        if "__version__" in namespace:
+            return namespace["__version__"]
         return "unknown"
     except Exception as e:
         logger.debug(f"Failed to read version from file: {e}")
