@@ -238,6 +238,33 @@
             flex-direction: column;
             align-items: flex-start;
         }
+        .question-file {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 10px 16px;
+            background: var(--option-bg);
+            border: 2px solid var(--option-border);
+            border-radius: 8px;
+            color: var(--text-color);
+            text-decoration: none;
+            font-size: 14px;
+            margin: 15px 0;
+            transition: all 0.2s ease;
+            cursor: pointer;
+        }
+        .question-file:hover {
+            background: var(--option-hover);
+            border-color: var(--option-selected-border);
+            transform: translateY(-1px);
+            box-shadow: 0 2px 8px var(--shadow);
+        }
+        .question-file-icon {
+            font-size: 18px;
+        }
+        .question-file-name {
+            font-weight: 500;
+        }
         button {
             background: #007bff;
             color: white;
@@ -1126,6 +1153,7 @@
                 <div class="current-question active-question">
                     ${question.question ? `<h3 class="question-text">${question.question}</h3>` : ''}
                     ${question.image ? `<a href="${makeRelativePath(question.image)}" target="_blank"><img src="${makeRelativePath(question.image)}" alt="Question image" class="question-image quiz-question-img"></a>` : ''}
+                    ${question.file ? `<a href="${makeRelativePath(question.file)}" download class="question-file"><span class="question-file-icon">📎</span><span class="question-file-name">${question.file.split('/').pop()}</span></a>` : ''}
                     <div class="options">
                         ${question.is_multiple_choice ? '<p class="multiple-choice-hint" style="font-size: 14px; color: var(--text-muted); margin-bottom: 10px;">📋 Можна обрати кілька відповідей</p>' : ''}
                         ${question.options.map((option, optionIndex) => {
@@ -1281,6 +1309,7 @@
                     questionId: question.id,
                     question: question.question,
                     image: question.image,
+                    file: question.file,
                     selectedAnswer: selectedAnswerDisplay,
                     isCorrect: data.is_correct !== undefined ? data.is_correct : null,  // null when not provided
                     timeTaken: data.time_taken || 0,
@@ -1437,21 +1466,33 @@
             }
         }
 
-        function formatQuestionForDisplay(questionText, questionImage) {
-            if (questionImage && questionImage.startsWith('/')) {
-                // Display image with optional text
-                let html = `<img src="${makeRelativePath(questionImage)}" alt="Question image" style="max-width: 200px; max-height: 150px; border-radius: 5px;">`;
-                if (questionText) {
-                    html = `${questionText}<br>${html}`;
-                }
-                return html;
-            } else if (questionText) {
-                // Text only
-                return questionText;
-            } else {
-                // Fallback
-                return questionImage || 'Немає контенту питання';
+        function formatQuestionForDisplay(questionText, questionImage, questionFile) {
+            let html = '';
+
+            // Add question text if present
+            if (questionText) {
+                html += questionText;
             }
+
+            // Add image if present
+            if (questionImage && questionImage.startsWith('/')) {
+                if (html) html += '<br>';
+                html += `<img src="${makeRelativePath(questionImage)}" alt="Question image" style="max-width: 200px; max-height: 150px; border-radius: 5px;">`;
+            }
+
+            // Add file download link if present
+            if (questionFile && questionFile.startsWith('/')) {
+                if (html) html += '<br>';
+                const fileName = questionFile.split('/').pop();
+                html += `<a href="${makeRelativePath(questionFile)}" download class="question-file" style="display: inline-flex; margin-top: 5px; padding: 5px 10px; font-size: 12px;"><span class="question-file-icon">📎</span><span class="question-file-name">${fileName}</span></a>`;
+            }
+
+            // Fallback if nothing present
+            if (!html) {
+                return questionImage || questionFile || 'Немає контенту питання';
+            }
+
+            return html;
         }
 
         function formatAnswerForDisplay(answerText) {
@@ -1513,7 +1554,7 @@
                 const correctAnswer = (questions[index] && questions[index].correct_answer !== undefined) ? questions[index].options[questions[index].correct_answer] : null;
                 tableContent += `
                     <tr>
-                        <td data-label="Питання">${formatQuestionForDisplay(result.question, result.image)}</td>
+                        <td data-label="Питання">${formatQuestionForDisplay(result.question, result.image, result.file)}</td>
                         <td data-label="Ваша відповідь">
                             <span class="${result.isCorrect === true ? 'answer-correct' : (result.isCorrect === false ? 'answer-incorrect' : '')}">
                                 ${formatAnswerForDisplay(result.selectedAnswer)}
@@ -1580,7 +1621,7 @@
                     <tbody>
                         ${finalResults.test_results.map((result, index) => `
                             <tr>
-                                <td data-label="Питання">${formatQuestionForDisplay(result.question, result.image)}</td>
+                                <td data-label="Питання">${formatQuestionForDisplay(result.question, result.image, result.file)}</td>
                                 <td data-label="Ваша відповідь">
                                     <span class="${result.is_correct === true ? 'answer-correct' : (result.is_correct === false ? 'answer-incorrect' : '')}">
                                         ${formatAnswerForDisplay(result.selected_answer)}
