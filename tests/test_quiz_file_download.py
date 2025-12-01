@@ -55,7 +55,7 @@ def test_admin_list_files_with_files(temp_dir):
             assert "filename" in file_info
             assert "path" in file_info
             assert "size" in file_info
-            assert file_info["path"].startswith("/files/")
+            assert file_info["path"].startswith("/attach/")
             assert isinstance(file_info["size"], int)
             assert file_info["size"] > 0
 
@@ -83,7 +83,7 @@ def test_quiz_file_download(temp_dir):
             f.write(test_content)
 
         # Download the file (no auth required for file download)
-        response = requests.get(f"http://localhost:{port}/files/testfile.txt")
+        response = requests.get(f"http://localhost:{port}/attach/testfile.txt")
 
         assert response.status_code == 200
         assert response.text == test_content
@@ -97,7 +97,7 @@ def test_quiz_file_download(temp_dir):
 def test_quiz_file_download_not_found(temp_dir):
     """Test downloading a non-existent file returns 404."""
     with custom_webquiz_server() as (proc, port):
-        response = requests.get(f"http://localhost:{port}/files/nonexistent.txt")
+        response = requests.get(f"http://localhost:{port}/attach/nonexistent.txt")
         assert response.status_code == 404
 
 
@@ -122,7 +122,7 @@ def test_quiz_file_download_path_traversal_blocked(temp_dir):
         ]
 
         for path in malicious_paths:
-            response = requests.get(f"http://localhost:{port}/files/{path}")
+            response = requests.get(f"http://localhost:{port}/attach/{path}")
             # Should return 400 (invalid filename) or 404 (not found after validation)
             # The important thing is that the file is NOT served with 200
             assert response.status_code in [400, 404], f"Path traversal not blocked for: {path} (got {response.status_code})"
@@ -134,7 +134,7 @@ def test_question_with_file_field_in_index(temp_dir):
     """Test that file field is properly included in embedded questions.
 
     Note: In YAML, files are specified as just filenames (e.g., "data.xlsx").
-    The server automatically prepends "/files/" when serving to the client.
+    The server automatically prepends "/attach/" when serving to the client.
     """
     quiz_data = {
         "file_test.yaml": {
@@ -145,7 +145,7 @@ def test_question_with_file_field_in_index(temp_dir):
                     "question": "Question with file?",
                     "options": ["Yes", "No"],
                     "correct_answer": 0,
-                    "file": "data.xlsx",  # Just filename, server prepends /files/
+                    "file": "data.xlsx",  # Just filename, server prepends /attach/
                 },
                 {
                     # Question with both image and file
@@ -153,14 +153,14 @@ def test_question_with_file_field_in_index(temp_dir):
                     "options": ["Option 1", "Option 2"],
                     "correct_answer": 1,
                     "image": "/imgs/diagram.png",
-                    "file": "analysis.csv",  # Just filename
+                    "file": "analysis.csv",  # Just filename, server prepends /attach/
                 },
                 {
                     # File-only question (just file, no text)
                     "options": ["A", "B", "C"],
                     "correct_answer": 0,
                     "image": "/imgs/chart.png",
-                    "file": "raw_data.json",  # Just filename
+                    "file": "raw_data.json",  # Just filename, server prepends /attach/
                 },
             ],
         }
@@ -183,24 +183,24 @@ def test_question_with_file_field_in_index(temp_dir):
         assert "question" in q1
         assert "file" not in q1
 
-        # Question 2: text and file (server prepends /files/)
+        # Question 2: text and file (server prepends /attach/)
         q2 = embedded_questions[1]
         assert "question" in q2
         assert "file" in q2
-        assert q2["file"] == "/files/data.xlsx"
+        assert q2["file"] == "/attach/data.xlsx"
 
         # Question 3: text, image, and file
         q3 = embedded_questions[2]
         assert "question" in q3
         assert "image" in q3
         assert "file" in q3
-        assert q3["file"] == "/files/analysis.csv"
+        assert q3["file"] == "/attach/analysis.csv"
 
         # Question 4: image and file, no text
         q4 = embedded_questions[3]
         assert "image" in q4
         assert "file" in q4
-        assert q4["file"] == "/files/raw_data.json"
+        assert q4["file"] == "/attach/raw_data.json"
 
 
 def test_files_directory_created_on_startup(temp_dir):
