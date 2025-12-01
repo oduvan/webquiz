@@ -197,13 +197,34 @@ def get_client_ip(request):
     return client_ip
 
 
+def is_loopback_address(ip_str: str) -> bool:
+    """Check if an IP address is a loopback address.
+
+    Uses the ipaddress module to properly check the entire loopback range
+    (127.0.0.0/8 for IPv4 and ::1 for IPv6).
+
+    Args:
+        ip_str: IP address string to check
+
+    Returns:
+        True if the address is loopback or invalid, False otherwise
+    """
+    try:
+        ip = ipaddress.ip_address(ip_str)
+        return ip.is_loopback
+    except ValueError:
+        # Invalid IP addresses are treated as loopback (excluded) for safety
+        return True
+
+
 def get_network_interfaces():
     """Get all network interfaces and their IP addresses.
 
     Returns list of non-localhost IP addresses available on the system.
+    Excludes all loopback addresses (127.0.0.0/8 and ::1).
 
     Returns:
-        List of IP address strings (excludes 127.0.0.1)
+        List of IP address strings (excludes loopback addresses)
     """
     interfaces = []
     # Get hostname
@@ -213,7 +234,7 @@ def get_network_interfaces():
     ip_addresses = socket.getaddrinfo(hostname, None, socket.AF_INET)
     for ip_info in ip_addresses:
         ip = ip_info[4][0]
-        if ip != "127.0.0.1":  # Skip localhost
+        if not is_loopback_address(ip):
             interfaces.append(ip)
 
     # Also try to get more interface info on Unix systems
@@ -223,7 +244,7 @@ def get_network_interfaces():
             if result.returncode == 0:
                 ips = result.stdout.strip().split()
                 for ip in ips:
-                    if ip not in interfaces and ip != "127.0.0.1":
+                    if ip not in interfaces and not is_loopback_address(ip):
                         interfaces.append(ip)
         except (subprocess.TimeoutExpired, subprocess.CalledProcessError, FileNotFoundError):
             pass
