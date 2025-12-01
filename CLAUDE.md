@@ -34,7 +34,7 @@ WebQuiz - Python/aiohttp quiz system with multi-quiz management, real-time WebSo
 
 **Public:**
 - `POST /api/register`, `PUT /api/update-registration`, `POST /api/submit-answer`, `GET /api/verify-user/{user_id}`
-- `GET /files/{filename}` - Download quiz file attachment (Content-Disposition: attachment)
+- `GET /attach/{filename}` - Download quiz file attachment (Content-Disposition: attachment)
 
 **Admin (session cookie required, local network only):**
 - `POST /api/admin/auth` - Authenticate with master key in request body (`{"master_key": "..."}`)
@@ -126,7 +126,7 @@ webquiz-stress-test -c 50
 - **Quiz download folder validation** - Path traversal protection: blocks "..", absolute paths (Unix/Windows), normalizes paths, ensures extraction stays within quizzes directory; allows subfolder paths like "folder/subfolder/"
 - **Clipboard API fallback** - Copy public key button uses modern navigator.clipboard API for HTTPS/localhost, falls back to document.execCommand() for non-secure contexts (HTTP over IP)
 - **Package version check** - Admin panel periodically checks if package was updated while server is running by comparing in-memory version with file version; shows "Restart Required" banner when mismatch detected
-- **Quiz file attachments** - Questions can have downloadable files via `file` field (e.g., `file: "data.xlsx"`). Files stored in `quizzes/files/`, served at `/files/{filename}` with `Content-Disposition: attachment` header for forced download. Server auto-prepends `/files/` when serving to client. Admin panel has file picker modal for selecting files.
+- **Quiz file attachments** - Questions can have downloadable files via `file` field (e.g., `file: "data.xlsx"`). Files stored in `quizzes/files/`, served at `/attach/{filename}` with `Content-Disposition: attachment` header for forced download. Server auto-prepends `/attach/` when serving to client. Admin panel has file picker modal for selecting files.
 
 ## Key Flows
 

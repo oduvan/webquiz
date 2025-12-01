@@ -766,11 +766,11 @@ class TestingServer:
             # Include optional image attribute if present
             if "image" in q and q["image"]:
                 client_question["image"] = q["image"]
-            # Include optional file attribute if present (prepend /files/ if not already there)
+            # Include optional file attribute if present (prepend /attach/ if not already there)
             if "file" in q and q["file"]:
                 file_path = q["file"]
-                if not file_path.startswith("/files/"):
-                    file_path = f"/files/{file_path}"
+                if not file_path.startswith("/attach/"):
+                    file_path = f"/attach/{file_path}"
                 client_question["file"] = file_path
             # Include min_correct for multiple choice questions
             if isinstance(q["correct_answer"], list):
@@ -1407,10 +1407,10 @@ class TestingServer:
         if user_id not in self.user_answers:
             self.user_answers[user_id] = []
 
-        # Normalize file path for results (prepend /files/ if needed)
+        # Normalize file path for results (prepend /attach/ if needed)
         file_value = question.get("file")
-        if file_value and not file_value.startswith("/files/"):
-            file_value = f"/files/{file_value}"
+        if file_value and not file_value.startswith("/attach/"):
+            file_value = f"/attach/{file_value}"
 
         answer_data = {
             "question": question.get("question", ""),  # Handle image-only questions
@@ -2414,7 +2414,7 @@ class TestingServer:
                 file_list.append(
                     {
                         "filename": filename,
-                        "path": f"/files/{filename}",
+                        "path": f"/attach/{filename}",
                         "size": file_size,
                     }
                 )
@@ -3211,8 +3211,8 @@ async def create_app(config: WebQuizConfig):
 
     # File management routes (admin access)
     app.router.add_get("/files/", server.serve_files_page)
-    # Quiz file download route (must be after /files/ to avoid conflict)
-    app.router.add_get("/files/{filename}", server.serve_quiz_file)
+    # Quiz file attachment download route
+    app.router.add_get("/attach/{filename}", server.serve_quiz_file)
     app.router.add_get("/api/files/list", server.files_list)
     app.router.add_get("/api/files/{type}/view/{filename}", server.files_view)
     app.router.add_get("/api/files/{type}/download/{filename}", server.files_download)

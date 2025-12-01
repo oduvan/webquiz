@@ -2074,8 +2074,8 @@
                 return;
             }
 
-            // Extract just the filename from the path (remove /files/ prefix)
-            const filename = filePath.replace(/^\/files\//, '');
+            // Extract just the filename from the path (remove /attach/ prefix)
+            const filename = filePath.replace(/^\/attach\//, '');
 
             // Find the question div by question ID
             const questionDiv = document.querySelector(`[data-question-id="${currentFileQuestionId}"]`);
