@@ -1,6 +1,6 @@
 """Webquiz - A modern light web-based testing platform."""
 
-__version__ = "1.9.3"
+__version__ = "1.9.4"
 __author__ = "oduvan"
 __email__ = "a.lyabah@checkio.org"
 __description__ = "A modern web-based testing system built with Python and aiohttp"
