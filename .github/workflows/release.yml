@@ -168,7 +168,7 @@ jobs:
     - name: Install Pandoc and LaTeX
       run: |
         sudo apt-get update
-        sudo apt-get install -y pandoc texlive-xetex texlive-fonts-recommended texlive-lang-cyrillic
+        sudo apt-get install -y pandoc texlive-xetex texlive-fonts-recommended texlive-lang-cyrillic fonts-dejavu
 
     - name: Generate Ukrainian PDF Documentation
       run: |
