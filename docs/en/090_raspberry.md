@@ -127,7 +127,7 @@ IP address `10.42.0.1` is reserved for Raspberry Pi itself — the WebQuiz serve
 > ⚠️ **Limitation:** Raspberry Pi can work as an access point, but simultaneously supports a limited number of clients (usually no more than 5–6).
 > After that, speed problems or user disconnections are possible.
 
-> 💡 **Recommendation:** If you need to connect more devices, it's better to use a separate Wi-Fi router connected to Raspberry Pi in **Bridge (Repeater / Access Point Client)** mode.
+> **Recommendation:** If you need to connect more devices, it's better to use a separate Wi-Fi router connected to Raspberry Pi in **Bridge (Repeater / Access Point Client)** mode.
 > Such a router will extend the Wi-Fi coverage area and allow more users to work safely.
 
 ---

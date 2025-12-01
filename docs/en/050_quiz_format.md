@@ -56,7 +56,7 @@ Determines whether to show the user the correct answer after submitting their ch
 show_right_answer: false  # Automatic progression to the next question
 ```
 
-> 💡 **Using `show_right_answer: false`** creates a fast, seamless quiz-taking experience without interruptions, which is useful for quick surveys or tests where students should not see correct answers during the testing process.
+> **Tip:** Using `show_right_answer: false` creates a fast, seamless quiz-taking experience without interruptions, which is useful for quick surveys or tests where students should not see correct answers during the testing process.
 
 ---
 
@@ -80,7 +80,7 @@ show_answers_on_completion: true    # Reveal after all complete
 4. Once **all registered students** finish the quiz, correct answers become visible
 5. If a new student registers later, answers are hidden again until they complete
 
-> 💡 **Using `show_answers_on_completion: true`** is useful for group learning environments where you want students to discuss answers together after everyone has completed the quiz independently.
+> **Tip:** Using `show_answers_on_completion: true` is useful for group learning environments where you want students to discuss answers together after everyone has completed the quiz independently.
 
 > ⚠️ **Important:** If approval mode is enabled (`registration.approve: true`), only **approved** students are counted. Students waiting for approval do not affect answer visibility.
 
@@ -97,7 +97,7 @@ Determines whether each student receives a unique randomized question order. Thi
 randomize_questions: true  # Each student gets a unique question order
 ```
 
-> 💡 **Using `randomize_questions: true`** helps ensure fair testing, as students sitting next to each other will receive questions in different orders. The question order is generated server-side during student registration and persists throughout the entire session, even after page reloads.
+> **Tip:** Using `randomize_questions: true` helps ensure fair testing, as students sitting next to each other will receive questions in different orders. The question order is generated server-side during student registration and persists throughout the entire session, even after page reloads.
 
 ---
 
@@ -392,7 +392,7 @@ The new test will appear in the list of available tests in the **Administration*
 3. Save the file.
 4. In the admin panel, switch to a different test and then back to the edited one — changes will apply automatically.
 
-> 💡 **Tip:** Use the **administrator web interface** to create and edit tests — it has built-in YAML validation and will warn you about errors before saving.
+> **Tip:** Use the **administrator web interface** to create and edit tests — it has built-in YAML validation and will warn you about errors before saving.
 
 ---
 
@@ -452,7 +452,7 @@ question: What is 2:1?
 question: "What is 2:1?"
 ```
 
-> 💡 **Tip:** The admin interface will automatically detect these errors and show them before saving the file.
+> **Tip:** The admin interface will automatically detect these errors and show them before saving the file.
 
 ---
 
