@@ -12,11 +12,11 @@ This way, you can be confident that participants’ results will not be shared o
 
 ### Key Features
 
-- 🧩 **Create quizzes in YAML format** — questions and answer options are stored in a simple text file that can be easily edited manually.
-- ⚙️ **Flexible testing configuration** — define which registration fields are required and whether manual approval is needed before the test begins.
-- 💻 **Local network operation** — participants connect to your device via Wi-Fi or Ethernet, without internet access.
-- 📊 **Results stored in CSV format** — test outcomes can be viewed or analyzed in any spreadsheet editor such as Excel or Google Sheets.
-- 🔒 **Simple and secure** — no accounts or passwords are needed; each participant is identified only by the name they enter.
+- **Create quizzes in YAML format** — questions and answer options are stored in a simple text file that can be easily edited manually.
+- **Flexible testing configuration** — define which registration fields are required and whether manual approval is needed before the test begins.
+- **Local network operation** — participants connect to your device via Wi-Fi or Ethernet, without internet access.
+- **Results stored in CSV format** — test outcomes can be viewed or analyzed in any spreadsheet editor such as Excel or Google Sheets.
+- **Simple and secure** — no accounts or passwords are needed; each participant is identified only by the name they enter.
 
 ---
 

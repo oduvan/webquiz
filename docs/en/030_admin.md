@@ -97,8 +97,8 @@ Available in two modes: **Wizard** (visual editor) and **Text** (working directl
 
 At the bottom of each admin interface page, there are convenient links:
 - **← Back to Quiz** — return to the main quiz page.
-- **🏠 Quiz Home** — go to the participant interface.
-- **📊 Live Stats** — page with live statistics (number of users, quiz status, active sessions).
+- **Quiz Home** — go to the participant interface.
+- **Live Stats** — page with live statistics (number of users, quiz status, active sessions).
 
 ---
 
