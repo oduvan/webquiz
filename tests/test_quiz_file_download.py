@@ -30,7 +30,7 @@ def test_admin_list_files_with_files(temp_dir):
     with custom_webquiz_server() as (proc, port):
         cookies = get_admin_session(port)
         # Create files directory with test files
-        files_dir = f"quizzes_{port}/files"
+        files_dir = f"quizzes_{port}/attach"
         os.makedirs(files_dir, exist_ok=True)
 
         # Create test files with different content sizes
@@ -75,7 +75,7 @@ def test_quiz_file_download(temp_dir):
     """Test downloading a quiz file with Content-Disposition header."""
     with custom_webquiz_server() as (proc, port):
         # Create files directory with a test file
-        files_dir = f"quizzes_{port}/files"
+        files_dir = f"quizzes_{port}/attach"
         os.makedirs(files_dir, exist_ok=True)
 
         test_content = "This is test file content"
@@ -105,7 +105,7 @@ def test_quiz_file_download_path_traversal_blocked(temp_dir):
     """Test that path traversal attempts are blocked."""
     with custom_webquiz_server() as (proc, port):
         # Create files directory with a test file to ensure the directory exists
-        files_dir = f"quizzes_{port}/files"
+        files_dir = f"quizzes_{port}/attach"
         os.makedirs(files_dir, exist_ok=True)
         with open(os.path.join(files_dir, "safe.txt"), "w") as f:
             f.write("safe content")
@@ -206,6 +206,6 @@ def test_question_with_file_field_in_index(temp_dir):
 def test_files_directory_created_on_startup(temp_dir):
     """Test that the files directory is created automatically on server startup."""
     with custom_webquiz_server() as (proc, port):
-        files_dir = Path(f"quizzes_{port}/files")
+        files_dir = Path(f"quizzes_{port}/attach")
         assert files_dir.exists(), "Files directory should be created on startup"
         assert files_dir.is_dir(), "Files directory should be a directory"

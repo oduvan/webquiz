@@ -223,7 +223,7 @@ You can combine an image in the question with text answer options:
 #### Question with Downloadable File
 
 You can add a downloadable file to a question using the **`file`** parameter.
-Files should be stored in the **`quizzes/files/`** folder.
+Files should be stored in the **`quizzes/attach/`** folder.
 
 ```
 - question: "Analyze the data from the file and find the average"
