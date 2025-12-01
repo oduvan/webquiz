@@ -183,6 +183,7 @@ jobs:
           --number-sections \
           -V geometry:margin=1in \
           -V mainfont="DejaVu Sans" \
+          -V monofont="DejaVu Sans Mono" \
           -V documentclass=report \
           -V header-includes='\usepackage{float} \floatplacement{figure}{H}' \
           --resource-path=.:imgs \
@@ -204,6 +205,7 @@ jobs:
           --number-sections \
           -V geometry:margin=1in \
           -V mainfont="DejaVu Sans" \
+          -V monofont="DejaVu Sans Mono" \
           -V documentclass=report \
           -V header-includes='\usepackage{float} \floatplacement{figure}{H}' \
           --resource-path=.:imgs \
