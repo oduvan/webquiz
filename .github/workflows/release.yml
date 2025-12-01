@@ -318,6 +318,32 @@ jobs:
           binaries/webquiz-macos-apple-silicon/webquiz-macos-apple-silicon.zip \
           binaries/webquiz-windows.exe/webquiz-windows.exe.zip
 
+    - name: Wait for package to appear on PyPI
+      run: |
+        echo "Waiting for webquiz ${{ github.event.inputs.version }} to appear on PyPI..."
+
+        MAX_ATTEMPTS=30
+        ATTEMPT=1
+        WAIT_TIME=10
+
+        while [ $ATTEMPT -le $MAX_ATTEMPTS ]; do
+          echo "Attempt $ATTEMPT/$MAX_ATTEMPTS: Checking PyPI..."
+
+          HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" "https://pypi.org/pypi/webquiz/${{ github.event.inputs.version }}/json")
+
+          if [ "$HTTP_CODE" = "200" ]; then
+            echo "✅ Package webquiz ${{ github.event.inputs.version }} is now available on PyPI!"
+            exit 0
+          fi
+
+          echo "Package not yet available (HTTP $HTTP_CODE). Waiting ${WAIT_TIME}s before retry..."
+          sleep $WAIT_TIME
+          ATTEMPT=$((ATTEMPT + 1))
+        done
+
+        echo "❌ Timeout: Package did not appear on PyPI after $MAX_ATTEMPTS attempts"
+        exit 1
+
     - name: Update webquiz-ansible repository
       env:
         ANSIBLE_REPO_TOKEN: ${{ secrets.ANSIBLE_REPO_TOKEN }}
