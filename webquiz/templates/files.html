@@ -593,16 +593,16 @@
                 const response = await fetch('/api/admin/auth', {
                     method: 'POST',
                     headers: {
-                        'Content-Type': 'application/json',
-                        'X-Master-Key': masterKey
+                        'Content-Type': 'application/json'
                     },
-                    body: JSON.stringify({})
+                    body: JSON.stringify({master_key: masterKey}),
+                    credentials: 'same-origin'  // Include cookies for session
                 });
 
                 const data = await response.json();
 
                 if (response.ok) {
-                    currentMasterKey = masterKey;
+                    currentMasterKey = 'session';  // Session is now managed by cookie
                     document.getElementById('auth-section').style.display = 'none';
                     document.getElementById('files-panel').classList.remove('hidden');
                     showMessage('Authentication successful!', 'success');
@@ -618,9 +618,7 @@
         async function loadFiles() {
             try {
                 const response = await fetch('/api/files/list', {
-                    headers: {
-                        'X-Master-Key': currentMasterKey
-                    }
+                    credentials: 'same-origin'
                 });
 
                 const data = await response.json();
@@ -718,9 +716,7 @@
                 }
 
                 const response = await fetch(`/api/files/${type}/view/${encodeURIComponent(filename)}`, {
-                    headers: {
-                        'X-Master-Key': currentMasterKey
-                    }
+                    credentials: 'same-origin'
                 });
 
                 if (response.ok) {
@@ -839,9 +835,7 @@
         async function downloadFile(type, filename) {
             try {
                 const response = await fetch(`/api/files/${type}/download/${encodeURIComponent(filename)}`, {
-                    headers: {
-                        'X-Master-Key': currentMasterKey
-                    }
+                    credentials: 'same-origin'
                 });
 
                 if (response.ok) {
@@ -949,10 +943,10 @@
                 const response = await fetch('/api/admin/config', {
                     method: 'PUT',
                     headers: {
-                        'Content-Type': 'application/json',
-                        'X-Master-Key': currentMasterKey
+                        'Content-Type': 'application/json'
                     },
-                    body: JSON.stringify({ content })
+                    body: JSON.stringify({ content }),
+                    credentials: 'same-origin'
                 });
 
                 const data = await response.json();
@@ -977,15 +971,46 @@
             initializeConfigEditor();
         }
 
-        // Auto-authenticate for trusted IPs
-        if (typeof IS_TRUSTED_IP !== 'undefined' && IS_TRUSTED_IP) {
-            // Hide auth section and show files panel immediately
+        // Auto-authenticate function that shows files panel
+        function showFilesPanel(message) {
             document.getElementById('auth-section').style.display = 'none';
             document.getElementById('files-panel').classList.remove('hidden');
-            currentMasterKey = 'trusted-ip'; // Set a placeholder key for API calls
-            showMessage('Auto-authenticated from trusted IP', 'success');
+            showMessage(message, 'success');
             initializePanelData();
         }
+
+        // Check for existing session cookie on page load
+        async function checkExistingSession() {
+            try {
+                const response = await fetch('/api/admin/check-session', {
+                    method: 'GET',
+                    credentials: 'same-origin'
+                });
+
+                if (response.ok) {
+                    // Valid session found - auto-authenticate
+                    currentMasterKey = 'session'; // Placeholder, actual auth is via cookie
+                    showFilesPanel('Session restored');
+                    return true;
+                }
+            } catch (error) {
+                // Session check failed, fall through to other auth methods
+            }
+            return false;
+        }
+
+        // Initialize authentication
+        (async function initAuth() {
+            // First, try to restore existing session
+            const hasSession = await checkExistingSession();
+            if (hasSession) return;
+
+            // Fall back to trusted IP auto-authentication
+            if (typeof IS_TRUSTED_IP !== 'undefined' && IS_TRUSTED_IP) {
+                currentMasterKey = 'trusted-ip';
+                showFilesPanel('Auto-authenticated from trusted IP');
+            }
+        })();
 
         // Quiz Editor Functions
         async function editQuizFile(filename) {
@@ -997,9 +1022,7 @@
                 document.getElementById('quiz-editor-modal').style.display = 'block';
 
                 const response = await fetch(`/api/files/quizzes/view/${encodeURIComponent(filename)}`, {
-                    headers: {
-                        'X-Master-Key': currentMasterKey
-                    }
+                    credentials: 'same-origin'
                 });
 
                 if (response.ok) {
@@ -1027,10 +1050,10 @@
                 const response = await fetch('/api/admin/validate-quiz', {
                     method: 'POST',
                     headers: {
-                        'Content-Type': 'application/json',
-                        'X-Master-Key': currentMasterKey
+                        'Content-Type': 'application/json'
                     },
-                    body: JSON.stringify({ content })
+                    body: JSON.stringify({ content }),
+                    credentials: 'same-origin'
                 });
 
                 const data = await response.json();
@@ -1067,10 +1090,10 @@
                 const response = await fetch(`/api/files/quizzes/save/${encodeURIComponent(currentEditingQuiz)}`, {
                     method: 'PUT',
                     headers: {
-                        'Content-Type': 'application/json',
-                        'X-Master-Key': currentMasterKey
+                        'Content-Type': 'application/json'
                     },
-                    body: JSON.stringify({ content })
+                    body: JSON.stringify({ content }),
+                    credentials: 'same-origin'
                 });
 
                 const data = await response.json();

@@ -5,7 +5,7 @@ import requests
 import asyncio
 import websockets
 import json
-from tests.conftest import custom_webquiz_server
+from conftest import custom_webquiz_server, get_admin_session
 
 
 @pytest.mark.asyncio
@@ -263,7 +263,7 @@ async def test_quiz_switch_resets_completed_users(temp_dir):
             requests.post(
                 f"http://localhost:{port}/api/admin/switch-quiz",
                 json={"quiz_filename": "quiz2.yaml"},
-                headers={"X-Master-Key": "test123"},
+                cookies = get_admin_session(port),
             )
 
             # Wait for quiz_switched message
@@ -343,7 +343,7 @@ async def test_approval_workflow_completion_tracking(temp_dir):
             requests.put(
                 f"http://localhost:{port}/api/admin/approve-user",
                 json={"user_id": user_id},
-                headers={"X-Master-Key": "test123"},
+                cookies = get_admin_session(port),
             )
 
             # Wait for user_registered message after approval

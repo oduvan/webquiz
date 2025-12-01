@@ -5,7 +5,7 @@ import requests
 import asyncio
 import websockets
 import json
-from tests.conftest import custom_webquiz_server
+from conftest import custom_webquiz_server, get_admin_session
 
 
 @pytest.mark.asyncio
@@ -134,7 +134,7 @@ async def test_live_stats_websocket_with_approval_workflow(temp_dir):
             response = requests.put(
                 f"http://localhost:{port}/api/admin/approve-user",
                 json={"user_id": user_id},
-                headers={"X-Master-Key": "test123"},
+                cookies = get_admin_session(port),
             )
             assert response.status_code == 200
 

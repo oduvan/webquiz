@@ -4,18 +4,17 @@ Tests _validate_quiz_data method through the validation endpoint
 """
 
 import requests
-from conftest import custom_webquiz_server
+from conftest import custom_webquiz_server, get_admin_session
 
 
 def test_validate_quiz_invalid_data_type_not_dict(temp_dir):
     """Test validation rejects non-dictionary data"""
     with custom_webquiz_server() as (proc, port):
-        headers = {"X-Master-Key": "test123"}
+        cookies = get_admin_session(port)
 
         # Test with list instead of dict
         response = requests.post(
-            f"http://localhost:{port}/api/admin/validate-quiz",
-            headers=headers,
+            f"http://localhost:{port}/api/admin/validate-quiz", cookies=cookies,
             json={"content": "- invalid\n- structure"},
         )
 
@@ -28,13 +27,13 @@ def test_validate_quiz_invalid_data_type_not_dict(temp_dir):
 def test_validate_quiz_missing_questions_field(temp_dir):
     """Test validation rejects quiz without 'questions' field"""
     with custom_webquiz_server() as (proc, port):
-        headers = {"X-Master-Key": "test123"}
+        cookies = get_admin_session(port)
 
         quiz_yaml = """title: No Questions Quiz
 description: This quiz has no questions field"""
 
         response = requests.post(
-            f"http://localhost:{port}/api/admin/validate-quiz", headers=headers, json={"content": quiz_yaml}
+            f"http://localhost:{port}/api/admin/validate-quiz", cookies=cookies, json={"content": quiz_yaml}
         )
 
         assert response.status_code == 200
@@ -46,13 +45,13 @@ description: This quiz has no questions field"""
 def test_validate_quiz_questions_not_list(temp_dir):
     """Test validation rejects when 'questions' is not a list"""
     with custom_webquiz_server() as (proc, port):
-        headers = {"X-Master-Key": "test123"}
+        cookies = get_admin_session(port)
 
         quiz_yaml = """title: Invalid Questions Type
 questions: "not a list"  # Should be array"""
 
         response = requests.post(
-            f"http://localhost:{port}/api/admin/validate-quiz", headers=headers, json={"content": quiz_yaml}
+            f"http://localhost:{port}/api/admin/validate-quiz", cookies=cookies, json={"content": quiz_yaml}
         )
 
         assert response.status_code == 200
@@ -64,13 +63,13 @@ questions: "not a list"  # Should be array"""
 def test_validate_quiz_empty_questions_array(temp_dir):
     """Test validation rejects empty questions array"""
     with custom_webquiz_server() as (proc, port):
-        headers = {"X-Master-Key": "test123"}
+        cookies = get_admin_session(port)
 
         quiz_yaml = """title: Empty Questions
 questions: []"""
 
         response = requests.post(
-            f"http://localhost:{port}/api/admin/validate-quiz", headers=headers, json={"content": quiz_yaml}
+            f"http://localhost:{port}/api/admin/validate-quiz", cookies=cookies, json={"content": quiz_yaml}
         )
 
         assert response.status_code == 200
@@ -82,7 +81,7 @@ questions: []"""
 def test_validate_quiz_question_not_dict(temp_dir):
     """Test validation rejects non-dictionary questions"""
     with custom_webquiz_server() as (proc, port):
-        headers = {"X-Master-Key": "test123"}
+        cookies = get_admin_session(port)
 
         quiz_yaml = """title: Invalid Question Type
 questions:
@@ -92,7 +91,7 @@ questions:
     correct_answer: 0"""
 
         response = requests.post(
-            f"http://localhost:{port}/api/admin/validate-quiz", headers=headers, json={"content": quiz_yaml}
+            f"http://localhost:{port}/api/admin/validate-quiz", cookies=cookies, json={"content": quiz_yaml}
         )
 
         assert response.status_code == 200
@@ -104,7 +103,7 @@ questions:
 def test_validate_quiz_missing_required_fields(temp_dir):
     """Test validation rejects questions missing required fields"""
     with custom_webquiz_server() as (proc, port):
-        headers = {"X-Master-Key": "test123"}
+        cookies = get_admin_session(port)
 
         # Missing 'options'
         quiz_yaml1 = """title: Missing Options
@@ -113,7 +112,7 @@ questions:
     correct_answer: 0"""
 
         response1 = requests.post(
-            f"http://localhost:{port}/api/admin/validate-quiz", headers=headers, json={"content": quiz_yaml1}
+            f"http://localhost:{port}/api/admin/validate-quiz", cookies=cookies, json={"content": quiz_yaml1}
         )
 
         assert response1.status_code == 200
@@ -128,7 +127,7 @@ questions:
     options: ['A', 'B', 'C']"""
 
         response2 = requests.post(
-            f"http://localhost:{port}/api/admin/validate-quiz", headers=headers, json={"content": quiz_yaml2}
+            f"http://localhost:{port}/api/admin/validate-quiz", cookies=cookies, json={"content": quiz_yaml2}
         )
 
         assert response2.status_code == 200
@@ -140,7 +139,7 @@ questions:
 def test_validate_quiz_no_question_text_or_image(temp_dir):
     """Test validation rejects questions with neither text nor image"""
     with custom_webquiz_server() as (proc, port):
-        headers = {"X-Master-Key": "test123"}
+        cookies = get_admin_session(port)
 
         quiz_yaml = """title: No Question Content
 questions:
@@ -148,7 +147,7 @@ questions:
     correct_answer: 0"""
 
         response = requests.post(
-            f"http://localhost:{port}/api/admin/validate-quiz", headers=headers, json={"content": quiz_yaml}
+            f"http://localhost:{port}/api/admin/validate-quiz", cookies=cookies, json={"content": quiz_yaml}
         )
 
         assert response.status_code == 200
@@ -160,7 +159,7 @@ questions:
 def test_validate_quiz_options_not_list(temp_dir):
     """Test validation rejects when options is not a list"""
     with custom_webquiz_server() as (proc, port):
-        headers = {"X-Master-Key": "test123"}
+        cookies = get_admin_session(port)
 
         quiz_yaml = """title: Options Not List
 questions:
@@ -169,7 +168,7 @@ questions:
     correct_answer: 0"""
 
         response = requests.post(
-            f"http://localhost:{port}/api/admin/validate-quiz", headers=headers, json={"content": quiz_yaml}
+            f"http://localhost:{port}/api/admin/validate-quiz", cookies=cookies, json={"content": quiz_yaml}
         )
 
         assert response.status_code == 200
@@ -181,7 +180,7 @@ questions:
 def test_validate_quiz_options_too_few(temp_dir):
     """Test validation rejects questions with less than 2 options"""
     with custom_webquiz_server() as (proc, port):
-        headers = {"X-Master-Key": "test123"}
+        cookies = get_admin_session(port)
 
         quiz_yaml = """title: Too Few Options
 questions:
@@ -190,7 +189,7 @@ questions:
     correct_answer: 0"""
 
         response = requests.post(
-            f"http://localhost:{port}/api/admin/validate-quiz", headers=headers, json={"content": quiz_yaml}
+            f"http://localhost:{port}/api/admin/validate-quiz", cookies=cookies, json={"content": quiz_yaml}
         )
 
         assert response.status_code == 200
@@ -202,7 +201,7 @@ questions:
 def test_validate_quiz_options_not_all_strings(temp_dir):
     """Test validation rejects when options contain non-string values"""
     with custom_webquiz_server() as (proc, port):
-        headers = {"X-Master-Key": "test123"}
+        cookies = get_admin_session(port)
 
         quiz_yaml = """title: Non-String Options
 questions:
@@ -211,7 +210,7 @@ questions:
     correct_answer: 0"""
 
         response = requests.post(
-            f"http://localhost:{port}/api/admin/validate-quiz", headers=headers, json={"content": quiz_yaml}
+            f"http://localhost:{port}/api/admin/validate-quiz", cookies=cookies, json={"content": quiz_yaml}
         )
 
         assert response.status_code == 200
@@ -223,7 +222,7 @@ questions:
 def test_validate_quiz_correct_answer_out_of_range(temp_dir):
     """Test validation rejects correct_answer index out of range"""
     with custom_webquiz_server() as (proc, port):
-        headers = {"X-Master-Key": "test123"}
+        cookies = get_admin_session(port)
 
         quiz_yaml = """title: Answer Out of Range
 questions:
@@ -232,7 +231,7 @@ questions:
     correct_answer: 5  # Index 5 doesn't exist"""
 
         response = requests.post(
-            f"http://localhost:{port}/api/admin/validate-quiz", headers=headers, json={"content": quiz_yaml}
+            f"http://localhost:{port}/api/admin/validate-quiz", cookies=cookies, json={"content": quiz_yaml}
         )
 
         assert response.status_code == 200
@@ -244,7 +243,7 @@ questions:
 def test_validate_quiz_correct_answer_array_empty(temp_dir):
     """Test validation rejects empty correct_answer array"""
     with custom_webquiz_server() as (proc, port):
-        headers = {"X-Master-Key": "test123"}
+        cookies = get_admin_session(port)
 
         quiz_yaml = """title: Empty Answer Array
 questions:
@@ -253,7 +252,7 @@ questions:
     correct_answer: []  # Empty array"""
 
         response = requests.post(
-            f"http://localhost:{port}/api/admin/validate-quiz", headers=headers, json={"content": quiz_yaml}
+            f"http://localhost:{port}/api/admin/validate-quiz", cookies=cookies, json={"content": quiz_yaml}
         )
 
         assert response.status_code == 200
@@ -265,7 +264,7 @@ questions:
 def test_validate_quiz_correct_answer_array_non_integers(temp_dir):
     """Test validation rejects correct_answer array with non-integers"""
     with custom_webquiz_server() as (proc, port):
-        headers = {"X-Master-Key": "test123"}
+        cookies = get_admin_session(port)
 
         quiz_yaml = """title: Non-Integer Answers
 questions:
@@ -274,7 +273,7 @@ questions:
     correct_answer: [0, "1", 2]  # "1" is string"""
 
         response = requests.post(
-            f"http://localhost:{port}/api/admin/validate-quiz", headers=headers, json={"content": quiz_yaml}
+            f"http://localhost:{port}/api/admin/validate-quiz", cookies=cookies, json={"content": quiz_yaml}
         )
 
         assert response.status_code == 200
@@ -286,7 +285,7 @@ questions:
 def test_validate_quiz_correct_answer_array_out_of_range(temp_dir):
     """Test validation rejects correct_answer array with out-of-range indices"""
     with custom_webquiz_server() as (proc, port):
-        headers = {"X-Master-Key": "test123"}
+        cookies = get_admin_session(port)
 
         quiz_yaml = """title: Answer Index Out of Range
 questions:
@@ -295,7 +294,7 @@ questions:
     correct_answer: [0, 5]  # 5 is out of range"""
 
         response = requests.post(
-            f"http://localhost:{port}/api/admin/validate-quiz", headers=headers, json={"content": quiz_yaml}
+            f"http://localhost:{port}/api/admin/validate-quiz", cookies=cookies, json={"content": quiz_yaml}
         )
 
         assert response.status_code == 200
@@ -307,7 +306,7 @@ questions:
 def test_validate_quiz_correct_answer_array_duplicates(temp_dir):
     """Test validation rejects correct_answer array with duplicate indices"""
     with custom_webquiz_server() as (proc, port):
-        headers = {"X-Master-Key": "test123"}
+        cookies = get_admin_session(port)
 
         quiz_yaml = """title: Duplicate Answer Indices
 questions:
@@ -316,7 +315,7 @@ questions:
     correct_answer: [0, 1, 0]  # 0 appears twice"""
 
         response = requests.post(
-            f"http://localhost:{port}/api/admin/validate-quiz", headers=headers, json={"content": quiz_yaml}
+            f"http://localhost:{port}/api/admin/validate-quiz", cookies=cookies, json={"content": quiz_yaml}
         )
 
         assert response.status_code == 200
@@ -328,7 +327,7 @@ questions:
 def test_validate_quiz_correct_answer_wrong_type(temp_dir):
     """Test validation rejects correct_answer that's neither int nor array"""
     with custom_webquiz_server() as (proc, port):
-        headers = {"X-Master-Key": "test123"}
+        cookies = get_admin_session(port)
 
         quiz_yaml = """title: Wrong Answer Type
 questions:
@@ -337,7 +336,7 @@ questions:
     correct_answer: "zero"  # String instead of int"""
 
         response = requests.post(
-            f"http://localhost:{port}/api/admin/validate-quiz", headers=headers, json={"content": quiz_yaml}
+            f"http://localhost:{port}/api/admin/validate-quiz", cookies=cookies, json={"content": quiz_yaml}
         )
 
         assert response.status_code == 200
@@ -349,7 +348,7 @@ questions:
 def test_validate_quiz_min_correct_without_correct_answer(temp_dir):
     """Test validation rejects min_correct without correct_answer"""
     with custom_webquiz_server() as (proc, port):
-        headers = {"X-Master-Key": "test123"}
+        cookies = get_admin_session(port)
 
         quiz_yaml = """title: Min Correct Without Answer
 questions:
@@ -358,7 +357,7 @@ questions:
     min_correct: 2"""
 
         response = requests.post(
-            f"http://localhost:{port}/api/admin/validate-quiz", headers=headers, json={"content": quiz_yaml}
+            f"http://localhost:{port}/api/admin/validate-quiz", cookies=cookies, json={"content": quiz_yaml}
         )
 
         assert response.status_code == 200
@@ -370,7 +369,7 @@ questions:
 def test_validate_quiz_min_correct_with_single_answer(temp_dir):
     """Test validation rejects min_correct with single answer question"""
     with custom_webquiz_server() as (proc, port):
-        headers = {"X-Master-Key": "test123"}
+        cookies = get_admin_session(port)
 
         quiz_yaml = """title: Min Correct With Single Answer
 questions:
@@ -380,7 +379,7 @@ questions:
     min_correct: 1  # min_correct only for multiple answers"""
 
         response = requests.post(
-            f"http://localhost:{port}/api/admin/validate-quiz", headers=headers, json={"content": quiz_yaml}
+            f"http://localhost:{port}/api/admin/validate-quiz", cookies=cookies, json={"content": quiz_yaml}
         )
 
         assert response.status_code == 200
@@ -392,7 +391,7 @@ questions:
 def test_validate_quiz_min_correct_not_integer(temp_dir):
     """Test validation rejects non-integer min_correct"""
     with custom_webquiz_server() as (proc, port):
-        headers = {"X-Master-Key": "test123"}
+        cookies = get_admin_session(port)
 
         quiz_yaml = """title: Min Correct Not Integer
 questions:
@@ -402,7 +401,7 @@ questions:
     min_correct: "two"  # String instead of int"""
 
         response = requests.post(
-            f"http://localhost:{port}/api/admin/validate-quiz", headers=headers, json={"content": quiz_yaml}
+            f"http://localhost:{port}/api/admin/validate-quiz", cookies=cookies, json={"content": quiz_yaml}
         )
 
         assert response.status_code == 200
@@ -414,7 +413,7 @@ questions:
 def test_validate_quiz_min_correct_too_low(temp_dir):
     """Test validation rejects min_correct < 1"""
     with custom_webquiz_server() as (proc, port):
-        headers = {"X-Master-Key": "test123"}
+        cookies = get_admin_session(port)
 
         quiz_yaml = """title: Min Correct Too Low
 questions:
@@ -424,7 +423,7 @@ questions:
     min_correct: 0  # Must be at least 1"""
 
         response = requests.post(
-            f"http://localhost:{port}/api/admin/validate-quiz", headers=headers, json={"content": quiz_yaml}
+            f"http://localhost:{port}/api/admin/validate-quiz", cookies=cookies, json={"content": quiz_yaml}
         )
 
         assert response.status_code == 200
@@ -436,7 +435,7 @@ questions:
 def test_validate_quiz_min_correct_exceeds_answers(temp_dir):
     """Test validation rejects min_correct > number of correct answers"""
     with custom_webquiz_server() as (proc, port):
-        headers = {"X-Master-Key": "test123"}
+        cookies = get_admin_session(port)
 
         quiz_yaml = """title: Min Correct Exceeds Answers
 questions:
@@ -446,7 +445,7 @@ questions:
     min_correct: 5  # Requires 5 but only 2 exist"""
 
         response = requests.post(
-            f"http://localhost:{port}/api/admin/validate-quiz", headers=headers, json={"content": quiz_yaml}
+            f"http://localhost:{port}/api/admin/validate-quiz", cookies=cookies, json={"content": quiz_yaml}
         )
 
         assert response.status_code == 200
@@ -458,7 +457,7 @@ questions:
 def test_validate_quiz_show_right_answer_not_boolean(temp_dir):
     """Test validation rejects non-boolean show_right_answer"""
     with custom_webquiz_server() as (proc, port):
-        headers = {"X-Master-Key": "test123"}
+        cookies = get_admin_session(port)
 
         quiz_yaml = """title: Invalid Show Right Answer Type
 show_right_answer: "yes"  # Should be boolean
@@ -468,7 +467,7 @@ questions:
     correct_answer: 0"""
 
         response = requests.post(
-            f"http://localhost:{port}/api/admin/validate-quiz", headers=headers, json={"content": quiz_yaml}
+            f"http://localhost:{port}/api/admin/validate-quiz", cookies=cookies, json={"content": quiz_yaml}
         )
 
         assert response.status_code == 200
@@ -480,7 +479,7 @@ questions:
 def test_validate_quiz_randomize_questions_not_boolean(temp_dir):
     """Test validation rejects non-boolean randomize_questions"""
     with custom_webquiz_server() as (proc, port):
-        headers = {"X-Master-Key": "test123"}
+        cookies = get_admin_session(port)
 
         quiz_yaml = """title: Invalid Randomize Type
 randomize_questions: 1  # Should be boolean
@@ -490,7 +489,7 @@ questions:
     correct_answer: 0"""
 
         response = requests.post(
-            f"http://localhost:{port}/api/admin/validate-quiz", headers=headers, json={"content": quiz_yaml}
+            f"http://localhost:{port}/api/admin/validate-quiz", cookies=cookies, json={"content": quiz_yaml}
         )
 
         assert response.status_code == 200
@@ -502,7 +501,7 @@ questions:
 def test_validate_quiz_title_not_string(temp_dir):
     """Test validation rejects non-string title"""
     with custom_webquiz_server() as (proc, port):
-        headers = {"X-Master-Key": "test123"}
+        cookies = get_admin_session(port)
 
         quiz_yaml = """title: 123  # Number instead of string
 questions:
@@ -511,7 +510,7 @@ questions:
     correct_answer: 0"""
 
         response = requests.post(
-            f"http://localhost:{port}/api/admin/validate-quiz", headers=headers, json={"content": quiz_yaml}
+            f"http://localhost:{port}/api/admin/validate-quiz", cookies=cookies, json={"content": quiz_yaml}
         )
 
         assert response.status_code == 200

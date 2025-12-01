@@ -3,7 +3,7 @@
 import pytest
 import requests
 import os
-from tests.conftest import custom_webquiz_server
+from conftest import custom_webquiz_server, get_admin_session
 
 
 def test_randomization_disabled_by_default(temp_dir):
@@ -163,7 +163,7 @@ def test_randomization_with_approval_workflow(temp_dir):
         response = requests.put(
             f"http://localhost:{port}/api/admin/approve-user",
             json={"user_id": user_id},
-            headers={"X-Master-Key": "test123"},
+            cookies = get_admin_session(port),
         )
         assert response.status_code == 200
 
@@ -191,7 +191,7 @@ def test_yaml_validation_accepts_randomize_questions_boolean(temp_dir):
         response = requests.post(
             f"http://localhost:{port}/api/admin/validate-quiz",
             json={"content": yaml_content},
-            headers={"X-Master-Key": "test123"},
+            cookies = get_admin_session(port),
         )
         assert response.status_code == 200
         data = response.json()
@@ -219,7 +219,7 @@ def test_yaml_validation_rejects_non_boolean_randomize_questions(temp_dir):
         response = requests.post(
             f"http://localhost:{port}/api/admin/validate-quiz",
             json={"content": yaml_content},
-            headers={"X-Master-Key": "test123"},
+            cookies = get_admin_session(port),
         )
         assert response.status_code == 200
         data = response.json()
@@ -311,7 +311,7 @@ def test_yaml_validation_accepts_other_top_level_fields(temp_dir):
         response = requests.post(
             f"http://localhost:{port}/api/admin/validate-quiz",
             json={"content": yaml_content},
-            headers={"X-Master-Key": "test123"},
+            cookies = get_admin_session(port),
         )
         assert response.status_code == 200
         data = response.json()

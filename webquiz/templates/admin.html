@@ -950,16 +950,16 @@
                 const response = await fetch('/api/admin/auth', {
                     method: 'POST',
                     headers: {
-                        'Content-Type': 'application/json',
-                        'X-Master-Key': masterKey
+                        'Content-Type': 'application/json'
                     },
-                    body: JSON.stringify({})
+                    body: JSON.stringify({master_key: masterKey}),
+                    credentials: 'same-origin'  // Include cookies for session
                 });
 
                 const data = await response.json();
 
                 if (response.ok) {
-                    currentMasterKey = masterKey;
+                    currentMasterKey = 'session';  // Session is now managed by cookie
                     document.getElementById('auth-section').style.display = 'none';
                     document.getElementById('admin-panel').classList.remove('hidden');
                     showMessage('Успішна автентифікація!', 'success');
@@ -980,9 +980,7 @@
         async function loadQuizzes() {
             try {
                 const response = await fetch('/api/admin/list-quizzes', {
-                    headers: {
-                        'X-Master-Key': currentMasterKey
-                    }
+                    credentials: 'same-origin'
                 });
 
                 const data = await response.json();
@@ -1062,12 +1060,12 @@
                 const response = await fetch('/api/admin/switch-quiz', {
                     method: 'POST',
                     headers: {
-                        'Content-Type': 'application/json',
-                        'X-Master-Key': currentMasterKey
+                        'Content-Type': 'application/json'
                     },
                     body: JSON.stringify({
                         quiz_filename: selectedQuiz
-                    })
+                    }),
+                    credentials: 'same-origin'
                 });
 
                 const data = await response.json();
@@ -1153,9 +1151,7 @@
 
             try {
                 const response = await fetch(`/api/admin/quiz/${selectedQuiz}`, {
-                    headers: {
-                        'X-Master-Key': currentMasterKey
-                    }
+                    credentials: 'same-origin'
                 });
 
                 const data = await response.json();
@@ -1188,9 +1184,7 @@
             try {
                 // First get the original quiz content
                 const getResponse = await fetch(`/api/admin/quiz/${selectedQuiz}`, {
-                    headers: {
-                        'X-Master-Key': currentMasterKey
-                    }
+                    credentials: 'same-origin'
                 });
 
                 const getResult = await getResponse.json();
@@ -1204,14 +1198,14 @@
                 const createResponse = await fetch('/api/admin/create-quiz', {
                     method: 'POST',
                     headers: {
-                        'Content-Type': 'application/json',
-                        'X-Master-Key': currentMasterKey
+                        'Content-Type': 'application/json'
                     },
                     body: JSON.stringify({
                         filename: newFilename,
                         mode: 'text',
                         content: getResult.content
-                    })
+                    }),
+                    credentials: 'same-origin'
                 });
 
                 const createResult = await createResponse.json();
@@ -1245,9 +1239,7 @@
             try {
                 const response = await fetch(`/api/admin/quiz/${selectedQuiz}`, {
                     method: 'DELETE',
-                    headers: {
-                        'X-Master-Key': currentMasterKey
-                    }
+                    credentials: 'same-origin'
                 });
 
                 const data = await response.json();
@@ -1748,8 +1740,7 @@
                 const response = await fetch(url, {
                     method,
                     headers: {
-                        'Content-Type': 'application/json',
-                        'X-Master-Key': currentMasterKey
+                        'Content-Type': 'application/json'
                     },
                     body: JSON.stringify({
                         filename,
@@ -1815,9 +1806,7 @@
 
                 // Load images from server
                 const response = await fetch('/api/admin/list-images', {
-                    headers: {
-                        'X-Master-Key': currentMasterKey
-                    }
+                    credentials: 'same-origin'
                 });
 
                 const data = await response.json();
@@ -2039,7 +2028,8 @@
                             name: quiz.name,
                             download_path: quiz.download_path,
                             folder: quiz.folder
-                        })
+                        }),
+                        credentials: 'same-origin'
                     });
 
                     const data = await response.json();
@@ -2192,10 +2182,10 @@
                 const response = await fetch('/api/admin/approve-user', {
                     method: 'PUT',
                     headers: {
-                        'Content-Type': 'application/json',
-                        'X-Master-Key': currentMasterKey
+                        'Content-Type': 'application/json'
                     },
-                    body: JSON.stringify({ user_id: userId })
+                    body: JSON.stringify({ user_id: userId }),
+                    credentials: 'same-origin'
                 });
 
                 const data = await response.json();
@@ -2215,20 +2205,51 @@
             }
         }
 
-        // Auto-authenticate for trusted IPs
-        if (typeof IS_TRUSTED_IP !== 'undefined' && IS_TRUSTED_IP) {
-            // Hide auth section and show admin panel immediately
+        // Auto-authenticate function that shows admin panel
+        function showAdminPanel(message) {
             document.getElementById('auth-section').style.display = 'none';
             document.getElementById('admin-panel').classList.remove('hidden');
-            currentMasterKey = 'trusted-ip'; // Set a placeholder key for API calls
-            showMessage('Авто-автентифікація з довіреного IP', 'success');
+            showMessage(message, 'success');
             loadQuizzes();
-            displayNetworkInfo(); // Show network info for trusted IPs
+            displayNetworkInfo();
             displayDownloadableQuizzes();
-            connectToAdminWebSocket(); // Connect to admin WebSocket for approvals
-            displayVersion(); // Display version in footer
-            checkForUpdates(); // Check for updates
+            connectToAdminWebSocket();
+            displayVersion();
+            checkForUpdates();
         }
+
+        // Check for existing session cookie on page load
+        async function checkExistingSession() {
+            try {
+                const response = await fetch('/api/admin/check-session', {
+                    method: 'GET',
+                    credentials: 'same-origin'
+                });
+
+                if (response.ok) {
+                    // Valid session found - auto-authenticate
+                    currentMasterKey = 'session'; // Placeholder, actual auth is via cookie
+                    showAdminPanel('Сесію відновлено');
+                    return true;
+                }
+            } catch (error) {
+                // Session check failed, fall through to other auth methods
+            }
+            return false;
+        }
+
+        // Initialize authentication
+        (async function initAuth() {
+            // First, try to restore existing session
+            const hasSession = await checkExistingSession();
+            if (hasSession) return;
+
+            // Fall back to trusted IP auto-authentication
+            if (typeof IS_TRUSTED_IP !== 'undefined' && IS_TRUSTED_IP) {
+                currentMasterKey = 'trusted-ip';
+                showAdminPanel('Авто-автентифікація з довіреного IP');
+            }
+        })();
 
         // Version display functionality
         function displayVersion() {
@@ -2456,10 +2477,7 @@
 
                 const response = await fetch(endpoint, {
                     method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'X-Master-Key': currentMasterKey
-                    }
+                    credentials: 'same-origin'
                 });
 
                 const data = await response.json();
