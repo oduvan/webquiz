@@ -679,7 +679,7 @@ class TestingServer:
         Raises:
             Various exceptions if file cannot be read or parsed
         """
-        async with aiofiles.open(quiz_file_path, "r") as f:
+        async with aiofiles.open(quiz_file_path, "r", encoding="utf-8") as f:
             content = await f.read()
             data = yaml.safe_load(content)
             self.questions = data["questions"]
@@ -864,7 +864,7 @@ class TestingServer:
             self.user_responses.clear()
 
             mode = "w" if not file_exists else "a"
-            async with aiofiles.open(self.csv_file, mode) as f:
+            async with aiofiles.open(self.csv_file, mode, encoding="utf-8") as f:
                 await f.write(csv_content)
 
             action = "Created" if not file_exists else "Updated"
