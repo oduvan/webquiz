@@ -37,7 +37,7 @@ WebQuiz - Python/aiohttp quiz system with multi-quiz management, real-time WebSo
 
 **Admin (session cookie required, local network only):**
 - `POST /api/admin/auth` - Authenticate with master key in request body (`{"master_key": "..."}`)
-- `GET /api/admin/check-session`, `PUT /api/admin/approve-user`, `GET /api/admin/list-quizzes`, `POST /api/admin/switch-quiz`, `PUT /api/admin/config`
+- `GET /api/admin/check-session`, `GET /api/admin/version-check`, `PUT /api/admin/approve-user`, `GET /api/admin/list-quizzes`, `POST /api/admin/switch-quiz`, `PUT /api/admin/config`
 - Quiz management: `GET /api/admin/quiz/{filename}`, `POST /api/admin/create-quiz`, `PUT /api/admin/quiz/{filename}`, `DELETE /api/admin/quiz/{filename}`, `POST /api/admin/download-quiz`
 - File management: `GET /api/files/list`, `GET /api/files/{type}/view/{filename}`, `GET /api/files/{type}/download/{filename}`, `PUT /api/files/quizzes/save/{filename}`
 - Tunnel management: `POST /api/admin/tunnel/connect`, `POST /api/admin/tunnel/disconnect`, `GET /api/admin/tunnel/public-key`
@@ -123,6 +123,7 @@ webquiz-stress-test -c 50
 - **Local network restriction** - All admin functionality (API endpoints via @admin_auth_required, HTML pages, WebSockets) automatically restricted to private networks (RFC 1918: 127.0.0.0/8, 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16) with no configuration needed
 - **Quiz download folder validation** - Path traversal protection: blocks "..", absolute paths (Unix/Windows), normalizes paths, ensures extraction stays within quizzes directory; allows subfolder paths like "folder/subfolder/"
 - **Clipboard API fallback** - Copy public key button uses modern navigator.clipboard API for HTTPS/localhost, falls back to document.execCommand() for non-secure contexts (HTTP over IP)
+- **Package version check** - Admin panel periodically checks if package was updated while server is running by comparing in-memory version with file version; shows "Restart Required" banner when mismatch detected
 
 ## Key Flows
 

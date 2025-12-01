@@ -495,6 +495,8 @@ Access admin panels:
 - `/files` - View logs, CSV files, and edit configuration
 - `/live-stats` - Real-time user progress dashboard
 
+The admin panel automatically detects when the package has been updated while the server is running and displays a "Restart Required" notification, prompting you to restart the server to use the new version.
+
 ### Styling
 
 - Templates are located in `webquiz/templates/`
