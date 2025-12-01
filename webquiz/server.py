@@ -2397,12 +2397,12 @@ class TestingServer:
 
     @admin_auth_required
     async def admin_list_files(self, request):
-        """List all files in quizzes/files directory.
+        """List all files in quizzes/attach directory.
 
         Returns:
             JSON response with list of files (filename, path, size)
         """
-        files_dir = os.path.join(self.quizzes_dir, "files")
+        files_dir = os.path.join(self.quizzes_dir, "attach")
         if not os.path.exists(files_dir):
             return web.json_response({"files": []})
 
@@ -2427,7 +2427,7 @@ class TestingServer:
     async def serve_quiz_file(self, request):
         """Serve quiz file for download.
 
-        Serves files from quizzes/files directory with Content-Disposition: attachment
+        Serves files from quizzes/attach directory with Content-Disposition: attachment
         to force browser download.
 
         Args:
@@ -2442,7 +2442,7 @@ class TestingServer:
         if not self._is_safe_filename(filename):
             return web.json_response({"error": "Invalid filename"}, status=400)
 
-        files_dir = os.path.join(self.quizzes_dir, "files")
+        files_dir = os.path.join(self.quizzes_dir, "attach")
         file_path = os.path.join(files_dir, filename)
 
         # Check if file exists
@@ -3225,9 +3225,9 @@ async def create_app(config: WebQuizConfig):
     # Serve index.html at root path
     app.router.add_get("/", server.serve_index_page)
 
-    # Ensure imgs and files directories exist
+    # Ensure imgs and attach directories exist
     ensure_directory_exists(os.path.join(config.paths.quizzes_dir, "imgs"))
-    ensure_directory_exists(os.path.join(config.paths.quizzes_dir, "files"))
+    ensure_directory_exists(os.path.join(config.paths.quizzes_dir, "attach"))
     app.router.add_static(
         "/imgs/",
         path=os.path.join(config.paths.quizzes_dir, "imgs"),
