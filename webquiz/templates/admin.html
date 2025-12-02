@@ -740,54 +740,13 @@
             margin-bottom: 10px;
         }
 
-        .footer-update {
-            display: none;
-            background: var(--warning-bg);
-            border: 1px solid var(--warning-border);
-            color: var(--warning-color);
-            padding: 10px 15px;
-            border-radius: 5px;
-            margin-top: 10px;
-            display: inline-block;
-        }
-
-        .footer-update a {
-            color: var(--button-bg);
-            text-decoration: none;
-            font-weight: bold;
-        }
-
-        .footer-update a:hover {
-            text-decoration: underline;
-        }
-
-        .footer-update.hidden {
-            display: none;
-        }
-
         .footer-restart {
-            background: var(--error-bg);
-            border: 1px solid var(--error-border);
-            color: var(--error-color);
-            padding: 10px 15px;
-            border-radius: 5px;
             margin-top: 10px;
-            display: inline-block;
+            color: var(--text-muted);
         }
 
         .footer-restart.hidden {
             display: none;
-        }
-
-        .footer-restart button {
-            background: var(--danger-red);
-            color: var(--white);
-            border: none;
-            padding: 5px 15px;
-            border-radius: 3px;
-            cursor: default;
-            margin-left: 10px;
-            font-size: 14px;
         }
     </style>
 </head>
@@ -892,10 +851,8 @@
                     WebQuiz v<span id="version-number">...</span>
                     <span id="footer-docs-link" style="margin-left: 15px;"></span>
                 </div>
-                <div id="footer-update" class="footer-update hidden"></div>
                 <div id="footer-restart" class="footer-restart hidden">
-                    New version installed (v<span id="new-version-number"></span>)
-                    <button disabled>Restart Required</button>
+                    New version installed (v<span id="new-version-number"></span>), restart required
                 </div>
             </div>
         </div>
@@ -1060,7 +1017,6 @@
                     displayDownloadableQuizzes();
                     connectToAdminWebSocket(); // Connect to admin WebSocket for approvals
                     displayVersion(); // Display version in footer
-                    checkForUpdates(); // Check for updates
                 } else {
                     showMessage(data.error || 'Автентифікація невдала', 'error');
                 }
@@ -2419,7 +2375,6 @@
             displayDownloadableQuizzes();
             connectToAdminWebSocket();
             displayVersion();
-            checkForUpdates();
         }
 
         // Check for existing session cookie on page load
@@ -2469,65 +2424,6 @@
             } else {
                 versionSpan.textContent = 'unknown';
                 docsLinkSpan.innerHTML = '';
-            }
-        }
-
-        // Version check functionality
-        async function checkForUpdates() {
-            // Only check if version is defined
-            if (typeof WEBQUIZ_VERSION === 'undefined') {
-                return;
-            }
-
-            try {
-                const response = await fetch('https://pypi.org/pypi/webquiz/json', {
-                    method: 'GET',
-                    headers: {
-                        'Accept': 'application/json'
-                    }
-                });
-
-                if (!response.ok) {
-                    return; // Silently fail
-                }
-
-                const data = await response.json();
-                const latestVersion = data.info.version;
-                const currentVersion = WEBQUIZ_VERSION;
-
-                // Parse versions into arrays of integers
-                const parseVersion = (version) => {
-                    return version.split('.').map(part => parseInt(part, 10) || 0);
-                };
-
-                const currentParts = parseVersion(currentVersion);
-                const latestParts = parseVersion(latestVersion);
-
-                // Compare versions
-                const maxLength = Math.max(currentParts.length, latestParts.length);
-                let isNewer = false;
-
-                for (let i = 0; i < maxLength; i++) {
-                    const current = currentParts[i] || 0;
-                    const latest = latestParts[i] || 0;
-
-                    if (latest > current) {
-                        isNewer = true;
-                        break;
-                    } else if (latest < current) {
-                        break;
-                    }
-                }
-
-                // Show update notification if newer version available
-                if (isNewer) {
-                    const updateElement = document.getElementById('footer-update');
-                    updateElement.classList.remove('hidden');
-                    updateElement.innerHTML = `⬆️ Update available: <a href="https://github.com/oduvan/webquiz/releases/tag/v${latestVersion}" target="_blank">v${latestVersion}</a>`;
-                }
-            } catch (error) {
-                // Silently fail - don't show any error messages
-                return;
             }
         }
 
