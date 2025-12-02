@@ -783,9 +783,7 @@ class TestingServer:
         template_content = self.templates.get("index.html", "")
 
         # Generate registration fields HTML as a table (always include username)
-        registration_fields_html = (
-            '<table class="registration-table">'
-        )
+        registration_fields_html = '<table class="registration-table">'
 
         # Get username label from config
         username_label = "Ім'я користувача"
@@ -836,47 +834,44 @@ class TestingServer:
         if not self.user_responses:
             return
 
-        try:
-            # Check if CSV file exists, if not create it with headers
-            file_exists = os.path.exists(self.csv_file)
+        # Check if CSV file exists, if not create it with headers
+        file_exists = os.path.exists(self.csv_file)
 
-            # Use StringIO buffer to write CSV data
-            csv_buffer = StringIO()
-            csv_writer = csv.writer(csv_buffer)
+        # Use StringIO buffer to write CSV data
+        csv_buffer = StringIO()
+        csv_writer = csv.writer(csv_buffer)
 
-            # Write headers if file doesn't exist
-            if not file_exists:
-                csv_writer.writerow(
-                    ["user_id", "question", "selected_answer", "correct_answer", "is_correct", "time_taken_seconds"]
-                )
+        # Write headers if file doesn't exist
+        if not file_exists:
+            csv_writer.writerow(
+                ["user_id", "question", "selected_answer", "correct_answer", "is_correct", "time_taken_seconds"]
+            )
 
-            # Write all responses to buffer
-            for response in self.user_responses:
-                csv_writer.writerow(
-                    [
-                        response["user_id"],
-                        response["question"],
-                        response["selected_answer"],
-                        response["correct_answer"],
-                        response["is_correct"],
-                        response["time_taken_seconds"],
-                    ]
-                )
+        # Write all responses to buffer
+        for response in self.user_responses:
+            csv_writer.writerow(
+                [
+                    response["user_id"],
+                    response["question"],
+                    response["selected_answer"],
+                    response["correct_answer"],
+                    response["is_correct"],
+                    response["time_taken_seconds"],
+                ]
+            )
 
-            # Write buffer content to file
-            csv_content = csv_buffer.getvalue()
-            csv_buffer.close()
-            total_responses = len(self.user_responses)
-            self.user_responses.clear()
+        # Write buffer content to file
+        csv_content = csv_buffer.getvalue()
+        csv_buffer.close()
+        total_responses = len(self.user_responses)
+        self.user_responses.clear()
 
-            mode = "w" if not file_exists else "a"
-            async with aiofiles.open(self.csv_file, mode, encoding="utf-8") as f:
-                await f.write(csv_content)
+        mode = "w" if not file_exists else "a"
+        async with aiofiles.open(self.csv_file, mode, encoding="utf-8") as f:
+            await f.write(csv_content)
 
-            action = "Created" if not file_exists else "Updated"
-            logger.info(f"{action} CSV file with {total_responses} responses: {self.csv_file}")
-        except Exception as e:
-            logger.error(f"Error flushing responses to CSV: {e}")
+        action = "Created" if not file_exists else "Updated"
+        logger.info(f"{action} CSV file with {total_responses} responses: {self.csv_file}")
 
     async def flush_users_to_csv(self):
         """Flush user registration data to separate CSV file.
@@ -886,9 +881,6 @@ class TestingServer:
         """
         if not self.users or not self.user_csv_file:
             return
-
-        # Check if CSV file exists
-        file_exists = os.path.exists(self.user_csv_file)
 
         # Use StringIO buffer to write CSV data
         csv_buffer = StringIO()
@@ -933,7 +925,6 @@ class TestingServer:
         # Write buffer content to file
         csv_content = csv_buffer.getvalue()
         csv_buffer.close()
-        total_users = len(self.users)
 
         # Always overwrite the file (users don't accumulate like responses do)
         async with aiofiles.open(self.user_csv_file, "w", encoding="utf-8") as f:
@@ -1855,16 +1846,12 @@ class TestingServer:
         file_version = get_file_version()
 
         restart_required = (
-            running_version != "unknown"
-            and file_version != "unknown"
-            and running_version != file_version
+            running_version != "unknown" and file_version != "unknown" and running_version != file_version
         )
 
-        return web.json_response({
-            "running_version": running_version,
-            "file_version": file_version,
-            "restart_required": restart_required
-        })
+        return web.json_response(
+            {"running_version": running_version, "file_version": file_version, "restart_required": restart_required}
+        )
 
     @admin_auth_required
     async def admin_approve_user(self, request):
