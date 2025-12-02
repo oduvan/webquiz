@@ -320,29 +320,6 @@ jobs:
           binaries/webquiz-macos-apple-silicon/webquiz-macos-apple-silicon.zip \
           binaries/webquiz-windows.exe/webquiz-windows.exe.zip
 
-    - name: Wait for package to be downloadable from PyPI
-      run: |
-        echo "Waiting for webquiz ${{ github.event.inputs.version }} to be downloadable from PyPI..."
-        MAX_ATTEMPTS=30
-        ATTEMPT=1
-        WAIT_TIME=10
-        # Create temporary directory for download test
-        TEMP_DIR=$(mktemp -d)
-        trap "rm -rf $TEMP_DIR" EXIT
-        while [ $ATTEMPT -le $MAX_ATTEMPTS ]; do
-          echo "Attempt $ATTEMPT/$MAX_ATTEMPTS: Trying to download package..."
-          # Use pip download to verify package is actually downloadable (not just metadata)
-          if pip download --no-deps --dest "$TEMP_DIR" "webquiz==${{ github.event.inputs.version }}" 2>/dev/null; then
-            echo "✅ Package webquiz ${{ github.event.inputs.version }} is now downloadable from PyPI!"
-            exit 0
-          fi
-          echo "Package not yet downloadable. Waiting ${WAIT_TIME}s before retry..."
-          sleep $WAIT_TIME
-          ATTEMPT=$((ATTEMPT + 1))
-        done
-        echo "❌ Timeout: Package was not downloadable from PyPI after $MAX_ATTEMPTS attempts"
-        exit 1
-
     - name: Update webquiz-ansible repository
       env:
         ANSIBLE_REPO_TOKEN: ${{ secrets.ANSIBLE_REPO_TOKEN }}
