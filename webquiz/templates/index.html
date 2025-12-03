@@ -801,6 +801,47 @@
             document.getElementById('user-info').classList.remove('visible');
         }
 
+        // Registration data storage management
+        const REGISTRATION_STORAGE_KEY = 'webquiz_registration_data';
+
+        function saveRegistrationData(data) {
+            try {
+                localStorage.setItem(REGISTRATION_STORAGE_KEY, JSON.stringify(data));
+            } catch (error) {
+                console.log('Failed to save registration data to localStorage:', error);
+            }
+        }
+
+        function loadRegistrationData() {
+            try {
+                const storedData = localStorage.getItem(REGISTRATION_STORAGE_KEY);
+                return storedData ? JSON.parse(storedData) : null;
+            } catch (error) {
+                console.log('Failed to load registration data from localStorage:', error);
+                return null;
+            }
+        }
+
+        function prefillRegistrationForm() {
+            const savedData = loadRegistrationData();
+            if (!savedData) return;
+
+            // Pre-fill username field
+            const usernameField = document.getElementById('username');
+            if (usernameField && savedData.username) {
+                usernameField.value = savedData.username;
+            }
+
+            // Pre-fill additional registration fields
+            const additionalFields = document.querySelectorAll('.registration-field');
+            for (const field of additionalFields) {
+                const fieldName = field.getAttribute('data-field-name');
+                if (fieldName && savedData[fieldName]) {
+                    field.value = savedData[fieldName];
+                }
+            }
+        }
+
         // Cookie management
         function setCookie(name, value, days = 30) {
             const expires = new Date();
@@ -909,6 +950,8 @@
         function hideLoadingShowRegistration() {
             document.getElementById('loading').classList.add('hidden');
             document.getElementById('registration').classList.remove('hidden');
+            // Pre-fill form with previously saved data
+            prefillRegistrationForm();
         }
 
         async function hideLoadingShowTest() {
@@ -962,6 +1005,9 @@
                     currentUsername = data.username;
                     currentUserId = data.user_id;
                     setCookie('user_id', currentUserId);
+
+                    // Save registration data to localStorage for future use
+                    saveRegistrationData(registrationData);
 
                     // Show username on page
                     showUsername(currentUsername);
@@ -1064,6 +1110,9 @@
 
                     currentUsername = updatedData.username;
                     showUsername(currentUsername);
+
+                    // Save updated registration data to localStorage for future use
+                    saveRegistrationData(updatedData);
                 } else {
                     showError('waiting-error', data.error || 'Помилка оновлення даних');
                 }
