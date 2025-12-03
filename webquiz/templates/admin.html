@@ -260,6 +260,77 @@
             justify-content: space-between;
             align-items: center;
             margin-bottom: 6px;
+            padding: 10px;
+            background: var(--question-bg, #e9ecef);
+            border-radius: 5px;
+            cursor: pointer;
+            user-select: none;
+        }
+
+        .question-header:hover {
+            background: var(--question-bg-hover, #dee2e6);
+        }
+
+        .question-header-left {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            flex: 1;
+            min-width: 0;
+        }
+
+        .question-collapse-icon {
+            font-size: 12px;
+            transition: transform 0.2s ease;
+            color: var(--text-muted);
+        }
+
+        .question-item.collapsed .question-collapse-icon {
+            transform: rotate(-90deg);
+        }
+
+        .question-number {
+            font-weight: bold;
+            white-space: nowrap;
+        }
+
+        .question-preview {
+            color: var(--text-muted);
+            font-size: 0.9em;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            max-width: 300px;
+        }
+
+        .question-header-buttons {
+            display: flex;
+            gap: 5px;
+            flex-shrink: 0;
+        }
+
+        .question-header-buttons button {
+            padding: 5px 8px;
+            font-size: 12px;
+            margin: 0;
+        }
+
+        .question-body {
+            overflow: hidden;
+            transition: max-height 0.3s ease, opacity 0.2s ease, padding 0.2s ease;
+            max-height: 2000px;
+            opacity: 1;
+            padding-top: 10px;
+        }
+
+        .question-item.collapsed .question-body {
+            max-height: 0;
+            opacity: 0;
+            padding-top: 0;
+        }
+
+        .question-item.collapsed {
+            padding-bottom: 0;
         }
 
         .option-item {
@@ -1346,70 +1417,76 @@
             addQuestion();
         }
 
-        function addQuestion() {
+        function addQuestion(collapsed = false) {
             const container = document.getElementById('questions-container');
             const questionDiv = document.createElement('div');
-            questionDiv.className = 'question-item';
+            questionDiv.className = collapsed ? 'question-item collapsed' : 'question-item';
             questionDiv.dataset.questionId = questionCounter;
 
             questionDiv.innerHTML = `
-                <div class="question-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; padding: 10px; background: var(--question-bg); border-radius: 5px;">
-                    <span style="font-weight: bold;">Question ${questionCounter}</span>
-                    <div>
-                        <button type="button" onclick="moveQuestion(${questionCounter}, 'up')" style="margin-right: 5px; padding: 5px 8px; font-size: 12px;">↑</button>
-                        <button type="button" onclick="moveQuestion(${questionCounter}, 'down')" style="margin-right: 5px; padding: 5px 8px; font-size: 12px;">↓</button>
-                        <button type="button" onclick="removeQuestion(${questionCounter})" class="btn-danger" style="padding: 5px 8px; font-size: 12px;">×</button>
+                <div class="question-header" onclick="toggleQuestionCollapse(${questionCounter}, event)">
+                    <div class="question-header-left">
+                        <span class="question-collapse-icon">▼</span>
+                        <span class="question-number">Питання ${questionCounter}</span>
+                        <span class="question-preview"></span>
+                    </div>
+                    <div class="question-header-buttons">
+                        <button type="button" onclick="moveQuestion(${questionCounter}, 'up', event)" title="Перемістити вгору">↑</button>
+                        <button type="button" onclick="moveQuestion(${questionCounter}, 'down', event)" title="Перемістити вниз">↓</button>
+                        <button type="button" onclick="removeQuestion(${questionCounter}, event)" class="btn-danger" title="Видалити">×</button>
                     </div>
                 </div>
-                <div class="form-group">
-                    <label>Текст Питання (необов'язково, якщо є зображення):</label>
-                    <input type="text" class="question-text" placeholder="Введіть текст питання" style="width: 100%;">
-                </div>
-                <div class="form-group">
-                    <label>Зображення Питання (необов'язково, якщо є текст):</label>
-                    <div style="display: flex; align-items: center; gap: 5px;">
-                        <input type="text" class="question-image" placeholder="напр., /imgs/diagram.png" style="width: 100%;" oninput="updateQuestionImagePreview(this)">
-                        <button type="button" onclick="openImagePicker('question-image', ${questionCounter})" style="padding: 5px 8px; font-size: 16px;" title="Select image">📷</button>
+                <div class="question-body">
+                    <div class="form-group">
+                        <label>Текст Питання (необов'язково, якщо є зображення):</label>
+                        <input type="text" class="question-text" placeholder="Введіть текст питання" style="width: 100%;" oninput="updateQuestionPreview(this)">
                     </div>
-                    <div class="image-preview-container">
-                        <img class="image-preview" src="" alt="Preview" onclick="openFullscreenPreview(this.src)" title="Click to enlarge">
-                    </div>
-                </div>
-                <div class="form-group">
-                    <label>Файл для Завантаження (необов'язково):</label>
-                    <div style="display: flex; align-items: center; gap: 5px;">
-                        <input type="text" class="question-file" placeholder="напр., data.xlsx" style="width: 100%;">
-                        <button type="button" onclick="openFilePicker(${questionCounter})" style="padding: 5px 8px; font-size: 16px;" title="Select file">📎</button>
-                    </div>
-                </div>
-                <div class="form-group">
-                    <label>Тип Питання:</label>
-                    <div style="margin: 10px 0;">
-                        <button type="button" class="question-type-toggle active" data-type="single" onclick="toggleQuestionType(${questionCounter}, 'single')">📝 Одна правильна відповідь</button>
-                        <button type="button" class="question-type-toggle" data-type="multiple" onclick="toggleQuestionType(${questionCounter}, 'multiple')">☑️ Кілька правильних відповідей</button>
-                    </div>
-                </div>
-                <div class="form-group">
-                    <label>Варіанти Відповідей:</label>
-                    <div class="options-container">
-                        <div class="option-item">
-                            <input type="radio" name="correct-${questionCounter}" value="0" checked>
-                            <input type="text" class="option-text" placeholder="Варіант 1" oninput="updateOptionImagePreview(this)">
-                            <button type="button" onclick="openImagePicker('option-text', ${questionCounter}, 0)" style="padding: 2px 5px; font-size: 12px;" title="Select image">📷</button>
-                            <button type="button" onclick="removeOption(this)">×</button>
+                    <div class="form-group">
+                        <label>Зображення Питання (необов'язково, якщо є текст):</label>
+                        <div style="display: flex; align-items: center; gap: 5px;">
+                            <input type="text" class="question-image" placeholder="напр., /imgs/diagram.png" style="width: 100%;" oninput="updateQuestionImagePreview(this); updateQuestionPreview(this)">
+                            <button type="button" onclick="openImagePicker('question-image', ${questionCounter})" style="padding: 5px 8px; font-size: 16px;" title="Select image">📷</button>
                         </div>
-                        <div class="option-item">
-                            <input type="radio" name="correct-${questionCounter}" value="1">
-                            <input type="text" class="option-text" placeholder="Варіант 2" oninput="updateOptionImagePreview(this)">
-                            <button type="button" onclick="openImagePicker('option-text', ${questionCounter}, 1)" style="padding: 2px 5px; font-size: 12px;" title="Select image">📷</button>
-                            <button type="button" onclick="removeOption(this)">×</button>
+                        <div class="image-preview-container">
+                            <img class="image-preview" src="" alt="Preview" onclick="openFullscreenPreview(this.src)" title="Click to enlarge">
                         </div>
                     </div>
-                    <button type="button" onclick="addOption(${questionCounter})">+ Додати Варіант</button>
-                </div>
-                <div class="form-group min-correct-container" style="display: none;">
-                    <label for="min-correct-${questionCounter}">Мінімум правильних відповідей:</label>
-                    <input type="number" id="min-correct-${questionCounter}" class="min-correct-input" min="1" placeholder="Усі правильні" style="width: 80px;">
+                    <div class="form-group">
+                        <label>Файл для Завантаження (необов'язково):</label>
+                        <div style="display: flex; align-items: center; gap: 5px;">
+                            <input type="text" class="question-file" placeholder="напр., data.xlsx" style="width: 100%;">
+                            <button type="button" onclick="openFilePicker(${questionCounter})" style="padding: 5px 8px; font-size: 16px;" title="Select file">📎</button>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label>Тип Питання:</label>
+                        <div style="margin: 10px 0;">
+                            <button type="button" class="question-type-toggle active" data-type="single" onclick="toggleQuestionType(${questionCounter}, 'single')">📝 Одна правильна відповідь</button>
+                            <button type="button" class="question-type-toggle" data-type="multiple" onclick="toggleQuestionType(${questionCounter}, 'multiple')">☑️ Кілька правильних відповідей</button>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label>Варіанти Відповідей:</label>
+                        <div class="options-container">
+                            <div class="option-item">
+                                <input type="radio" name="correct-${questionCounter}" value="0" checked>
+                                <input type="text" class="option-text" placeholder="Варіант 1" oninput="updateOptionImagePreview(this)">
+                                <button type="button" onclick="openImagePicker('option-text', ${questionCounter}, 0)" style="padding: 2px 5px; font-size: 12px;" title="Select image">📷</button>
+                                <button type="button" onclick="removeOption(this)">×</button>
+                            </div>
+                            <div class="option-item">
+                                <input type="radio" name="correct-${questionCounter}" value="1">
+                                <input type="text" class="option-text" placeholder="Варіант 2" oninput="updateOptionImagePreview(this)">
+                                <button type="button" onclick="openImagePicker('option-text', ${questionCounter}, 1)" style="padding: 2px 5px; font-size: 12px;" title="Select image">📷</button>
+                                <button type="button" onclick="removeOption(this)">×</button>
+                            </div>
+                        </div>
+                        <button type="button" onclick="addOption(${questionCounter})">+ Додати Варіант</button>
+                    </div>
+                    <div class="form-group min-correct-container" style="display: none;">
+                        <label for="min-correct-${questionCounter}">Мінімум правильних відповідей:</label>
+                        <input type="number" id="min-correct-${questionCounter}" class="min-correct-input" min="1" placeholder="Усі правильні" style="width: 80px;">
+                    </div>
                 </div>
             `;
 
@@ -1417,17 +1494,50 @@
             questionCounter++;
             updateQuestionNumbers();
 
-            // Scroll the new question into view
-            questionDiv.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+            // Scroll the new question into view and focus if not collapsed
+            if (!collapsed) {
+                questionDiv.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 
-            // Focus on the question text input
-            const questionTextInput = questionDiv.querySelector('.question-text');
-            if (questionTextInput) {
-                setTimeout(() => questionTextInput.focus(), 300);
+                // Focus on the question text input
+                const questionTextInput = questionDiv.querySelector('.question-text');
+                if (questionTextInput) {
+                    setTimeout(() => questionTextInput.focus(), 300);
+                }
             }
         }
 
-        function removeQuestion(questionId) {
+        function toggleQuestionCollapse(questionId, event) {
+            // Don't toggle if clicking on buttons
+            if (event && event.target.closest('.question-header-buttons')) {
+                return;
+            }
+            const questionDiv = document.querySelector(`[data-question-id="${questionId}"]`);
+            if (questionDiv) {
+                questionDiv.classList.toggle('collapsed');
+            }
+        }
+
+        function updateQuestionPreview(input) {
+            const questionDiv = input.closest('.question-item');
+            if (!questionDiv) return;
+
+            const previewSpan = questionDiv.querySelector('.question-preview');
+            if (!previewSpan) return;
+
+            const questionText = questionDiv.querySelector('.question-text').value.trim();
+            const questionImage = questionDiv.querySelector('.question-image').value.trim();
+
+            let preview = '';
+            if (questionText) {
+                preview = questionText.length > 50 ? questionText.substring(0, 50) + '...' : questionText;
+            } else if (questionImage) {
+                preview = '[Зображення]';
+            }
+            previewSpan.textContent = preview ? `— ${preview}` : '';
+        }
+
+        function removeQuestion(questionId, event) {
+            if (event) event.stopPropagation();
             const questionDiv = document.querySelector(`[data-question-id="${questionId}"]`);
             if (questionDiv) {
                 questionDiv.remove();
@@ -1435,7 +1545,8 @@
             }
         }
 
-        function moveQuestion(questionId, direction) {
+        function moveQuestion(questionId, direction, event) {
+            if (event) event.stopPropagation();
             const questionDiv = document.querySelector(`[data-question-id="${questionId}"]`);
             if (!questionDiv) return;
 
@@ -1504,9 +1615,9 @@
                 const questionNumber = i + 1;
 
                 // Update the visual question number in header
-                const headerSpan = questionDiv.querySelector('.question-header span');
-                if (headerSpan) {
-                    headerSpan.textContent = `Питання ${questionNumber}`;
+                const numberSpan = questionDiv.querySelector('.question-number');
+                if (numberSpan) {
+                    numberSpan.textContent = `Питання ${questionNumber}`;
                 }
 
                 // Update radio button names to ensure correct grouping
@@ -1644,7 +1755,8 @@
             if (quizData.questions) {
                 quizData.questions.forEach(question => {
                     const questionDiv = document.createElement('div');
-                    questionDiv.className = 'question-item';
+                    // Start collapsed when editing existing quiz
+                    questionDiv.className = 'question-item collapsed';
                     questionDiv.dataset.questionId = questionCounter;
 
                     const isMultipleChoice = Array.isArray(question.correct_answer);
@@ -1670,53 +1782,68 @@
                     const minCorrectValue = question.min_correct || '';
                     const minCorrectDisplay = isMultipleChoice ? 'block' : 'none';
 
+                    // Build preview text
+                    let previewText = '';
+                    if (question.question) {
+                        previewText = question.question.length > 50 ? question.question.substring(0, 50) + '...' : question.question;
+                    } else if (question.image) {
+                        previewText = '[Зображення]';
+                    }
+                    const previewDisplay = previewText ? `— ${previewText}` : '';
+
                     questionDiv.innerHTML = `
-                        <div class="question-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; padding: 10px; background: var(--question-bg); border-radius: 5px;">
-                            <span style="font-weight: bold;">Питання ${questionCounter}</span>
-                            <div>
-                                <button type="button" onclick="moveQuestion(${questionCounter}, 'up')" style="margin-right: 5px; padding: 5px 8px; font-size: 12px;">↑</button>
-                                <button type="button" onclick="moveQuestion(${questionCounter}, 'down')" style="margin-right: 5px; padding: 5px 8px; font-size: 12px;">↓</button>
-                                <button type="button" onclick="removeQuestion(${questionCounter})" class="btn-danger" style="padding: 5px 8px; font-size: 12px;">×</button>
+                        <div class="question-header" onclick="toggleQuestionCollapse(${questionCounter}, event)">
+                            <div class="question-header-left">
+                                <span class="question-collapse-icon">▼</span>
+                                <span class="question-number">Питання ${questionCounter}</span>
+                                <span class="question-preview">${escapeHtml(previewDisplay)}</span>
+                            </div>
+                            <div class="question-header-buttons">
+                                <button type="button" onclick="moveQuestion(${questionCounter}, 'up', event)" title="Перемістити вгору">↑</button>
+                                <button type="button" onclick="moveQuestion(${questionCounter}, 'down', event)" title="Перемістити вниз">↓</button>
+                                <button type="button" onclick="removeQuestion(${questionCounter}, event)" class="btn-danger" title="Видалити">×</button>
                             </div>
                         </div>
-                        <div class="form-group">
-                            <label>Текст Питання (необов'язково, якщо є зображення):</label>
-                            <input type="text" class="question-text" value="${escapeHtml(question.question || '')}" placeholder="Введіть текст питання" style="width: 100%;">
-                        </div>
-                        <div class="form-group">
-                            <label>Зображення Питання (необов'язково, якщо є текст):</label>
-                            <div style="display: flex; align-items: center; gap: 5px;">
-                                <input type="text" class="question-image" value="${escapeHtml(question.image || '')}" placeholder="напр., /imgs/diagram.png" style="width: 100%;" oninput="updateQuestionImagePreview(this)">
-                                <button type="button" onclick="openImagePicker('question-image', ${questionCounter})" style="padding: 5px 8px; font-size: 16px;" title="Select image">📷</button>
+                        <div class="question-body">
+                            <div class="form-group">
+                                <label>Текст Питання (необов'язково, якщо є зображення):</label>
+                                <input type="text" class="question-text" value="${escapeHtml(question.question || '')}" placeholder="Введіть текст питання" style="width: 100%;" oninput="updateQuestionPreview(this)">
                             </div>
-                            <div class="image-preview-container${question.image ? ' has-image' : ''}">
-                                <img class="image-preview" src="${question.image || ''}" alt="Preview" onclick="openFullscreenPreview(this.src)" title="Click to enlarge">
+                            <div class="form-group">
+                                <label>Зображення Питання (необов'язково, якщо є текст):</label>
+                                <div style="display: flex; align-items: center; gap: 5px;">
+                                    <input type="text" class="question-image" value="${escapeHtml(question.image || '')}" placeholder="напр., /imgs/diagram.png" style="width: 100%;" oninput="updateQuestionImagePreview(this); updateQuestionPreview(this)">
+                                    <button type="button" onclick="openImagePicker('question-image', ${questionCounter})" style="padding: 5px 8px; font-size: 16px;" title="Select image">📷</button>
+                                </div>
+                                <div class="image-preview-container${question.image ? ' has-image' : ''}">
+                                    <img class="image-preview" src="${question.image || ''}" alt="Preview" onclick="openFullscreenPreview(this.src)" title="Click to enlarge">
+                                </div>
                             </div>
-                        </div>
-                        <div class="form-group">
-                            <label>Файл для Завантаження (необов'язково):</label>
-                            <div style="display: flex; align-items: center; gap: 5px;">
-                                <input type="text" class="question-file" value="${escapeHtml(question.file || '')}" placeholder="напр., data.xlsx" style="width: 100%;">
-                                <button type="button" onclick="openFilePicker(${questionCounter})" style="padding: 5px 8px; font-size: 16px;" title="Select file">📎</button>
+                            <div class="form-group">
+                                <label>Файл для Завантаження (необов'язково):</label>
+                                <div style="display: flex; align-items: center; gap: 5px;">
+                                    <input type="text" class="question-file" value="${escapeHtml(question.file || '')}" placeholder="напр., data.xlsx" style="width: 100%;">
+                                    <button type="button" onclick="openFilePicker(${questionCounter})" style="padding: 5px 8px; font-size: 16px;" title="Select file">📎</button>
+                                </div>
                             </div>
-                        </div>
-                        <div class="form-group">
-                            <label>Тип Питання:</label>
-                            <div style="margin: 10px 0;">
-                                <button type="button" class="question-type-toggle ${!isMultipleChoice ? 'active' : ''}" data-type="single" onclick="toggleQuestionType(${questionCounter}, 'single')">📝 Одна правильна відповідь</button>
-                                <button type="button" class="question-type-toggle ${isMultipleChoice ? 'active' : ''}" data-type="multiple" onclick="toggleQuestionType(${questionCounter}, 'multiple')">☑️ Кілька правильних відповідей</button>
+                            <div class="form-group">
+                                <label>Тип Питання:</label>
+                                <div style="margin: 10px 0;">
+                                    <button type="button" class="question-type-toggle ${!isMultipleChoice ? 'active' : ''}" data-type="single" onclick="toggleQuestionType(${questionCounter}, 'single')">📝 Одна правильна відповідь</button>
+                                    <button type="button" class="question-type-toggle ${isMultipleChoice ? 'active' : ''}" data-type="multiple" onclick="toggleQuestionType(${questionCounter}, 'multiple')">☑️ Кілька правильних відповідей</button>
+                                </div>
                             </div>
-                        </div>
-                        <div class="form-group">
-                            <label>Варіанти Відповідей:</label>
-                            <div class="options-container">
-                                ${optionsHtml}
+                            <div class="form-group">
+                                <label>Варіанти Відповідей:</label>
+                                <div class="options-container">
+                                    ${optionsHtml}
+                                </div>
+                                <button type="button" onclick="addOption(${questionCounter})">+ Додати Варіант</button>
                             </div>
-                            <button type="button" onclick="addOption(${questionCounter})">+ Додати Варіант</button>
-                        </div>
-                        <div class="form-group min-correct-container" style="display: ${minCorrectDisplay};">
-                            <label for="min-correct-${questionCounter}">Мінімум правильних відповідей:</label>
-                            <input type="number" id="min-correct-${questionCounter}" class="min-correct-input" min="1" value="${minCorrectValue}" placeholder="Усі правильні" style="width: 80px;">
+                            <div class="form-group min-correct-container" style="display: ${minCorrectDisplay};">
+                                <label for="min-correct-${questionCounter}">Мінімум правильних відповідей:</label>
+                                <input type="number" id="min-correct-${questionCounter}" class="min-correct-input" min="1" value="${minCorrectValue}" placeholder="Усі правильні" style="width: 80px;">
+                            </div>
                         </div>
                     `;
 
