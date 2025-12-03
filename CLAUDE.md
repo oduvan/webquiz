@@ -57,7 +57,13 @@ WebQuiz - Python/aiohttp quiz system with multi-quiz management, real-time WebSo
 ⚠️ **ALWAYS use venv**: All Python commands and poetry operations must run inside virtual environment (`source venv/bin/activate` or `poetry shell`)
 
 ```bash
-# Setup
+# Environment Setup (from scratch)
+python3 -m venv venv           # Create virtual environment
+source venv/bin/activate       # Activate venv
+pip install poetry             # Install poetry inside venv
+poetry install                 # Install project dependencies
+
+# Quick Setup (if venv already exists)
 source venv/bin/activate && poetry install
 
 # Run
@@ -75,6 +81,11 @@ source venv/bin/activate && python -m pytest tests/ -v --cov=webquiz --cov-repor
 # Build binary (current OS only)
 source venv/bin/activate && poetry run build_binary
 ```
+
+### Environment Requirements
+- **Python**: 3.9+ (tested with 3.9-3.14)
+- **Poetry**: Installed inside venv (not globally) to avoid conflicts
+- **Test ports**: Tests use ports 8080-8087 for parallel execution (-n 4 uses 4 workers)
 
 ## Stress Testing
 
