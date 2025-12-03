@@ -555,31 +555,17 @@
             .registration-label,
             .registration-input {
                 display: block;
-                width: 100%;
-                text-align: left;
+                width: 100% !important;
+                text-align: left !important;
                 padding: 5px 0;
             }
 
             .registration-input input {
-                max-width: 100%;
+                width: 100% !important;
+                max-width: 100% !important;
+                box-sizing: border-box;
             }
 
-            #waiting-registration-fields table {
-                width: 100%;
-                max-width: 100%;
-            }
-
-            #waiting-registration-fields table td {
-                display: block;
-                width: 100%;
-                text-align: left;
-                padding: 5px 0;
-            }
-
-            #waiting-registration-fields table td:first-child {
-                font-weight: bold;
-                margin-top: 10px;
-            }
 
             h2 {
                 padding: 0 10px;
@@ -1009,9 +995,9 @@
             // Populate the waiting approval form with current registration data
             const waitingFieldsContainer = document.getElementById('waiting-registration-fields');
 
-            // Create a table similar to registration form
-            let fieldsHTML = '<table style="margin: 20px auto; max-width: 500px; width: 100%;">';
-            fieldsHTML += `<tr><td style="padding: 8px; text-align: right; width: 200px;">{{USERNAME_LABEL}}:</td><td style="padding: 8px;"><input type="text" id="waiting-username" value="${registrationData.username || ''}" style="width: 100%; max-width: 250px; padding: 8px; border: 1px solid var(--border-color); border-radius: 5px; box-sizing: border-box;" /></td></tr>`;
+            // Create a table similar to registration form using CSS classes
+            let fieldsHTML = '<table class="registration-table">';
+            fieldsHTML += `<tr><td class="registration-label">{{USERNAME_LABEL}}:</td><td class="registration-input"><input type="text" id="waiting-username" value="${registrationData.username || ''}" /></td></tr>`;
 
             // Add additional registration fields if they exist
             const additionalFields = document.querySelectorAll('.registration-field');
@@ -1021,7 +1007,7 @@
                 const fieldLabel = fieldRow ? fieldRow.querySelector('td:first-child')?.textContent.trim() : fieldName;
                 const fieldValue = registrationData[fieldName] || '';
 
-                fieldsHTML += `<tr><td style="padding: 8px; text-align: right;">${fieldLabel}</td><td style="padding: 8px;"><input type="text" class="waiting-field" data-field-name="${fieldName}" value="${fieldValue}" style="width: 100%; max-width: 250px; padding: 8px; border: 1px solid var(--border-color); border-radius: 5px; box-sizing: border-box;" /></td></tr>`;
+                fieldsHTML += `<tr><td class="registration-label">${fieldLabel}</td><td class="registration-input"><input type="text" class="waiting-field" data-field-name="${fieldName}" value="${fieldValue}" /></td></tr>`;
             }
             fieldsHTML += '</table>';
 
