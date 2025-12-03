@@ -205,6 +205,106 @@ def load_config_with_overrides(config_path: Optional[str] = None, **cli_override
     return config
 
 
+def log_startup_environment(config: WebQuizConfig):
+    """Log important environment information at startup for troubleshooting.
+
+    Logs system info, Python version, package versions, server configuration,
+    and other useful debugging information to help diagnose issues.
+
+    Args:
+        config: WebQuizConfig object with server configuration
+    """
+    import sys
+    import aiohttp
+
+    logger.info("=" * 60)
+    logger.info("WebQuiz Server Starting - Environment Information")
+    logger.info("=" * 60)
+
+    # WebQuiz version
+    logger.info(f"WebQuiz version: {get_package_version()}")
+
+    # Python information
+    logger.info(f"Python version: {sys.version}")
+    logger.info(f"Python executable: {sys.executable}")
+
+    # Platform and OS information
+    logger.info(f"Platform: {platform.platform()}")
+    logger.info(f"OS: {platform.system()} {platform.release()}")
+    logger.info(f"Machine: {platform.machine()}")
+    logger.info(f"Processor: {platform.processor() or 'Unknown'}")
+
+    # Key dependency versions
+    logger.info(f"aiohttp version: {aiohttp.__version__}")
+    try:
+        import yaml as yaml_module
+        logger.info(f"PyYAML version: {yaml_module.__version__}")
+    except (ImportError, AttributeError):
+        pass
+
+    # Working directory and paths
+    logger.info(f"Working directory: {os.getcwd()}")
+    logger.info(f"Config file: {config.config_path or 'None (using defaults)'}")
+
+    # Binary mode detection
+    is_binary = os.environ.get("WEBQUIZ_IS_BINARY") == "1"
+    binary_dir = os.environ.get("WEBQUIZ_BINARY_DIR")
+    logger.info(f"Running as binary: {is_binary}")
+    if binary_dir:
+        logger.info(f"Binary directory: {binary_dir}")
+
+    # Server configuration
+    logger.info("-" * 40)
+    logger.info("Server Configuration:")
+    logger.info(f"  Host: {config.server.host}")
+    logger.info(f"  Port: {config.server.port}")
+
+    # Path configuration
+    logger.info("Path Configuration:")
+    logger.info(f"  Quizzes directory: {config.paths.quizzes_dir}")
+    logger.info(f"  Logs directory: {config.paths.logs_dir}")
+    logger.info(f"  CSV directory: {config.paths.csv_dir}")
+    logger.info(f"  Static directory: {config.paths.static_dir}")
+
+    # Admin configuration (without exposing master key)
+    logger.info("Admin Configuration:")
+    logger.info(f"  Master key set: {bool(config.admin.master_key)}")
+    logger.info(f"  Trusted IPs: {config.admin.trusted_ips}")
+
+    # Registration configuration
+    logger.info("Registration Configuration:")
+    logger.info(f"  Approval required: {config.registration.approve}")
+    logger.info(f"  Username label: {config.registration.username_label}")
+    logger.info(f"  Custom fields: {config.registration.fields}")
+
+    # Tunnel configuration
+    if config.tunnel.server:
+        logger.info("Tunnel Configuration:")
+        logger.info(f"  Server: {config.tunnel.server}")
+        logger.info(f"  Public key path: {config.tunnel.public_key}")
+        logger.info(f"  Private key path: {config.tunnel.private_key}")
+        if config.tunnel.socket_name:
+            logger.info(f"  Socket name: {config.tunnel.socket_name}")
+
+    # Network interfaces
+    try:
+        interfaces = get_network_interfaces()
+        if interfaces:
+            logger.info(f"Network interfaces: {', '.join(interfaces)}")
+        else:
+            logger.info("Network interfaces: No non-loopback interfaces found")
+    except Exception as e:
+        logger.info(f"Network interfaces: Unable to retrieve ({e})")
+
+    # Hostname
+    try:
+        logger.info(f"Hostname: {socket.gethostname()}")
+    except Exception:
+        pass
+
+    logger.info("=" * 60)
+
+
 def get_client_ip(request):
     """Extract client IP address from request, handling proxies.
 
@@ -3152,6 +3252,9 @@ async def create_app(config: WebQuizConfig):
         handlers=[logging.FileHandler(server.log_file), logging.StreamHandler()],  # Also log to console
         force=True,  # Override any existing configuration
     )
+
+    # Log startup environment information for troubleshooting
+    log_startup_environment(config)
 
     # Initialize SSH tunnel if configured (checks keys, but doesn't auto-connect)
     await server.initialize_tunnel()

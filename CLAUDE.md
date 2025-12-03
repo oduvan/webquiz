@@ -127,6 +127,7 @@ webquiz-stress-test -c 50
 - **Clipboard API fallback** - Copy public key button uses modern navigator.clipboard API for HTTPS/localhost, falls back to document.execCommand() for non-secure contexts (HTTP over IP)
 - **Package version check** - Admin panel periodically checks if package was updated while server is running by comparing in-memory version with file version; shows "Restart Required" banner when mismatch detected
 - **Quiz file attachments** - Questions can have downloadable files via `file` field (e.g., `file: "data.xlsx"`). Files stored in `quizzes/attach/`, served at `/attach/{filename}` with `Content-Disposition: attachment` header for forced download. Server auto-prepends `/attach/` when serving to client. Admin panel has file picker modal for selecting files.
+- **Startup environment logging** - On server start, logs comprehensive environment info for troubleshooting: WebQuiz version, Python version/executable, OS/platform info, aiohttp version, working directory, config file path, binary mode status, server/path/admin/registration/tunnel configuration, and network interfaces. Master key value is never logged (only True/False).
 
 ## Key Flows
 
@@ -136,6 +137,7 @@ webquiz-stress-test -c 50
 **Admin**: Switch quiz → reset all state (users, progress, responses) → new CSV → session isolation
 **Live Stats Groups**: Users display in "In Progress" group → answer questions → complete final question → automatically move to "Completed" group with `completed: true` flag in WebSocket
 **Tunnel**: Initialize → check/generate keys → admin clicks connect → fetch server config → create SSH connection → forward remote Unix socket to local port (forward_remote_path_to_port) → broadcast public URL via WebSocket → auto-reconnect on disconnect
+**Startup**: Load config → create TestingServer → initialize log file → configure logging → **log environment info** (version, Python, OS, config, paths, network) → initialize tunnel → load questions → start periodic flush → register routes
 
 **Setup**: Parallel testing with ports 8080-8087, `custom_webquiz_server` fixture auto-cleans directories, `conftest.py` for shared fixtures
 
