@@ -273,7 +273,7 @@
 
         .question-header-left {
             display: flex;
-            align-items: center;
+            align-items: flex-start;
             gap: 10px;
             flex: 1;
             min-width: 0;
@@ -283,6 +283,7 @@
             font-size: 12px;
             transition: transform 0.2s ease;
             color: var(--text-muted);
+            margin-top: 3px;
         }
 
         .question-item.collapsed .question-collapse-icon {
@@ -297,22 +298,53 @@
         .question-preview {
             color: var(--text-muted);
             font-size: 0.9em;
-            overflow: hidden;
-            text-overflow: ellipsis;
-            white-space: nowrap;
-            max-width: 300px;
+            flex: 1;
+        }
+
+        .question-indicators {
+            display: flex;
+            gap: 5px;
+            margin-left: 8px;
+            flex-shrink: 0;
+        }
+
+        .question-indicator {
+            font-size: 14px;
+            opacity: 0.8;
         }
 
         .question-header-buttons {
             display: flex;
             gap: 5px;
             flex-shrink: 0;
+            align-self: flex-start;
         }
 
         .question-header-buttons button {
             padding: 5px 8px;
             font-size: 12px;
             margin: 0;
+        }
+
+        .drag-handle {
+            cursor: grab;
+            color: var(--text-muted);
+            font-size: 16px;
+            padding: 2px 4px;
+            user-select: none;
+        }
+
+        .drag-handle:active {
+            cursor: grabbing;
+        }
+
+        .question-item.dragging {
+            opacity: 0.5;
+            background: var(--question-bg-hover, #dee2e6);
+        }
+
+        .question-item.drag-over {
+            border-top: 3px solid var(--button-bg);
         }
 
         .question-body {
@@ -1422,17 +1454,18 @@
             const questionDiv = document.createElement('div');
             questionDiv.className = collapsed ? 'question-item collapsed' : 'question-item';
             questionDiv.dataset.questionId = questionCounter;
+            questionDiv.draggable = true;
 
             questionDiv.innerHTML = `
                 <div class="question-header" onclick="toggleQuestionCollapse(${questionCounter}, event)">
                     <div class="question-header-left">
+                        <span class="drag-handle" title="Перетягніть для зміни порядку">☰</span>
                         <span class="question-collapse-icon">▼</span>
-                        <span class="question-number">Питання ${questionCounter}</span>
+                        <span class="question-number">${questionCounter}.</span>
                         <span class="question-preview"></span>
+                        <span class="question-indicators"></span>
                     </div>
                     <div class="question-header-buttons">
-                        <button type="button" onclick="moveQuestion(${questionCounter}, 'up', event)" title="Перемістити вгору">↑</button>
-                        <button type="button" onclick="moveQuestion(${questionCounter}, 'down', event)" title="Перемістити вниз">↓</button>
                         <button type="button" onclick="removeQuestion(${questionCounter}, event)" class="btn-danger" title="Видалити">×</button>
                     </div>
                 </div>
@@ -1454,7 +1487,7 @@
                     <div class="form-group">
                         <label>Файл для Завантаження (необов'язково):</label>
                         <div style="display: flex; align-items: center; gap: 5px;">
-                            <input type="text" class="question-file" placeholder="напр., data.xlsx" style="width: 100%;">
+                            <input type="text" class="question-file" placeholder="напр., data.xlsx" style="width: 100%;" oninput="updateQuestionPreview(this)">
                             <button type="button" onclick="openFilePicker(${questionCounter})" style="padding: 5px 8px; font-size: 16px;" title="Select file">📎</button>
                         </div>
                     </div>
@@ -1491,6 +1524,7 @@
             `;
 
             container.appendChild(questionDiv);
+            setupDragEvents(questionDiv);
             questionCounter++;
             updateQuestionNumbers();
 
@@ -1506,9 +1540,72 @@
             }
         }
 
+        // Drag and drop functionality
+        let draggedQuestion = null;
+
+        function setupDragEvents(questionDiv) {
+            questionDiv.addEventListener('dragstart', handleDragStart);
+            questionDiv.addEventListener('dragend', handleDragEnd);
+            questionDiv.addEventListener('dragover', handleDragOver);
+            questionDiv.addEventListener('dragenter', handleDragEnter);
+            questionDiv.addEventListener('dragleave', handleDragLeave);
+            questionDiv.addEventListener('drop', handleDrop);
+        }
+
+        function handleDragStart(e) {
+            draggedQuestion = this;
+            this.classList.add('dragging');
+            e.dataTransfer.effectAllowed = 'move';
+            e.dataTransfer.setData('text/plain', this.dataset.questionId);
+        }
+
+        function handleDragEnd(e) {
+            this.classList.remove('dragging');
+            document.querySelectorAll('.question-item').forEach(item => {
+                item.classList.remove('drag-over');
+            });
+            draggedQuestion = null;
+        }
+
+        function handleDragOver(e) {
+            e.preventDefault();
+            e.dataTransfer.dropEffect = 'move';
+        }
+
+        function handleDragEnter(e) {
+            e.preventDefault();
+            if (this !== draggedQuestion) {
+                this.classList.add('drag-over');
+            }
+        }
+
+        function handleDragLeave(e) {
+            this.classList.remove('drag-over');
+        }
+
+        function handleDrop(e) {
+            e.preventDefault();
+            this.classList.remove('drag-over');
+
+            if (draggedQuestion && this !== draggedQuestion) {
+                const container = document.getElementById('questions-container');
+                const allQuestions = Array.from(container.children);
+                const draggedIndex = allQuestions.indexOf(draggedQuestion);
+                const dropIndex = allQuestions.indexOf(this);
+
+                if (draggedIndex < dropIndex) {
+                    this.parentNode.insertBefore(draggedQuestion, this.nextSibling);
+                } else {
+                    this.parentNode.insertBefore(draggedQuestion, this);
+                }
+
+                updateQuestionNumbers();
+            }
+        }
+
         function toggleQuestionCollapse(questionId, event) {
-            // Don't toggle if clicking on buttons
-            if (event && event.target.closest('.question-header-buttons')) {
+            // Don't toggle if clicking on buttons or drag handle
+            if (event && (event.target.closest('.question-header-buttons') || event.target.closest('.drag-handle'))) {
                 return;
             }
             const questionDiv = document.querySelector(`[data-question-id="${questionId}"]`);
@@ -1522,22 +1619,37 @@
             if (!questionDiv) return;
 
             const previewSpan = questionDiv.querySelector('.question-preview');
+            const indicatorsSpan = questionDiv.querySelector('.question-indicators');
             if (!previewSpan) return;
 
             const questionText = questionDiv.querySelector('.question-text').value.trim();
             const questionImage = questionDiv.querySelector('.question-image').value.trim();
+            const questionFile = questionDiv.querySelector('.question-file').value.trim();
 
-            let preview = '';
-            if (questionText) {
-                preview = questionText.length > 50 ? questionText.substring(0, 50) + '...' : questionText;
-            } else if (questionImage) {
-                preview = '[Зображення]';
+            // Set preview text (full text, no truncation)
+            previewSpan.textContent = questionText || '';
+
+            // Set indicators for image and file
+            if (indicatorsSpan) {
+                let indicators = '';
+                if (questionImage) {
+                    indicators += '<span class="question-indicator" title="Має зображення">🖼️</span>';
+                }
+                if (questionFile) {
+                    indicators += '<span class="question-indicator" title="Має файл">📎</span>';
+                }
+                indicatorsSpan.innerHTML = indicators;
             }
-            previewSpan.textContent = preview ? `— ${preview}` : '';
         }
 
         function removeQuestion(questionId, event) {
             if (event) event.stopPropagation();
+
+            // Show confirmation dialog
+            if (!confirm('Ви впевнені, що хочете видалити це питання?')) {
+                return;
+            }
+
             const questionDiv = document.querySelector(`[data-question-id="${questionId}"]`);
             if (questionDiv) {
                 questionDiv.remove();
@@ -1617,7 +1729,7 @@
                 // Update the visual question number in header
                 const numberSpan = questionDiv.querySelector('.question-number');
                 if (numberSpan) {
-                    numberSpan.textContent = `Питання ${questionNumber}`;
+                    numberSpan.textContent = `${questionNumber}.`;
                 }
 
                 // Update radio button names to ensure correct grouping
@@ -1628,9 +1740,6 @@
                     radio.checked = (index === checkedStates[i]);
                 });
             }
-
-            // Update button visibility
-            updateMoveButtonVisibility();
         }
 
         function updateMoveButtonVisibility() {
@@ -1758,6 +1867,7 @@
                     // Start collapsed when editing existing quiz
                     questionDiv.className = 'question-item collapsed';
                     questionDiv.dataset.questionId = questionCounter;
+                    questionDiv.draggable = true;
 
                     const isMultipleChoice = Array.isArray(question.correct_answer);
                     const correctAnswers = isMultipleChoice ? question.correct_answer : [question.correct_answer];
@@ -1782,25 +1892,28 @@
                     const minCorrectValue = question.min_correct || '';
                     const minCorrectDisplay = isMultipleChoice ? 'block' : 'none';
 
-                    // Build preview text
-                    let previewText = '';
-                    if (question.question) {
-                        previewText = question.question.length > 50 ? question.question.substring(0, 50) + '...' : question.question;
-                    } else if (question.image) {
-                        previewText = '[Зображення]';
+                    // Build preview text (full text, no truncation)
+                    const previewText = question.question || '';
+
+                    // Build indicators for image and file
+                    let indicatorsHtml = '';
+                    if (question.image) {
+                        indicatorsHtml += '<span class="question-indicator" title="Має зображення">🖼️</span>';
                     }
-                    const previewDisplay = previewText ? `— ${previewText}` : '';
+                    if (question.file) {
+                        indicatorsHtml += '<span class="question-indicator" title="Має файл">📎</span>';
+                    }
 
                     questionDiv.innerHTML = `
                         <div class="question-header" onclick="toggleQuestionCollapse(${questionCounter}, event)">
                             <div class="question-header-left">
+                                <span class="drag-handle" title="Перетягніть для зміни порядку">☰</span>
                                 <span class="question-collapse-icon">▼</span>
-                                <span class="question-number">Питання ${questionCounter}</span>
-                                <span class="question-preview">${escapeHtml(previewDisplay)}</span>
+                                <span class="question-number">${questionCounter}.</span>
+                                <span class="question-preview">${escapeHtml(previewText)}</span>
+                                <span class="question-indicators">${indicatorsHtml}</span>
                             </div>
                             <div class="question-header-buttons">
-                                <button type="button" onclick="moveQuestion(${questionCounter}, 'up', event)" title="Перемістити вгору">↑</button>
-                                <button type="button" onclick="moveQuestion(${questionCounter}, 'down', event)" title="Перемістити вниз">↓</button>
                                 <button type="button" onclick="removeQuestion(${questionCounter}, event)" class="btn-danger" title="Видалити">×</button>
                             </div>
                         </div>
@@ -1822,7 +1935,7 @@
                             <div class="form-group">
                                 <label>Файл для Завантаження (необов'язково):</label>
                                 <div style="display: flex; align-items: center; gap: 5px;">
-                                    <input type="text" class="question-file" value="${escapeHtml(question.file || '')}" placeholder="напр., data.xlsx" style="width: 100%;">
+                                    <input type="text" class="question-file" value="${escapeHtml(question.file || '')}" placeholder="напр., data.xlsx" style="width: 100%;" oninput="updateQuestionPreview(this)">
                                     <button type="button" onclick="openFilePicker(${questionCounter})" style="padding: 5px 8px; font-size: 16px;" title="Select file">📎</button>
                                 </div>
                             </div>
@@ -1848,6 +1961,7 @@
                     `;
 
                     container.appendChild(questionDiv);
+                    setupDragEvents(questionDiv);
                     questionCounter++;
                 });
                 updateQuestionNumbers();

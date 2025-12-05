@@ -6,6 +6,8 @@ Tests verify:
 2. Clicking on a question header toggles the collapsed state
 3. New questions added are expanded by default
 4. Question preview text is displayed in the header
+5. File/image indicators are shown
+6. Drag handle is present for reordering
 """
 
 import time
@@ -193,7 +195,6 @@ def test_question_preview_text_displayed(temp_dir, browser):
             "title": "Preview Test Quiz",
             "questions": [
                 {"question": "What is the capital of Ukraine?", "options": ["Kyiv", "Lviv"], "correct_answer": 0},
-                {"image": "/imgs/test.png", "options": ["A", "B"], "correct_answer": 0},
             ],
         }
     }
@@ -221,17 +222,60 @@ def test_question_preview_text_displayed(temp_dir, browser):
         preview1 = question_items[0].find_element(By.CSS_SELECTOR, ".question-preview")
         assert "What is the capital of Ukraine?" in preview1.text, f"Preview should contain question text, got: {preview1.text}"
 
-        # Check second question preview (image question)
-        preview2 = question_items[1].find_element(By.CSS_SELECTOR, ".question-preview")
-        assert "[Зображення]" in preview2.text, f"Preview should indicate image, got: {preview2.text}"
+
+@skip_if_selenium_disabled
+def test_file_image_indicators_displayed(temp_dir, browser):
+    """Test that file and image indicators are displayed in the collapsed header."""
+    quiz_data = {
+        "test_quiz.yaml": {
+            "title": "Indicators Test Quiz",
+            "questions": [
+                {"question": "Question with image", "image": "/imgs/test.png", "options": ["A", "B"], "correct_answer": 0},
+                {"question": "Question with file", "file": "data.xlsx", "options": ["C", "D"], "correct_answer": 0},
+                {"question": "Question with both", "image": "/imgs/pic.jpg", "file": "doc.pdf", "options": ["E", "F"], "correct_answer": 0},
+            ],
+        }
+    }
+
+    with custom_webquiz_server(quizzes=quiz_data) as (proc, port):
+        admin_login(browser, port)
+
+        # Find and click edit button
+        edit_buttons = browser.find_elements(By.CSS_SELECTOR, ".quiz-item button")
+        for btn in edit_buttons:
+            if "Редагувати" in btn.text or "Edit" in btn.text:
+                btn.click()
+                break
+
+        # Wait for modal
+        WebDriverWait(browser, 10).until(
+            EC.visibility_of_element_located((By.ID, "quiz-editor-modal"))
+        )
+        time.sleep(0.5)
+
+        # Get question items
+        question_items = browser.find_elements(By.CSS_SELECTOR, ".question-item")
+
+        # Check first question has image indicator
+        indicators1 = question_items[0].find_element(By.CSS_SELECTOR, ".question-indicators")
+        assert "🖼️" in indicators1.text, f"First question should have image indicator, got: {indicators1.text}"
+
+        # Check second question has file indicator
+        indicators2 = question_items[1].find_element(By.CSS_SELECTOR, ".question-indicators")
+        assert "📎" in indicators2.text, f"Second question should have file indicator, got: {indicators2.text}"
+
+        # Check third question has both indicators
+        indicators3 = question_items[2].find_element(By.CSS_SELECTOR, ".question-indicators")
+        assert "🖼️" in indicators3.text, f"Third question should have image indicator"
+        assert "📎" in indicators3.text, f"Third question should have file indicator"
 
 
 @skip_if_selenium_disabled
-def test_reorder_buttons_work_when_collapsed(temp_dir, browser):
-    """Test that reorder and delete buttons work without expanding the question."""
+def test_drag_handle_present(temp_dir, browser):
+    """Test that drag handle is present for reordering questions."""
     quiz_data = {
         "test_quiz.yaml": {
-            "title": "Reorder Test Quiz",
+            "title": "Drag Handle Test Quiz",
             "questions": [
                 {"question": "Question 1", "options": ["A", "B"], "correct_answer": 0},
                 {"question": "Question 2", "options": ["C", "D"], "correct_answer": 0},
@@ -258,22 +302,49 @@ def test_reorder_buttons_work_when_collapsed(temp_dir, browser):
         # Get question items
         question_items = browser.find_elements(By.CSS_SELECTOR, ".question-item")
 
-        # Both should be collapsed
-        assert "collapsed" in question_items[0].get_attribute("class")
-        assert "collapsed" in question_items[1].get_attribute("class")
+        # Verify drag handle is present on each question
+        for i, item in enumerate(question_items):
+            drag_handle = item.find_element(By.CSS_SELECTOR, ".drag-handle")
+            assert drag_handle is not None, f"Question {i+1} should have drag handle"
+            assert drag_handle.is_displayed(), f"Drag handle should be visible for question {i+1}"
+            assert "☰" in drag_handle.text, f"Drag handle should show ☰ icon"
 
-        # Find and click the down button on the first question
-        down_button = question_items[0].find_element(By.CSS_SELECTOR, "button[onclick*='down']")
-        down_button.click()
-        time.sleep(0.3)
 
-        # Questions should be reordered but still collapsed
+@skip_if_selenium_disabled
+def test_question_numbers_without_prefix(temp_dir, browser):
+    """Test that question numbers are displayed without 'Питання' prefix."""
+    quiz_data = {
+        "test_quiz.yaml": {
+            "title": "Numbers Test Quiz",
+            "questions": [
+                {"question": "Question 1", "options": ["A", "B"], "correct_answer": 0},
+                {"question": "Question 2", "options": ["C", "D"], "correct_answer": 0},
+            ],
+        }
+    }
+
+    with custom_webquiz_server(quizzes=quiz_data) as (proc, port):
+        admin_login(browser, port)
+
+        # Find and click edit button
+        edit_buttons = browser.find_elements(By.CSS_SELECTOR, ".quiz-item button")
+        for btn in edit_buttons:
+            if "Редагувати" in btn.text or "Edit" in btn.text:
+                btn.click()
+                break
+
+        # Wait for modal
+        WebDriverWait(browser, 10).until(
+            EC.visibility_of_element_located((By.ID, "quiz-editor-modal"))
+        )
+        time.sleep(0.5)
+
+        # Get question items
         question_items = browser.find_elements(By.CSS_SELECTOR, ".question-item")
 
-        # Verify questions are still collapsed (clicking button shouldn't expand)
-        assert "collapsed" in question_items[0].get_attribute("class"), "First question should still be collapsed"
-        assert "collapsed" in question_items[1].get_attribute("class"), "Second question should still be collapsed"
+        # Check question numbers are just digits with dot
+        number1 = question_items[0].find_element(By.CSS_SELECTOR, ".question-number")
+        assert number1.text == "1.", f"First question number should be '1.', got: {number1.text}"
 
-        # Verify order changed by checking preview text
-        preview1 = question_items[0].find_element(By.CSS_SELECTOR, ".question-preview")
-        assert "Question 2" in preview1.text, "Questions should have been reordered"
+        number2 = question_items[1].find_element(By.CSS_SELECTOR, ".question-number")
+        assert number2.text == "2.", f"Second question number should be '2.', got: {number2.text}"
