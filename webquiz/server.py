@@ -969,6 +969,8 @@ class TestingServer:
         mode = "w" if not file_exists else "a"
         async with aiofiles.open(self.csv_file, mode, encoding="utf-8") as f:
             await f.write(csv_content)
+            await f.flush()
+            os.fsync(f.fileno())
 
         action = "Created" if not file_exists else "Updated"
         logger.info(f"{action} CSV file with {total_responses} responses: {self.csv_file}")
@@ -1029,6 +1031,8 @@ class TestingServer:
         # Always overwrite the file (users don't accumulate like responses do)
         async with aiofiles.open(self.user_csv_file, "w", encoding="utf-8") as f:
             await f.write(csv_content)
+            await f.flush()
+            os.fsync(f.fileno())
 
     async def periodic_flush(self):
         """Periodically flush responses and users to CSV every 5 seconds."""
@@ -2101,9 +2105,11 @@ class TestingServer:
             except yaml.YAMLError as e:
                 return web.json_response({"error": f"Неправильний YAML: {str(e)}"}, status=400)
 
-        # Write the quiz file
-        with open(quiz_path, "w", encoding="utf-8") as f:
-            f.write(quiz_content)
+        # Write the quiz file with fsync for SD card/slow storage reliability
+        async with aiofiles.open(quiz_path, "w", encoding="utf-8") as f:
+            await f.write(quiz_content)
+            await f.flush()
+            os.fsync(f.fileno())
 
         logger.info(f"Created new quiz: {filename}")
         return web.json_response(
@@ -2156,9 +2162,11 @@ class TestingServer:
             except yaml.YAMLError as e:
                 return web.json_response({"error": f"Неправильний YAML: {str(e)}"}, status=400)
 
-        # Write updated content
-        with open(quiz_path, "w", encoding="utf-8") as f:
-            f.write(quiz_content)
+        # Write updated content with fsync for SD card/slow storage reliability
+        async with aiofiles.open(quiz_path, "w", encoding="utf-8") as f:
+            await f.write(quiz_content)
+            await f.flush()
+            os.fsync(f.fileno())
 
         # If this is the current quiz, reload it
         if self.current_quiz_file and os.path.basename(self.current_quiz_file) == filename:
@@ -2679,9 +2687,11 @@ class TestingServer:
         if not self._validate_config_data(parsed_config, errors):
             return web.json_response({"error": "Configuration validation failed", "errors": errors}, status=400)
 
-        # Write to config file
+        # Write to config file with fsync for SD card/slow storage reliability
         async with aiofiles.open(config_path, "w", encoding="utf-8") as f:
             await f.write(content if content else "")
+            await f.flush()
+            os.fsync(f.fileno())
 
         logger.info(f"Configuration file updated: {config_path}")
         return web.json_response(
@@ -2961,9 +2971,11 @@ class TestingServer:
 
         shutil.copy2(quiz_path, backup_path)
 
-        # Write the updated content
-        with open(quiz_path, "w", encoding="utf-8") as f:
-            f.write(content)
+        # Write the updated content with fsync for SD card/slow storage reliability
+        async with aiofiles.open(quiz_path, "w", encoding="utf-8") as f:
+            await f.write(content)
+            await f.flush()
+            os.fsync(f.fileno())
 
         # If this is the currently active quiz, reload it
         if filename == self.current_quiz_file:

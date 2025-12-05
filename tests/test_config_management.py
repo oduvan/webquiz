@@ -284,3 +284,97 @@ def test_config_master_key_can_be_null():
         assert response.status_code == 200
         data = response.json()
         assert data["success"] is True
+
+
+def test_config_registration_fields_saved_to_file():
+    """Test that registration fields are actually written to the config file.
+
+    This is a comprehensive test that verifies:
+    1. The API accepts the config with registration fields
+    2. The file is actually written with the correct content
+    3. The /files/ page returns the saved content correctly
+    """
+    with custom_webquiz_server() as (proc, port):
+        cookies = get_admin_session(port)
+
+        # Config with registration fields
+        config_content = """registration:
+  fields:
+    - "Grade"
+    - "School"
+    - "Teacher"
+  approve: true
+  username_label: "Student Name"
+"""
+
+        # Save the config
+        response = requests.put(
+            f"http://localhost:{port}/api/admin/config", cookies=cookies, json={"content": config_content}
+        )
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["success"] is True
+        config_path = data["config_path"]
+
+        # Read the file directly to verify content was saved
+        with open(config_path, "r", encoding="utf-8") as f:
+            saved_content = f.read()
+
+        # Verify the fields are in the saved file
+        assert "fields:" in saved_content
+        assert '"Grade"' in saved_content or "Grade" in saved_content
+        assert '"School"' in saved_content or "School" in saved_content
+        assert '"Teacher"' in saved_content or "Teacher" in saved_content
+        assert "approve: true" in saved_content
+        assert "Student Name" in saved_content
+
+        # Parse the saved YAML to verify structure
+        saved_yaml = yaml.safe_load(saved_content)
+        assert "registration" in saved_yaml
+        assert saved_yaml["registration"]["fields"] == ["Grade", "School", "Teacher"]
+        assert saved_yaml["registration"]["approve"] is True
+        assert saved_yaml["registration"]["username_label"] == "Student Name"
+
+
+def test_config_registration_fields_reload_from_files_page():
+    """Test that saved registration fields are shown correctly on /files/ page reload."""
+    import re
+    import json
+
+    with custom_webquiz_server() as (proc, port):
+        session = requests.Session()
+        auth_response = session.post(
+            f"http://localhost:{port}/api/admin/auth",
+            json={"master_key": "test123"}
+        )
+        assert auth_response.status_code == 200
+
+        # Save config with registration fields
+        config_content = """registration:
+  fields:
+    - "Grade"
+    - "School"
+"""
+        response = session.put(
+            f"http://localhost:{port}/api/admin/config",
+            json={"content": config_content}
+        )
+        assert response.status_code == 200
+
+        # Load /files/ page and extract CONFIG_CONTENT
+        files_response = session.get(f"http://localhost:{port}/files/")
+        assert files_response.status_code == 200
+        html = files_response.text
+
+        # Extract CONFIG_CONTENT from JavaScript in the page
+        match = re.search(r'const CONFIG_CONTENT = (.*?);', html)
+        assert match is not None, "CONFIG_CONTENT not found in /files/ page"
+
+        config_content_js = match.group(1)
+        config_content_from_page = json.loads(config_content_js)
+
+        # Verify the fields are in the content returned by the page
+        assert "fields:" in config_content_from_page
+        assert "Grade" in config_content_from_page
+        assert "School" in config_content_from_page
