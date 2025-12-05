@@ -38,7 +38,7 @@ def admin_login(browser, port, master_key="test123"):
 
     # Wait for admin panel to load
     WebDriverWait(browser, 10).until(
-        EC.visibility_of_element_located((By.ID, "quiz-management"))
+        EC.visibility_of_element_located((By.ID, "admin-panel"))
     )
 
 
