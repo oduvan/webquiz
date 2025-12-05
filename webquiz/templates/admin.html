@@ -2787,8 +2787,8 @@
             }
         }
 
-        // Periodically check for package version mismatch (every 30 seconds)
-        setInterval(checkPackageVersionMismatch, 30000);
+        // Periodically check for package version mismatch (every 5 minutes)
+        setInterval(checkPackageVersionMismatch, 300000);
 
         // Initial check after page load
         setTimeout(checkPackageVersionMismatch, 2000);
