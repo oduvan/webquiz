@@ -41,6 +41,35 @@ def admin_login(browser, port, master_key="test123"):
         EC.visibility_of_element_located((By.ID, "admin-panel"))
     )
 
+    # Wait for quiz list to load
+    time.sleep(0.5)
+
+
+def select_and_edit_quiz(browser):
+    """Helper to select a quiz and open the editor."""
+    # Wait for quiz items to appear
+    WebDriverWait(browser, 10).until(
+        EC.presence_of_element_located((By.CSS_SELECTOR, ".quiz-item"))
+    )
+
+    # Click on the first quiz item to select it
+    quiz_item = browser.find_element(By.CSS_SELECTOR, ".quiz-item")
+    quiz_item.click()
+
+    # Wait for edit button to become enabled and click it
+    edit_btn = WebDriverWait(browser, 10).until(
+        EC.element_to_be_clickable((By.ID, "edit-btn"))
+    )
+    edit_btn.click()
+
+    # Wait for the quiz editor modal to open
+    WebDriverWait(browser, 10).until(
+        EC.visibility_of_element_located((By.ID, "quiz-editor-modal"))
+    )
+
+    # Give time for questions to load
+    time.sleep(1.0)
+
 
 @skip_if_selenium_disabled
 def test_questions_collapsed_when_editing_quiz(temp_dir, browser):
@@ -58,25 +87,7 @@ def test_questions_collapsed_when_editing_quiz(temp_dir, browser):
 
     with custom_webquiz_server(quizzes=quiz_data) as (proc, port):
         admin_login(browser, port)
-
-        # Find and click edit button for the quiz
-        edit_buttons = browser.find_elements(By.CSS_SELECTOR, ".quiz-item button")
-        edit_button = None
-        for btn in edit_buttons:
-            if "Редагувати" in btn.text or "Edit" in btn.text:
-                edit_button = btn
-                break
-
-        assert edit_button is not None, "Edit button not found"
-        edit_button.click()
-
-        # Wait for the quiz editor modal to open
-        WebDriverWait(browser, 10).until(
-            EC.visibility_of_element_located((By.ID, "quiz-editor-modal"))
-        )
-
-        # Give time for questions to load (increased for CI environments)
-        time.sleep(1.0)
+        select_and_edit_quiz(browser)
 
         # Find all question items
         question_items = browser.find_elements(By.CSS_SELECTOR, ".question-item")
@@ -108,19 +119,7 @@ def test_click_header_toggles_collapse(temp_dir, browser):
 
     with custom_webquiz_server(quizzes=quiz_data) as (proc, port):
         admin_login(browser, port)
-
-        # Find and click edit button
-        edit_buttons = browser.find_elements(By.CSS_SELECTOR, ".quiz-item button")
-        for btn in edit_buttons:
-            if "Редагувати" in btn.text or "Edit" in btn.text:
-                btn.click()
-                break
-
-        # Wait for modal
-        WebDriverWait(browser, 10).until(
-            EC.visibility_of_element_located((By.ID, "quiz-editor-modal"))
-        )
-        time.sleep(1.0)  # Increased for CI environments
+        select_and_edit_quiz(browser)
 
         # Get the question item
         question_item = browser.find_element(By.CSS_SELECTOR, ".question-item")
@@ -158,19 +157,7 @@ def test_new_question_is_expanded(temp_dir, browser):
 
     with custom_webquiz_server(quizzes=quiz_data) as (proc, port):
         admin_login(browser, port)
-
-        # Find and click edit button
-        edit_buttons = browser.find_elements(By.CSS_SELECTOR, ".quiz-item button")
-        for btn in edit_buttons:
-            if "Редагувати" in btn.text or "Edit" in btn.text:
-                btn.click()
-                break
-
-        # Wait for modal
-        WebDriverWait(browser, 10).until(
-            EC.visibility_of_element_located((By.ID, "quiz-editor-modal"))
-        )
-        time.sleep(1.0)
+        select_and_edit_quiz(browser)
 
         # Find and click the "Add Question" button
         add_button = browser.find_element(By.XPATH, "//button[contains(text(), 'Додати Питання')]")
@@ -202,19 +189,7 @@ def test_question_preview_text_displayed(temp_dir, browser):
 
     with custom_webquiz_server(quizzes=quiz_data) as (proc, port):
         admin_login(browser, port)
-
-        # Find and click edit button
-        edit_buttons = browser.find_elements(By.CSS_SELECTOR, ".quiz-item button")
-        for btn in edit_buttons:
-            if "Редагувати" in btn.text or "Edit" in btn.text:
-                btn.click()
-                break
-
-        # Wait for modal
-        WebDriverWait(browser, 10).until(
-            EC.visibility_of_element_located((By.ID, "quiz-editor-modal"))
-        )
-        time.sleep(1.0)
+        select_and_edit_quiz(browser)
 
         # Get question items
         question_items = browser.find_elements(By.CSS_SELECTOR, ".question-item")
@@ -240,19 +215,7 @@ def test_file_image_indicators_displayed(temp_dir, browser):
 
     with custom_webquiz_server(quizzes=quiz_data) as (proc, port):
         admin_login(browser, port)
-
-        # Find and click edit button
-        edit_buttons = browser.find_elements(By.CSS_SELECTOR, ".quiz-item button")
-        for btn in edit_buttons:
-            if "Редагувати" in btn.text or "Edit" in btn.text:
-                btn.click()
-                break
-
-        # Wait for modal
-        WebDriverWait(browser, 10).until(
-            EC.visibility_of_element_located((By.ID, "quiz-editor-modal"))
-        )
-        time.sleep(1.0)
+        select_and_edit_quiz(browser)
 
         # Get question items
         question_items = browser.find_elements(By.CSS_SELECTOR, ".question-item")
@@ -287,19 +250,7 @@ def test_drag_handle_present(temp_dir, browser):
 
     with custom_webquiz_server(quizzes=quiz_data) as (proc, port):
         admin_login(browser, port)
-
-        # Find and click edit button
-        edit_buttons = browser.find_elements(By.CSS_SELECTOR, ".quiz-item button")
-        for btn in edit_buttons:
-            if "Редагувати" in btn.text or "Edit" in btn.text:
-                btn.click()
-                break
-
-        # Wait for modal
-        WebDriverWait(browser, 10).until(
-            EC.visibility_of_element_located((By.ID, "quiz-editor-modal"))
-        )
-        time.sleep(1.0)
+        select_and_edit_quiz(browser)
 
         # Get question items
         question_items = browser.find_elements(By.CSS_SELECTOR, ".question-item")
@@ -328,19 +279,7 @@ def test_question_numbers_without_prefix(temp_dir, browser):
 
     with custom_webquiz_server(quizzes=quiz_data) as (proc, port):
         admin_login(browser, port)
-
-        # Find and click edit button
-        edit_buttons = browser.find_elements(By.CSS_SELECTOR, ".quiz-item button")
-        for btn in edit_buttons:
-            if "Редагувати" in btn.text or "Edit" in btn.text:
-                btn.click()
-                break
-
-        # Wait for modal
-        WebDriverWait(browser, 10).until(
-            EC.visibility_of_element_located((By.ID, "quiz-editor-modal"))
-        )
-        time.sleep(1.0)
+        select_and_edit_quiz(browser)
 
         # Get question items
         question_items = browser.find_elements(By.CSS_SELECTOR, ".question-item")
