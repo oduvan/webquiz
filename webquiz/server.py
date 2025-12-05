@@ -2106,9 +2106,9 @@ class TestingServer:
                 return web.json_response({"error": f"Неправильний YAML: {str(e)}"}, status=400)
 
         # Write the quiz file with fsync for SD card/slow storage reliability
-        with open(quiz_path, "w", encoding="utf-8") as f:
-            f.write(quiz_content)
-            f.flush()
+        async with aiofiles.open(quiz_path, "w", encoding="utf-8") as f:
+            await f.write(quiz_content)
+            await f.flush()
             os.fsync(f.fileno())
 
         logger.info(f"Created new quiz: {filename}")
@@ -2163,9 +2163,9 @@ class TestingServer:
                 return web.json_response({"error": f"Неправильний YAML: {str(e)}"}, status=400)
 
         # Write updated content with fsync for SD card/slow storage reliability
-        with open(quiz_path, "w", encoding="utf-8") as f:
-            f.write(quiz_content)
-            f.flush()
+        async with aiofiles.open(quiz_path, "w", encoding="utf-8") as f:
+            await f.write(quiz_content)
+            await f.flush()
             os.fsync(f.fileno())
 
         # If this is the current quiz, reload it
@@ -2972,9 +2972,9 @@ class TestingServer:
         shutil.copy2(quiz_path, backup_path)
 
         # Write the updated content with fsync for SD card/slow storage reliability
-        with open(quiz_path, "w", encoding="utf-8") as f:
-            f.write(content)
-            f.flush()
+        async with aiofiles.open(quiz_path, "w", encoding="utf-8") as f:
+            await f.write(content)
+            await f.flush()
             os.fsync(f.fileno())
 
         # If this is the currently active quiz, reload it
