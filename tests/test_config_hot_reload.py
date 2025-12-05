@@ -236,3 +236,119 @@ def test_config_hot_reload_preserves_master_key():
             f"http://localhost:{port}/api/admin/auth", json={"master_key": "new_master_key_12345"}
         )
         assert auth_response2.status_code == 401
+
+
+def test_config_hot_reload_quizzes_list():
+    """Test that downloadable quizzes list is hot-reloaded."""
+    with custom_webquiz_server() as (proc, port):
+        cookies = get_admin_session(port)
+
+        # Update config with downloadable quizzes
+        new_config = """quizzes:
+  - name: "Math Quiz"
+    download_path: "https://example.com/math.zip"
+    folder: "math/"
+  - name: "Science Quiz"
+    download_path: "https://example.com/science.zip"
+    folder: "science/"
+"""
+        response = requests.put(
+            f"http://localhost:{port}/api/admin/config", cookies=cookies, json={"content": new_config}
+        )
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["success"] is True
+        assert "saved and applied" in data["message"]
+
+        # Verify admin page shows the quizzes (they're embedded in the HTML)
+        admin_response = requests.get(f"http://localhost:{port}/admin/", cookies=cookies)
+        assert admin_response.status_code == 200
+        assert "Math Quiz" in admin_response.text
+        assert "Science Quiz" in admin_response.text
+
+
+def test_config_hot_reload_tunnel_config():
+    """Test that tunnel config changes are applied."""
+    with custom_webquiz_server() as (proc, port):
+        cookies = get_admin_session(port)
+
+        # Update config with tunnel settings
+        new_config = """tunnel:
+  server: "tunnel.example.com"
+  socket_name: "myquiz"
+"""
+        response = requests.put(
+            f"http://localhost:{port}/api/admin/config", cookies=cookies, json={"content": new_config}
+        )
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["success"] is True
+        assert "saved and applied" in data["message"]
+        # Tunnel config is applied but connection is not automatic
+
+
+def test_config_hot_reload_restart_required_message():
+    """Test that changing server.port shows restart required message."""
+    with custom_webquiz_server() as (proc, port):
+        cookies = get_admin_session(port)
+
+        # Try to change server port (requires restart)
+        new_config = """server:
+  port: 9999
+"""
+        response = requests.put(
+            f"http://localhost:{port}/api/admin/config", cookies=cookies, json={"content": new_config}
+        )
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["success"] is True
+        assert "restart required" in data["message"].lower()
+        assert "server.port" in data["message"]
+        assert "restart_required" in data
+        assert "server.port" in data["restart_required"]
+
+
+def test_config_hot_reload_restart_required_paths():
+    """Test that changing paths shows restart required message."""
+    with custom_webquiz_server() as (proc, port):
+        cookies = get_admin_session(port)
+
+        # Try to change paths (requires restart)
+        new_config = """paths:
+  quizzes_dir: "new_quizzes"
+  csv_dir: "new_data"
+"""
+        response = requests.put(
+            f"http://localhost:{port}/api/admin/config", cookies=cookies, json={"content": new_config}
+        )
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["success"] is True
+        assert "restart required" in data["message"].lower()
+        assert "paths.quizzes_dir" in data["message"]
+        assert "paths.csv_dir" in data["message"]
+
+
+def test_config_hot_reload_restart_required_master_key():
+    """Test that changing master_key shows restart required message."""
+    with custom_webquiz_server() as (proc, port):
+        cookies = get_admin_session(port)
+
+        # Try to change master_key (requires restart)
+        new_config = """admin:
+  master_key: "new_key_123"
+  trusted_ips: []
+"""
+        response = requests.put(
+            f"http://localhost:{port}/api/admin/config", cookies=cookies, json={"content": new_config}
+        )
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["success"] is True
+        assert "restart required" in data["message"].lower()
+        assert "admin.master_key" in data["message"]

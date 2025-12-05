@@ -626,11 +626,56 @@ class TestingServer:
             return None
         return load_config_from_yaml(self.config.config_path)
 
-    def apply_config_changes(self, new_config: WebQuizConfig):
+    def _config_requires_restart(self, new_config: WebQuizConfig, raw_config: dict = None) -> List[str]:
+        """Check which config changes require server restart.
+
+        Only checks sections that were explicitly specified in the raw config.
+        If a section is missing from raw_config, the user didn't change it.
+
+        Args:
+            new_config: New configuration to compare against current
+            raw_config: Raw parsed YAML data to check which sections were specified
+
+        Returns:
+            List of config paths that require restart (empty if none)
+        """
+        restart_reasons = []
+        raw_config = raw_config or {}
+
+        # Check server config (only if server section was specified)
+        if "server" in raw_config:
+            server_data = raw_config.get("server", {})
+            if "host" in server_data and self.config.server.host != new_config.server.host:
+                restart_reasons.append("server.host")
+            if "port" in server_data and self.config.server.port != new_config.server.port:
+                restart_reasons.append("server.port")
+
+        # Check paths (only if paths section was specified)
+        if "paths" in raw_config:
+            paths_data = raw_config.get("paths", {})
+            if "quizzes_dir" in paths_data and self.quizzes_dir != new_config.paths.quizzes_dir:
+                restart_reasons.append("paths.quizzes_dir")
+            if "logs_dir" in paths_data and self.logs_dir != new_config.paths.logs_dir:
+                restart_reasons.append("paths.logs_dir")
+            if "csv_dir" in paths_data and self.csv_dir != new_config.paths.csv_dir:
+                restart_reasons.append("paths.csv_dir")
+            if "static_dir" in paths_data and self.static_dir != new_config.paths.static_dir:
+                restart_reasons.append("paths.static_dir")
+
+        # Check master_key (only if admin.master_key was specified)
+        if "admin" in raw_config:
+            admin_data = raw_config.get("admin", {})
+            if "master_key" in admin_data and self.master_key != new_config.admin.master_key:
+                restart_reasons.append("admin.master_key")
+
+        return restart_reasons
+
+    async def apply_config_changes(self, new_config: WebQuizConfig):
         """Apply hot-reloadable config changes to running server.
 
-        Updates registration and admin config (trusted_ips only).
-        Does NOT change server, paths, master_key, or tunnel config.
+        Updates registration, admin.trusted_ips, quizzes, tunnel config.
+        Reloads templates. Disconnects tunnel if connected (admin can reconnect).
+        Does NOT change server, paths, or master_key.
 
         Args:
             new_config: New configuration loaded from file
@@ -643,6 +688,19 @@ class TestingServer:
 
         # Update downloadable quizzes list
         self.config.quizzes = new_config.quizzes
+
+        # Update tunnel config and disconnect if connected
+        self.config.tunnel = new_config.tunnel
+        if self.tunnel_manager:
+            # Update tunnel manager's config reference
+            self.tunnel_manager.config = new_config.tunnel
+            # Disconnect if connected (admin can reconnect with new config)
+            if self.tunnel_manager.status.get("connected"):
+                logger.info("Disconnecting tunnel due to config change")
+                await self.tunnel_manager.disconnect()
+
+        # Reload templates (in case package was updated)
+        self.templates = self._load_templates()
 
         logger.info("Configuration changes applied to running server")
 
@@ -2742,19 +2800,33 @@ class TestingServer:
 
         # Hot-reload configuration and apply changes
         new_config = self.reload_config_from_file()
+        restart_reasons = []
+
         if new_config:
             # Preserve config_path in new config
             new_config.config_path = config_path
-            self.apply_config_changes(new_config)
+
+            # Check for changes that require server restart
+            restart_reasons = self._config_requires_restart(new_config, parsed_config)
+
+            # Apply hot-reloadable changes
+            await self.apply_config_changes(new_config)
 
             # Restart current quiz if one is running
             await self.restart_current_quiz()
 
+        # Build response message based on restart requirements
+        if restart_reasons:
+            message = f"Configuration saved. Server restart required for: {', '.join(restart_reasons)}. Other changes applied."
+        else:
+            message = "Configuration saved and applied. Quiz restarted."
+
         return web.json_response(
             {
                 "success": True,
-                "message": "Configuration saved and applied. Quiz restarted.",
+                "message": message,
                 "config_path": config_path,
+                "restart_required": restart_reasons,
             }
         )
 
