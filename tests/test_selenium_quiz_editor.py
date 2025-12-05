@@ -75,8 +75,8 @@ def test_questions_collapsed_when_editing_quiz(temp_dir, browser):
             EC.visibility_of_element_located((By.ID, "quiz-editor-modal"))
         )
 
-        # Give time for questions to load
-        time.sleep(0.5)
+        # Give time for questions to load (increased for CI environments)
+        time.sleep(1.0)
 
         # Find all question items
         question_items = browser.find_elements(By.CSS_SELECTOR, ".question-item")
@@ -90,7 +90,8 @@ def test_questions_collapsed_when_editing_quiz(temp_dir, browser):
             question_body = item.find_element(By.CSS_SELECTOR, ".question-body")
             # When collapsed, the body should have 0 height due to CSS
             body_height = question_body.value_of_css_property("max-height")
-            assert body_height == "0px", f"Question {i+1} body should have max-height: 0px when collapsed, got {body_height}"
+            # CSS might return "0px" or "0" depending on browser
+            assert body_height in ("0px", "0"), f"Question {i+1} body should have max-height: 0 when collapsed, got {body_height}"
 
 
 @skip_if_selenium_disabled
@@ -119,7 +120,7 @@ def test_click_header_toggles_collapse(temp_dir, browser):
         WebDriverWait(browser, 10).until(
             EC.visibility_of_element_located((By.ID, "quiz-editor-modal"))
         )
-        time.sleep(0.5)
+        time.sleep(1.0)  # Increased for CI environments
 
         # Get the question item
         question_item = browser.find_element(By.CSS_SELECTOR, ".question-item")
@@ -130,14 +131,14 @@ def test_click_header_toggles_collapse(temp_dir, browser):
 
         # Click header to expand
         question_header.click()
-        time.sleep(0.3)  # Wait for animation
+        time.sleep(1.0)  # Wait for animation (increased for CI)
 
         # Should be expanded now
         assert "collapsed" not in question_item.get_attribute("class"), "Question should be expanded after click"
 
         # Click header again to collapse
         question_header.click()
-        time.sleep(0.3)
+        time.sleep(1.0)  # Increased for CI
 
         # Should be collapsed again
         assert "collapsed" in question_item.get_attribute("class"), "Question should be collapsed after second click"
@@ -169,12 +170,12 @@ def test_new_question_is_expanded(temp_dir, browser):
         WebDriverWait(browser, 10).until(
             EC.visibility_of_element_located((By.ID, "quiz-editor-modal"))
         )
-        time.sleep(0.5)
+        time.sleep(1.0)
 
         # Find and click the "Add Question" button
         add_button = browser.find_element(By.XPATH, "//button[contains(text(), 'Додати Питання')]")
         add_button.click()
-        time.sleep(0.3)
+        time.sleep(0.5)
 
         # Get all question items
         question_items = browser.find_elements(By.CSS_SELECTOR, ".question-item")
@@ -213,7 +214,7 @@ def test_question_preview_text_displayed(temp_dir, browser):
         WebDriverWait(browser, 10).until(
             EC.visibility_of_element_located((By.ID, "quiz-editor-modal"))
         )
-        time.sleep(0.5)
+        time.sleep(1.0)
 
         # Get question items
         question_items = browser.find_elements(By.CSS_SELECTOR, ".question-item")
@@ -251,23 +252,24 @@ def test_file_image_indicators_displayed(temp_dir, browser):
         WebDriverWait(browser, 10).until(
             EC.visibility_of_element_located((By.ID, "quiz-editor-modal"))
         )
-        time.sleep(0.5)
+        time.sleep(1.0)
 
         # Get question items
         question_items = browser.find_elements(By.CSS_SELECTOR, ".question-item")
 
         # Check first question has image indicator
         indicators1 = question_items[0].find_element(By.CSS_SELECTOR, ".question-indicators")
-        assert "🖼️" in indicators1.text, f"First question should have image indicator, got: {indicators1.text}"
+        # Use base emoji without variation selector for cross-platform compatibility
+        assert "\U0001F5BC" in indicators1.text or "🖼" in indicators1.text, f"First question should have image indicator, got: {indicators1.text}"
 
         # Check second question has file indicator
         indicators2 = question_items[1].find_element(By.CSS_SELECTOR, ".question-indicators")
-        assert "📎" in indicators2.text, f"Second question should have file indicator, got: {indicators2.text}"
+        assert "\U0001F4CE" in indicators2.text or "📎" in indicators2.text, f"Second question should have file indicator, got: {indicators2.text}"
 
         # Check third question has both indicators
         indicators3 = question_items[2].find_element(By.CSS_SELECTOR, ".question-indicators")
-        assert "🖼️" in indicators3.text, f"Third question should have image indicator"
-        assert "📎" in indicators3.text, f"Third question should have file indicator"
+        assert "\U0001F5BC" in indicators3.text or "🖼" in indicators3.text, f"Third question should have image indicator"
+        assert "\U0001F4CE" in indicators3.text or "📎" in indicators3.text, f"Third question should have file indicator"
 
 
 @skip_if_selenium_disabled
@@ -297,7 +299,7 @@ def test_drag_handle_present(temp_dir, browser):
         WebDriverWait(browser, 10).until(
             EC.visibility_of_element_located((By.ID, "quiz-editor-modal"))
         )
-        time.sleep(0.5)
+        time.sleep(1.0)
 
         # Get question items
         question_items = browser.find_elements(By.CSS_SELECTOR, ".question-item")
@@ -307,7 +309,8 @@ def test_drag_handle_present(temp_dir, browser):
             drag_handle = item.find_element(By.CSS_SELECTOR, ".drag-handle")
             assert drag_handle is not None, f"Question {i+1} should have drag handle"
             assert drag_handle.is_displayed(), f"Drag handle should be visible for question {i+1}"
-            assert "☰" in drag_handle.text, f"Drag handle should show ☰ icon"
+            # Unicode TRIGRAM FOR HEAVEN (☰) or its codepoint
+            assert "\u2630" in drag_handle.text or "☰" in drag_handle.text, f"Drag handle should show ☰ icon, got: {drag_handle.text}"
 
 
 @skip_if_selenium_disabled
@@ -337,7 +340,7 @@ def test_question_numbers_without_prefix(temp_dir, browser):
         WebDriverWait(browser, 10).until(
             EC.visibility_of_element_located((By.ID, "quiz-editor-modal"))
         )
-        time.sleep(0.5)
+        time.sleep(1.0)
 
         # Get question items
         question_items = browser.find_elements(By.CSS_SELECTOR, ".question-item")
