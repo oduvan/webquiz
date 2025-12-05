@@ -139,6 +139,7 @@ webquiz-stress-test -c 50
 - **Package version check** - Admin panel periodically checks if package was updated while server is running by comparing in-memory version with file version; shows "Restart Required" banner when mismatch detected
 - **Quiz file attachments** - Questions can have downloadable files via `file` field (e.g., `file: "data.xlsx"`). Files stored in `quizzes/attach/`, served at `/attach/{filename}` with `Content-Disposition: attachment` header for forced download. Server auto-prepends `/attach/` when serving to client. Admin panel has file picker modal for selecting files.
 - **Startup environment logging** - On server start, logs comprehensive environment info for troubleshooting: WebQuiz version, Python version/executable, OS/platform info, aiohttp version, working directory, config file path, binary mode status, server/path/admin/registration/tunnel configuration, and network interfaces. Master key value is never logged (only True/False).
+- **SD card/slow storage reliability** - All file writes (config, quizzes, CSV) use `flush()` + `os.fsync()` to ensure data is physically written to storage before returning success. Prevents data loss on Raspberry Pi and systems with SD cards or exFAT partitions when powered off shortly after save.
 
 ## Key Flows
 
