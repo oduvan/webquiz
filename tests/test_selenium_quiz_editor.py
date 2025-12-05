@@ -33,7 +33,7 @@ def admin_login(browser, port, master_key="test123"):
     password_input = wait_for_element(browser, By.ID, "master-key")
     password_input.send_keys(master_key)
 
-    login_button = browser.find_element(By.CSS_SELECTOR, "button[onclick='login()']")
+    login_button = browser.find_element(By.CSS_SELECTOR, "button[onclick='authenticate()']")
     login_button.click()
 
     # Wait for admin panel to load
