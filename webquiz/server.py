@@ -714,8 +714,11 @@ class TestingServer:
             return
 
         quiz_filename = os.path.basename(self.current_quiz_file)
-        await self.switch_quiz(quiz_filename)
-        logger.info(f"Quiz restarted after config change: {quiz_filename}")
+        try:
+            await self.switch_quiz(quiz_filename)
+            logger.info(f"Quiz restarted after config change: {quiz_filename}")
+        except Exception as e:
+            logger.error(f"Failed to restart quiz after config change: {e}")
 
     async def list_available_quizzes(self):
         """List all available quiz files in quizzes directory.
@@ -2790,6 +2793,12 @@ class TestingServer:
         if not self._validate_config_data(parsed_config, errors):
             return web.json_response({"error": "Configuration validation failed", "errors": errors}, status=400)
 
+        # Read original config for rollback if apply fails
+        original_content = None
+        if os.path.exists(config_path):
+            async with aiofiles.open(config_path, "r", encoding="utf-8") as f:
+                original_content = await f.read()
+
         # Write to config file with fsync for SD card/slow storage reliability
         async with aiofiles.open(config_path, "w", encoding="utf-8") as f:
             await f.write(content if content else "")
@@ -2798,11 +2807,12 @@ class TestingServer:
 
         logger.info(f"Configuration file updated: {config_path}")
 
-        # Hot-reload configuration and apply changes
-        new_config = self.reload_config_from_file()
         restart_reasons = []
 
-        if new_config:
+        try:
+            # Hot-reload configuration and apply changes
+            new_config = self.reload_config_from_file()
+
             # Preserve config_path in new config
             new_config.config_path = config_path
 
@@ -2814,12 +2824,31 @@ class TestingServer:
 
             # Restart current quiz if one is running
             await self.restart_current_quiz()
+        except Exception as e:
+            logger.error(f"Failed to apply config changes: {e}")
+            # Rollback config file to original content
+            if original_content is not None:
+                async with aiofiles.open(config_path, "w", encoding="utf-8") as f:
+                    await f.write(original_content)
+                    await f.flush()
+                    os.fsync(f.fileno())
+                logger.info("Configuration file rolled back to previous state")
+            return web.json_response(
+                {
+                    "success": False,
+                    "error": f"Failed to apply configuration: {str(e)}. Changes rolled back.",
+                    "config_path": config_path,
+                },
+                status=500,
+            )
 
         # Build response message based on restart requirements
         if restart_reasons:
             message = f"Configuration saved. Server restart required for: {', '.join(restart_reasons)}. Other changes applied."
-        else:
+        elif self.current_quiz_file:
             message = "Configuration saved and applied. Quiz restarted."
+        else:
+            message = "Configuration saved and applied."
 
         return web.json_response(
             {
