@@ -1462,10 +1462,12 @@
                         <span class="drag-handle" title="Перетягніть для зміни порядку">☰</span>
                         <span class="question-collapse-icon">▼</span>
                         <span class="question-number">${questionCounter}.</span>
-                        <span class="question-preview"></span>
                         <span class="question-indicators"></span>
+                        <span class="question-preview"></span>
                     </div>
                     <div class="question-header-buttons">
+                        <button type="button" onclick="moveQuestion(${questionCounter}, 'up', event)" title="Перемістити вгору">↑</button>
+                        <button type="button" onclick="moveQuestion(${questionCounter}, 'down', event)" title="Перемістити вниз">↓</button>
                         <button type="button" onclick="removeQuestion(${questionCounter}, event)" class="btn-danger" title="Видалити">×</button>
                     </div>
                 </div>
@@ -1740,6 +1742,9 @@
                     radio.checked = (index === checkedStates[i]);
                 });
             }
+
+            // Update button visibility
+            updateMoveButtonVisibility();
         }
 
         function updateMoveButtonVisibility() {
@@ -1910,10 +1915,12 @@
                                 <span class="drag-handle" title="Перетягніть для зміни порядку">☰</span>
                                 <span class="question-collapse-icon">▼</span>
                                 <span class="question-number">${questionCounter}.</span>
-                                <span class="question-preview">${escapeHtml(previewText)}</span>
                                 <span class="question-indicators">${indicatorsHtml}</span>
+                                <span class="question-preview">${escapeHtml(previewText)}</span>
                             </div>
                             <div class="question-header-buttons">
+                                <button type="button" onclick="moveQuestion(${questionCounter}, 'up', event)" title="Перемістити вгору">↑</button>
+                                <button type="button" onclick="moveQuestion(${questionCounter}, 'down', event)" title="Перемістити вниз">↓</button>
                                 <button type="button" onclick="removeQuestion(${questionCounter}, event)" class="btn-danger" title="Видалити">×</button>
                             </div>
                         </div>
