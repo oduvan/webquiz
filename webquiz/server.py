@@ -238,6 +238,7 @@ def log_startup_environment(config: WebQuizConfig):
     logger.info(f"aiohttp version: {aiohttp.__version__}")
     try:
         import yaml as yaml_module
+
         logger.info(f"PyYAML version: {yaml_module.__version__}")
     except (ImportError, AttributeError):
         pass
@@ -614,6 +615,49 @@ class TestingServer:
         self.user_answers.clear()
         self.live_stats.clear()
         logger.info("Server state reset for new quiz")
+
+    def reload_config_from_file(self) -> Optional[WebQuizConfig]:
+        """Reload configuration from file.
+
+        Returns:
+            New WebQuizConfig if successful, None if failed or no config path
+        """
+        if not self.config.config_path:
+            return None
+        return load_config_from_yaml(self.config.config_path)
+
+    def apply_config_changes(self, new_config: WebQuizConfig):
+        """Apply hot-reloadable config changes to running server.
+
+        Updates registration and admin config (trusted_ips only).
+        Does NOT change server, paths, master_key, or tunnel config.
+
+        Args:
+            new_config: New configuration loaded from file
+        """
+        # Update registration config
+        self.config.registration = new_config.registration
+
+        # Update admin.trusted_ips only (keep master_key unchanged)
+        self.config.admin.trusted_ips = new_config.admin.trusted_ips
+
+        # Update downloadable quizzes list
+        self.config.quizzes = new_config.quizzes
+
+        logger.info("Configuration changes applied to running server")
+
+    async def restart_current_quiz(self):
+        """Restart currently running quiz, resetting all state.
+
+        Reloads quiz file, regenerates index.html, notifies clients.
+        Does nothing if no quiz is currently active.
+        """
+        if not self.current_quiz_file or not os.path.exists(self.current_quiz_file):
+            return
+
+        quiz_filename = os.path.basename(self.current_quiz_file)
+        await self.switch_quiz(quiz_filename)
+        logger.info(f"Quiz restarted after config change: {quiz_filename}")
 
     async def list_available_quizzes(self):
         """List all available quiz files in quizzes directory.
@@ -2656,15 +2700,16 @@ class TestingServer:
 
     @admin_auth_required
     async def admin_update_config(self, request):
-        """Update server configuration file.
+        """Update server configuration file and apply changes.
 
-        Validates YAML syntax and structure before writing to file.
+        Validates YAML syntax and structure, writes to file, then hot-reloads
+        configuration and restarts current quiz if one is active.
 
         Args:
             request: aiohttp request with config content
 
         Returns:
-            JSON response with success status (requires server restart)
+            JSON response with success status
         """
         data = await request.json()
         content = data.get("content", "").strip()
@@ -2694,10 +2739,21 @@ class TestingServer:
             os.fsync(f.fileno())
 
         logger.info(f"Configuration file updated: {config_path}")
+
+        # Hot-reload configuration and apply changes
+        new_config = self.reload_config_from_file()
+        if new_config:
+            # Preserve config_path in new config
+            new_config.config_path = config_path
+            self.apply_config_changes(new_config)
+
+            # Restart current quiz if one is running
+            await self.restart_current_quiz()
+
         return web.json_response(
             {
                 "success": True,
-                "message": "Configuration saved successfully. Restart server to apply changes.",
+                "message": "Configuration saved and applied. Quiz restarted.",
                 "config_path": config_path,
             }
         )

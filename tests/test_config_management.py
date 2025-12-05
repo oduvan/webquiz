@@ -41,7 +41,7 @@ registration:
         assert response.status_code == 200
         data = response.json()
         assert data["success"] is True
-        assert "Restart server" in data["message"]
+        assert "saved and applied" in data["message"]
         assert "config_path" in data
 
 
@@ -344,10 +344,7 @@ def test_config_registration_fields_reload_from_files_page():
 
     with custom_webquiz_server() as (proc, port):
         session = requests.Session()
-        auth_response = session.post(
-            f"http://localhost:{port}/api/admin/auth",
-            json={"master_key": "test123"}
-        )
+        auth_response = session.post(f"http://localhost:{port}/api/admin/auth", json={"master_key": "test123"})
         assert auth_response.status_code == 200
 
         # Save config with registration fields
@@ -356,10 +353,7 @@ def test_config_registration_fields_reload_from_files_page():
     - "Grade"
     - "School"
 """
-        response = session.put(
-            f"http://localhost:{port}/api/admin/config",
-            json={"content": config_content}
-        )
+        response = session.put(f"http://localhost:{port}/api/admin/config", json={"content": config_content})
         assert response.status_code == 200
 
         # Load /files/ page and extract CONFIG_CONTENT
@@ -368,7 +362,7 @@ def test_config_registration_fields_reload_from_files_page():
         html = files_response.text
 
         # Extract CONFIG_CONTENT from JavaScript in the page
-        match = re.search(r'const CONFIG_CONTENT = (.*?);', html)
+        match = re.search(r"const CONFIG_CONTENT = (.*?);", html)
         assert match is not None, "CONFIG_CONTENT not found in /files/ page"
 
         config_content_js = match.group(1)
