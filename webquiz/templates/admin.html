@@ -331,7 +331,7 @@
         }
 
         .question-indicator.points-indicator {
-            color: #ffc107;
+            color: darkgoldenrod;
             font-weight: bold;
         }
 
@@ -1655,7 +1655,7 @@
                         <input type="number" id="min-correct-${questionCounter}" class="min-correct-input" min="1" placeholder="Усі правильні" style="width: 80px;">
                     </div>
                     <div class="form-group">
-                        <label for="points-${questionCounter}">Бали за питання:</label>
+                        <label for="points-${questionCounter}" style="display: inline-block;">Бали за питання:</label>
                         <input type="number" id="points-${questionCounter}" class="points-input" min="1" value="1" placeholder="1" style="width: 80px;" oninput="updateQuestionPreview(this)">
                     </div>
                 </div>
@@ -1779,7 +1779,7 @@
                     indicators += '<span class="question-indicator" title="Має файл">📎</span>';
                 }
                 if (points > 1) {
-                    indicators += `<span class="question-indicator points-indicator" title="${points} балів">🏆${points}</span>`;
+                    indicators += `<span class="question-indicator points-indicator" title="${points} балів"> 🏆${points}</span>`;
                 }
                 indicatorsSpan.innerHTML = indicators;
             }
@@ -2051,7 +2051,7 @@
                         indicatorsHtml += '<span class="question-indicator" title="Має файл">📎</span>';
                     }
                     if (pointsValue > 1) {
-                        indicatorsHtml += `<span class="question-indicator points-indicator" title="${pointsValue} балів">🏆${pointsValue}</span>`;
+                        indicatorsHtml += `<span class="question-indicator points-indicator" title="${pointsValue} балів">🏆 ${pointsValue}</span>`;
                     }
 
                     questionDiv.innerHTML = `
@@ -2110,7 +2110,7 @@
                                 <input type="number" id="min-correct-${questionCounter}" class="min-correct-input" min="1" value="${minCorrectValue}" placeholder="Усі правильні" style="width: 80px;">
                             </div>
                             <div class="form-group">
-                                <label for="points-${questionCounter}">Бали за питання:</label>
+                                <label for="points-${questionCounter}" style="display: inline-block;">Бали за питання:</label>
                                 <input type="number" id="points-${questionCounter}" class="points-input" min="1" value="${pointsValue}" placeholder="1" style="width: 80px;" oninput="updateQuestionPreview(this)">
                             </div>
                         </div>
