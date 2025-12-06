@@ -143,6 +143,7 @@ webquiz-stress-test -c 50
 - **Config hot-reload** - When admin saves config via web form (`PUT /api/admin/config`), changes are applied immediately without server restart. Hot-reloadable: registration settings (approve, fields, username_label), admin.trusted_ips, downloadable quizzes list, tunnel config. Requires restart (security/stability): server host/port, paths, master_key - shows "restart required" message with specific config paths. Quiz always restarted (users/state cleared) on config save. Templates are reloaded on each config save. If applying changes fails, config file is automatically rolled back to previous state.
 - **Multi-quiz selection** - Admin panel uses `<select multiple>` for quiz list instead of clickable divs. Single selection shows standard buttons (Switch, Edit, Duplicate, Delete). Multiple selection (Ctrl+click/Cmd+click) shows Unite button and Delete. Delete button disabled when current quiz is in selection.
 - **Quiz unite** - `POST /api/admin/unite-quizzes` combines multiple quizzes into one. Takes config (title, settings) from first quiz, combines all questions in order. Accepts `{quiz_filenames: [...], new_name: "..."}`, validates all quizzes exist and have valid structure, warns about duplicate questions, creates new quiz file with fsync.
+- **Question points** - Each question can have a `points` field (default: 1). Points are tracked per-answer, accumulated in user stats, and displayed in live stats (earned/total format), final results, and users CSV. Questions with >1 point show a trophy indicator in UI.
 
 ## Key Flows
 
@@ -158,7 +159,7 @@ webquiz-stress-test -c 50
 **Setup**: Parallel testing with ports 8080-8087, `custom_webquiz_server` fixture auto-cleans directories, `conftest.py` for shared fixtures
 
 ## Important Notes
-- **CSV files** (2 per session): `{quiz_name}_user_responses.csv` (submissions) + `{quiz_name}_user_responses.users.csv` (user stats with total_time in MM:SS format)
+- **CSV files** (2 per session): `{quiz_name}_user_responses.csv` (submissions) + `{quiz_name}_user_responses.users.csv` (user stats with total_time in MM:SS format, earned_points, total_points)
 - **Config** (`webquiz.yaml`): All sections optional, editable via `/files/` or admin panel, hot-reloaded on save (returns `restart_required` list if server/paths/master_key changed), UTF-8 charset header
 - **Config options**:
   - `registration.approve: true` - Admin approval required, timing starts on approval (default: false)
@@ -171,7 +172,7 @@ webquiz-stress-test -c 50
   - `tunnel.private_key` - Path to SSH private key file (auto-generated if missing)
   - `tunnel.socket_name` - Optional fixed socket name instead of random generation (default: random 6-8 hex chars)
   - `tunnel.config` - Optional nested config subsection (username, socket_directory, base_url) - bypasses server fetch when provided
-- Questions use **0-indexed** `correct_answer` field
+- Questions use **0-indexed** `correct_answer` field and optional `points` field (default: 1)
 - Usernames unique per quiz session
 - Switching quizzes = full state reset
 

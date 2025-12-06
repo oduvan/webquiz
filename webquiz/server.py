@@ -964,6 +964,7 @@ class TestingServer:
                 "id": q["id"],
                 "options": q["options"],
                 "is_multiple_choice": isinstance(q["correct_answer"], list),
+                "points": q.get("points", 1),  # Default 1 point per question
             }
             # Include question text if present
             if "question" in q and q["question"]:
@@ -1099,7 +1100,7 @@ class TestingServer:
             for field_label in self.config.registration.fields:
                 field_name = field_label.lower().replace(" ", "_")
                 headers.append(field_name)
-        headers.extend(["registered_at", "total_questions_asked", "correct_answers", "total_time"])
+        headers.extend(["registered_at", "total_questions_asked", "correct_answers", "earned_points", "total_points", "total_time"])
 
         # Always write headers (we always overwrite the file)
         csv_writer.writerow(headers)
@@ -1120,12 +1121,14 @@ class TestingServer:
             user_answer_list = self.user_answers.get(user_id, [])
             total_questions_asked = len(user_answer_list)
             correct_answers = sum(answer["is_correct"] for answer in user_answer_list)
+            earned_points = sum(answer.get("earned_points", 1 if answer["is_correct"] else 0) for answer in user_answer_list)
+            total_points = sum(answer.get("points", 1) for answer in user_answer_list)
             total_time_seconds = sum(answer.get("time_taken", 0) for answer in user_answer_list)
             # Format total_time as MM:SS
             minutes = int(total_time_seconds // 60)
             seconds = int(total_time_seconds % 60)
             total_time_formatted = f"{minutes}:{seconds:02d}"
-            row.extend([total_questions_asked, correct_answers, total_time_formatted])
+            row.extend([total_questions_asked, correct_answers, earned_points, total_points, total_time_formatted])
 
             csv_writer.writerow(row)
 
@@ -1418,6 +1421,7 @@ class TestingServer:
                         "state": "think",
                         "time_taken": None,
                         "total_questions": len(self.questions),
+                        "total_points": sum(q.get("points", 1) for q in self.questions),
                     }
                 )
         else:
@@ -1612,6 +1616,10 @@ class TestingServer:
         if file_value and not file_value.startswith("/attach/"):
             file_value = f"/attach/{file_value}"
 
+        # Get points for this question (default: 1)
+        question_points = question.get("points", 1)
+        earned_points = question_points if is_correct else 0
+
         answer_data = {
             "question": question.get("question", ""),  # Handle image-only questions
             "image": question.get("image"),
@@ -1620,6 +1628,8 @@ class TestingServer:
             "correct_answer": self._format_answer_text(question["correct_answer"], question["options"]),
             "is_correct": is_correct,
             "time_taken": time_taken,
+            "points": question_points,  # Points for this question
+            "earned_points": earned_points,  # Points actually earned
         }
         self.user_answers[user_id].append(answer_data)
 
@@ -1651,6 +1661,9 @@ class TestingServer:
                 "state": state,
                 "time_taken": time_taken,
                 "total_questions": len(self.questions),
+                "total_points": sum(q.get("points", 1) for q in self.questions),
+                "earned_points": earned_points,
+                "question_points": question_points,
                 "completed": test_completed,
                 "completed_at": completion_time,
             }
@@ -1696,6 +1709,10 @@ class TestingServer:
             self.question_start_times[user_id] = datetime.now()
         self.update_live_stats(user_id, question_id, "think")
 
+        # Get points for current question
+        question = next((q for q in self.questions if q["id"] == question_id), None)
+        question_points = question.get("points", 1) if question else 1
+
         await self.broadcast_to_websockets(
             {
                 "type": "state_update",
@@ -1705,6 +1722,8 @@ class TestingServer:
                 "state": "think",
                 "time_taken": None,
                 "total_questions": len(self.questions),
+                "total_points": sum(q.get("points", 1) for q in self.questions),
+                "question_points": question_points,
             }
         )
 
@@ -1714,7 +1733,7 @@ class TestingServer:
         """Calculate and store final stats for a completed user.
 
         Uses user_answers tracking (independent of CSV flushing) to calculate
-        correct count, percentage, and total time.
+        correct count, percentage, points, and total time.
 
         Args:
             user_id: User identifier
@@ -1729,14 +1748,19 @@ class TestingServer:
         # Calculate stats from user_answers
         correct_count = 0
         total_time = 0
+        earned_points = 0
+        total_points = 0
 
         for answer in user_answer_list:
             if answer["is_correct"]:
                 correct_count += 1
             total_time += answer["time_taken"]
+            earned_points += answer.get("earned_points", 1 if answer["is_correct"] else 0)
+            total_points += answer.get("points", 1)
 
         total_count = len(user_answer_list)
         percentage = round((correct_count / total_count) * 100) if total_count > 0 else 0
+        points_percentage = round((earned_points / total_points) * 100) if total_points > 0 else 0
 
         # Store final stats (copy the answer data to avoid reference issues)
         self.user_stats[user_id] = {
@@ -1744,12 +1768,16 @@ class TestingServer:
             "correct_count": correct_count,
             "total_count": total_count,
             "percentage": percentage,
+            "earned_points": earned_points,
+            "total_points": total_points,
+            "points_percentage": points_percentage,
             "total_time": total_time,
             "completed_at": datetime.now().isoformat(),
         }
 
         logger.info(
-            f"Stored final stats for user {user_id}: {correct_count}/{total_count} ({percentage}%) using user_answers"
+            f"Stored final stats for user {user_id}: {correct_count}/{total_count} ({percentage}%), "
+            f"points: {earned_points}/{total_points} ({points_percentage}%) using user_answers"
         )
 
     def all_students_completed(self):
@@ -1832,6 +1860,9 @@ class TestingServer:
             "correct_count": 0,
             "total_count": 0,
             "percentage": 0,
+            "earned_points": 0,
+            "total_points": 0,
+            "points_percentage": 0,
             "total_time": 0,
             "all_completed": False,
             "show_answers_on_completion": False,
@@ -2121,6 +2152,7 @@ class TestingServer:
                     "state": "think",
                     "time_taken": None,
                     "total_questions": len(self.questions),
+                    "total_points": sum(q.get("points", 1) for q in self.questions),
                 }
             )
 
@@ -3490,6 +3522,7 @@ class TestingServer:
             "completion_times": completion_times,
             "questions": self.questions,
             "total_questions": len(self.questions),
+            "total_points": sum(q.get("points", 1) for q in self.questions),
             "current_quiz": os.path.basename(self.current_quiz_file) if self.current_quiz_file else None,
         }
         return await self._handle_websocket_connection(request, self.websocket_clients, initial_data, "WebSocket")

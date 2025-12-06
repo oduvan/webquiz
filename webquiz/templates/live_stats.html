@@ -306,6 +306,13 @@
             cursor: help;
         }
 
+        .points-indicator {
+            margin-left: 4px;
+            cursor: help;
+            font-size: 0.85em;
+            color: #ffc107;
+        }
+
         @media (max-width: 768px) {
             body {
                 padding: 10px;
@@ -537,6 +544,7 @@
                 this.completionTimes = data.completion_times || {};
                 this.questions = data.questions || [];
                 this.totalQuestions = data.total_questions || 0;
+                this.totalPoints = data.total_points || this.questions.reduce((sum, q) => sum + (q.points || 1), 0);
                 this.currentQuiz = data.current_quiz || 'No quiz selected';
 
                 // Calculate statistics client-side
@@ -649,25 +657,35 @@
             }
 
             calculateStatistics() {
-                // Calculate user statistics
+                // Calculate user statistics (with points)
                 this.userStatistics = {};
                 for (const userId in this.liveStats) {
                     let correctCount = 0;
                     let totalAnswered = 0;
+                    let earnedPoints = 0;
+                    let attemptedPoints = 0;
 
                     for (const questionId in this.liveStats[userId]) {
                         const state = this.liveStats[userId][questionId].state;
+                        const qId = parseInt(questionId);
+                        const question = this.questions.find(q => q.id === qId);
+                        const questionPoints = question ? (question.points || 1) : 1;
+
                         if (state === 'ok' || state === 'fail') {
                             totalAnswered++;
+                            attemptedPoints += questionPoints;
                             if (state === 'ok') {
                                 correctCount++;
+                                earnedPoints += questionPoints;
                             }
                         }
                     }
 
                     this.userStatistics[userId] = {
                         correct_count: correctCount,
-                        total_answered: totalAnswered
+                        total_answered: totalAnswered,
+                        earned_points: earnedPoints,
+                        attempted_points: attemptedPoints
                     };
                 }
 
@@ -695,9 +713,13 @@
             }
 
             updateStatisticsIncremental(userId, questionId, oldState, newState) {
+                // Get question points
+                const question = this.questions.find(q => q.id === parseInt(questionId));
+                const questionPoints = question ? (question.points || 1) : 1;
+
                 // Initialize stats if needed
                 if (!this.userStatistics[userId]) {
-                    this.userStatistics[userId] = { correct_count: 0, total_answered: 0 };
+                    this.userStatistics[userId] = { correct_count: 0, total_answered: 0, earned_points: 0, attempted_points: 0 };
                 }
                 if (!this.questionStatistics[questionId]) {
                     this.questionStatistics[questionId] = { correct_count: 0, total_attempts: 0 };
@@ -706,9 +728,11 @@
                 // Remove old state contribution
                 if (oldState === 'ok' || oldState === 'fail') {
                     this.userStatistics[userId].total_answered--;
+                    this.userStatistics[userId].attempted_points -= questionPoints;
                     this.questionStatistics[questionId].total_attempts--;
                     if (oldState === 'ok') {
                         this.userStatistics[userId].correct_count--;
+                        this.userStatistics[userId].earned_points -= questionPoints;
                         this.questionStatistics[questionId].correct_count--;
                     }
                 }
@@ -716,9 +740,11 @@
                 // Add new state contribution
                 if (newState === 'ok' || newState === 'fail') {
                     this.userStatistics[userId].total_answered++;
+                    this.userStatistics[userId].attempted_points += questionPoints;
                     this.questionStatistics[questionId].total_attempts++;
                     if (newState === 'ok') {
                         this.userStatistics[userId].correct_count++;
+                        this.userStatistics[userId].earned_points += questionPoints;
                         this.questionStatistics[questionId].correct_count++;
                     }
                 }
@@ -797,6 +823,7 @@
                 for (let i = 0; i < this.questions.length; i++) {
                     const question = this.questions[i];
                     const questionId = i + 1;
+                    const questionPoints = question.points || 1;
 
                     // Get question statistics
                     const questionStats = this.questionStatistics[questionId] || { correct_count: 0, total_attempts: 0 };
@@ -805,23 +832,26 @@
                     // Build file indicator if question has a file attachment
                     const fileIndicator = question.file ? `<span class="file-indicator" title="${question.file.split('/').pop()}">📎</span>` : '';
 
+                    // Build points indicator if question has more than 1 point
+                    const pointsIndicator = questionPoints > 1 ? `<span class="points-indicator" title="${questionPoints} points">🏆${questionPoints}</span>` : '';
+
                     if (question.image && !question.question) {
                         // Image-only question: show filename and small image
                         const imagePath = question.image;
                         const filename = imagePath.split('/').pop().split('.').slice(0, -1).join('.');
-                        headerHtml += `<th title="${filename} - Correct: ${statsText}">
+                        headerHtml += `<th title="${filename} - Correct: ${statsText}${questionPoints > 1 ? ` - ${questionPoints} points` : ''}">
                             <div class="image-header">
                                 <img src="${imagePath}" alt="${filename}" class="header-image">
-                                <div class="image-filename">${filename}${fileIndicator}</div>
+                                <div class="image-filename">${filename}${fileIndicator}${pointsIndicator}</div>
                                 <div class="question-stats">${statsText}</div>
                             </div>
                         </th>`;
                     } else {
                         // Regular question with text
                         const questionText = question.question || `Q${i + 1}`;
-                        headerHtml += `<th title="${questionText} - Correct: ${statsText}">
+                        headerHtml += `<th title="${questionText} - Correct: ${statsText}${questionPoints > 1 ? ` - ${questionPoints} points` : ''}">
                             <div class="question-header">
-                                <div class="question-text">${questionText}${fileIndicator}</div>
+                                <div class="question-text">${questionText}${fileIndicator}${pointsIndicator}</div>
                                 <div class="question-stats">${statsText}</div>
                             </div>
                         </th>`;
@@ -835,9 +865,9 @@
                 userIds.forEach(userId => {
                     const username = this.users[userId];
 
-                    // Get user statistics
-                    const userStats = this.userStatistics[userId] || { correct_count: 0, total_answered: 0 };
-                    const userStatsText = `${userStats.correct_count}/${userStats.total_answered}`;
+                    // Get user statistics - show points instead of question count
+                    const userStats = this.userStatistics[userId] || { correct_count: 0, total_answered: 0, earned_points: 0, attempted_points: 0 };
+                    const userStatsText = `${userStats.earned_points}/${this.totalPoints}`;
 
                     bodyHtml += `<tr id="user-${userId}">`;
                     bodyHtml += `<td class="username-cell">

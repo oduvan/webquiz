@@ -126,6 +126,26 @@ In this example, the correct answer is `"4"` (index 1).
 
 ---
 
+#### Question Points
+
+Each question can have its own point value using the **`points`** parameter.
+By default, each question is worth **1 point**.
+
+```
+- question: "Difficult question"
+  options: ["A", "B", "C", "D"]
+  correct_answer: 2
+  points: 3  # This question is worth 3 points
+```
+
+**Features:**
+- Points are displayed in **live stats** as earned/total points
+- **Final results** show earned points
+- **Users CSV file** includes `earned_points` and `total_points` columns
+- Questions worth more than 1 point show a 🏆 indicator during the quiz
+
+---
+
 #### Multiple Correct Answers Question
 
 WebQuiz supports questions with multiple correct answers.
@@ -559,6 +579,7 @@ The YAML format for tests in **WebQuiz** allows:
 ✅ Setting minimum number of correct answers
 ✅ Showing or hiding correct answers after completion
 ✅ Randomizing question order for each student to prevent cheating
+✅ Setting different point values for each question
 ✅ Easily editing tests in web interface with automatic validation
 
 **Recommendation:** Use the administrator web interface to create and edit tests — it automatically validates syntax and warns about errors!

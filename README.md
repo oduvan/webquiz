@@ -343,6 +343,28 @@ questions:
 - Helps prevent cheating and ensures fair testing
 - Default is `false` (questions appear in YAML order)
 
+**Question Points:**
+- Each question can have a custom point value using the `points` field (default: 1)
+- Points are tracked and displayed in:
+  - Live stats: shows earned points / total points for each user
+  - Final results: displays points earned along with correct/incorrect count
+  - Users CSV: includes `earned_points` and `total_points` columns
+- Questions with more than 1 point show a trophy indicator (🏆) during the quiz
+
+Example:
+```yaml
+questions:
+  - question: "Easy question"
+    options: ["A", "B", "C", "D"]
+    correct_answer: 0
+    # points: 1  (default, can be omitted)
+
+  - question: "Hard question worth 3 points"
+    options: ["X", "Y", "Z"]
+    correct_answer: 2
+    points: 3  # This question is worth 3 points
+```
+
 ### Server Configuration
 
 Optional server configuration file (`webquiz.yaml`):
@@ -451,11 +473,13 @@ user_id,question,selected_answer,correct_answer,is_correct,time_taken_seconds
 A second file with `.users.csv` suffix contains user statistics:
 
 ```csv
-user_id,username,registered_at,total_questions_asked,correct_answers,total_time
-123456,student1,2025-01-15T10:30:00,5,4,12:46
+user_id,username,registered_at,total_questions_asked,correct_answers,earned_points,total_points,total_time
+123456,student1,2025-01-15T10:30:00,5,4,7,9,12:46
 ```
 
-The `total_time` column shows the total quiz completion time in `MM:SS` format (minutes:seconds).
+- `total_time` - Total quiz completion time in `MM:SS` format (minutes:seconds)
+- `earned_points` - Points earned from correct answers
+- `total_points` - Maximum possible points for questions answered
 
 CSV files are created with proper escaping and include all user response data. Files are flushed periodically (every 5 seconds) to ensure data persistence.
 
