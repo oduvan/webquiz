@@ -1069,6 +1069,7 @@
 
             <div class="actions-sticky">
                 <button onclick="saveQuiz()">💾 Зберегти Quiz</button>
+                <button id="save-continue-btn" onclick="saveQuizAndContinue()">💾 Зберегти і Продовжити</button>
                 <button onclick="closeQuizEditor()">❌ Скасувати</button>
             </div>
         </div>
@@ -2262,6 +2263,82 @@
             } catch (error) {
                 showMessage('Помилка збереження quiz: ' + error.message, 'error');
             }
+        }
+
+        async function saveQuizAndContinue() {
+            const filename = document.getElementById('quiz-filename').value.trim();
+
+            if (!filename) {
+                showMessage('Будь ласка, введіть ім\'я файлу', 'error');
+                return;
+            }
+
+            const quizData = getWizardData();
+            if (!quizData.questions || quizData.questions.length === 0) {
+                showMessage('Будь ласка, додайте принаймні одне питання', 'error');
+                return;
+            }
+
+            const button = document.getElementById('save-continue-btn');
+            const originalText = '💾 Зберегти і Продовжити';
+            button.disabled = true;
+            button.innerHTML = '⏳ Збереження...';
+            button.style.backgroundColor = '';
+
+            let success = false;
+
+            try {
+                const url = isEditMode ? `/api/admin/quiz/${editingQuizName}` : '/api/admin/create-quiz';
+                const method = isEditMode ? 'PUT' : 'POST';
+
+                const response = await fetch(url, {
+                    method,
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        filename,
+                        mode: 'wizard',
+                        quiz_data: quizData
+                    })
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    success = true;
+                    showMessage(data.message, 'success');
+                    // If this was a new quiz, switch to edit mode
+                    if (!isEditMode) {
+                        isEditMode = true;
+                        editingQuizName = filename + '.yaml';
+                        document.getElementById('modal-title').textContent = `Редагувати Quiz: ${editingQuizName}`;
+                        document.getElementById('quiz-filename').disabled = true;
+                    }
+                    // Reload quiz list in background
+                    loadQuizzes();
+                } else {
+                    showMessage(data.error || 'Не вдалося зберегти quiz', 'error');
+                }
+            } catch (error) {
+                showMessage('Помилка збереження quiz: ' + error.message, 'error');
+            }
+
+            // Show result state
+            if (success) {
+                button.innerHTML = '✅ Збережено';
+                button.style.backgroundColor = '#28a745';
+            } else {
+                button.innerHTML = '❌ Помилка';
+                button.style.backgroundColor = '#dc3545';
+            }
+
+            // Return to default state after delay
+            setTimeout(() => {
+                button.disabled = false;
+                button.innerHTML = originalText;
+                button.style.backgroundColor = '';
+            }, 1500);
         }
 
         // Network information display using server-generated data
