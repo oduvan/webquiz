@@ -41,6 +41,7 @@ WebQuiz - Python/aiohttp quiz system with multi-quiz management, real-time WebSo
 - `GET /api/admin/check-session`, `GET /api/admin/version-check`, `PUT /api/admin/approve-user`, `GET /api/admin/list-quizzes`, `POST /api/admin/switch-quiz`, `PUT /api/admin/config`
 - Quiz management: `GET /api/admin/quiz/{filename}`, `POST /api/admin/create-quiz`, `PUT /api/admin/quiz/{filename}`, `DELETE /api/admin/quiz/{filename}`, `POST /api/admin/download-quiz`, `POST /api/admin/unite-quizzes`
 - Quiz file attachments: `GET /api/admin/list-files` (list files in quizzes/attach/)
+- Checker templates: `GET /api/admin/list-checker-templates` (list configured checker templates for text questions)
 - File management: `GET /api/files/list`, `GET /api/files/{type}/view/{filename}`, `GET /api/files/{type}/download/{filename}`, `PUT /api/files/quizzes/save/{filename}`
 - Tunnel management: `POST /api/admin/tunnel/connect`, `POST /api/admin/tunnel/disconnect`, `GET /api/admin/tunnel/public-key`
 
@@ -145,6 +146,8 @@ webquiz-stress-test -c 50
 - **Quiz list with titles** - `GET /api/admin/list-quizzes` returns array of objects with `filename` and `title` fields (title is null if quiz has no title). Admin panel displays quiz titles alongside filenames in selection list.
 - **Quiz unite** - `POST /api/admin/unite-quizzes` combines multiple quizzes into one. Takes config (title, settings) from first quiz, combines all questions in order. Accepts `{quiz_filenames: [...], new_name: "..."}`, validates all quizzes exist and have valid structure, warns about duplicate questions, creates new quiz file with fsync.
 - **Question points** - Each question can have a `points` field (default: 1). Points are tracked per-answer, accumulated in user stats, and displayed in live stats (earned/total format), final results, and users CSV. Questions with >1 point show a trophy indicator in UI.
+- **Text input questions** - Questions with `checker` field are automatically detected as text input questions (no `type` field needed). Fields: `default_value` (initial textarea value), `correct_value` (shown when wrong), `checker` (Python code for validation). Checker code runs in sandboxed environment with limited builtins (math functions, basic types). If checker is empty, exact match with `correct_value` is used. Returns `checker_error` message on failure.
+- **Checker templates** - Admin-configurable code templates for text question validation. Defined in config as `checker_templates: [{name: "...", code: "..."}]`. Templates available in admin quiz editor for quick insertion.
 
 ## Key Flows
 
@@ -156,6 +159,7 @@ webquiz-stress-test -c 50
 **Tunnel**: Initialize → check/generate keys → admin clicks connect → fetch server config → create SSH connection → forward remote Unix socket to local port (forward_remote_path_to_port) → broadcast public URL via WebSocket → auto-reconnect on disconnect
 **Startup**: Load config → create TestingServer → initialize log file → configure logging → **log environment info** (version, Python, OS, config, paths, network) → initialize tunnel → load questions → start periodic flush → register routes
 **Config Hot-Reload**: Admin saves config → validate YAML → backup original config → write to file → reload config from file → detect restart-required changes (server, paths, master_key) → apply safe changes (registration, trusted_ips, quizzes, tunnel) → reload templates → disconnect tunnel if connected (admin can reconnect) → restart current quiz (reset users/state) → return message (either "saved and applied" or "restart required for: ..."). On failure: rollback config file to backup → return error
+**Text Question Validation**: Submit text answer → check question type → if text: execute checker code in sandboxed env (restricted builtins + math) → if exception: answer incorrect + return error message → if no exception: answer correct. No checker: exact match with `correct_value`
 
 **Setup**: Parallel testing with ports 8080-8087, `custom_webquiz_server` fixture auto-cleans directories, `conftest.py` for shared fixtures
 
@@ -174,6 +178,8 @@ webquiz-stress-test -c 50
   - `tunnel.socket_name` - Optional fixed socket name instead of random generation (default: random 6-8 hex chars)
   - `tunnel.config` - Optional nested config subsection (username, socket_directory, base_url) - bypasses server fetch when provided
 - Questions use **0-indexed** `correct_answer` field and optional `points` field (default: 1)
+- Text questions are detected by `checker` field (no `type` field needed, no `options` or `correct_answer`)
+- `checker_templates` - List of `{name, code}` objects for admin panel template dropdown
 - Usernames unique per quiz session
 - Switching quizzes = full state reset
 

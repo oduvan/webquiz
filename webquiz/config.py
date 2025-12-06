@@ -109,6 +109,25 @@ class QuizzesConfig:
 
 
 @dataclass
+class CheckerTemplate:
+    """Checker template for text input questions"""
+
+    name: str
+    code: str
+
+
+@dataclass
+class CheckerTemplatesConfig:
+    """Checker templates configuration data class"""
+
+    templates: List[CheckerTemplate] = None
+
+    def __post_init__(self):
+        if self.templates is None:
+            self.templates = []
+
+
+@dataclass
 class TunnelServerConfig:
     """Tunnel server configuration data class (fetched from server or provided locally)"""
 
@@ -145,6 +164,7 @@ class WebQuizConfig:
     registration: RegistrationConfig = field(default_factory=RegistrationConfig)
     quizzes: QuizzesConfig = field(default_factory=QuizzesConfig)
     tunnel: TunnelConfig = field(default_factory=TunnelConfig)
+    checker_templates: CheckerTemplatesConfig = field(default_factory=CheckerTemplatesConfig)
     config_path: Optional[str] = None  # Path to the config file that was loaded
 
 
@@ -193,6 +213,16 @@ def load_config_from_yaml(config_path: str) -> WebQuizConfig:
 
         tunnel_config = TunnelConfig(**tunnel_data, config=tunnel_server_config)
 
+        # Parse checker templates configuration
+        checker_templates_data = config_data.get("checker_templates", [])
+        checker_templates = []
+        if checker_templates_data:
+            for template_data in checker_templates_data:
+                checker_templates.append(
+                    CheckerTemplate(name=template_data["name"], code=template_data["code"])
+                )
+        checker_templates_config = CheckerTemplatesConfig(templates=checker_templates)
+
         return WebQuizConfig(
             server=server_config,
             paths=paths_config,
@@ -200,6 +230,7 @@ def load_config_from_yaml(config_path: str) -> WebQuizConfig:
             registration=registration_config,
             quizzes=quizzes_config,
             tunnel=tunnel_config,
+            checker_templates=checker_templates_config,
         )
     except FileNotFoundError:
         logger.warning(f"Config file not found: {config_path}, using defaults")
