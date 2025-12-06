@@ -365,7 +365,7 @@ def test_save_and_continue_keeps_editor_open(temp_dir, browser):
         admin_login(browser, port)
 
         # Click "Create Quiz" button
-        create_btn = wait_for_clickable(browser, By.ID, "create-btn")
+        create_btn = wait_for_clickable(browser, By.XPATH, "//button[contains(text(), 'Створити Новий Quiz')]")
         create_btn.click()
 
         # Wait for editor modal
