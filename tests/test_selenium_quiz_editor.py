@@ -354,3 +354,98 @@ def test_question_numbers_without_prefix(temp_dir, browser):
 
         number2 = question_items[1].find_element(By.CSS_SELECTOR, ".question-number")
         assert number2.text == "2.", f"Second question number should be '2.', got: {number2.text}"
+
+
+@skip_if_selenium_disabled
+def test_save_and_continue_keeps_editor_open(temp_dir, browser):
+    """Test that 'Save and Continue' button saves quiz and keeps editor open."""
+    config = {"admin": {"master_key": "test123"}}
+
+    with custom_webquiz_server(config=config) as (proc, port):
+        admin_login(browser, port)
+
+        # Click "Create Quiz" button
+        create_btn = wait_for_clickable(browser, By.ID, "create-btn")
+        create_btn.click()
+
+        # Wait for editor modal
+        WebDriverWait(browser, 10).until(EC.visibility_of_element_located((By.ID, "quiz-editor-modal")))
+
+        # Enter quiz filename
+        filename_input = browser.find_element(By.ID, "quiz-filename")
+        filename_input.send_keys("test_save_continue")
+
+        # Enter quiz title
+        title_input = browser.find_element(By.ID, "quiz-title")
+        title_input.clear()
+        title_input.send_keys("Save and Continue Test")
+
+        # Find and click "Add Question" button
+        add_button = browser.find_element(By.XPATH, "//button[contains(text(), 'Додати Питання')]")
+        add_button.click()
+        time.sleep(0.3)
+
+        # Fill in question text
+        question_input = browser.find_element(By.CSS_SELECTOR, ".question-item textarea")
+        question_input.send_keys("Test question")
+
+        # Fill in options (find option inputs within the question)
+        option_inputs = browser.find_elements(By.CSS_SELECTOR, ".question-item .option-input")
+        option_inputs[0].send_keys("Option A")
+        option_inputs[1].send_keys("Option B")
+
+        # Click "Save and Continue" button
+        save_continue_btn = browser.find_element(By.XPATH, "//button[contains(text(), 'Зберегти і Продовжити')]")
+        save_continue_btn.click()
+
+        # Wait for success message
+        time.sleep(1.0)
+
+        # Verify editor is still open
+        editor_modal = browser.find_element(By.ID, "quiz-editor-modal")
+        assert editor_modal.is_displayed(), "Editor should still be open after Save and Continue"
+
+        # Verify we're now in edit mode (filename should be disabled)
+        filename_input = browser.find_element(By.ID, "quiz-filename")
+        assert filename_input.get_attribute("disabled") == "true", "Filename should be disabled in edit mode"
+
+        # Verify modal title changed to edit mode
+        modal_title = browser.find_element(By.ID, "modal-title")
+        assert "Редагувати" in modal_title.text, f"Modal title should indicate edit mode, got: {modal_title.text}"
+
+
+@skip_if_selenium_disabled
+def test_save_and_continue_in_edit_mode(temp_dir, browser):
+    """Test that 'Save and Continue' works when already in edit mode."""
+    quiz_data = {
+        "test_quiz.yaml": {
+            "title": "Existing Quiz",
+            "questions": [
+                {"question": "Original question", "options": ["A", "B"], "correct_answer": 0},
+            ],
+        }
+    }
+
+    with custom_webquiz_server(quizzes=quiz_data) as (proc, port):
+        admin_login(browser, port)
+        select_and_edit_quiz(browser)
+
+        # Modify the title
+        title_input = browser.find_element(By.ID, "quiz-title")
+        title_input.clear()
+        title_input.send_keys("Modified Title")
+
+        # Click "Save and Continue" button
+        save_continue_btn = browser.find_element(By.XPATH, "//button[contains(text(), 'Зберегти і Продовжити')]")
+        save_continue_btn.click()
+
+        # Wait for success message
+        time.sleep(1.0)
+
+        # Verify editor is still open
+        editor_modal = browser.find_element(By.ID, "quiz-editor-modal")
+        assert editor_modal.is_displayed(), "Editor should still be open after Save and Continue"
+
+        # Verify title input still has the modified value
+        title_input = browser.find_element(By.ID, "quiz-title")
+        assert title_input.get_attribute("value") == "Modified Title", "Title should be preserved"
