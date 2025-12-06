@@ -368,7 +368,7 @@ questions:
 
 **Text Input Questions:**
 
-In addition to multiple choice questions, you can create text input questions where students type their answer. Questions with `checker` or `correct_value` fields are automatically detected as text input questions:
+In addition to multiple choice questions, you can create text input questions where students type their answer. Questions with `checker` field are automatically detected as text input questions:
 
 ```yaml
 questions:
@@ -389,10 +389,9 @@ questions:
 
 **Text Question Fields:**
 - `question` - Question text (required)
-- `checker` or `correct_value` - At least one required to identify as text question
+- `checker` - Required to identify as text question (can be empty for exact match)
 - `default_value` - Initial value shown in textarea (optional)
 - `correct_value` - Correct answer shown when student is wrong (optional)
-- `checker` - Python code for answer validation (optional)
 - `points` - Points for correct answer (default: 1)
 
 **Checker Code:**

@@ -273,7 +273,7 @@ You can combine an image and a file in the same question:
 
 #### Text Input Questions
 
-In addition to multiple choice questions, WebQuiz supports text input questions where students type their answer. Questions with `checker` or `correct_value` fields are automatically detected as text input questions:
+In addition to multiple choice questions, WebQuiz supports text input questions where students type their answer. Questions with `checker` field are automatically detected as text input questions:
 
 ```
 - question: "What is 2+2?"
@@ -285,17 +285,16 @@ In addition to multiple choice questions, WebQuiz supports text input questions 
 
 **Text Question Fields:**
 - **question** — question text
-- **checker** or **correct_value** — at least one required to identify as text question
+- **checker** — required to identify as text question (can be empty for exact match)
 - **default_value** — initial value shown in the textarea (optional)
 - **correct_value** — correct answer shown when student is wrong (optional)
-- **checker** — Python code for answer validation (optional)
 - **points** — points for correct answer (default: 1)
 
 **Checker Code:**
 - Uses variable `user_answer` (the student's text input)
 - Available functions: `sqrt`, `sin`, `cos`, `tan`, `log`, `exp`, `pi`, `e`, `abs`, `len`, `int`, `float`, `str`, `list`, `dict`, `range`, `sorted`, `sum`, `max`, `min`
 - If the code raises any exception, the answer is marked incorrect
-- If no checker is provided, exact match with `correct_value` is used (with whitespace stripped)
+- If checker is empty, exact match with `correct_value` is used (with whitespace stripped)
 
 Example with math validation:
 

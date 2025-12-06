@@ -960,8 +960,8 @@ class TestingServer:
         # Prepare questions data for client (without correct answers)
         questions_for_client = []
         for q in self.questions:
-            # Check if this is a text input question (has checker or correct_value)
-            is_text_question = "checker" in q or "correct_value" in q
+            # Check if this is a text input question (has checker)
+            is_text_question = "checker" in q
 
             if is_text_question:
                 # Text input question - no options, no correct_answer
@@ -1257,8 +1257,8 @@ class TestingServer:
             For choice questions: True if answer is correct, False otherwise
             For text questions: tuple (is_correct: bool, error_message: str or None)
         """
-        # Handle text input questions (has checker or correct_value)
-        if "checker" in question or "correct_value" in question:
+        # Handle text input questions (has checker)
+        if "checker" in question:
             return self._execute_checker(selected_answer, question)
 
         correct_answer = question["correct_answer"]
@@ -1708,8 +1708,8 @@ class TestingServer:
             # Clean up the start time
             del self.question_start_times[user_id]
 
-        # Check if this is a text input question (has checker or correct_value)
-        is_text_question = "checker" in question or "correct_value" in question
+        # Check if this is a text input question (has checker)
+        is_text_question = "checker" in question
         checker_error = None
 
         # Check if answer is correct (handle single, multiple, and text answers)
@@ -2712,8 +2712,8 @@ class TestingServer:
                 errors.append(f"Question {i+1} must be a dictionary")
                 continue
 
-            # Check if this is a text input question (has checker or correct_value)
-            is_text_question = "checker" in question or "correct_value" in question
+            # Check if this is a text input question (has checker)
+            is_text_question = "checker" in question
 
             # Either question text OR image must be provided (for all question types)
             has_question = "question" in question and question["question"]

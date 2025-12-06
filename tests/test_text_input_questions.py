@@ -30,10 +30,11 @@ def text_input_server():
                 "checker": "result = float(user_answer.strip())\nassert abs(result - sqrt(16)) < 0.01, f'Expected 4, got {result}'",
                 "points": 2,
             },
-            # Text question without checker (exact match with correct_value)
+            # Text question with simple checker (exact match with correct_value)
             {
                 "question": "What is the capital of France?",
                 "correct_value": "Paris",
+                "checker": "",  # Empty checker uses exact match with correct_value
                 "points": 1,
             },
             # Mixed with choice question
@@ -271,6 +272,7 @@ class TestTextInputQuizValidation:
                     "question": "Look at the image and answer:",
                     "image": "/imgs/test.png",
                     "correct_value": "answer",
+                    "checker": "",  # Empty checker uses exact match
                 }
             ],
         }
@@ -287,7 +289,7 @@ class TestTextInputQuizValidation:
         quiz_data = {
             "title": "Points Text Quiz",
             "questions": [
-                {"question": "Enter answer:", "correct_value": "test", "points": 5}
+                {"question": "Enter answer:", "correct_value": "test", "checker": "", "points": 5}
             ],
         }
 
