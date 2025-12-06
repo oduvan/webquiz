@@ -1661,11 +1661,11 @@
                     <div class="text-question-fields" style="display: none;">
                         <div class="form-group">
                             <label>Початкове Значення (показується користувачу):</label>
-                            <textarea class="default-value-input" placeholder="Введіть початкове значення для відображення..." style="width: 100%; min-height: 60px; font-family: monospace;"></textarea>
+                            <textarea class="default-value-input" placeholder="Введіть початкове значення для відображення..." style="width: 100%; min-height: 60px; font-family: monospace;">0</textarea>
                         </div>
                         <div class="form-group">
                             <label>Правильна Відповідь (показується при помилці):</label>
-                            <textarea class="correct-value-input" placeholder="Введіть правильну відповідь..." style="width: 100%; min-height: 60px; font-family: monospace;"></textarea>
+                            <textarea class="correct-value-input" placeholder="Введіть правильну відповідь..." style="width: 100%; min-height: 60px; font-family: monospace;">1000</textarea>
                         </div>
                         <div class="form-group">
                             <label>Перевірка (Python код):</label>
@@ -1674,8 +1674,7 @@
                                     <option value="">-- Оберіть шаблон --</option>
                                 </select>
                             </div>
-                            <textarea class="checker-input" placeholder="# Змінна user_answer містить відповідь користувача&#10;# Код повинен викинути виключення, якщо відповідь неправильна&#10;&#10;assert user_answer.strip() == 'правильна відповідь', 'Неправильна відповідь'" style="width: 100%; min-height: 120px; font-family: monospace;"></textarea>
-                            <p style="font-size: 12px; color: #666; margin-top: 5px;">Доступні: user_answer (відповідь користувача), sqrt, sin, cos, tan, log, exp, pi, e, abs, len, int, float, str, list, dict, range, sorted, sum, max, min</p>
+                            <textarea class="checker-input" style="width: 100%; min-height: 120px; font-family: monospace;">assert 900 < to_int(user_answer) < 1100, "Вийшли за рамки"</textarea>
                         </div>
                     </div>
                     <div class="form-group">
@@ -2241,8 +2240,7 @@
                                             <option value="">-- Оберіть шаблон --</option>
                                         </select>
                                     </div>
-                                    <textarea class="checker-input" placeholder="# Змінна user_answer містить відповідь користувача&#10;# Код повинен викинути виключення, якщо відповідь неправильна&#10;&#10;assert user_answer.strip() == 'правильна відповідь', 'Неправильна відповідь'" style="width: 100%; min-height: 120px; font-family: monospace;">${escapeHtml(question.checker || '')}</textarea>
-                                    <p style="font-size: 12px; color: #666; margin-top: 5px;">Доступні: user_answer (відповідь користувача), sqrt, sin, cos, tan, log, exp, pi, e, abs, len, int, float, str, list, dict, range, sorted, sum, max, min</p>
+                                    <textarea class="checker-input" style="width: 100%; min-height: 120px; font-family: monospace;">${escapeHtml(question.checker)}</textarea>
                                 </div>
                             </div>
                             <div class="form-group">
