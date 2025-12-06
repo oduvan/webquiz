@@ -395,11 +395,22 @@ def test_save_and_continue_keeps_editor_open(temp_dir, browser):
         option_inputs[1].send_keys("Option B")
 
         # Click "Save and Continue" button
-        save_continue_btn = browser.find_element(By.XPATH, "//button[contains(text(), 'Зберегти і Продовжити')]")
+        save_continue_btn = browser.find_element(By.ID, "save-continue-btn")
         save_continue_btn.click()
 
-        # Wait for success message
-        time.sleep(1.0)
+        # Wait briefly and check for success state
+        time.sleep(0.5)
+        save_continue_btn = browser.find_element(By.ID, "save-continue-btn")
+        # Button should show success state (green background, "Збережено" text)
+        assert "Збережено" in save_continue_btn.text, f"Button should show success state, got: {save_continue_btn.text}"
+
+        # Wait for button to return to default state (1.5s delay)
+        time.sleep(1.5)
+
+        # Verify button is re-enabled and text restored
+        save_continue_btn = browser.find_element(By.ID, "save-continue-btn")
+        assert save_continue_btn.is_enabled(), "Button should be re-enabled after save"
+        assert "Продовжити" in save_continue_btn.text, "Button text should be restored"
 
         # Verify editor is still open
         editor_modal = browser.find_element(By.ID, "quiz-editor-modal")
@@ -436,11 +447,20 @@ def test_save_and_continue_in_edit_mode(temp_dir, browser):
         title_input.send_keys("Modified Title")
 
         # Click "Save and Continue" button
-        save_continue_btn = browser.find_element(By.XPATH, "//button[contains(text(), 'Зберегти і Продовжити')]")
+        save_continue_btn = browser.find_element(By.ID, "save-continue-btn")
         save_continue_btn.click()
 
-        # Wait for success message
-        time.sleep(1.0)
+        # Wait briefly and check for success state
+        time.sleep(0.5)
+        save_continue_btn = browser.find_element(By.ID, "save-continue-btn")
+        assert "Збережено" in save_continue_btn.text, f"Button should show success state, got: {save_continue_btn.text}"
+
+        # Wait for button to return to default state (1.5s delay)
+        time.sleep(1.5)
+
+        # Verify button is re-enabled after save
+        save_continue_btn = browser.find_element(By.ID, "save-continue-btn")
+        assert save_continue_btn.is_enabled(), "Button should be re-enabled after save"
 
         # Verify editor is still open
         editor_modal = browser.find_element(By.ID, "quiz-editor-modal")

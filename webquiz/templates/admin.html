@@ -1064,7 +1064,7 @@
 
             <div class="actions-sticky">
                 <button onclick="saveQuiz()">💾 Зберегти Quiz</button>
-                <button onclick="saveQuizAndContinue()">💾 Зберегти і Продовжити</button>
+                <button id="save-continue-btn" onclick="saveQuizAndContinue()">💾 Зберегти і Продовжити</button>
                 <button onclick="closeQuizEditor()">❌ Скасувати</button>
             </div>
         </div>
@@ -2248,6 +2248,14 @@
                 return;
             }
 
+            const button = document.getElementById('save-continue-btn');
+            const originalText = '💾 Зберегти і Продовжити';
+            button.disabled = true;
+            button.innerHTML = '⏳ Збереження...';
+            button.style.backgroundColor = '';
+
+            let success = false;
+
             try {
                 const url = isEditMode ? `/api/admin/quiz/${editingQuizName}` : '/api/admin/create-quiz';
                 const method = isEditMode ? 'PUT' : 'POST';
@@ -2267,6 +2275,7 @@
                 const data = await response.json();
 
                 if (response.ok) {
+                    success = true;
                     showMessage(data.message, 'success');
                     // If this was a new quiz, switch to edit mode
                     if (!isEditMode) {
@@ -2283,6 +2292,22 @@
             } catch (error) {
                 showMessage('Помилка збереження quiz: ' + error.message, 'error');
             }
+
+            // Show result state
+            if (success) {
+                button.innerHTML = '✅ Збережено';
+                button.style.backgroundColor = '#28a745';
+            } else {
+                button.innerHTML = '❌ Помилка';
+                button.style.backgroundColor = '#dc3545';
+            }
+
+            // Return to default state after delay
+            setTimeout(() => {
+                button.disabled = false;
+                button.innerHTML = originalText;
+                button.style.backgroundColor = '';
+            }, 1500);
         }
 
         // Network information display using server-generated data
