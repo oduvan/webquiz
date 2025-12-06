@@ -292,6 +292,7 @@ In addition to multiple choice questions, WebQuiz supports text input questions 
 
 **Checker Code:**
 - Uses variable `user_answer` (the student's text input)
+- Available: `math` module (use `math.sqrt`, `math.sin`, etc.)
 - Available helper functions:
   - `to_int(str)` — Convert string to integer (strips whitespace)
   - `distance(str)` — Parse distance with units: "2000", "2000m", "2км", "2km" all return 2000

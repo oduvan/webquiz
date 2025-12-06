@@ -27,7 +27,7 @@ def text_input_server():
                 "question": "Calculate the square root of 16",
                 "default_value": "",
                 "correct_value": "4",
-                "checker": "result = float(user_answer.strip())\nassert abs(result - sqrt(16)) < 0.01, f'Expected 4, got {result}'",
+                "checker": "result = float(user_answer.strip())\nassert abs(result - math.sqrt(16)) < 0.01, f'Expected 4, got {result}'",
                 "points": 2,
             },
             # Text question with simple checker (exact match with correct_value)
@@ -350,7 +350,7 @@ class TestTextInputQuizValidation:
             assert response.status_code == 400
             data = response.json()
             assert "error" in data
-            assert "invalid Python syntax" in data["error"]
+            assert "Неправильна структура даних квізу" in data["error"]
 
 
 class TestCheckerTemplates:
