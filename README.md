@@ -396,7 +396,10 @@ questions:
 
 **Checker Code:**
 - Uses variable `user_answer` (the student's text input)
-- Available functions: `sqrt`, `sin`, `cos`, `tan`, `log`, `exp`, `pi`, `e`, `abs`, `len`, `int`, `float`, `str`, `list`, `dict`, `range`, `sorted`, `sum`, `max`, `min`
+- Available helper functions:
+  - `to_int(str)` - Convert string to integer (strips whitespace)
+  - `distance(str)` - Parse distance with units: "2000", "2000m", "2км", "2km" all return 2000
+  - `direction_angle(str)` - Parse direction angle: "20" returns 2000, "20-30" returns 2030
 - If checker raises any exception, the answer is marked incorrect
 - If no checker is provided, exact match with `correct_value` is used (with whitespace stripped)
 

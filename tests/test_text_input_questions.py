@@ -288,9 +288,7 @@ class TestTextInputQuizValidation:
         """Test text question can have custom points"""
         quiz_data = {
             "title": "Points Text Quiz",
-            "questions": [
-                {"question": "Enter answer:", "correct_value": "test", "checker": "", "points": 5}
-            ],
+            "questions": [{"question": "Enter answer:", "correct_value": "test", "checker": "", "points": 5}],
         }
 
         quizzes = {"default.yaml": quiz_data}
@@ -418,6 +416,194 @@ class TestCheckerTemplates:
             assert len(data["templates"]) == 2
             assert data["templates"][0]["name"] == "Exact Match"
             assert data["templates"][1]["name"] == "Numeric Check"
+
+
+class TestCheckerBuiltinFunctions:
+    """Test that checker builtin functions work correctly in text questions"""
+
+    def test_to_int_function(self):
+        """Test to_int function is available in checker code"""
+        quiz_data = {
+            "title": "Checker Functions Quiz",
+            "questions": [
+                {
+                    "question": "Enter a number:",
+                    "correct_value": "42",
+                    "checker": "assert to_int(user_answer) == 42",
+                }
+            ],
+        }
+
+        quizzes = {"default.yaml": quiz_data}
+
+        with custom_webquiz_server(quizzes=quizzes) as (proc, port):
+            base_url = f"http://localhost:{port}"
+
+            # Register and answer correctly
+            response = requests.post(f"{base_url}/api/register", json={"username": "toint_user"})
+            user_id = response.json()["user_id"]
+
+            response = requests.post(
+                f"{base_url}/api/submit-answer",
+                json={"user_id": user_id, "question_id": 1, "selected_answer": "  42  "},
+            )
+            assert response.status_code == 200
+            assert response.json()["is_correct"] == True
+
+    def test_distance_function(self):
+        """Test distance function is available in checker code"""
+        quiz_data = {
+            "title": "Distance Quiz",
+            "questions": [
+                {
+                    "question": "Enter distance:",
+                    "correct_value": "2000",
+                    "checker": "assert distance(user_answer) == 2000",
+                }
+            ],
+        }
+
+        quizzes = {"default.yaml": quiz_data}
+
+        with custom_webquiz_server(quizzes=quizzes) as (proc, port):
+            base_url = f"http://localhost:{port}"
+
+            # Register user
+            response = requests.post(f"{base_url}/api/register", json={"username": "dist_user"})
+            user_id = response.json()["user_id"]
+
+            # Test with "2km" format
+            response = requests.post(
+                f"{base_url}/api/submit-answer",
+                json={"user_id": user_id, "question_id": 1, "selected_answer": "2km"},
+            )
+            assert response.status_code == 200
+            assert response.json()["is_correct"] == True
+
+    def test_distance_function_cyrillic(self):
+        """Test distance function handles Cyrillic units"""
+        quiz_data = {
+            "title": "Distance Quiz Cyrillic",
+            "questions": [
+                {
+                    "question": "Enter distance:",
+                    "correct_value": "2000",
+                    "checker": "assert distance(user_answer) == 2000",
+                }
+            ],
+        }
+
+        quizzes = {"default.yaml": quiz_data}
+
+        with custom_webquiz_server(quizzes=quizzes) as (proc, port):
+            base_url = f"http://localhost:{port}"
+
+            # Register user
+            response = requests.post(f"{base_url}/api/register", json={"username": "dist_cyr"})
+            user_id = response.json()["user_id"]
+
+            # Test with "2км" format (Cyrillic)
+            response = requests.post(
+                f"{base_url}/api/submit-answer",
+                json={"user_id": user_id, "question_id": 1, "selected_answer": "2км"},
+            )
+            assert response.status_code == 200
+            assert response.json()["is_correct"] == True
+
+    def test_direction_angle_function(self):
+        """Test direction_angle function is available in checker code"""
+        quiz_data = {
+            "title": "Direction Quiz",
+            "questions": [
+                {
+                    "question": "Enter direction angle:",
+                    "correct_value": "2030",
+                    "checker": "assert direction_angle(user_answer) == 2030",
+                }
+            ],
+        }
+
+        quizzes = {"default.yaml": quiz_data}
+
+        with custom_webquiz_server(quizzes=quizzes) as (proc, port):
+            base_url = f"http://localhost:{port}"
+
+            # Register user
+            response = requests.post(f"{base_url}/api/register", json={"username": "dir_user"})
+            user_id = response.json()["user_id"]
+
+            # Test with "20-30" format
+            response = requests.post(
+                f"{base_url}/api/submit-answer",
+                json={"user_id": user_id, "question_id": 1, "selected_answer": "20-30"},
+            )
+            assert response.status_code == 200
+            assert response.json()["is_correct"] == True
+
+    def test_checker_error_message(self):
+        """Test that checker error messages are returned correctly"""
+        quiz_data = {
+            "title": "Error Message Quiz",
+            "questions": [
+                {
+                    "question": "Enter a number:",
+                    "correct_value": "42",
+                    "checker": "assert to_int(user_answer) == 42, 'Expected 42'",
+                }
+            ],
+        }
+
+        quizzes = {"default.yaml": quiz_data}
+
+        with custom_webquiz_server(quizzes=quizzes) as (proc, port):
+            base_url = f"http://localhost:{port}"
+
+            # Register user
+            response = requests.post(f"{base_url}/api/register", json={"username": "err_user"})
+            user_id = response.json()["user_id"]
+
+            # Submit wrong answer
+            response = requests.post(
+                f"{base_url}/api/submit-answer",
+                json={"user_id": user_id, "question_id": 1, "selected_answer": "10"},
+            )
+            assert response.status_code == 200
+            data = response.json()
+            assert data["is_correct"] == False
+            assert "checker_error" in data
+            assert "Expected 42" in data["checker_error"]
+
+    def test_distance_invalid_format_error(self):
+        """Test that distance function returns error for invalid format"""
+        quiz_data = {
+            "title": "Distance Error Quiz",
+            "questions": [
+                {
+                    "question": "Enter distance:",
+                    "correct_value": "2000",
+                    "checker": "assert distance(user_answer) == 2000",
+                }
+            ],
+        }
+
+        quizzes = {"default.yaml": quiz_data}
+
+        with custom_webquiz_server(quizzes=quizzes) as (proc, port):
+            base_url = f"http://localhost:{port}"
+
+            # Register user
+            response = requests.post(f"{base_url}/api/register", json={"username": "dist_err"})
+            user_id = response.json()["user_id"]
+
+            # Submit invalid format
+            response = requests.post(
+                f"{base_url}/api/submit-answer",
+                json={"user_id": user_id, "question_id": 1, "selected_answer": "abc"},
+            )
+            assert response.status_code == 200
+            data = response.json()
+            assert data["is_correct"] == False
+            assert "checker_error" in data
 
 
 if __name__ == "__main__":

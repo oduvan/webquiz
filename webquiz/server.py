@@ -25,6 +25,7 @@ from .config import WebQuizConfig, load_config_from_yaml
 from .tunnel import TunnelManager
 
 from webquiz import __version__ as package_version
+from webquiz import checker as checker_module
 
 # Logger will be configured in create_app() with custom log file
 logger = logging.getLogger(__name__)
@@ -1115,7 +1116,9 @@ class TestingServer:
             for field_label in self.config.registration.fields:
                 field_name = field_label.lower().replace(" ", "_")
                 headers.append(field_name)
-        headers.extend(["registered_at", "total_questions_asked", "correct_answers", "earned_points", "total_points", "total_time"])
+        headers.extend(
+            ["registered_at", "total_questions_asked", "correct_answers", "earned_points", "total_points", "total_time"]
+        )
 
         # Always write headers (we always overwrite the file)
         csv_writer.writerow(headers)
@@ -1136,7 +1139,9 @@ class TestingServer:
             user_answer_list = self.user_answers.get(user_id, [])
             total_questions_asked = len(user_answer_list)
             correct_answers = sum(answer["is_correct"] for answer in user_answer_list)
-            earned_points = sum(answer.get("earned_points", 1 if answer["is_correct"] else 0) for answer in user_answer_list)
+            earned_points = sum(
+                answer.get("earned_points", 1 if answer["is_correct"] else 0) for answer in user_answer_list
+            )
             total_points = sum(answer.get("points", 1) for answer in user_answer_list)
             total_time_seconds = sum(answer.get("time_taken", 0) for answer in user_answer_list)
             # Format total_time as MM:SS
@@ -1313,6 +1318,8 @@ class TestingServer:
             correct_value = question.get("correct_value", "")
             return (user_answer.strip() == correct_value.strip(), None)
 
+        import math
+
         # Define restricted builtins for safe execution
         safe_builtins = {
             "abs": abs,
@@ -1347,29 +1354,12 @@ class TestingServer:
             "tuple": tuple,
             "type": type,
             "zip": zip,
-            # Math functions
+            "math": math,
             "__import__": None,  # Disable imports
+            # Checker helper functions
+            **{fname: getattr(checker_module, fname) for fname in checker_module.__all__},
         }
-
-        # Import math module functions into the namespace
-        import math
-        math_functions = {
-            "sqrt": math.sqrt,
-            "sin": math.sin,
-            "cos": math.cos,
-            "tan": math.tan,
-            "log": math.log,
-            "log10": math.log10,
-            "exp": math.exp,
-            "ceil": math.ceil,
-            "floor": math.floor,
-            "pi": math.pi,
-            "e": math.e,
-        }
-
-        # Create execution namespace
         exec_globals = {"__builtins__": safe_builtins}
-        exec_globals.update(math_functions)
         exec_locals = {"user_answer": user_answer}
 
         try:
@@ -1377,13 +1367,8 @@ class TestingServer:
             exec(checker_code, exec_globals, exec_locals)
             # If no exception was raised, the answer is correct
             return (True, None)
-        except AssertionError as e:
-            # Assertion failed - answer is incorrect
-            error_msg = str(e) if str(e) else "Assertion failed"
-            return (False, error_msg)
         except Exception as e:
-            # Other exception - answer is incorrect
-            return (False, f"{type(e).__name__}: {str(e)}")
+            return (False, str(e))
 
     def _format_answer_text(self, answer_indices, options, is_text_question=False):
         """Format answer text for CSV with | separator for multiple answers.
@@ -1405,7 +1390,9 @@ class TestingServer:
             if options and 0 <= answer_indices < len(options):
                 return options[answer_indices]
             else:
-                logger.warning(f"Invalid answer index {answer_indices} for options with length {len(options) if options else 0}")
+                logger.warning(
+                    f"Invalid answer index {answer_indices} for options with length {len(options) if options else 0}"
+                )
                 return f"Invalid index: {answer_indices}"
         elif isinstance(answer_indices, list):
             # Sort indices and join corresponding option texts with |
@@ -1415,7 +1402,9 @@ class TestingServer:
                 if options and 0 <= idx < len(options):
                     valid_options.append(options[idx])
                 else:
-                    logger.warning(f"Invalid answer index {idx} in list for options with length {len(options) if options else 0}")
+                    logger.warning(
+                        f"Invalid answer index {idx} in list for options with length {len(options) if options else 0}"
+                    )
                     valid_options.append(f"Invalid index: {idx}")
             return "|".join(valid_options)
         else:
