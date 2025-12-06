@@ -435,6 +435,21 @@
             color: var(--text-color);
         }
 
+        /* Question points badge */
+        .question-points-badge {
+            position: absolute;
+            top: 0;
+            right: 0;
+            background: linear-gradient(135deg, #ffc107 0%, #ff9800 100%);
+            color: #000;
+            font-size: 13px;
+            font-weight: bold;
+            padding: 5px 10px;
+            border-radius: 0 8px 0 8px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+            z-index: 10;
+        }
+
         /* Mobile responsive styles */
         @media screen and (max-width: 768px) {
             /* Full width mobile layout - no side margins */
@@ -1184,8 +1199,10 @@
 
             // Show current question
             const container = document.getElementById('current-question-container');
+            const questionPoints = question.points || 1;
             container.innerHTML = `
-                <div class="current-question active-question">
+                <div class="current-question active-question" style="position: relative;">
+                    ${questionPoints > 1 ? `<div class="question-points-badge">🏆 ${questionPoints} ${questionPoints >= 2 && questionPoints <= 4 ? 'бали' : 'балів'}</div>` : ''}
                     ${question.question ? `<h3 class="question-text">${question.question}</h3>` : ''}
                     ${question.image ? `<a href="${makeRelativePath(question.image)}" target="_blank"><img src="${makeRelativePath(question.image)}" alt="Question image" class="question-image quiz-question-img"></a>` : ''}
                     ${question.file ? `<a href="${makeRelativePath(question.file)}" download class="question-file"><span class="question-file-icon">📎</span><span class="question-file-name">${question.file.split('/').pop()}</span></a>` : ''}
@@ -1624,6 +1641,9 @@
             const correctCount = finalResults.correct_count;
             const totalCount = finalResults.total_count;
             const percentage = finalResults.percentage;
+            const earnedPoints = finalResults.earned_points || 0;
+            const totalPoints = finalResults.total_points || totalCount;
+            const pointsPercentage = finalResults.points_percentage || percentage;
             const showAnswersOnCompletion = finalResults.show_answers_on_completion || false;
             const allCompleted = finalResults.all_completed || false;
 
@@ -1634,8 +1654,15 @@
             const hasCorrectAnswers = finalResults.test_results.length > 0 &&
                                       finalResults.test_results[0].is_correct !== undefined;
 
+            // Build results display - show points if there are questions with non-default points
+            const hasCustomPoints = totalPoints !== totalCount;
+            const pointsDisplay = hasCustomPoints
+                ? `<p><strong>Бали:</strong> ${earnedPoints}/${totalPoints} (${pointsPercentage}%)</p>`
+                : '';
+
             container.innerHTML = `
                 <p><strong>Результат:</strong> ${correctCount}/${totalCount} (${percentage}%)</p>
+                ${pointsDisplay}
                 ${shouldShowWaitingMessage ? `
                     <div style="background: var(--stats-bg); padding: 15px; border-radius: 5px; margin: 15px 0; border-left: 4px solid #2196f3;">
                         <p style="margin: 0 0 10px 0;"><strong>ℹ️ Правильні відповіді будуть доступні після завершення тесту всіма учнями.</strong></p>
@@ -1651,6 +1678,7 @@
                             <th>Питання</th>
                             <th>Ваша відповідь</th>
                             <th style="text-align: center;">Правильно</th>
+                            ${hasCustomPoints ? '<th style="text-align: center;">Бали</th>' : ''}
                         </tr>
                     </thead>
                     <tbody>
@@ -1666,6 +1694,7 @@
                                 <td data-label="Правильно" style="text-align: center;">
                                     ${result.is_correct !== undefined ? `<span class="${result.is_correct ? 'correct' : 'incorrect'}" style="font-size: 18px;">${result.is_correct ? '✓' : '✗'}</span>` : '<span style="color: #666;">не відомо</span>'}
                                 </td>
+                                ${hasCustomPoints ? `<td data-label="Бали" style="text-align: center;">${result.earned_points !== undefined ? result.earned_points : (result.is_correct ? (result.points || 1) : 0)}/${result.points || 1}</td>` : ''}
                             </tr>
                         `).join('')}
                     </tbody>

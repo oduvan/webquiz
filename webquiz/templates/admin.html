@@ -330,6 +330,11 @@
             opacity: 0.8;
         }
 
+        .question-indicator.points-indicator {
+            color: darkgoldenrod;
+            font-weight: bold;
+        }
+
         .question-header-buttons {
             display: flex;
             gap: 5px;
@@ -1649,6 +1654,10 @@
                         <label for="min-correct-${questionCounter}">Мінімум правильних відповідей:</label>
                         <input type="number" id="min-correct-${questionCounter}" class="min-correct-input" min="1" placeholder="Усі правильні" style="width: 80px;">
                     </div>
+                    <div class="form-group">
+                        <label for="points-${questionCounter}" style="display: inline-block;">Бали за питання:</label>
+                        <input type="number" id="points-${questionCounter}" class="points-input" min="1" value="1" placeholder="1" style="width: 80px;" oninput="updateQuestionPreview(this)">
+                    </div>
                 </div>
             `;
 
@@ -1754,11 +1763,13 @@
             const questionText = questionDiv.querySelector('.question-text').value.trim();
             const questionImage = questionDiv.querySelector('.question-image').value.trim();
             const questionFile = questionDiv.querySelector('.question-file').value.trim();
+            const pointsInput = questionDiv.querySelector('.points-input');
+            const points = pointsInput ? parseInt(pointsInput.value) || 1 : 1;
 
             // Set preview text (full text, no truncation)
             previewSpan.textContent = questionText || '';
 
-            // Set indicators for image and file
+            // Set indicators for image, file, and points
             if (indicatorsSpan) {
                 let indicators = '';
                 if (questionImage) {
@@ -1766,6 +1777,9 @@
                 }
                 if (questionFile) {
                     indicators += '<span class="question-indicator" title="Має файл">📎</span>';
+                }
+                if (points > 1) {
+                    indicators += `<span class="question-indicator points-indicator" title="${points} балів"> 🏆${points}</span>`;
                 }
                 indicatorsSpan.innerHTML = indicators;
             }
@@ -2023,17 +2037,21 @@
 
                     const minCorrectValue = question.min_correct || '';
                     const minCorrectDisplay = isMultipleChoice ? 'block' : 'none';
+                    const pointsValue = question.points || 1;
 
                     // Build preview text (full text, no truncation)
                     const previewText = question.question || '';
 
-                    // Build indicators for image and file
+                    // Build indicators for image, file, and points
                     let indicatorsHtml = '';
                     if (question.image) {
                         indicatorsHtml += '<span class="question-indicator" title="Має зображення">🖼️</span>';
                     }
                     if (question.file) {
                         indicatorsHtml += '<span class="question-indicator" title="Має файл">📎</span>';
+                    }
+                    if (pointsValue > 1) {
+                        indicatorsHtml += `<span class="question-indicator points-indicator" title="${pointsValue} балів">🏆 ${pointsValue}</span>`;
                     }
 
                     questionDiv.innerHTML = `
@@ -2090,6 +2108,10 @@
                             <div class="form-group min-correct-container" style="display: ${minCorrectDisplay};">
                                 <label for="min-correct-${questionCounter}">Мінімум правильних відповідей:</label>
                                 <input type="number" id="min-correct-${questionCounter}" class="min-correct-input" min="1" value="${minCorrectValue}" placeholder="Усі правильні" style="width: 80px;">
+                            </div>
+                            <div class="form-group">
+                                <label for="points-${questionCounter}" style="display: inline-block;">Бали за питання:</label>
+                                <input type="number" id="points-${questionCounter}" class="points-input" min="1" value="${pointsValue}" placeholder="1" style="width: 80px;" oninput="updateQuestionPreview(this)">
                             </div>
                         </div>
                     `;
@@ -2163,6 +2185,15 @@
                     // Include file if provided
                     if (questionFile) {
                         questionData.file = questionFile;
+                    }
+
+                    // Include points if different from default (1)
+                    const pointsInput = div.querySelector('.points-input');
+                    if (pointsInput && pointsInput.value.trim()) {
+                        const points = parseInt(pointsInput.value);
+                        if (points > 1) {
+                            questionData.points = points;
+                        }
                     }
 
                     questions.push(questionData);
