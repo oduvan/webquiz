@@ -271,6 +271,65 @@ You can combine an image and a file in the same question:
 
 ---
 
+#### Text Input Questions
+
+In addition to multiple choice questions, WebQuiz supports text input questions where students type their answer.
+
+```
+- type: "text"
+  question: "What is 2+2?"
+  default_value: ""
+  correct_value: "4"
+  checker: "assert user_answer.strip() == '4', 'Expected 4'"
+  points: 1
+```
+
+**Text Question Fields:**
+- **type: "text"** — required to indicate this is a text input question
+- **question** — question text
+- **default_value** — initial value shown in the textarea (optional)
+- **correct_value** — correct answer shown when student is wrong (optional)
+- **checker** — Python code for answer validation (optional)
+- **points** — points for correct answer (default: 1)
+
+**Checker Code:**
+- Uses variable `user_answer` (the student's text input)
+- Available functions: `sqrt`, `sin`, `cos`, `tan`, `log`, `exp`, `pi`, `e`, `abs`, `len`, `int`, `float`, `str`, `list`, `dict`, `range`, `sorted`, `sum`, `max`, `min`
+- If the code raises any exception, the answer is marked incorrect
+- If no checker is provided, exact match with `correct_value` is used (with whitespace stripped)
+
+Example with math validation:
+
+```
+- type: "text"
+  question: "Calculate the square root of 16"
+  correct_value: "4"
+  checker: |
+    result = float(user_answer)
+    assert abs(result - sqrt(16)) < 0.01, f'Expected 4, got {result}'
+  points: 2
+```
+
+---
+
+#### Checker Templates
+
+You can configure checker code templates in your `webquiz.yaml`:
+
+```
+checker_templates:
+  - name: "Exact Match"
+    code: "assert user_answer.strip() == 'expected', 'Wrong answer'"
+  - name: "Numeric Check"
+    code: "assert float(user_answer) == 42, 'Expected 42'"
+  - name: "Contains Check"
+    code: "assert 'keyword' in user_answer.lower(), 'Must contain keyword'"
+```
+
+Templates are available in the admin quiz editor for quick insertion.
+
+---
+
 ### Complete Test File Example
 
 Below is an example of a complete test file with different types of questions:
@@ -575,11 +634,13 @@ questions:
 The YAML format for tests in **WebQuiz** allows:
 
 ✅ Creating questions with single and multiple choice
+✅ Creating text input questions with Python validation
 ✅ Adding images to questions and answer options
 ✅ Setting minimum number of correct answers
 ✅ Showing or hiding correct answers after completion
 ✅ Randomizing question order for each student to prevent cheating
 ✅ Setting different point values for each question
+✅ Using checker templates for text questions
 ✅ Easily editing tests in web interface with automatic validation
 
 **Recommendation:** Use the administrator web interface to create and edit tests — it automatically validates syntax and warns about errors!
