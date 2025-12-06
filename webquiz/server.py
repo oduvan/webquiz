@@ -238,6 +238,7 @@ def log_startup_environment(config: WebQuizConfig):
     logger.info(f"aiohttp version: {aiohttp.__version__}")
     try:
         import yaml as yaml_module
+
         logger.info(f"PyYAML version: {yaml_module.__version__}")
     except (ImportError, AttributeError):
         pass
@@ -614,6 +615,110 @@ class TestingServer:
         self.user_answers.clear()
         self.live_stats.clear()
         logger.info("Server state reset for new quiz")
+
+    def reload_config_from_file(self) -> Optional[WebQuizConfig]:
+        """Reload configuration from file.
+
+        Returns:
+            New WebQuizConfig if successful, None if failed or no config path
+        """
+        if not self.config.config_path:
+            return None
+        return load_config_from_yaml(self.config.config_path)
+
+    def _config_requires_restart(self, new_config: WebQuizConfig, raw_config: dict = None) -> List[str]:
+        """Check which config changes require server restart.
+
+        Only checks sections that were explicitly specified in the raw config.
+        If a section is missing from raw_config, the user didn't change it.
+
+        Args:
+            new_config: New configuration to compare against current
+            raw_config: Raw parsed YAML data to check which sections were specified
+
+        Returns:
+            List of config paths that require restart (empty if none)
+        """
+        restart_reasons = []
+        raw_config = raw_config or {}
+
+        # Check server config (only if server section was specified)
+        if "server" in raw_config:
+            server_data = raw_config.get("server", {})
+            if "host" in server_data and self.config.server.host != new_config.server.host:
+                restart_reasons.append("server.host")
+            if "port" in server_data and self.config.server.port != new_config.server.port:
+                restart_reasons.append("server.port")
+
+        # Check paths (only if paths section was specified)
+        if "paths" in raw_config:
+            paths_data = raw_config.get("paths", {})
+            if "quizzes_dir" in paths_data and self.quizzes_dir != new_config.paths.quizzes_dir:
+                restart_reasons.append("paths.quizzes_dir")
+            if "logs_dir" in paths_data and self.logs_dir != new_config.paths.logs_dir:
+                restart_reasons.append("paths.logs_dir")
+            if "csv_dir" in paths_data and self.csv_dir != new_config.paths.csv_dir:
+                restart_reasons.append("paths.csv_dir")
+            if "static_dir" in paths_data and self.static_dir != new_config.paths.static_dir:
+                restart_reasons.append("paths.static_dir")
+
+        # Check master_key (only if admin.master_key was specified)
+        if "admin" in raw_config:
+            admin_data = raw_config.get("admin", {})
+            if "master_key" in admin_data and self.master_key != new_config.admin.master_key:
+                restart_reasons.append("admin.master_key")
+
+        return restart_reasons
+
+    async def apply_config_changes(self, new_config: WebQuizConfig):
+        """Apply hot-reloadable config changes to running server.
+
+        Updates registration, admin.trusted_ips, quizzes, tunnel config.
+        Reloads templates. Disconnects tunnel if connected (admin can reconnect).
+        Does NOT change server, paths, or master_key.
+
+        Args:
+            new_config: New configuration loaded from file
+        """
+        # Update registration config
+        self.config.registration = new_config.registration
+
+        # Update admin.trusted_ips only (keep master_key unchanged)
+        self.config.admin.trusted_ips = new_config.admin.trusted_ips
+
+        # Update downloadable quizzes list
+        self.config.quizzes = new_config.quizzes
+
+        # Update tunnel config and disconnect if connected
+        self.config.tunnel = new_config.tunnel
+        if self.tunnel_manager:
+            # Update tunnel manager's config reference
+            self.tunnel_manager.config = new_config.tunnel
+            # Disconnect if connected (admin can reconnect with new config)
+            if self.tunnel_manager.status.get("connected"):
+                logger.info("Disconnecting tunnel due to config change")
+                await self.tunnel_manager.disconnect()
+
+        # Reload templates (in case package was updated)
+        self.templates = self._load_templates()
+
+        logger.info("Configuration changes applied to running server")
+
+    async def restart_current_quiz(self):
+        """Restart currently running quiz, resetting all state.
+
+        Reloads quiz file, regenerates index.html, notifies clients.
+        Does nothing if no quiz is currently active.
+        """
+        if not self.current_quiz_file or not os.path.exists(self.current_quiz_file):
+            return
+
+        quiz_filename = os.path.basename(self.current_quiz_file)
+        try:
+            await self.switch_quiz(quiz_filename)
+            logger.info(f"Quiz restarted after config change: {quiz_filename}")
+        except Exception as e:
+            logger.error(f"Failed to restart quiz after config change: {e}")
 
     async def list_available_quizzes(self):
         """List all available quiz files in quizzes directory.
@@ -2656,15 +2761,16 @@ class TestingServer:
 
     @admin_auth_required
     async def admin_update_config(self, request):
-        """Update server configuration file.
+        """Update server configuration file and apply changes.
 
-        Validates YAML syntax and structure before writing to file.
+        Validates YAML syntax and structure, writes to file, then hot-reloads
+        configuration and restarts current quiz if one is active.
 
         Args:
             request: aiohttp request with config content
 
         Returns:
-            JSON response with success status (requires server restart)
+            JSON response with success status
         """
         data = await request.json()
         content = data.get("content", "").strip()
@@ -2687,6 +2793,12 @@ class TestingServer:
         if not self._validate_config_data(parsed_config, errors):
             return web.json_response({"error": "Configuration validation failed", "errors": errors}, status=400)
 
+        # Read original config for rollback if apply fails
+        original_content = None
+        if os.path.exists(config_path):
+            async with aiofiles.open(config_path, "r", encoding="utf-8") as f:
+                original_content = await f.read()
+
         # Write to config file with fsync for SD card/slow storage reliability
         async with aiofiles.open(config_path, "w", encoding="utf-8") as f:
             await f.write(content if content else "")
@@ -2694,11 +2806,56 @@ class TestingServer:
             os.fsync(f.fileno())
 
         logger.info(f"Configuration file updated: {config_path}")
+
+        restart_reasons = []
+
+        try:
+            # Hot-reload configuration and apply changes
+            new_config = self.reload_config_from_file()
+
+            # Preserve config_path in new config
+            new_config.config_path = config_path
+
+            # Check for changes that require server restart
+            restart_reasons = self._config_requires_restart(new_config, parsed_config)
+
+            # Apply hot-reloadable changes
+            await self.apply_config_changes(new_config)
+
+            # Restart current quiz if one is running
+            await self.restart_current_quiz()
+        except Exception as e:
+            logger.error(f"Failed to apply config changes: {e}")
+            # Rollback config file to original content
+            if original_content is not None:
+                async with aiofiles.open(config_path, "w", encoding="utf-8") as f:
+                    await f.write(original_content)
+                    await f.flush()
+                    os.fsync(f.fileno())
+                logger.info("Configuration file rolled back to previous state")
+            return web.json_response(
+                {
+                    "success": False,
+                    "error": f"Failed to apply configuration: {str(e)}. Changes rolled back.",
+                    "config_path": config_path,
+                },
+                status=500,
+            )
+
+        # Build response message based on restart requirements
+        if restart_reasons:
+            message = f"Configuration saved. Server restart required for: {', '.join(restart_reasons)}. Other changes applied."
+        elif self.current_quiz_file:
+            message = "Configuration saved and applied. Quiz restarted."
+        else:
+            message = "Configuration saved and applied."
+
         return web.json_response(
             {
                 "success": True,
-                "message": "Configuration saved successfully. Restart server to apply changes.",
+                "message": message,
                 "config_path": config_path,
+                "restart_required": restart_reasons,
             }
         )
 

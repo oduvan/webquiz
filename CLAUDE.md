@@ -140,6 +140,7 @@ webquiz-stress-test -c 50
 - **Quiz file attachments** - Questions can have downloadable files via `file` field (e.g., `file: "data.xlsx"`). Files stored in `quizzes/attach/`, served at `/attach/{filename}` with `Content-Disposition: attachment` header for forced download. Server auto-prepends `/attach/` when serving to client. Admin panel has file picker modal for selecting files.
 - **Startup environment logging** - On server start, logs comprehensive environment info for troubleshooting: WebQuiz version, Python version/executable, OS/platform info, aiohttp version, working directory, config file path, binary mode status, server/path/admin/registration/tunnel configuration, and network interfaces. Master key value is never logged (only True/False).
 - **SD card/slow storage reliability** - All file writes (config, quizzes, CSV) use `flush()` + `os.fsync()` to ensure data is physically written to storage before returning success. Prevents data loss on Raspberry Pi and systems with SD cards or exFAT partitions when powered off shortly after save.
+- **Config hot-reload** - When admin saves config via web form (`PUT /api/admin/config`), changes are applied immediately without server restart. Hot-reloadable: registration settings (approve, fields, username_label), admin.trusted_ips, downloadable quizzes list, tunnel config. Requires restart (security/stability): server host/port, paths, master_key - shows "restart required" message with specific config paths. Quiz always restarted (users/state cleared) on config save. Templates are reloaded on each config save. If applying changes fails, config file is automatically rolled back to previous state.
 
 ## Key Flows
 
@@ -150,12 +151,13 @@ webquiz-stress-test -c 50
 **Live Stats Groups**: Users display in "In Progress" group → answer questions → complete final question → automatically move to "Completed" group with `completed: true` flag in WebSocket
 **Tunnel**: Initialize → check/generate keys → admin clicks connect → fetch server config → create SSH connection → forward remote Unix socket to local port (forward_remote_path_to_port) → broadcast public URL via WebSocket → auto-reconnect on disconnect
 **Startup**: Load config → create TestingServer → initialize log file → configure logging → **log environment info** (version, Python, OS, config, paths, network) → initialize tunnel → load questions → start periodic flush → register routes
+**Config Hot-Reload**: Admin saves config → validate YAML → backup original config → write to file → reload config from file → detect restart-required changes (server, paths, master_key) → apply safe changes (registration, trusted_ips, quizzes, tunnel) → reload templates → disconnect tunnel if connected (admin can reconnect) → restart current quiz (reset users/state) → return message (either "saved and applied" or "restart required for: ..."). On failure: rollback config file to backup → return error
 
 **Setup**: Parallel testing with ports 8080-8087, `custom_webquiz_server` fixture auto-cleans directories, `conftest.py` for shared fixtures
 
 ## Important Notes
 - **CSV files** (2 per session): `{quiz_name}_user_responses.csv` (submissions) + `{quiz_name}_user_responses.users.csv` (user stats with total_time in MM:SS format)
-- **Config** (`webquiz.yaml`): All sections optional, editable via `/files/`, requires restart, UTF-8 charset header
+- **Config** (`webquiz.yaml`): All sections optional, editable via `/files/` or admin panel, hot-reloaded on save (returns `restart_required` list if server/paths/master_key changed), UTF-8 charset header
 - **Config options**:
   - `registration.approve: true` - Admin approval required, timing starts on approval (default: false)
   - `registration.username_label` - Customize username field label (default: "Ім'я користувача")
