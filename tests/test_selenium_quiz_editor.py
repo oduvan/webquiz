@@ -37,38 +37,76 @@ def admin_login(browser, port, master_key="test123"):
     login_button.click()
 
     # Wait for admin panel to load
-    WebDriverWait(browser, 10).until(
-        EC.visibility_of_element_located((By.ID, "admin-panel"))
-    )
+    WebDriverWait(browser, 10).until(EC.visibility_of_element_located((By.ID, "admin-panel")))
 
     # Wait for quiz list to load
     time.sleep(0.5)
 
 
-def select_and_edit_quiz(browser):
-    """Helper to select a quiz and open the editor."""
-    # Wait for quiz items to appear
-    WebDriverWait(browser, 10).until(
-        EC.presence_of_element_located((By.CSS_SELECTOR, ".quiz-item"))
-    )
+def select_and_edit_quiz(browser, quiz_index=0):
+    """Helper to select a quiz and open the editor.
 
-    # Click on the first quiz item to select it
-    quiz_item = browser.find_element(By.CSS_SELECTOR, ".quiz-item")
-    quiz_item.click()
+    Args:
+        browser: Selenium browser instance
+        quiz_index: Index of quiz to select (default 0 = first)
+    """
+    from selenium.webdriver.support.ui import Select
+
+    # Wait for quiz select element to appear
+    quiz_select_elem = WebDriverWait(browser, 10).until(EC.presence_of_element_located((By.ID, "quiz-select")))
+
+    # Get all options
+    options = quiz_select_elem.find_elements(By.TAG_NAME, "option")
+    if len(options) <= quiz_index:
+        raise ValueError(f"Quiz index {quiz_index} out of range, only {len(options)} quizzes available")
+
+    # Click to select the option
+    options[quiz_index].click()
 
     # Wait for edit button to become enabled and click it
-    edit_btn = WebDriverWait(browser, 10).until(
-        EC.element_to_be_clickable((By.ID, "edit-btn"))
-    )
+    edit_btn = WebDriverWait(browser, 10).until(EC.element_to_be_clickable((By.ID, "edit-btn")))
     edit_btn.click()
 
     # Wait for the quiz editor modal to open
-    WebDriverWait(browser, 10).until(
-        EC.visibility_of_element_located((By.ID, "quiz-editor-modal"))
-    )
+    WebDriverWait(browser, 10).until(EC.visibility_of_element_located((By.ID, "quiz-editor-modal")))
 
     # Give time for questions to load
     time.sleep(1.0)
+
+
+def select_multiple_quizzes(browser, quiz_indices):
+    """Helper to select multiple quizzes using modifier+click.
+
+    Args:
+        browser: Selenium browser instance
+        quiz_indices: List of indices to select
+
+    Uses Command key on macOS, Ctrl on other platforms.
+    """
+    import platform
+    from selenium.webdriver.common.action_chains import ActionChains
+    from selenium.webdriver.common.keys import Keys
+
+    quiz_select_elem = WebDriverWait(browser, 10).until(EC.presence_of_element_located((By.ID, "quiz-select")))
+
+    options = quiz_select_elem.find_elements(By.TAG_NAME, "option")
+    actions = ActionChains(browser)
+
+    # Use Command key on macOS, Ctrl on other platforms
+    modifier = Keys.COMMAND if platform.system() == "Darwin" else Keys.CONTROL
+
+    for i, idx in enumerate(quiz_indices):
+        if idx >= len(options):
+            raise ValueError(f"Quiz index {idx} out of range, only {len(options)} quizzes available")
+
+        if i == 0:
+            # First click without modifier
+            actions.click(options[idx])
+        else:
+            # Subsequent clicks with modifier held
+            actions.key_down(modifier).click(options[idx]).key_up(modifier)
+
+    actions.perform()
 
 
 @skip_if_selenium_disabled
@@ -102,7 +140,10 @@ def test_questions_collapsed_when_editing_quiz(temp_dir, browser):
             # When collapsed, the body should have 0 height due to CSS
             body_height = question_body.value_of_css_property("max-height")
             # CSS might return "0px" or "0" depending on browser
-            assert body_height in ("0px", "0"), f"Question {i+1} body should have max-height: 0 when collapsed, got {body_height}"
+            assert body_height in (
+                "0px",
+                "0",
+            ), f"Question {i+1} body should have max-height: 0 when collapsed, got {body_height}"
 
 
 @skip_if_selenium_disabled
@@ -196,7 +237,9 @@ def test_question_preview_text_displayed(temp_dir, browser):
 
         # Check first question preview (text question)
         preview1 = question_items[0].find_element(By.CSS_SELECTOR, ".question-preview")
-        assert "What is the capital of Ukraine?" in preview1.text, f"Preview should contain question text, got: {preview1.text}"
+        assert (
+            "What is the capital of Ukraine?" in preview1.text
+        ), f"Preview should contain question text, got: {preview1.text}"
 
 
 @skip_if_selenium_disabled
@@ -206,9 +249,20 @@ def test_file_image_indicators_displayed(temp_dir, browser):
         "test_quiz.yaml": {
             "title": "Indicators Test Quiz",
             "questions": [
-                {"question": "Question with image", "image": "/imgs/test.png", "options": ["A", "B"], "correct_answer": 0},
+                {
+                    "question": "Question with image",
+                    "image": "/imgs/test.png",
+                    "options": ["A", "B"],
+                    "correct_answer": 0,
+                },
                 {"question": "Question with file", "file": "data.xlsx", "options": ["C", "D"], "correct_answer": 0},
-                {"question": "Question with both", "image": "/imgs/pic.jpg", "file": "doc.pdf", "options": ["E", "F"], "correct_answer": 0},
+                {
+                    "question": "Question with both",
+                    "image": "/imgs/pic.jpg",
+                    "file": "doc.pdf",
+                    "options": ["E", "F"],
+                    "correct_answer": 0,
+                },
             ],
         }
     }
@@ -223,16 +277,24 @@ def test_file_image_indicators_displayed(temp_dir, browser):
         # Check first question has image indicator
         indicators1 = question_items[0].find_element(By.CSS_SELECTOR, ".question-indicators")
         # Use base emoji without variation selector for cross-platform compatibility
-        assert "\U0001F5BC" in indicators1.text or "🖼" in indicators1.text, f"First question should have image indicator, got: {indicators1.text}"
+        assert (
+            "\U0001F5BC" in indicators1.text or "🖼" in indicators1.text
+        ), f"First question should have image indicator, got: {indicators1.text}"
 
         # Check second question has file indicator
         indicators2 = question_items[1].find_element(By.CSS_SELECTOR, ".question-indicators")
-        assert "\U0001F4CE" in indicators2.text or "📎" in indicators2.text, f"Second question should have file indicator, got: {indicators2.text}"
+        assert (
+            "\U0001F4CE" in indicators2.text or "📎" in indicators2.text
+        ), f"Second question should have file indicator, got: {indicators2.text}"
 
         # Check third question has both indicators
         indicators3 = question_items[2].find_element(By.CSS_SELECTOR, ".question-indicators")
-        assert "\U0001F5BC" in indicators3.text or "🖼" in indicators3.text, f"Third question should have image indicator"
-        assert "\U0001F4CE" in indicators3.text or "📎" in indicators3.text, f"Third question should have file indicator"
+        assert (
+            "\U0001F5BC" in indicators3.text or "🖼" in indicators3.text
+        ), f"Third question should have image indicator"
+        assert (
+            "\U0001F4CE" in indicators3.text or "📎" in indicators3.text
+        ), f"Third question should have file indicator"
 
 
 @skip_if_selenium_disabled
@@ -261,7 +323,9 @@ def test_drag_handle_present(temp_dir, browser):
             assert drag_handle is not None, f"Question {i+1} should have drag handle"
             assert drag_handle.is_displayed(), f"Drag handle should be visible for question {i+1}"
             # Unicode TRIGRAM FOR HEAVEN (☰) or its codepoint
-            assert "\u2630" in drag_handle.text or "☰" in drag_handle.text, f"Drag handle should show ☰ icon, got: {drag_handle.text}"
+            assert (
+                "\u2630" in drag_handle.text or "☰" in drag_handle.text
+            ), f"Drag handle should show ☰ icon, got: {drag_handle.text}"
 
 
 @skip_if_selenium_disabled

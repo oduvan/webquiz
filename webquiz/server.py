@@ -2327,6 +2327,135 @@ class TestingServer:
         )
 
     @admin_auth_required
+    async def admin_unite_quizzes(self, request):
+        """Unite multiple quizzes into a single new quiz file.
+
+        Takes config from first quiz, combines questions from all in order.
+
+        Args:
+            request: aiohttp request with:
+                - quiz_filenames: List of quiz filenames to unite
+                - new_name: Name for the united quiz file
+
+        Returns:
+            JSON response with success status, filename, and total question count
+        """
+        data = await request.json()
+        quiz_filenames = data.get("quiz_filenames", [])
+        new_name = data.get("new_name", "").strip()
+
+        # Validation
+        if not quiz_filenames or len(quiz_filenames) < 2:
+            return web.json_response(
+                {"error": "Потрібно вибрати принаймні 2 quiz для об'єднання"},
+                status=400,
+            )
+
+        if not new_name:
+            return web.json_response(
+                {"error": "Ім'я нового quiz обов'язкове"},
+                status=400,
+            )
+
+        # Add .yaml extension if not present
+        if not new_name.endswith(".yaml") and not new_name.endswith(".yml"):
+            new_name += ".yaml"
+
+        # Check new filename doesn't exist
+        new_quiz_path = os.path.join(self.quizzes_dir, new_name)
+        if os.path.exists(new_quiz_path):
+            return web.json_response(
+                {"error": f"Quiz '{new_name}' вже існує"},
+                status=409,
+            )
+
+        # Load and validate all quizzes
+        quizzes_data = []
+        for filename in quiz_filenames:
+            quiz_path = os.path.join(self.quizzes_dir, filename)
+            if not os.path.exists(quiz_path):
+                return web.json_response(
+                    {"error": f"Quiz '{filename}' не знайдено"},
+                    status=404,
+                )
+
+            try:
+                with open(quiz_path, "r", encoding="utf-8") as f:
+                    quiz_content = yaml.safe_load(f)
+                    errors = []
+                    if not self._validate_quiz_data(quiz_content, errors):
+                        return web.json_response(
+                            {
+                                "error": f"Quiz '{filename}' має неправильну структуру: {errors[0] if errors else 'Unknown error'}"
+                            },
+                            status=400,
+                        )
+                    quizzes_data.append(quiz_content)
+            except yaml.YAMLError as e:
+                return web.json_response(
+                    {"error": f"Помилка читання quiz '{filename}': {str(e)}"},
+                    status=400,
+                )
+
+        # Take config from first quiz
+        united_quiz = {
+            "title": quizzes_data[0].get("title", "United Quiz"),
+            "questions": [],
+        }
+
+        # Copy optional config fields from first quiz
+        optional_fields = [
+            "description",
+            "show_right_answer",
+            "randomize_questions",
+            "min_correct",
+            "show_answers_on_completion",
+        ]
+        for field in optional_fields:
+            if field in quizzes_data[0]:
+                united_quiz[field] = quizzes_data[0][field]
+
+        # Combine questions from all quizzes
+        seen_questions = set()  # Track duplicate questions by text+file
+        duplicate_count = 0
+
+        for quiz_data in quizzes_data:
+            for question in quiz_data.get("questions", []):
+                # Check for duplicate by question text and file
+                question_text = question.get("question", "") or question.get("image", "")
+                question_file = question.get("file", "")
+                question_key = (question_text, question_file)
+                if question_key in seen_questions:
+                    duplicate_count += 1
+                else:
+                    seen_questions.add(question_key)
+
+                united_quiz["questions"].append(question)
+
+        # Write the new quiz file with fsync for reliability
+        async with aiofiles.open(new_quiz_path, "w", encoding="utf-8") as f:
+            await f.write(yaml.dump(united_quiz, default_flow_style=False, allow_unicode=True))
+            await f.flush()
+            os.fsync(f.fileno())
+
+        logger.info(
+            f"United {len(quiz_filenames)} quizzes into '{new_name}': " f"{len(united_quiz['questions'])} questions"
+        )
+
+        response_data = {
+            "success": True,
+            "message": "Quiz успішно об'єднано",
+            "filename": new_name,
+            "total_questions": len(united_quiz["questions"]),
+            "source_quizzes": quiz_filenames,
+        }
+
+        if duplicate_count > 0:
+            response_data["warning"] = f"Знайдено {duplicate_count} можливих дублікатів питань"
+
+        return web.json_response(response_data)
+
+    @admin_auth_required
     async def admin_validate_quiz(self, request):
         """Validate quiz YAML structure.
 
@@ -3456,6 +3585,7 @@ async def create_app(config: WebQuizConfig):
     app.router.add_post("/api/admin/create-quiz", server.admin_create_quiz)
     app.router.add_put("/api/admin/quiz/{filename}", server.admin_update_quiz)
     app.router.add_delete("/api/admin/quiz/{filename}", server.admin_delete_quiz)
+    app.router.add_post("/api/admin/unite-quizzes", server.admin_unite_quizzes)
     app.router.add_post("/api/admin/validate-quiz", server.admin_validate_quiz)
     app.router.add_get("/api/admin/list-images", server.admin_list_images)
     app.router.add_get("/api/admin/list-files", server.admin_list_files)
