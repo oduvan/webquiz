@@ -1216,11 +1216,20 @@
             quizSelect.innerHTML = '';
             quizzes.forEach(quiz => {
                 const option = document.createElement('option');
-                option.value = quiz;
-                option.textContent = quiz === currentQuiz ? `${quiz} (поточний)` : quiz;
-                if (quiz === currentQuiz) {
+                const filename = quiz.filename;
+                const title = quiz.title;
+                option.value = filename;
+
+                // Build display text: filename with optional title
+                let displayText = filename;
+                if (title) {
+                    displayText = `${filename} - ${title}`;
+                }
+                if (filename === currentQuiz) {
+                    displayText += ' (поточний)';
                     option.classList.add('current-quiz');
                 }
+                option.textContent = displayText;
                 quizSelect.appendChild(option);
             });
 
