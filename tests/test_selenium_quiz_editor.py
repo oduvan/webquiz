@@ -380,8 +380,10 @@ def test_save_and_continue_keeps_editor_open(temp_dir, browser):
         title_input.clear()
         title_input.send_keys("Save and Continue Test")
 
-        # Find and click "Add Question" button
+        # Find and click "Add Question" button (scroll into view to avoid sticky bar)
         add_button = browser.find_element(By.XPATH, "//button[contains(text(), 'Додати Питання')]")
+        browser.execute_script("arguments[0].scrollIntoView({block: 'center'});", add_button)
+        time.sleep(0.2)
         add_button.click()
         time.sleep(0.3)
 
