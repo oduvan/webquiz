@@ -127,43 +127,60 @@
 
 
 
-        .quiz-list {
-            max-height: 300px;
-            overflow-y: auto;
+        /* Multi-select quiz dropdown */
+        .quiz-select {
+            width: 100%;
+            padding: 10px;
             border: 1px solid var(--border-color);
             border-radius: 5px;
-            padding: 10px;
+            font-size: 14px;
+            box-sizing: border-box;
             background: var(--light-bg);
+            font-family: monospace;
         }
 
-        .quiz-item {
+        .quiz-select option {
             padding: 8px;
-            margin: 2px 0;
-            background: var(--white);
-            border-radius: 3px;
-            cursor: pointer;
-            border: 1px solid transparent;
         }
 
-        .quiz-item:hover {
-            border-color: var(--button-bg);
-        }
-
-        .quiz-item.selected {
-            background: var(--button-bg);
-            color: var(--white);
-        }
-
-        .quiz-item.current {
-            background: var(--warning-bg);
-            border-color: var(--warning-border);
+        .quiz-select option.current-quiz {
             font-weight: bold;
+            background: var(--warning-bg);
         }
 
-        .quiz-item.current.selected {
+        .selection-hint {
+            font-size: 0.85em;
+            color: var(--text-muted);
+            margin-top: 5px;
+            font-style: italic;
+        }
+
+        .btn-success {
             background: var(--success-green);
             color: var(--white);
-            border-color: var(--success-green);
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+
+        .btn-success:hover {
+            background: var(--success-green-hover);
+        }
+
+        .hidden {
+            display: none !important;
+        }
+
+        /* Mobile responsive for quiz select */
+        @media (max-width: 768px) {
+            .quiz-select {
+                font-size: 16px; /* Prevent zoom on iOS */
+            }
+
+            .selection-hint {
+                display: none; /* Hide Ctrl+click hint on mobile */
+            }
         }
 
         .actions {
@@ -898,16 +915,24 @@
 
             <div class="form-group">
                 <label>Доступні Файли Quiz:</label>
-                <div id="quiz-list" class="quiz-list">
-                    Завантаження файлів quiz...
+                <select id="quiz-select" class="quiz-select" multiple size="8">
+                    <!-- Options populated by JavaScript -->
+                </select>
+                <div class="selection-hint">
+                    Ctrl+клік для вибору декількох, Shift+клік для діапазону
                 </div>
             </div>
 
-            <div class="actions">
+            <div class="actions" id="single-quiz-actions">
                 <button id="switch-btn" onclick="switchQuiz()" disabled>Переключитися на Вибраний Quiz</button>
                 <button onclick="refreshQuizzes()">🔄</button>
                 <button id="edit-btn" onclick="editSelectedQuiz()" disabled>✏️</button>
                 <button id="duplicate-btn" onclick="duplicateSelectedQuiz()" disabled>📋</button>
+            </div>
+
+            <div class="actions hidden" id="multi-quiz-actions">
+                <button id="unite-btn" onclick="uniteSelectedQuizzes()" class="btn-success">🔗 Об'єднати Quizzes</button>
+                <button onclick="refreshQuizzes()">🔄</button>
             </div>
 
             <div class="quiz-actions">
@@ -1084,7 +1109,7 @@
 
     <script>
         let currentMasterKey = '';
-        let selectedQuiz = '';
+        let selectedQuizzes = [];  // Array of selected quiz filenames
         let currentQuiz = '';
 
         // HTML escape function to prevent quote truncation in form inputs
@@ -1175,59 +1200,82 @@
         }
 
         function displayQuizzes(quizzes) {
-            const quizList = document.getElementById('quiz-list');
+            const quizSelect = document.getElementById('quiz-select');
 
             if (quizzes.length === 0) {
-                quizList.innerHTML = '<div style="text-align: center; color: var(--text-muted);">Файли quiz не знайдені</div>';
+                quizSelect.innerHTML = '<option disabled>Файли quiz не знайдені</option>';
                 return;
             }
 
-            let html = '';
+            quizSelect.innerHTML = '';
             quizzes.forEach(quiz => {
-                const isCurrent = quiz === currentQuiz;
-                const classes = isCurrent ? 'quiz-item current' : 'quiz-item';
-                html += `<div class="${classes}" onclick="selectQuiz('${quiz}')">${quiz}${isCurrent ? ' (current)' : ''}</div>`;
+                const option = document.createElement('option');
+                option.value = quiz;
+                option.textContent = quiz === currentQuiz ? `${quiz} (поточний)` : quiz;
+                if (quiz === currentQuiz) {
+                    option.classList.add('current-quiz');
+                }
+                quizSelect.appendChild(option);
             });
 
-            quizList.innerHTML = html;
+            // Add change event listener
+            quizSelect.onchange = handleQuizSelectionChange;
         }
 
-        function selectQuiz(quizName) {
-            selectedQuiz = quizName;
+        function handleQuizSelectionChange() {
+            const quizSelect = document.getElementById('quiz-select');
+            selectedQuizzes = Array.from(quizSelect.selectedOptions).map(opt => opt.value);
+            updateButtonVisibility();
+        }
 
-            // Update UI
-            document.querySelectorAll('.quiz-item').forEach(item => {
-                item.classList.remove('selected');
-            });
-
-            event.target.classList.add('selected');
-
-            // Enable switch button if different from current
+        function updateButtonVisibility() {
+            const singleActions = document.getElementById('single-quiz-actions');
+            const multiActions = document.getElementById('multi-quiz-actions');
             const switchBtn = document.getElementById('switch-btn');
             const editBtn = document.getElementById('edit-btn');
             const duplicateBtn = document.getElementById('duplicate-btn');
             const deleteBtn = document.getElementById('delete-btn');
 
-            if (selectedQuiz !== currentQuiz) {
-                switchBtn.disabled = false;
-                switchBtn.textContent = 'Переключитися на Вибраний Quiz';
-            } else {
-                switchBtn.disabled = false;
-                switchBtn.textContent = 'Перезапустити Поточний Quiz';
-            }
+            const count = selectedQuizzes.length;
 
-            // Enable edit and duplicate buttons (current quiz can be edited now)
-            editBtn.disabled = false;
-            duplicateBtn.disabled = false;
-            deleteBtn.disabled = selectedQuiz === currentQuiz; // Can't delete current quiz
+            if (count === 0) {
+                // No selection - show single actions, all disabled
+                singleActions.classList.remove('hidden');
+                multiActions.classList.add('hidden');
+                switchBtn.disabled = true;
+                editBtn.disabled = true;
+                duplicateBtn.disabled = true;
+                deleteBtn.disabled = true;
+            } else if (count === 1) {
+                // Single selection - show standard buttons
+                singleActions.classList.remove('hidden');
+                multiActions.classList.add('hidden');
+
+                const selected = selectedQuizzes[0];
+                switchBtn.disabled = false;
+                switchBtn.textContent = selected === currentQuiz
+                    ? 'Перезапустити Поточний Quiz'
+                    : 'Переключитися на Вибраний Quiz';
+                editBtn.disabled = false;
+                duplicateBtn.disabled = false;
+                deleteBtn.disabled = selected === currentQuiz;
+            } else {
+                // Multiple selection - show unite button, hide switch/edit/duplicate
+                singleActions.classList.add('hidden');
+                multiActions.classList.remove('hidden');
+
+                // Delete enabled if none of selected is current quiz
+                deleteBtn.disabled = selectedQuizzes.includes(currentQuiz);
+            }
         }
 
         async function switchQuiz() {
-            if (!selectedQuiz) {
-                showMessage('Будь ласка, виберіть quiz', 'warning');
+            if (selectedQuizzes.length !== 1) {
+                showMessage('Будь ласка, виберіть один quiz', 'warning');
                 return;
             }
 
+            const selectedQuiz = selectedQuizzes[0];
             const isRestart = selectedQuiz === currentQuiz;
 
             const switchBtn = document.getElementById('switch-btn');
@@ -1257,7 +1305,7 @@
                     await loadQuizzes();
 
                     // Reset selection
-                    selectedQuiz = '';
+                    selectedQuizzes = [];
                     switchBtn.textContent = 'Переключитися на Вибраний Quiz';
                 } else {
                     showMessage(data.error || `Failed to ${isRestart ? 'restart' : 'switch'} quiz`, 'error');
@@ -1316,11 +1364,12 @@
         }
 
         async function editSelectedQuiz() {
-            if (!selectedQuiz) {
-                showMessage('Будь ласка, виберіть quiz для редагування', 'warning');
+            if (selectedQuizzes.length !== 1) {
+                showMessage('Будь ласка, виберіть один quiz для редагування', 'warning');
                 return;
             }
 
+            const selectedQuiz = selectedQuizzes[0];
             isEditMode = true;
             editingQuizName = selectedQuiz;
             document.getElementById('modal-title').textContent = `Редагувати Quiz: ${selectedQuiz}`;
@@ -1349,12 +1398,13 @@
         }
 
         async function duplicateSelectedQuiz() {
-            if (!selectedQuiz) {
-                showMessage('Будь ласка, виберіть quiz для дублювання', 'warning');
+            if (selectedQuizzes.length !== 1) {
+                showMessage('Будь ласка, виберіть один quiz для дублювання', 'warning');
                 return;
             }
 
-            const newFilename = prompt(`Введіть ім’я для дубльованого quiz:`, selectedQuiz.replace('.yaml', '_copy'));
+            const selectedQuiz = selectedQuizzes[0];
+            const newFilename = prompt(`Введіть ім'я для дубльованого quiz:`, selectedQuiz.replace('.yaml', '_copy'));
             if (!newFilename) {
                 return;
             }
@@ -1400,37 +1450,111 @@
         }
 
         async function deleteSelectedQuiz() {
-            if (!selectedQuiz) {
+            if (selectedQuizzes.length === 0) {
                 showMessage('Будь ласка, виберіть quiz для видалення', 'warning');
                 return;
             }
 
-            if (selectedQuiz === currentQuiz) {
+            // Check if any selected is current quiz
+            if (selectedQuizzes.includes(currentQuiz)) {
                 showMessage('Неможливо видалити поточний активний quiz', 'error');
                 return;
             }
 
-            if (!confirm(`Ви впевнені, що хочете видалити "${selectedQuiz}"? Ця дія не може бути скасована.`)) {
+            const message = selectedQuizzes.length === 1
+                ? `Ви впевнені, що хочете видалити "${selectedQuizzes[0]}"?`
+                : `Ви впевнені, що хочете видалити ${selectedQuizzes.length} quiz(ів)?`;
+
+            if (!confirm(message + ' Ця дія не може бути скасована.')) {
                 return;
             }
 
+            // Delete each quiz sequentially
+            const errors = [];
+            let successCount = 0;
+
+            for (const quiz of selectedQuizzes) {
+                try {
+                    const response = await fetch(`/api/admin/quiz/${quiz}`, {
+                        method: 'DELETE',
+                        credentials: 'same-origin'
+                    });
+
+                    if (response.ok) {
+                        successCount++;
+                    } else {
+                        const data = await response.json();
+                        errors.push(`${quiz}: ${data.error || 'Помилка'}`);
+                    }
+                } catch (error) {
+                    errors.push(`${quiz}: ${error.message}`);
+                }
+            }
+
+            if (errors.length === 0) {
+                showMessage(`Успішно видалено ${successCount} quiz(ів)`, 'success');
+            } else if (successCount > 0) {
+                showMessage(`Видалено ${successCount} quiz(ів). Помилки: ${errors.join(', ')}`, 'warning');
+            } else {
+                showMessage(`Помилка видалення: ${errors.join(', ')}`, 'error');
+            }
+
+            selectedQuizzes = [];
+            await loadQuizzes();
+        }
+
+        async function uniteSelectedQuizzes() {
+            if (selectedQuizzes.length < 2) {
+                showMessage('Будь ласка, виберіть принаймні 2 quiz для об\'єднання', 'warning');
+                return;
+            }
+
+            // Suggest name based on first quiz
+            const suggestedName = selectedQuizzes[0].replace('.yaml', '_united');
+            const newFilename = prompt(
+                `Введіть ім'я для об'єднаного quiz (${selectedQuizzes.length} quizzes):`,
+                suggestedName
+            );
+
+            if (!newFilename) {
+                return;
+            }
+
+            const uniteBtn = document.getElementById('unite-btn');
+            uniteBtn.disabled = true;
+            uniteBtn.textContent = 'Об\'єднання...';
+
             try {
-                const response = await fetch(`/api/admin/quiz/${selectedQuiz}`, {
-                    method: 'DELETE',
+                const response = await fetch('/api/admin/unite-quizzes', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        quiz_filenames: selectedQuizzes,
+                        new_name: newFilename
+                    }),
                     credentials: 'same-origin'
                 });
 
                 const data = await response.json();
 
                 if (response.ok) {
-                    showMessage(data.message, 'success');
-                    selectedQuiz = '';
+                    let message = `Quiz успішно об'єднано в "${data.filename}". Загалом питань: ${data.total_questions}`;
+                    if (data.warning) {
+                        message += `. ${data.warning}`;
+                    }
+                    showMessage(message, 'success');
+                    selectedQuizzes = [];
                     await loadQuizzes();
                 } else {
-                    showMessage(data.error || 'Не вдалося видалити quiz', 'error');
+                    showMessage(data.error || 'Не вдалося об\'єднати quizzes', 'error');
                 }
             } catch (error) {
-                showMessage('Помилка видалення quiz: ' + error.message, 'error');
+                showMessage('Помилка об\'єднання quiz: ' + error.message, 'error');
+            } finally {
+                uniteBtn.disabled = false;
+                uniteBtn.textContent = '🔗 Об\'єднати Quizzes';
             }
         }
 
