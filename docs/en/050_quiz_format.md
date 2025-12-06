@@ -273,11 +273,10 @@ You can combine an image and a file in the same question:
 
 #### Text Input Questions
 
-In addition to multiple choice questions, WebQuiz supports text input questions where students type their answer.
+In addition to multiple choice questions, WebQuiz supports text input questions where students type their answer. Questions with `checker` or `correct_value` fields are automatically detected as text input questions:
 
 ```
-- type: "text"
-  question: "What is 2+2?"
+- question: "What is 2+2?"
   default_value: ""
   correct_value: "4"
   checker: "assert user_answer.strip() == '4', 'Expected 4'"
@@ -285,8 +284,8 @@ In addition to multiple choice questions, WebQuiz supports text input questions 
 ```
 
 **Text Question Fields:**
-- **type: "text"** — required to indicate this is a text input question
 - **question** — question text
+- **checker** or **correct_value** — at least one required to identify as text question
 - **default_value** — initial value shown in the textarea (optional)
 - **correct_value** — correct answer shown when student is wrong (optional)
 - **checker** — Python code for answer validation (optional)
@@ -301,8 +300,7 @@ In addition to multiple choice questions, WebQuiz supports text input questions 
 Example with math validation:
 
 ```
-- type: "text"
-  question: "Calculate the square root of 16"
+- question: "Calculate the square root of 16"
   correct_value: "4"
   checker: |
     result = float(user_answer)

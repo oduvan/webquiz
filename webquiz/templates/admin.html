@@ -2107,8 +2107,8 @@
                     questionDiv.dataset.questionId = questionCounter;
                     questionDiv.draggable = true;
 
-                    // Check if this is a text question
-                    const isTextQuestion = question.type === 'text';
+                    // Check if this is a text question (has checker or correct_value)
+                    const isTextQuestion = 'checker' in question || 'correct_value' in question;
                     const isMultipleChoice = !isTextQuestion && Array.isArray(question.correct_answer);
                     const correctAnswers = isMultipleChoice ? question.correct_answer : [question.correct_answer || 0];
                     const inputType = isMultipleChoice ? 'checkbox' : 'radio';
@@ -2280,10 +2280,8 @@
                 let questionData;
 
                 if (isText) {
-                    // Text input question
-                    questionData = {
-                        type: 'text'
-                    };
+                    // Text input question (detected by checker/correct_value, no type field needed)
+                    questionData = {};
 
                     // Get text question fields
                     const defaultValueInput = div.querySelector('.default-value-input');

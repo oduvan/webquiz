@@ -14,9 +14,8 @@ def text_input_server():
         "title": "Text Input Test Quiz",
         "show_right_answer": True,
         "questions": [
-            # Simple text question with exact match checker
+            # Simple text question with exact match checker (detected by checker/correct_value)
             {
-                "type": "text",
                 "question": "What is 2+2? (Enter the number)",
                 "default_value": "",
                 "correct_value": "4",
@@ -25,16 +24,14 @@ def text_input_server():
             },
             # Text question with math checker
             {
-                "type": "text",
                 "question": "Calculate the square root of 16",
                 "default_value": "",
                 "correct_value": "4",
                 "checker": "result = float(user_answer.strip())\nassert abs(result - sqrt(16)) < 0.01, f'Expected 4, got {result}'",
                 "points": 2,
             },
-            # Text question without checker (exact match)
+            # Text question without checker (exact match with correct_value)
             {
-                "type": "text",
                 "question": "What is the capital of France?",
                 "correct_value": "Paris",
                 "points": 1,
@@ -250,7 +247,6 @@ class TestTextInputQuizValidation:
             "title": "Valid Text Quiz",
             "questions": [
                 {
-                    "type": "text",
                     "question": "Enter your answer:",
                     "default_value": "",
                     "correct_value": "test",
@@ -272,7 +268,6 @@ class TestTextInputQuizValidation:
             "title": "Image Text Quiz",
             "questions": [
                 {
-                    "type": "text",
                     "question": "Look at the image and answer:",
                     "image": "/imgs/test.png",
                     "correct_value": "answer",
@@ -292,7 +287,7 @@ class TestTextInputQuizValidation:
         quiz_data = {
             "title": "Points Text Quiz",
             "questions": [
-                {"type": "text", "question": "Enter answer:", "correct_value": "test", "points": 5}
+                {"question": "Enter answer:", "correct_value": "test", "points": 5}
             ],
         }
 

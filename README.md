@@ -368,20 +368,18 @@ questions:
 
 **Text Input Questions:**
 
-In addition to multiple choice questions, you can create text input questions where students type their answer:
+In addition to multiple choice questions, you can create text input questions where students type their answer. Questions with `checker` or `correct_value` fields are automatically detected as text input questions:
 
 ```yaml
 questions:
-  - type: "text"
-    question: "What is 2+2?"
+  - question: "What is 2+2?"
     default_value: ""           # Initial value shown in textarea
     correct_value: "4"          # Shown when answer is wrong (if show_right_answer is true)
     checker: |                  # Python code to validate the answer
       assert user_answer.strip() == '4', 'Expected 4'
     points: 1
 
-  - type: "text"
-    question: "Calculate sqrt(16)"
+  - question: "Calculate sqrt(16)"
     correct_value: "4.0"
     checker: |
       result = float(user_answer)
@@ -390,8 +388,8 @@ questions:
 ```
 
 **Text Question Fields:**
-- `type: "text"` - Required to mark as text input question
 - `question` - Question text (required)
+- `checker` or `correct_value` - At least one required to identify as text question
 - `default_value` - Initial value shown in textarea (optional)
 - `correct_value` - Correct answer shown when student is wrong (optional)
 - `checker` - Python code for answer validation (optional)
