@@ -330,6 +330,45 @@ def test_unite_warns_on_duplicate_questions(temp_dir):
         assert "1" in data["warning"]  # 1 duplicate found
 
 
+def test_unite_same_text_different_file_not_duplicate(temp_dir):
+    """Test that same question text with different file is not counted as duplicate."""
+    quizzes = {
+        "quiz1.yaml": {
+            "title": "Quiz 1",
+            "questions": [
+                {"question": "Same question text", "options": ["A", "B"], "correct_answer": 0, "file": "file1.xlsx"},
+            ],
+        },
+        "quiz2.yaml": {
+            "title": "Quiz 2",
+            "questions": [
+                {
+                    "question": "Same question text",
+                    "options": ["C", "D"],
+                    "correct_answer": 1,
+                    "file": "file2.xlsx",
+                },  # Different file
+            ],
+        },
+    }
+
+    with custom_webquiz_server(quizzes=quizzes) as (proc, port):
+        cookies = get_admin_session(port)
+
+        response = requests.post(
+            f"http://localhost:{port}/api/admin/unite-quizzes",
+            cookies=cookies,
+            json={"quiz_filenames": ["quiz1.yaml", "quiz2.yaml"], "new_name": "no_dups"},
+        )
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["success"] is True
+        assert data["total_questions"] == 2
+        # No warning because different files make them unique
+        assert "warning" not in data or data.get("warning") is None
+
+
 def test_unite_with_yaml_extension_in_name(temp_dir):
     """Test that providing .yaml extension in name works correctly."""
     quizzes = {

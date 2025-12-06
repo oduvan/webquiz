@@ -931,7 +931,7 @@
             </div>
 
             <div class="actions hidden" id="multi-quiz-actions">
-                <button id="unite-btn" onclick="uniteSelectedQuizzes()" class="btn-success">🔗 Об'єднати Quizzes</button>
+                <button id="unite-btn" onclick="uniteSelectedQuizzes()" class="btn-success">🔗 Об'єднати quizzes</button>
                 <button onclick="refreshQuizzes()">🔄</button>
             </div>
 
@@ -1220,6 +1220,9 @@
 
             // Add change event listener
             quizSelect.onchange = handleQuizSelectionChange;
+
+            // Update button visibility based on current selection state
+            updateButtonVisibility();
         }
 
         function handleQuizSelectionChange() {
@@ -1554,7 +1557,7 @@
                 showMessage('Помилка об\'єднання quiz: ' + error.message, 'error');
             } finally {
                 uniteBtn.disabled = false;
-                uniteBtn.textContent = '🔗 Об\'єднати Quizzes';
+                uniteBtn.textContent = '🔗 Об\'єднати quizzes';
             }
         }
 

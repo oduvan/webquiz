@@ -2416,17 +2416,19 @@ class TestingServer:
                 united_quiz[field] = quizzes_data[0][field]
 
         # Combine questions from all quizzes
-        seen_questions = set()  # Track duplicate questions by text
+        seen_questions = set()  # Track duplicate questions by text+file
         duplicate_count = 0
 
         for quiz_data in quizzes_data:
             for question in quiz_data.get("questions", []):
-                # Check for duplicate by question text
+                # Check for duplicate by question text and file
                 question_text = question.get("question", "") or question.get("image", "")
-                if question_text in seen_questions:
+                question_file = question.get("file", "")
+                question_key = (question_text, question_file)
+                if question_key in seen_questions:
                     duplicate_count += 1
                 else:
-                    seen_questions.add(question_text)
+                    seen_questions.add(question_key)
 
                 united_quiz["questions"].append(question)
 
