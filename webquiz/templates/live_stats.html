@@ -308,7 +308,6 @@
 
         .points-indicator {
             margin-left: 4px;
-            cursor: help;
             font-size: 0.85em;
             color: #ffc107;
         }
@@ -833,7 +832,7 @@
                     const fileIndicator = question.file ? `<span class="file-indicator" title="${question.file.split('/').pop()}">📎</span>` : '';
 
                     // Build points indicator if question has more than 1 point
-                    const pointsIndicator = questionPoints > 1 ? `<span class="points-indicator" title="${questionPoints} points">🏆${questionPoints}</span>` : '';
+                    const pointsIndicator = questionPoints > 1 ? `<span class="points-indicator" title="${questionPoints} points">🏆 ${questionPoints}</span>` : '';
 
                     if (question.image && !question.question) {
                         // Image-only question: show filename and small image
