@@ -435,6 +435,21 @@
             color: var(--text-color);
         }
 
+        /* Question points badge */
+        .question-points-badge {
+            position: absolute;
+            top: 0;
+            right: 0;
+            background: linear-gradient(135deg, #ffc107 0%, #ff9800 100%);
+            color: #000;
+            font-size: 13px;
+            font-weight: bold;
+            padding: 5px 10px;
+            border-radius: 0 10px 0 10px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+            z-index: 10;
+        }
+
         /* Mobile responsive styles */
         @media screen and (max-width: 768px) {
             /* Full width mobile layout - no side margins */
@@ -1186,9 +1201,9 @@
             const container = document.getElementById('current-question-container');
             const questionPoints = question.points || 1;
             container.innerHTML = `
-                <div class="current-question active-question">
+                <div class="current-question active-question" style="position: relative;">
+                    ${questionPoints > 1 ? `<div class="question-points-badge">🏆 ${questionPoints} ${questionPoints >= 2 && questionPoints <= 4 ? 'бали' : 'балів'}</div>` : ''}
                     ${question.question ? `<h3 class="question-text">${question.question}</h3>` : ''}
-                    ${questionPoints > 1 ? `<p class="question-points-hint" style="font-size: 14px; color: #ffc107; margin-bottom: 10px; font-weight: bold;">🏆 ${questionPoints} ${questionPoints === 1 ? 'бал' : (questionPoints >= 2 && questionPoints <= 4 ? 'бали' : 'балів')}</p>` : ''}
                     ${question.image ? `<a href="${makeRelativePath(question.image)}" target="_blank"><img src="${makeRelativePath(question.image)}" alt="Question image" class="question-image quiz-question-img"></a>` : ''}
                     ${question.file ? `<a href="${makeRelativePath(question.file)}" download class="question-file"><span class="question-file-icon">📎</span><span class="question-file-name">${question.file.split('/').pop()}</span></a>` : ''}
                     <div class="options">
