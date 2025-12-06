@@ -395,8 +395,8 @@ def test_save_and_continue_keeps_editor_open(temp_dir, browser):
         question_input = question_item.find_element(By.CSS_SELECTOR, ".question-text")
         question_input.send_keys("Test question")
 
-        # Fill in options (find option inputs within the question)
-        option_inputs = question_item.find_elements(By.CSS_SELECTOR, ".option-input")
+        # Fill in options (find option text inputs within the question)
+        option_inputs = question_item.find_elements(By.CSS_SELECTOR, ".option-text")
         option_inputs[0].send_keys("Option A")
         option_inputs[1].send_keys("Option B")
 
