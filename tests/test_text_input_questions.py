@@ -308,6 +308,52 @@ class TestTextInputQuizValidation:
             )
             assert response.status_code == 200
 
+    def test_invalid_checker_python_syntax(self):
+        """Test that quiz with invalid Python syntax in checker is rejected"""
+        quiz_data = {
+            "title": "Invalid Checker Quiz",
+            "questions": [
+                {
+                    "question": "Enter answer:",
+                    "correct_value": "test",
+                    "checker": "if True\n    print('missing colon')",  # Invalid Python - missing colon after if
+                }
+            ],
+        }
+
+        quizzes = {"default.yaml": quiz_data}
+
+        with custom_webquiz_server(quizzes=quizzes) as (proc, port):
+            base_url = f"http://localhost:{port}"
+
+            # Authenticate as admin
+            response = requests.post(
+                f"{base_url}/api/admin/auth", json={"master_key": "test123"}, allow_redirects=False
+            )
+            cookies = response.cookies
+
+            # Try to create a quiz with invalid checker syntax
+            invalid_quiz = {
+                "title": "Bad Checker Quiz",
+                "questions": [
+                    {
+                        "question": "Test question",
+                        "checker": "def broken(\n    pass",  # Invalid Python syntax
+                        "correct_value": "answer",
+                    }
+                ],
+            }
+
+            response = requests.post(
+                f"{base_url}/api/admin/create-quiz",
+                json={"filename": "invalid_checker.yaml", "quiz_data": invalid_quiz},
+                cookies=cookies,
+            )
+            assert response.status_code == 400
+            data = response.json()
+            assert "error" in data
+            assert "invalid Python syntax" in data["error"]
+
 
 class TestCheckerTemplates:
     """Test checker templates API"""

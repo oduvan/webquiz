@@ -2731,6 +2731,14 @@ class TestingServer:
                 if "checker" in question and not isinstance(question["checker"], str):
                     errors.append(f"Question {i+1} checker must be a string")
 
+                # Validate checker is valid Python syntax
+                checker_code = question.get("checker", "")
+                if checker_code and isinstance(checker_code, str):
+                    try:
+                        compile(checker_code, f"<question {i+1} checker>", "exec")
+                    except SyntaxError as e:
+                        errors.append(f"Question {i+1} checker has invalid Python syntax: {e.msg} (line {e.lineno})")
+
                 # Validate points if specified
                 if "points" in question:
                     points = question["points"]
