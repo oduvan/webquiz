@@ -1640,29 +1640,51 @@
                         <div style="margin: 10px 0;">
                             <button type="button" class="question-type-toggle active" data-type="single" onclick="toggleQuestionType(${questionCounter}, 'single')">📝 Одна правильна відповідь</button>
                             <button type="button" class="question-type-toggle" data-type="multiple" onclick="toggleQuestionType(${questionCounter}, 'multiple')">☑️ Кілька правильних відповідей</button>
+                            <button type="button" class="question-type-toggle" data-type="text" onclick="toggleQuestionType(${questionCounter}, 'text')">✍️ Текстова відповідь</button>
                         </div>
                     </div>
-                    <div class="form-group">
-                        <label>Варіанти Відповідей:</label>
-                        <div class="options-container">
-                            <div class="option-item">
-                                <input type="radio" name="correct-${questionCounter}" value="0" checked>
-                                <input type="text" class="option-text" placeholder="Варіант 1" oninput="updateOptionImagePreview(this)">
-                                <button type="button" onclick="openImagePicker('option-text', ${questionCounter}, 0)" style="padding: 2px 5px; font-size: 12px;" title="Select image">📷</button>
-                                <button type="button" onclick="removeOption(this)">×</button>
+                    <div class="choice-question-fields">
+                        <div class="form-group">
+                            <label>Варіанти Відповідей:</label>
+                            <div class="options-container">
+                                <div class="option-item">
+                                    <input type="radio" name="correct-${questionCounter}" value="0" checked>
+                                    <input type="text" class="option-text" placeholder="Варіант 1" oninput="updateOptionImagePreview(this)">
+                                    <button type="button" onclick="openImagePicker('option-text', ${questionCounter}, 0)" style="padding: 2px 5px; font-size: 12px;" title="Select image">📷</button>
+                                    <button type="button" onclick="removeOption(this)">×</button>
+                                </div>
+                                <div class="option-item">
+                                    <input type="radio" name="correct-${questionCounter}" value="1">
+                                    <input type="text" class="option-text" placeholder="Варіант 2" oninput="updateOptionImagePreview(this)">
+                                    <button type="button" onclick="openImagePicker('option-text', ${questionCounter}, 1)" style="padding: 2px 5px; font-size: 12px;" title="Select image">📷</button>
+                                    <button type="button" onclick="removeOption(this)">×</button>
+                                </div>
                             </div>
-                            <div class="option-item">
-                                <input type="radio" name="correct-${questionCounter}" value="1">
-                                <input type="text" class="option-text" placeholder="Варіант 2" oninput="updateOptionImagePreview(this)">
-                                <button type="button" onclick="openImagePicker('option-text', ${questionCounter}, 1)" style="padding: 2px 5px; font-size: 12px;" title="Select image">📷</button>
-                                <button type="button" onclick="removeOption(this)">×</button>
-                            </div>
+                            <button type="button" onclick="addOption(${questionCounter})">+ Додати Варіант</button>
                         </div>
-                        <button type="button" onclick="addOption(${questionCounter})">+ Додати Варіант</button>
+                        <div class="form-group min-correct-container" style="display: none;">
+                            <label for="min-correct-${questionCounter}">Мінімум правильних відповідей:</label>
+                            <input type="number" id="min-correct-${questionCounter}" class="min-correct-input" min="1" placeholder="Усі правильні" style="width: 80px;">
+                        </div>
                     </div>
-                    <div class="form-group min-correct-container" style="display: none;">
-                        <label for="min-correct-${questionCounter}">Мінімум правильних відповідей:</label>
-                        <input type="number" id="min-correct-${questionCounter}" class="min-correct-input" min="1" placeholder="Усі правильні" style="width: 80px;">
+                    <div class="text-question-fields" style="display: none;">
+                        <div class="form-group">
+                            <label>Початкове Значення (показується користувачу):</label>
+                            <textarea class="default-value-input" placeholder="Введіть початкове значення для відображення..." style="width: 100%; min-height: 60px; font-family: monospace;">0</textarea>
+                        </div>
+                        <div class="form-group">
+                            <label>Правильна Відповідь (показується при помилці):</label>
+                            <textarea class="correct-value-input" placeholder="Введіть правильну відповідь..." style="width: 100%; min-height: 60px; font-family: monospace;">1000</textarea>
+                        </div>
+                        <div class="form-group">
+                            <label>Перевірка (Python код):</label>
+                            <div style="display: flex; gap: 10px; margin-bottom: 5px;">
+                                <select class="checker-template-select" onchange="insertCheckerTemplate(${questionCounter}, this)" style="flex: 1;">
+                                    <option value="">-- Оберіть шаблон --</option>
+                                </select>
+                            </div>
+                            <textarea class="checker-input" style="width: 100%; min-height: 120px; font-family: monospace;">assert 900 < to_int(user_answer) < 1100, "Вийшли за рамки"</textarea>
+                        </div>
                     </div>
                     <div class="form-group">
                         <label for="points-${questionCounter}" style="display: inline-block;">Бали за питання:</label>
@@ -1922,8 +1944,10 @@
             if (!questionDiv) return;
 
             const toggleButtons = questionDiv.querySelectorAll('.question-type-toggle');
-            const optionInputs = questionDiv.querySelectorAll('input[type="radio"], input[type="checkbox"]');
+            const optionInputs = questionDiv.querySelectorAll('.choice-question-fields input[type="radio"], .choice-question-fields input[type="checkbox"]');
             const minCorrectContainer = questionDiv.querySelector('.min-correct-container');
+            const choiceFields = questionDiv.querySelector('.choice-question-fields');
+            const textFields = questionDiv.querySelector('.text-question-fields');
 
             // Update toggle button states
             toggleButtons.forEach(btn => {
@@ -1934,28 +1958,94 @@
                 }
             });
 
-            // Convert input types
-            if (type === 'multiple') {
-                // Convert to checkboxes
-                optionInputs.forEach(input => {
-                    if (input.type === 'radio') {
-                        input.type = 'checkbox';
-                        input.name = `correct-${questionId}-multiple`;
-                    }
-                });
-                minCorrectContainer.style.display = 'block';
+            // Show/hide appropriate fields
+            if (type === 'text') {
+                // Text input question
+                choiceFields.style.display = 'none';
+                textFields.style.display = 'block';
+                // Load checker templates
+                loadCheckerTemplates(questionId);
             } else {
-                // Convert to radio buttons
-                optionInputs.forEach((input, index) => {
-                    if (input.type === 'checkbox') {
-                        input.type = 'radio';
-                        input.name = `correct-${questionId}`;
-                        // Keep only first checked item for radio mode
-                        input.checked = index === 0;
-                    }
-                });
-                minCorrectContainer.style.display = 'none';
+                // Choice question (single or multiple)
+                choiceFields.style.display = 'block';
+                textFields.style.display = 'none';
+
+                // Convert input types
+                if (type === 'multiple') {
+                    // Convert to checkboxes
+                    optionInputs.forEach(input => {
+                        if (input.type === 'radio') {
+                            input.type = 'checkbox';
+                            input.name = `correct-${questionId}-multiple`;
+                        }
+                    });
+                    minCorrectContainer.style.display = 'block';
+                } else {
+                    // Convert to radio buttons
+                    optionInputs.forEach((input, index) => {
+                        if (input.type === 'checkbox') {
+                            input.type = 'radio';
+                            input.name = `correct-${questionId}`;
+                            // Keep only first checked item for radio mode
+                            input.checked = index === 0;
+                        }
+                    });
+                    minCorrectContainer.style.display = 'none';
+                }
             }
+        }
+
+        // Cache for checker templates
+        let checkerTemplatesCache = null;
+
+        async function loadCheckerTemplates(questionId) {
+            const questionDiv = document.querySelector(`[data-question-id="${questionId}"]`);
+            if (!questionDiv) return;
+
+            const select = questionDiv.querySelector('.checker-template-select');
+            if (!select) return;
+
+            // Check if already loaded
+            if (select.options.length > 1) return;
+
+            // Load from cache or fetch
+            if (!checkerTemplatesCache) {
+                try {
+                    const response = await fetch('/api/admin/list-checker-templates');
+                    if (response.ok) {
+                        const data = await response.json();
+                        checkerTemplatesCache = data.templates || [];
+                    } else {
+                        checkerTemplatesCache = [];
+                    }
+                } catch (e) {
+                    console.error('Failed to load checker templates:', e);
+                    checkerTemplatesCache = [];
+                }
+            }
+
+            // Populate select
+            checkerTemplatesCache.forEach(template => {
+                const option = document.createElement('option');
+                option.value = template.code;
+                option.textContent = template.name;
+                select.appendChild(option);
+            });
+        }
+
+        function insertCheckerTemplate(questionId, selectElement) {
+            if (!selectElement.value) return;
+
+            const questionDiv = document.querySelector(`[data-question-id="${questionId}"]`);
+            if (!questionDiv) return;
+
+            const checkerInput = questionDiv.querySelector('.checker-input');
+            if (checkerInput) {
+                checkerInput.value = selectElement.value;
+            }
+
+            // Reset select
+            selectElement.selectedIndex = 0;
         }
 
         function addOption(questionId) {
@@ -2025,25 +2115,46 @@
                     questionDiv.dataset.questionId = questionCounter;
                     questionDiv.draggable = true;
 
-                    const isMultipleChoice = Array.isArray(question.correct_answer);
-                    const correctAnswers = isMultipleChoice ? question.correct_answer : [question.correct_answer];
+                    // Check if this is a text question (has checker)
+                    const isTextQuestion = 'checker' in question;
+                    const isMultipleChoice = !isTextQuestion && Array.isArray(question.correct_answer);
+                    const correctAnswers = isMultipleChoice ? question.correct_answer : [question.correct_answer || 0];
                     const inputType = isMultipleChoice ? 'checkbox' : 'radio';
                     const inputName = isMultipleChoice ? `correct-${questionCounter}-multiple` : `correct-${questionCounter}`;
 
+                    // Build options HTML (for choice questions only)
                     let optionsHtml = '';
-                    question.options.forEach((option, index) => {
-                        const isCorrect = correctAnswers.includes(index);
-                        const isImageOption = option && option.startsWith('/imgs/');
-                        optionsHtml += `
+                    if (!isTextQuestion && question.options) {
+                        question.options.forEach((option, index) => {
+                            const isCorrect = correctAnswers.includes(index);
+                            const isImageOption = option && option.startsWith('/imgs/');
+                            optionsHtml += `
+                                <div class="option-item">
+                                    <input type="${inputType}" name="${inputName}" value="${index}" ${isCorrect ? 'checked' : ''}>
+                                    <input type="text" class="option-text" value="${escapeHtml(option)}" placeholder="Варіант ${index + 1}" oninput="updateOptionImagePreview(this)">
+                                    ${isImageOption ? `<img class="option-image-preview" src="${option}" alt="Option preview" title="Click to enlarge" onclick="openFullscreenPreview(this.src)">` : ''}
+                                    <button type="button" onclick="openImagePicker('option-text', ${questionCounter}, ${index})" style="padding: 2px 5px; font-size: 12px;" title="Select image">📷</button>
+                                    <button type="button" onclick="removeOption(this)">×</button>
+                                </div>
+                            `;
+                        });
+                    } else if (!isTextQuestion) {
+                        // Default empty options for new choice question
+                        optionsHtml = `
                             <div class="option-item">
-                                <input type="${inputType}" name="${inputName}" value="${index}" ${isCorrect ? 'checked' : ''}>
-                                <input type="text" class="option-text" value="${escapeHtml(option)}" placeholder="Варіант ${index + 1}" oninput="updateOptionImagePreview(this)">
-                                ${isImageOption ? `<img class="option-image-preview" src="${option}" alt="Option preview" title="Click to enlarge" onclick="openFullscreenPreview(this.src)">` : ''}
-                                <button type="button" onclick="openImagePicker('option-text', ${questionCounter}, ${index})" style="padding: 2px 5px; font-size: 12px;" title="Select image">📷</button>
+                                <input type="radio" name="${inputName}" value="0" checked>
+                                <input type="text" class="option-text" placeholder="Варіант 1" oninput="updateOptionImagePreview(this)">
+                                <button type="button" onclick="openImagePicker('option-text', ${questionCounter}, 0)" style="padding: 2px 5px; font-size: 12px;" title="Select image">📷</button>
+                                <button type="button" onclick="removeOption(this)">×</button>
+                            </div>
+                            <div class="option-item">
+                                <input type="radio" name="${inputName}" value="1">
+                                <input type="text" class="option-text" placeholder="Варіант 2" oninput="updateOptionImagePreview(this)">
+                                <button type="button" onclick="openImagePicker('option-text', ${questionCounter}, 1)" style="padding: 2px 5px; font-size: 12px;" title="Select image">📷</button>
                                 <button type="button" onclick="removeOption(this)">×</button>
                             </div>
                         `;
-                    });
+                    }
 
                     const minCorrectValue = question.min_correct || '';
                     const minCorrectDisplay = isMultipleChoice ? 'block' : 'none';
@@ -2104,20 +2215,42 @@
                             <div class="form-group">
                                 <label>Тип Питання:</label>
                                 <div style="margin: 10px 0;">
-                                    <button type="button" class="question-type-toggle ${!isMultipleChoice ? 'active' : ''}" data-type="single" onclick="toggleQuestionType(${questionCounter}, 'single')">📝 Одна правильна відповідь</button>
+                                    <button type="button" class="question-type-toggle ${!isMultipleChoice && !isTextQuestion ? 'active' : ''}" data-type="single" onclick="toggleQuestionType(${questionCounter}, 'single')">📝 Одна правильна відповідь</button>
                                     <button type="button" class="question-type-toggle ${isMultipleChoice ? 'active' : ''}" data-type="multiple" onclick="toggleQuestionType(${questionCounter}, 'multiple')">☑️ Кілька правильних відповідей</button>
+                                    <button type="button" class="question-type-toggle ${isTextQuestion ? 'active' : ''}" data-type="text" onclick="toggleQuestionType(${questionCounter}, 'text')">✍️ Текстова відповідь</button>
                                 </div>
                             </div>
-                            <div class="form-group">
-                                <label>Варіанти Відповідей:</label>
-                                <div class="options-container">
-                                    ${optionsHtml}
+                            <div class="choice-question-fields" style="display: ${isTextQuestion ? 'none' : 'block'};">
+                                <div class="form-group">
+                                    <label>Варіанти Відповідей:</label>
+                                    <div class="options-container">
+                                        ${optionsHtml}
+                                    </div>
+                                    <button type="button" onclick="addOption(${questionCounter})">+ Додати Варіант</button>
                                 </div>
-                                <button type="button" onclick="addOption(${questionCounter})">+ Додати Варіант</button>
+                                <div class="form-group min-correct-container" style="display: ${minCorrectDisplay};">
+                                    <label for="min-correct-${questionCounter}">Мінімум правильних відповідей:</label>
+                                    <input type="number" id="min-correct-${questionCounter}" class="min-correct-input" min="1" value="${minCorrectValue}" placeholder="Усі правильні" style="width: 80px;">
+                                </div>
                             </div>
-                            <div class="form-group min-correct-container" style="display: ${minCorrectDisplay};">
-                                <label for="min-correct-${questionCounter}">Мінімум правильних відповідей:</label>
-                                <input type="number" id="min-correct-${questionCounter}" class="min-correct-input" min="1" value="${minCorrectValue}" placeholder="Усі правильні" style="width: 80px;">
+                            <div class="text-question-fields" style="display: ${isTextQuestion ? 'block' : 'none'};">
+                                <div class="form-group">
+                                    <label>Початкове Значення (показується користувачу):</label>
+                                    <textarea class="default-value-input" placeholder="Введіть початкове значення для відображення..." style="width: 100%; min-height: 60px; font-family: monospace;">${escapeHtml(question.default_value || '')}</textarea>
+                                </div>
+                                <div class="form-group">
+                                    <label>Правильна Відповідь (показується при помилці):</label>
+                                    <textarea class="correct-value-input" placeholder="Введіть правильну відповідь..." style="width: 100%; min-height: 60px; font-family: monospace;">${escapeHtml(question.correct_value || '')}</textarea>
+                                </div>
+                                <div class="form-group">
+                                    <label>Перевірка (Python код):</label>
+                                    <div style="display: flex; gap: 10px; margin-bottom: 5px;">
+                                        <select class="checker-template-select" onchange="insertCheckerTemplate(${questionCounter}, this)" style="flex: 1;">
+                                            <option value="">-- Оберіть шаблон --</option>
+                                        </select>
+                                    </div>
+                                    <textarea class="checker-input" style="width: 100%; min-height: 120px; font-family: monospace;">${escapeHtml(question.checker)}</textarea>
+                                </div>
                             </div>
                             <div class="form-group">
                                 <label for="points-${questionCounter}" style="display: inline-block;">Бали за питання:</label>
@@ -2142,23 +2275,49 @@
                 const questionText = div.querySelector('.question-text').value.trim();
                 const questionImage = div.querySelector('.question-image').value.trim();
                 const questionFile = div.querySelector('.question-file').value.trim();
-                const options = Array.from(div.querySelectorAll('.option-text')).map(input => input.value.trim());
 
                 // Either question text OR image must be provided
                 const hasQuestionContent = questionText || questionImage;
+                if (!hasQuestionContent) return;
 
-                // Check if we have valid question content and options
-                if (hasQuestionContent && options.every(opt => opt) && options.length > 0) {
-                    const questionData = {
+                // Determine question type
+                const isText = div.querySelector('.question-type-toggle[data-type="text"]').classList.contains('active');
+                const isMultiple = div.querySelector('.question-type-toggle[data-type="multiple"]').classList.contains('active');
+
+                let questionData;
+
+                if (isText) {
+                    // Text input question (detected by checker/correct_value, no type field needed)
+                    questionData = {};
+
+                    // Get text question fields
+                    const defaultValueInput = div.querySelector('.default-value-input');
+                    const correctValueInput = div.querySelector('.correct-value-input');
+                    const checkerInput = div.querySelector('.checker-input');
+
+                    if (defaultValueInput && defaultValueInput.value) {
+                        questionData.default_value = defaultValueInput.value;
+                    }
+                    if (correctValueInput && correctValueInput.value) {
+                        questionData.correct_value = correctValueInput.value;
+                    }
+                    if (checkerInput && checkerInput.value.trim()) {
+                        questionData.checker = checkerInput.value;
+                    }
+                } else {
+                    // Choice question (single or multiple)
+                    const options = Array.from(div.querySelectorAll('.option-text')).map(input => input.value.trim());
+
+                    // Check if we have valid options
+                    if (!options.every(opt => opt) || options.length === 0) return;
+
+                    questionData = {
                         options: options
                     };
 
-                    // Determine question type and correct answers
-                    const isMultiple = div.querySelector('.question-type-toggle[data-type="multiple"]').classList.contains('active');
-
                     if (isMultiple) {
                         // Multiple choice - collect all checked checkboxes
-                        const checkedCheckboxes = Array.from(div.querySelectorAll('input[type="checkbox"]:checked'));
+                        const checkedCheckboxes = Array.from(div.querySelectorAll('.choice-question-fields input[type="checkbox"]:checked'));
                         const correctAnswers = checkedCheckboxes.map(cb => parseInt(cb.value)).sort((a, b) => a - b);
 
                         if (correctAnswers.length > 0) {
@@ -2178,36 +2337,36 @@
                         }
                     } else {
                         // Single choice - get checked radio button
-                        const correctRadio = div.querySelector('input[type="radio"]:checked');
+                        const correctRadio = div.querySelector('.choice-question-fields input[type="radio"]:checked');
                         questionData.correct_answer = correctRadio ? parseInt(correctRadio.value) : 0;
                     }
-
-                    // Include question text if provided
-                    if (questionText) {
-                        questionData.question = questionText;
-                    }
-
-                    // Include image if provided
-                    if (questionImage) {
-                        questionData.image = questionImage;
-                    }
-
-                    // Include file if provided
-                    if (questionFile) {
-                        questionData.file = questionFile;
-                    }
-
-                    // Include points if different from default (1)
-                    const pointsInput = div.querySelector('.points-input');
-                    if (pointsInput && pointsInput.value.trim()) {
-                        const points = parseInt(pointsInput.value);
-                        if (points > 1) {
-                            questionData.points = points;
-                        }
-                    }
-
-                    questions.push(questionData);
                 }
+
+                // Include question text if provided
+                if (questionText) {
+                    questionData.question = questionText;
+                }
+
+                // Include image if provided
+                if (questionImage) {
+                    questionData.image = questionImage;
+                }
+
+                // Include file if provided
+                if (questionFile) {
+                    questionData.file = questionFile;
+                }
+
+                // Include points if different from default (1)
+                const pointsInput = div.querySelector('.points-input');
+                if (pointsInput && pointsInput.value.trim()) {
+                    const points = parseInt(pointsInput.value);
+                    if (points > 1) {
+                        questionData.points = points;
+                    }
+                }
+
+                questions.push(questionData);
             });
 
             const quizData = { questions };

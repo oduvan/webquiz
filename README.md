@@ -1,10 +1,11 @@
 # WebQuiz
 
-A modern web-based quiz and testing system built with Python and aiohttp that allows users to take multiple-choice tests with real-time answer validation and performance tracking.
+A modern web-based quiz and testing system built with Python and aiohttp that allows users to take multiple-choice and text input tests with real-time answer validation and performance tracking.
 
 ## ✨ Features
 
 - **Multi-Quiz System**: Questions loaded from `quizzes/` directory with multiple YAML files
+- **Multiple Question Types**: Single choice, multiple choice, and text input questions with Python-based validation
 - **Admin Interface**: Web-based admin panel with master key authentication for quiz management
 - **Registration Approval**: Optional admin approval workflow for new registrations with real-time notifications
 - **Question Randomization**: Configurable per-student question order randomization for fair testing
@@ -364,6 +365,60 @@ questions:
     correct_answer: 2
     points: 3  # This question is worth 3 points
 ```
+
+**Text Input Questions:**
+
+In addition to multiple choice questions, you can create text input questions where students type their answer. Questions with `checker` field are automatically detected as text input questions:
+
+```yaml
+questions:
+  - question: "What is 2+2?"
+    default_value: ""           # Initial value shown in textarea
+    correct_value: "4"          # Shown when answer is wrong (if show_right_answer is true)
+    checker: |                  # Python code to validate the answer
+      assert user_answer.strip() == '4', 'Expected 4'
+    points: 1
+
+  - question: "Calculate sqrt(16)"
+    correct_value: "4.0"
+    checker: |
+      result = float(user_answer)
+      assert abs(result - sqrt(16)) < 0.01, f'Expected 4, got {result}'
+    points: 2
+```
+
+**Text Question Fields:**
+- `question` - Question text (required)
+- `checker` - Required to identify as text question (can be empty for exact match)
+- `default_value` - Initial value shown in textarea (optional)
+- `correct_value` - Correct answer shown when student is wrong (optional)
+- `points` - Points for correct answer (default: 1)
+
+**Checker Code:**
+- Uses variable `user_answer` (the student's text input)
+- Available: `math` module (use `math.sqrt`, `math.sin`, etc.)
+- Available helper functions:
+  - `to_int(str)` - Convert string to integer (strips whitespace)
+  - `distance(str)` - Parse distance with units: "2000", "2000m", "2км", "2km" all return 2000
+  - `direction_angle(str)` - Parse direction angle: "20" returns 2000, "20-30" returns 2030
+- If checker raises any exception, the answer is marked incorrect
+- If no checker is provided, exact match with `correct_value` is used (with whitespace stripped)
+
+**Checker Templates:**
+
+You can configure reusable checker templates in your `webquiz.yaml`:
+
+```yaml
+checker_templates:
+  - name: "Exact Match"
+    code: "assert user_answer.strip() == 'expected', 'Wrong answer'"
+  - name: "Numeric Check"
+    code: "assert float(user_answer) == 42, 'Expected 42'"
+  - name: "Contains Check"
+    code: "assert 'keyword' in user_answer.lower(), 'Must contain keyword'"
+```
+
+Templates appear in the admin quiz editor for easy insertion.
 
 ### Server Configuration
 

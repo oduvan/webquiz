@@ -25,6 +25,7 @@ from .config import WebQuizConfig, load_config_from_yaml
 from .tunnel import TunnelManager
 
 from webquiz import __version__ as package_version
+from webquiz import checker as checker_module
 
 # Logger will be configured in create_app() with custom log file
 logger = logging.getLogger(__name__)
@@ -974,12 +975,29 @@ class TestingServer:
         # Prepare questions data for client (without correct answers)
         questions_for_client = []
         for q in self.questions:
-            client_question = {
-                "id": q["id"],
-                "options": q["options"],
-                "is_multiple_choice": isinstance(q["correct_answer"], list),
-                "points": q.get("points", 1),  # Default 1 point per question
-            }
+            # Check if this is a text input question (has checker)
+            is_text_question = "checker" in q
+
+            if is_text_question:
+                # Text input question - no options, no correct_answer
+                client_question = {
+                    "id": q["id"],
+                    "type": "text",
+                    "default_value": q.get("default_value", ""),
+                    "points": q.get("points", 1),
+                }
+            else:
+                # Choice question
+                client_question = {
+                    "id": q["id"],
+                    "options": q["options"],
+                    "is_multiple_choice": isinstance(q["correct_answer"], list),
+                    "points": q.get("points", 1),  # Default 1 point per question
+                }
+                # Include min_correct for multiple choice questions
+                if isinstance(q["correct_answer"], list):
+                    client_question["min_correct"] = q.get("min_correct", len(q["correct_answer"]))
+
             # Include question text if present
             if "question" in q and q["question"]:
                 client_question["question"] = q["question"]
@@ -992,9 +1010,7 @@ class TestingServer:
                 if not file_path.startswith("/attach/"):
                     file_path = f"/attach/{file_path}"
                 client_question["file"] = file_path
-            # Include min_correct for multiple choice questions
-            if isinstance(q["correct_answer"], list):
-                client_question["min_correct"] = q.get("min_correct", len(q["correct_answer"]))
+
             questions_for_client.append(client_question)
 
         # Convert questions to JSON string for embedding
@@ -1114,7 +1130,9 @@ class TestingServer:
             for field_label in self.config.registration.fields:
                 field_name = field_label.lower().replace(" ", "_")
                 headers.append(field_name)
-        headers.extend(["registered_at", "total_questions_asked", "correct_answers", "earned_points", "total_points", "total_time"])
+        headers.extend(
+            ["registered_at", "total_questions_asked", "correct_answers", "earned_points", "total_points", "total_time"]
+        )
 
         # Always write headers (we always overwrite the file)
         csv_writer.writerow(headers)
@@ -1135,7 +1153,9 @@ class TestingServer:
             user_answer_list = self.user_answers.get(user_id, [])
             total_questions_asked = len(user_answer_list)
             correct_answers = sum(answer["is_correct"] for answer in user_answer_list)
-            earned_points = sum(answer.get("earned_points", 1 if answer["is_correct"] else 0) for answer in user_answer_list)
+            earned_points = sum(
+                answer.get("earned_points", 1 if answer["is_correct"] else 0) for answer in user_answer_list
+            )
             total_points = sum(answer.get("points", 1) for answer in user_answer_list)
             total_time_seconds = sum(answer.get("time_taken", 0) for answer in user_answer_list)
             # Format total_time as MM:SS
@@ -1241,19 +1261,25 @@ class TestingServer:
         return fields
 
     def _validate_answer(self, selected_answer, question):
-        """Validate answer for both single and multiple choice questions.
+        """Validate answer for single choice, multiple choice, and text input questions.
 
         For single answer: checks if selected index matches correct index.
         For multiple answers: validates all selected are correct, no incorrect
         selected, and minimum correct requirement is met.
+        For text input: executes the checker code with the user's answer.
 
         Args:
-            selected_answer: Integer index or list of integer indices
-            question: Question dictionary with options and correct_answer
+            selected_answer: Integer index, list of integer indices, or string (for text input)
+            question: Question dictionary with options and correct_answer (or checker for text)
 
         Returns:
-            True if answer is correct, False otherwise
+            For choice questions: True if answer is correct, False otherwise
+            For text questions: tuple (is_correct: bool, error_message: str or None)
         """
+        # Handle text input questions (has checker)
+        if "checker" in question:
+            return self._execute_checker(selected_answer, question)
+
         correct_answer = question["correct_answer"]
 
         if isinstance(correct_answer, int):
@@ -1285,32 +1311,114 @@ class TestingServer:
         else:
             return False  # Invalid correct_answer format
 
-    def _format_answer_text(self, answer_indices, options):
+    def _execute_checker(self, user_answer, question):
+        """Execute checker code to validate a text input answer.
+
+        The checker code is executed in a restricted environment with limited
+        builtins and access to the user's answer via the 'user_answer' variable.
+
+        Args:
+            user_answer: The user's text answer string
+            question: Question dictionary with 'checker' code
+
+        Returns:
+            tuple: (is_correct: bool, error_message: str or None)
+                   is_correct is True if checker runs without exceptions
+                   error_message contains the exception message if validation failed
+        """
+        checker_code = question.get("checker", "")
+        if not checker_code:
+            # No checker code - consider correct if answer matches correct_value
+            correct_value = question.get("correct_value", "")
+            return (user_answer.strip() == correct_value.strip(), None)
+
+        import math
+
+        # Define restricted builtins for safe execution
+        safe_builtins = {
+            "abs": abs,
+            "all": all,
+            "any": any,
+            "bool": bool,
+            "chr": chr,
+            "dict": dict,
+            "enumerate": enumerate,
+            "filter": filter,
+            "float": float,
+            "format": format,
+            "frozenset": frozenset,
+            "int": int,
+            "isinstance": isinstance,
+            "len": len,
+            "list": list,
+            "map": map,
+            "max": max,
+            "min": min,
+            "ord": ord,
+            "pow": pow,
+            "range": range,
+            "repr": repr,
+            "reversed": reversed,
+            "round": round,
+            "set": set,
+            "slice": slice,
+            "sorted": sorted,
+            "str": str,
+            "sum": sum,
+            "tuple": tuple,
+            "type": type,
+            "zip": zip,
+            "math": math,
+            "__import__": None,  # Disable imports
+            # Checker helper functions
+            **{fname: getattr(checker_module, fname) for fname in checker_module.__all__},
+        }
+        exec_globals = {"__builtins__": safe_builtins}
+        exec_locals = {"user_answer": user_answer}
+
+        try:
+            # Execute the checker code
+            exec(checker_code, exec_globals, exec_locals)
+            # If no exception was raised, the answer is correct
+            return (True, None)
+        except Exception as e:
+            return (False, str(e))
+
+    def _format_answer_text(self, answer_indices, options, is_text_question=False):
         """Format answer text for CSV with | separator for multiple answers.
 
         Args:
-            answer_indices: Integer index or list of integer indices
-            options: List of option strings
+            answer_indices: Integer index, list of integer indices, or string (for text input)
+            options: List of option strings (None for text questions)
+            is_text_question: True if this is a text input question
 
         Returns:
             Formatted answer string (single option or pipe-separated options)
         """
+        # Handle text input questions
+        if is_text_question or isinstance(answer_indices, str):
+            return str(answer_indices)
+
         if isinstance(answer_indices, int):
             # Validate index bounds
-            if 0 <= answer_indices < len(options):
+            if options and 0 <= answer_indices < len(options):
                 return options[answer_indices]
             else:
-                logger.warning(f"Invalid answer index {answer_indices} for options with length {len(options)}")
+                logger.warning(
+                    f"Invalid answer index {answer_indices} for options with length {len(options) if options else 0}"
+                )
                 return f"Invalid index: {answer_indices}"
         elif isinstance(answer_indices, list):
             # Sort indices and join corresponding option texts with |
             sorted_indices = sorted(answer_indices)
             valid_options = []
             for idx in sorted_indices:
-                if 0 <= idx < len(options):
+                if options and 0 <= idx < len(options):
                     valid_options.append(options[idx])
                 else:
-                    logger.warning(f"Invalid answer index {idx} in list for options with length {len(options)}")
+                    logger.warning(
+                        f"Invalid answer index {idx} in list for options with length {len(options) if options else 0}"
+                    )
                     valid_options.append(f"Invalid index: {idx}")
             return "|".join(valid_options)
         else:
@@ -1603,8 +1711,26 @@ class TestingServer:
             # Clean up the start time
             del self.question_start_times[user_id]
 
-        # Check if answer is correct (handle both single and multiple answers)
-        is_correct = self._validate_answer(selected_answer, question)
+        # Check if this is a text input question (has checker)
+        is_text_question = "checker" in question
+        checker_error = None
+
+        # Check if answer is correct (handle single, multiple, and text answers)
+        validation_result = self._validate_answer(selected_answer, question)
+
+        # Handle text question result (returns tuple)
+        if is_text_question:
+            is_correct, checker_error = validation_result
+        else:
+            is_correct = validation_result
+
+        # Determine the correct answer text for storage
+        if is_text_question:
+            correct_answer_text = question.get("correct_value", "")
+            selected_answer_text = str(selected_answer)
+        else:
+            correct_answer_text = self._format_answer_text(question["correct_answer"], question.get("options"))
+            selected_answer_text = self._format_answer_text(selected_answer, question.get("options"))
 
         # Store response in memory
         response_data = {
@@ -1612,12 +1738,16 @@ class TestingServer:
             "username": username,
             "question_id": question_id,
             "question": question.get("question", ""),  # Handle image-only questions
-            "selected_answer": self._format_answer_text(selected_answer, question["options"]),
-            "correct_answer": self._format_answer_text(question["correct_answer"], question["options"]),
+            "selected_answer": selected_answer_text,
+            "correct_answer": correct_answer_text,
             "is_correct": is_correct,
             "time_taken_seconds": time_taken,
             "timestamp": datetime.now().isoformat(),
         }
+
+        # Add checker error for text questions if present
+        if is_text_question and checker_error:
+            response_data["checker_error"] = checker_error
 
         self.user_responses.append(response_data)
 
@@ -1638,13 +1768,18 @@ class TestingServer:
             "question": question.get("question", ""),  # Handle image-only questions
             "image": question.get("image"),
             "file": file_value,
-            "selected_answer": self._format_answer_text(selected_answer, question["options"]),
-            "correct_answer": self._format_answer_text(question["correct_answer"], question["options"]),
+            "selected_answer": selected_answer_text,
+            "correct_answer": correct_answer_text,
             "is_correct": is_correct,
             "time_taken": time_taken,
             "points": question_points,  # Points for this question
             "earned_points": earned_points,  # Points actually earned
         }
+
+        # Add checker error for text questions if present
+        if is_text_question and checker_error:
+            answer_data["checker_error"] = checker_error
+
         self.user_answers[user_id].append(answer_data)
 
         # Update user progress
@@ -1694,8 +1829,17 @@ class TestingServer:
         # Only include correctness feedback and correct answer if show_right_answer is enabled
         if self.show_right_answer:
             response_data["is_correct"] = is_correct
-            response_data["correct_answer"] = question["correct_answer"]
-            response_data["is_multiple_choice"] = isinstance(question["correct_answer"], list)
+
+            if is_text_question:
+                # Text input question response
+                response_data["is_text_question"] = True
+                response_data["correct_value"] = question.get("correct_value", "")
+                if checker_error:
+                    response_data["checker_error"] = checker_error
+            else:
+                # Choice question response
+                response_data["correct_answer"] = question["correct_answer"]
+                response_data["is_multiple_choice"] = isinstance(question["correct_answer"], list)
 
         return web.json_response(response_data)
 
@@ -2571,30 +2715,59 @@ class TestingServer:
                 errors.append(f"Question {i+1} must be a dictionary")
                 continue
 
-            # Validate required fields (except 'question' which is optional if image provided)
-            required_fields = ["options", "correct_answer"]
-            for field in required_fields:
-                if field not in question:
-                    errors.append(f"Question {i+1} missing required field: {field}")
+            # Check if this is a text input question (has checker)
+            is_text_question = "checker" in question
 
-            # Either question text OR image must be provided
+            # Either question text OR image must be provided (for all question types)
             has_question = "question" in question and question["question"]
             has_image = "image" in question and question["image"]
             if not has_question and not has_image:
                 errors.append(f"Question {i+1} must have either question text or image")
 
-            # Validate options
-            if "options" in question:
-                options = question["options"]
-                if not isinstance(options, list):
-                    errors.append(f"Question {i+1} options must be a list")
-                elif len(options) < 2:
-                    errors.append(f"Question {i+1} must have at least 2 options")
-                elif not all(isinstance(opt, str) for opt in options):
-                    errors.append(f"Question {i+1} all options must be strings")
+            if is_text_question:
+                # Text input question validation
+                # Optional fields: default_value, correct_value, checker
+                if "default_value" in question and not isinstance(question["default_value"], str):
+                    errors.append(f"Question {i+1} default_value must be a string")
+                if "correct_value" in question and not isinstance(question["correct_value"], str):
+                    errors.append(f"Question {i+1} correct_value must be a string")
+                if "checker" in question and not isinstance(question["checker"], str):
+                    errors.append(f"Question {i+1} checker must be a string")
+
+                # Validate checker is valid Python syntax
+                checker_code = question.get("checker", "")
+                if checker_code and isinstance(checker_code, str):
+                    try:
+                        compile(checker_code, f"<question {i+1} checker>", "exec")
+                    except SyntaxError as e:
+                        errors.append(f"Question {i+1} checker has invalid Python syntax: {e.msg} (line {e.lineno})")
+
+                # Validate points if specified
+                if "points" in question:
+                    points = question["points"]
+                    if not isinstance(points, int) or points < 1:
+                        errors.append(f"Question {i+1} points must be a positive integer")
+            else:
+                # Choice question validation
+                # Validate required fields
+                required_fields = ["options", "correct_answer"]
+                for field in required_fields:
+                    if field not in question:
+                        errors.append(f"Question {i+1} missing required field: {field}")
+
+                # Validate options
+                if "options" in question:
+                    options = question["options"]
+                    if not isinstance(options, list):
+                        errors.append(f"Question {i+1} options must be a list")
+                    elif len(options) < 2:
+                        errors.append(f"Question {i+1} must have at least 2 options")
+                    elif not all(isinstance(opt, str) for opt in options):
+                        errors.append(f"Question {i+1} all options must be strings")
 
             # Validate correct_answer (can be integer for single answer or list for multiple answers)
-            if "correct_answer" in question and "options" in question:
+            # Only for choice questions
+            if not is_text_question and "correct_answer" in question and "options" in question:
                 correct_answer = question["correct_answer"]
                 options_count = len(question["options"])
 
@@ -2615,8 +2788,8 @@ class TestingServer:
                 else:
                     errors.append(f"Question {i+1} correct_answer must be an integer or array of integers")
 
-            # Validate min_correct (only valid for multiple answers)
-            if "min_correct" in question:
+            # Validate min_correct (only valid for multiple choice questions)
+            if not is_text_question and "min_correct" in question:
                 min_correct = question["min_correct"]
                 if "correct_answer" not in question:
                     errors.append(f"Question {i+1} has min_correct but no correct_answer")
@@ -2798,6 +2971,20 @@ class TestingServer:
         file_list.sort(key=lambda x: x["filename"].lower())
 
         return web.json_response({"files": file_list})
+
+    @admin_auth_required
+    async def admin_list_checker_templates(self, request):
+        """List all checker templates from configuration.
+
+        Returns:
+            JSON response with list of templates (name, code)
+        """
+        templates = []
+        if hasattr(self.config, "checker_templates") and self.config.checker_templates.templates:
+            for template in self.config.checker_templates.templates:
+                templates.append({"name": template.name, "code": template.code})
+
+        return web.json_response({"templates": templates})
 
     async def serve_quiz_file(self, request):
         """Serve quiz file for download.
@@ -3636,6 +3823,7 @@ async def create_app(config: WebQuizConfig):
     app.router.add_post("/api/admin/validate-quiz", server.admin_validate_quiz)
     app.router.add_get("/api/admin/list-images", server.admin_list_images)
     app.router.add_get("/api/admin/list-files", server.admin_list_files)
+    app.router.add_get("/api/admin/list-checker-templates", server.admin_list_checker_templates)
     app.router.add_post("/api/admin/download-quiz", server.admin_download_quiz)
     app.router.add_put("/api/admin/config", server.admin_update_config)
 

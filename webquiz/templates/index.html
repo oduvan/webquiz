@@ -663,6 +663,73 @@
             color: #f8d7da;
             border-color: #721c24;
         }
+
+        /* Text input question styles */
+        .text-input-container {
+            margin: 15px 0;
+        }
+        .text-answer-input {
+            width: 100%;
+            min-height: 100px;
+            padding: 12px;
+            border: 2px solid var(--option-border);
+            border-radius: 8px;
+            background: var(--option-bg);
+            color: var(--text-color);
+            font-family: monospace;
+            font-size: 14px;
+            resize: vertical;
+            box-sizing: border-box;
+            transition: border-color 0.3s ease;
+        }
+        .text-answer-input:focus {
+            border-color: var(--option-selected-border);
+            outline: none;
+        }
+        .text-answer-input.feedback-correct {
+            border-color: #2d731c;
+            background: #f0fff0;
+        }
+        .text-answer-input.feedback-incorrect {
+            border-color: #dc3545;
+            background: #fff0f0;
+        }
+        [data-theme="dark"] .text-answer-input.feedback-correct {
+            background: #1a3a1a;
+        }
+        [data-theme="dark"] .text-answer-input.feedback-incorrect {
+            background: #3a1a1a;
+        }
+        .checker-error {
+            background: #fff3cd;
+            border: 1px solid #ffc107;
+            color: #856404;
+            padding: 10px;
+            border-radius: 5px;
+            margin: 10px 0;
+            font-family: monospace;
+            font-size: 13px;
+        }
+        [data-theme="dark"] .checker-error {
+            background: #3d3a1a;
+            border-color: #ffc107;
+            color: #ffc107;
+        }
+        .correct-value-display {
+            background: #d4edda;
+            border: 1px solid #28a745;
+            color: #155724;
+            padding: 10px;
+            border-radius: 5px;
+            margin: 10px 0;
+            font-family: monospace;
+            font-size: 13px;
+        }
+        [data-theme="dark"] .correct-value-display {
+            background: #1a3a1a;
+            border-color: #28a745;
+            color: #a5d6a7;
+        }
     </style>
 </head>
 <body>
@@ -734,6 +801,7 @@
         let currentQuestionIndex = 0;
         let selectedAnswer = null;
         let selectedAnswers = []; // For multiple choice questions
+        let textAnswer = ''; // For text input questions
         let testResults = [];
 
         // Helper function to convert absolute paths to relative paths
@@ -1191,6 +1259,7 @@
             const question = questions[currentQuestionIndex];
             selectedAnswer = null;
             selectedAnswers = [];
+            textAnswer = question.type === 'text' ? (question.default_value || '') : '';
 
             // Update progress
             const progress = ((currentQuestionIndex + 1) / questions.length) * 100;
@@ -1200,12 +1269,21 @@
             // Show current question
             const container = document.getElementById('current-question-container');
             const questionPoints = question.points || 1;
-            container.innerHTML = `
-                <div class="current-question active-question" style="position: relative;">
-                    ${questionPoints > 1 ? `<div class="question-points-badge">🏆 ${questionPoints} ${questionPoints >= 2 && questionPoints <= 4 ? 'бали' : 'балів'}</div>` : ''}
-                    ${question.question ? `<h3 class="question-text">${question.question}</h3>` : ''}
-                    ${question.image ? `<a href="${makeRelativePath(question.image)}" target="_blank"><img src="${makeRelativePath(question.image)}" alt="Question image" class="question-image quiz-question-img"></a>` : ''}
-                    ${question.file ? `<a href="${makeRelativePath(question.file)}" download class="question-file"><span class="question-file-icon">📎</span><span class="question-file-name">${question.file.split('/').pop()}</span></a>` : ''}
+            const isTextQuestion = question.type === 'text';
+
+            let questionContent;
+            if (isTextQuestion) {
+                // Text input question
+                questionContent = `
+                    <div class="text-input-container">
+                        <p style="font-size: 14px; color: var(--text-muted); margin-bottom: 10px;">✍️ Введіть вашу відповідь:</p>
+                        <textarea id="text-answer-input" class="text-answer-input" placeholder="Введіть відповідь..." oninput="onTextAnswerInput(this)">${question.default_value || ''}</textarea>
+                        <div id="checker-feedback"></div>
+                    </div>
+                `;
+            } else {
+                // Choice question (single or multiple)
+                questionContent = `
                     <div class="options">
                         ${question.is_multiple_choice ? '<p class="multiple-choice-hint" style="font-size: 14px; color: var(--text-muted); margin-bottom: 10px;">📋 Можна обрати кілька відповідей</p>' : ''}
                         ${question.options.map((option, optionIndex) => {
@@ -1228,6 +1306,16 @@
                             }
                         }).join('')}
                     </div>
+                `;
+            }
+
+            container.innerHTML = `
+                <div class="current-question active-question" style="position: relative;">
+                    ${questionPoints > 1 ? `<div class="question-points-badge">🏆 ${questionPoints} ${questionPoints >= 2 && questionPoints <= 4 ? 'бали' : 'балів'}</div>` : ''}
+                    ${question.question ? `<h3 class="question-text">${question.question}</h3>` : ''}
+                    ${question.image ? `<a href="${makeRelativePath(question.image)}" target="_blank"><img src="${makeRelativePath(question.image)}" alt="Question image" class="question-image quiz-question-img"></a>` : ''}
+                    ${question.file ? `<a href="${makeRelativePath(question.file)}" download class="question-file"><span class="question-file-icon">📎</span><span class="question-file-name">${question.file.split('/').pop()}</span></a>` : ''}
+                    ${questionContent}
                 </div>
             `;
 
@@ -1244,8 +1332,20 @@
             const continueBtn = document.getElementById('continue-btn');
 
             submitBtn.classList.remove('hidden');
-            submitBtn.disabled = true;
+            // For text questions, enable submit if there's a default value or any text
+            if (isTextQuestion) {
+                submitBtn.disabled = !textAnswer.trim();
+            } else {
+                submitBtn.disabled = true;
+            }
             continueBtn.classList.add('hidden');
+        }
+
+        // Handle text input changes
+        function onTextAnswerInput(textarea) {
+            textAnswer = textarea.value;
+            const submitBtn = document.getElementById('submit-answer-btn');
+            submitBtn.disabled = !textAnswer.trim();
         }
 
         function selectCurrentAnswer(optionIndex) {
@@ -1294,9 +1394,15 @@
 
         async function submitCurrentAnswer() {
             const question = questions[currentQuestionIndex];
+            const isTextQuestion = question.type === 'text';
 
             // Validate selection based on question type
-            if (question.is_multiple_choice) {
+            if (isTextQuestion) {
+                if (!textAnswer.trim()) {
+                    showError('test-error', 'Будь ласка, введіть відповідь');
+                    return;
+                }
+            } else if (question.is_multiple_choice) {
                 if (selectedAnswers.length === 0) {
                     showError('test-error', 'Будь ласка, оберіть хоча б одну відповідь');
                     return;
@@ -1315,6 +1421,16 @@
             const submitBtn = document.getElementById('submit-answer-btn');
             submitBtn.disabled = true;
 
+            // Determine the answer to submit
+            let answerToSubmit;
+            if (isTextQuestion) {
+                answerToSubmit = textAnswer;
+            } else if (question.is_multiple_choice) {
+                answerToSubmit = selectedAnswers.slice().sort((a, b) => a - b);
+            } else {
+                answerToSubmit = selectedAnswer;
+            }
+
             try {
                 const response = await fetch('api/submit-answer', {
                     method: 'POST',
@@ -1324,7 +1440,7 @@
                     body: JSON.stringify({
                         user_id: currentUserId,
                         question_id: question.id,
-                        selected_answer: question.is_multiple_choice ? selectedAnswers.slice().sort((a, b) => a - b) : selectedAnswer
+                        selected_answer: answerToSubmit
                     })
                 });
 
@@ -1349,9 +1465,12 @@
                     console.error('Response text:', responseText);
                     throw new Error(`Invalid JSON response: ${responseText.substring(0, 100)}`);
                 }
+
                 // Format selected answer for display
                 let selectedAnswerDisplay;
-                if (question.is_multiple_choice) {
+                if (isTextQuestion) {
+                    selectedAnswerDisplay = textAnswer;
+                } else if (question.is_multiple_choice) {
                     selectedAnswerDisplay = selectedAnswers.map(idx => question.options[idx]).join(' | ');
                 } else {
                     selectedAnswerDisplay = question.options[selectedAnswer];
@@ -1365,11 +1484,14 @@
                     selectedAnswer: selectedAnswerDisplay,
                     isCorrect: data.is_correct !== undefined ? data.is_correct : null,  // null when not provided
                     timeTaken: data.time_taken || 0,
-                    isMultipleChoice: question.is_multiple_choice
+                    isMultipleChoice: question.is_multiple_choice,
+                    isTextQuestion: isTextQuestion,
+                    checkerError: data.checker_error,
+                    correctValue: data.correct_value
                 });
 
                 // Show feedback on selected answer
-                showAnswerFeedback(data.is_correct, data.correct_answer);
+                showAnswerFeedback(data.is_correct, data.correct_answer, data.is_text_question, data.checker_error, data.correct_value);
 
             } catch (error) {
                 showError('test-error', 'Помилка відправки відповіді: ' + error.message);
@@ -1378,15 +1500,23 @@
             }
         }
 
-        function showAnswerFeedback(isCorrect, correctAnswer) {
+        function showAnswerFeedback(isCorrect, correctAnswer, isTextQuestion, checkerError, correctValue) {
             const question = questions[currentQuestionIndex];
+            const actualIsTextQuestion = question.type === 'text';
 
             // If isCorrect is undefined, don't show any feedback (show_right_answer is false)
             if (isCorrect === undefined) {
-                // Disable all options to prevent further selection but don't show any visual feedback
-                document.querySelectorAll('.option').forEach(option => {
-                    option.classList.add('disabled');
-                });
+                // Disable all options or text input to prevent further selection
+                if (actualIsTextQuestion) {
+                    const textInput = document.getElementById('text-answer-input');
+                    if (textInput) {
+                        textInput.disabled = true;
+                    }
+                } else {
+                    document.querySelectorAll('.option').forEach(option => {
+                        option.classList.add('disabled');
+                    });
+                }
 
                 // Hide submit button (no continue button needed - auto-advance)
                 const submitBtn = document.getElementById('submit-answer-btn');
@@ -1400,7 +1530,32 @@
                 return;
             }
 
-            if (question.is_multiple_choice) {
+            if (actualIsTextQuestion) {
+                // Text input question feedback
+                const textInput = document.getElementById('text-answer-input');
+                const feedbackContainer = document.getElementById('checker-feedback');
+
+                if (textInput) {
+                    textInput.disabled = true;
+                    textInput.classList.add(isCorrect ? 'feedback-correct' : 'feedback-incorrect');
+                }
+
+                if (feedbackContainer) {
+                    let feedbackHtml = '';
+
+                    // Show checker error if present and answer is incorrect
+                    if (!isCorrect && checkerError) {
+                        feedbackHtml += `<div class="checker-error">⚠️ ${checkerError}</div>`;
+                    }
+
+                    // Show correct value if answer is incorrect and correct value is available
+                    if (!isCorrect && correctValue) {
+                        feedbackHtml += `<div class="correct-value-display">✓ Правильна відповідь: <pre style="margin: 5px 0 0 0; white-space: pre-wrap;">${correctValue}</pre></div>`;
+                    }
+
+                    feedbackContainer.innerHTML = feedbackHtml;
+                }
+            } else if (question.is_multiple_choice) {
                 // Multiple choice feedback
                 const correctAnswerArray = Array.isArray(correctAnswer) ? correctAnswer : [];
 
@@ -1442,10 +1597,12 @@
                 }
             }
 
-            // Disable all options to prevent further selection
-            document.querySelectorAll('.option').forEach(option => {
-                option.classList.add('disabled');
-            });
+            // Disable all options to prevent further selection (for choice questions)
+            if (!actualIsTextQuestion) {
+                document.querySelectorAll('.option').forEach(option => {
+                    option.classList.add('disabled');
+                });
+            }
 
             // Hide submit button and show continue button
             const submitBtn = document.getElementById('submit-answer-btn');
