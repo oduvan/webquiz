@@ -61,7 +61,49 @@ def test_admin_list_quizzes_endpoint():
         assert "current_quiz" in data
         assert isinstance(data["quizzes"], list)
         assert len(data["quizzes"]) > 0
-        assert "test_quiz.yaml" in data["quizzes"]
+        # Quizzes are now objects with filename and title
+        quiz_filenames = [q["filename"] for q in data["quizzes"]]
+        assert "test_quiz.yaml" in quiz_filenames
+        # Verify quiz structure
+        first_quiz = data["quizzes"][0]
+        assert "filename" in first_quiz
+        assert "title" in first_quiz
+        # Verify title is returned (from conftest default quiz)
+        test_quiz = next((q for q in data["quizzes"] if q["filename"] == "test_quiz.yaml"), None)
+        assert test_quiz is not None
+        assert test_quiz["title"] == "Test Quiz"
+
+
+def test_admin_list_quizzes_without_title():
+    """Test listing quizzes when a quiz has no title."""
+    # Quiz without title field
+    quiz_no_title = {
+        "questions": [{"question": "What is 1 + 1?", "options": ["1", "2", "3"], "correct_answer": 1}],
+    }
+    quizzes = {
+        "test_quiz.yaml": {
+            "title": "Test Quiz",
+            "questions": [{"question": "What is 2 + 2?", "options": ["3", "4", "5"], "correct_answer": 1}],
+        },
+        "no_title.yaml": quiz_no_title,
+    }
+
+    with custom_webquiz_server(quizzes=quizzes) as (proc, port):
+        auth_response = requests.post(
+            f"http://localhost:{port}/api/admin/auth",
+            json={"master_key": "test123"}
+        )
+        assert auth_response.status_code == 200
+        cookies = auth_response.cookies
+
+        response = requests.get(f"http://localhost:{port}/api/admin/list-quizzes", cookies=cookies)
+        assert response.status_code == 200
+        data = response.json()
+
+        # Find the quiz without title
+        no_title_quiz = next((q for q in data["quizzes"] if q["filename"] == "no_title.yaml"), None)
+        assert no_title_quiz is not None
+        assert no_title_quiz["title"] is None
 
 
 def test_admin_list_quizzes_without_auth():

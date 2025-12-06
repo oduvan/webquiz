@@ -721,17 +721,28 @@ class TestingServer:
             logger.error(f"Failed to restart quiz after config change: {e}")
 
     async def list_available_quizzes(self):
-        """List all available quiz files in quizzes directory.
+        """List all available quiz files in quizzes directory with titles.
 
         Returns:
-            Sorted list of quiz filenames (.yaml and .yml files)
+            Sorted list of dicts with 'filename' and 'title' keys
         """
         quiz_files = []
         if os.path.exists(self.quizzes_dir):
             for filename in os.listdir(self.quizzes_dir):
                 if filename.endswith((".yaml", ".yml")):
-                    quiz_files.append(filename)
-        return sorted(quiz_files)
+                    quiz_info = {"filename": filename, "title": None}
+                    # Try to read the title from the quiz file
+                    try:
+                        quiz_path = os.path.join(self.quizzes_dir, filename)
+                        with open(quiz_path, "r", encoding="utf-8") as f:
+                            data = yaml.safe_load(f)
+                            if data and isinstance(data, dict) and "title" in data:
+                                quiz_info["title"] = data["title"]
+                    except Exception:
+                        # If we can't read the title, leave it as None
+                        pass
+                    quiz_files.append(quiz_info)
+        return sorted(quiz_files, key=lambda x: x["filename"])
 
     async def switch_quiz(self, quiz_filename: str):
         """Switch to a different quiz file and reset server state.
@@ -789,7 +800,10 @@ class TestingServer:
         available_quizzes = await self.list_available_quizzes()
         quiz_list_html = ""
         for quiz in available_quizzes:
-            quiz_list_html += f"<li>{quiz}</li>"
+            if quiz["title"]:
+                quiz_list_html += f"<li>{quiz['filename']} - {quiz['title']}</li>"
+            else:
+                quiz_list_html += f"<li>{quiz['filename']}</li>"
 
         # Load template and replace placeholders
         template_content = self.templates.get("quiz_selection_required.html", "")
@@ -927,20 +941,20 @@ class TestingServer:
 
         # Get available quiz files
         available_quizzes = await self.list_available_quizzes()
+        quiz_filenames = [q["filename"] for q in available_quizzes]
 
         if not available_quizzes:
             # No quiz files found, create default
             default_path = os.path.join(self.quizzes_dir, "default.yaml")
             await self.create_default_config_yaml(default_path)
-            available_quizzes = ["default.yaml"]
             await self.switch_quiz("default.yaml")
         elif len(available_quizzes) == 1:
             # Only one quiz file - use it as default
-            await self.switch_quiz(available_quizzes[0])
-            logger.info(f"Using single quiz file as default: {available_quizzes[0]}")
-        elif "default.yaml" in available_quizzes or "default.yml" in available_quizzes:
+            await self.switch_quiz(quiz_filenames[0])
+            logger.info(f"Using single quiz file as default: {quiz_filenames[0]}")
+        elif "default.yaml" in quiz_filenames or "default.yml" in quiz_filenames:
             # Multiple files but default.yaml exists - use it
-            default_file = "default.yaml" if "default.yaml" in available_quizzes else "default.yml"
+            default_file = "default.yaml" if "default.yaml" in quiz_filenames else "default.yml"
             await self.switch_quiz(default_file)
             logger.info(f"Using explicit default file: {default_file}")
         else:
