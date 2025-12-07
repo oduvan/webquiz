@@ -18,6 +18,19 @@
             --header-color: white;
         }
 
+        [data-theme="dark"] {
+            --bg-color: #1a1a1a;
+            --container-bg: #2d2d2d;
+            --text-color: #e0e0e0;
+            --border-color: #555;
+            --think-color: #3d3a1a;
+            --ok-color: #1e3a1e;
+            --fail-color: #3a1a1a;
+            --empty-color: #3a3a3a;
+            --header-bg: #0d6efd;
+            --header-color: white;
+        }
+
         html, body {
             font-family: Arial, sans-serif;
             margin: 0;
@@ -25,6 +38,7 @@
             height: 100%;
             background-color: var(--bg-color);
             color: var(--text-color);
+            transition: background-color 0.3s ease, color 0.3s ease;
         }
 
         body {
@@ -32,6 +46,7 @@
             flex-direction: column;
             padding: 20px;
             box-sizing: border-box;
+            position: relative;
         }
 
         .connection-status {
@@ -341,9 +356,81 @@
                 font-size: 8px;
             }
         }
+
+        /* Dark theme state color overrides */
+        [data-theme="dark"] .state-think {
+            color: #ffc107;
+        }
+
+        [data-theme="dark"] .state-ok {
+            color: #a5d6a7;
+        }
+
+        [data-theme="dark"] .state-fail {
+            color: #ef9a9a;
+        }
+
+        [data-theme="dark"] .state-empty {
+            color: #888;
+        }
+
+        [data-theme="dark"] .connected {
+            background: #1e3a1e;
+            color: #a5d6a7;
+        }
+
+        [data-theme="dark"] .disconnected {
+            background: #3a1a1a;
+            color: #ef9a9a;
+        }
+
+        [data-theme="dark"] .connecting {
+            background: #3d3a1a;
+            color: #ffc107;
+        }
+
+        [data-theme="dark"] .filter-button:hover {
+            background: #3a3a3a;
+        }
+
+        [data-theme="dark"] .username-cell {
+            background: var(--container-bg);
+        }
+
+        /* Theme toggle button */
+        .top-right-controls {
+            position: absolute;
+            top: 15px;
+            right: 15px;
+            z-index: 100;
+        }
+
+        .theme-toggle {
+            background: var(--container-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 50%;
+            padding: 8px;
+            cursor: pointer;
+            font-size: 16px;
+            color: var(--text-color);
+            transition: all 0.3s ease;
+            width: 36px;
+            height: 36px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .theme-toggle:hover {
+            background: var(--border-color);
+        }
     </style>
 </head>
 <body>
+    <div class="top-right-controls">
+        <button class="theme-toggle" onclick="toggleTheme()" title="Toggle theme">🌙</button>
+    </div>
+
     <div id="connectionStatus" class="connection-status" style="display: none;">
     </div>
 
@@ -386,6 +473,33 @@
     </div>
 
     <script>
+        // Theme management
+        function initializeTheme() {
+            const savedTheme = localStorage.getItem('theme') || 'light';
+            if (savedTheme === 'dark') {
+                document.body.setAttribute('data-theme', 'dark');
+                document.querySelector('.theme-toggle').textContent = '☀️';
+            }
+        }
+
+        function toggleTheme() {
+            const currentTheme = document.body.getAttribute('data-theme');
+            const toggleButton = document.querySelector('.theme-toggle');
+
+            if (currentTheme === 'dark') {
+                document.body.removeAttribute('data-theme');
+                toggleButton.textContent = '🌙';
+                localStorage.setItem('theme', 'light');
+            } else {
+                document.body.setAttribute('data-theme', 'dark');
+                toggleButton.textContent = '☀️';
+                localStorage.setItem('theme', 'dark');
+            }
+        }
+
+        // Initialize theme on page load
+        initializeTheme();
+
         class LiveStatsClient {
             constructor() {
                 this.ws = null;
