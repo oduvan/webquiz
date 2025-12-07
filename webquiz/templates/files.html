@@ -362,7 +362,7 @@
         .file-content {
             flex: 1;
             overflow: auto;
-            background: #f8f9fa;
+            background: var(--light-bg);
             border: 1px solid var(--border-color);
             padding: 15px;
             font-family: 'Courier New', monospace;
@@ -370,6 +370,7 @@
             line-height: 1.4;
             white-space: pre-wrap;
             word-wrap: break-word;
+            color: var(--text-color);
         }
 
         .close {
@@ -393,7 +394,7 @@
         .csv-table-container {
             flex: 1;
             overflow: auto;
-            background: var(--white);
+            background: var(--container-bg);
             border: 1px solid var(--border-color);
         }
 
@@ -471,8 +472,17 @@
             background: var(--light-bg);
         }
 
-        [data-theme="dark"] .file-content {
-            background: #1a1a1a;
+        [data-theme="dark"] .csv-table td {
+            color: var(--text-color);
+        }
+
+        [data-theme="dark"] input[type="password"],
+        [data-theme="dark"] input[type="text"],
+        [data-theme="dark"] textarea,
+        [data-theme="dark"] #config-editor {
+            background: var(--light-bg);
+            color: var(--text-color);
+            border-color: var(--border-color);
         }
 
         /* Theme toggle button */
