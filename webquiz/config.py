@@ -41,6 +41,8 @@ class ServerConfig:
 
     host: str = "0.0.0.0"
     port: int = 8080
+    include_ipv6: bool = False
+    url_format: str = "http://{IP}:{PORT}/"
 
 
 @dataclass
@@ -218,9 +220,7 @@ def load_config_from_yaml(config_path: str) -> WebQuizConfig:
         checker_templates = []
         if checker_templates_data:
             for template_data in checker_templates_data:
-                checker_templates.append(
-                    CheckerTemplate(name=template_data["name"], code=template_data["code"])
-                )
+                checker_templates.append(CheckerTemplate(name=template_data["name"], code=template_data["code"]))
         checker_templates_config = CheckerTemplatesConfig(templates=checker_templates)
 
         return WebQuizConfig(

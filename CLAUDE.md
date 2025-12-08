@@ -168,6 +168,8 @@ webquiz-stress-test -c 50
 - **CSV files** (2 per session): `{quiz_name}_user_responses.csv` (submissions) + `{quiz_name}_user_responses.users.csv` (user stats with total_time in MM:SS format, earned_points, total_points)
 - **Config** (`webquiz.yaml`): All sections optional, editable via `/files/` or admin panel, hot-reloaded on save (returns `restart_required` list if server/paths/master_key changed), UTF-8 charset header
 - **Config options**:
+  - `server.include_ipv6: true` - Include IPv6 addresses in network interfaces list (default: false)
+  - `server.url_format` - URL format for admin panel network access URLs (default: `http://{IP}:{PORT}/`). Placeholders: `{IP}`, `{PORT}`. Example for reverse proxy: `http://{IP}/webquiz/`
   - `registration.approve: true` - Admin approval required, timing starts on approval (default: false)
   - `registration.username_label` - Customize username field label (default: "Ім'я користувача")
   - `randomize_questions: true` - Per-student random order, stored as `question_order` array (default: false)
