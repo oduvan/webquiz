@@ -228,6 +228,22 @@
             }
         }
 
+        .current-quiz-display {
+            margin-top: 10px;
+            padding: 10px 15px;
+            background: var(--success-bg);
+            border: 1px solid var(--success-border);
+            border-radius: 5px;
+            color: var(--success-color);
+            font-weight: bold;
+        }
+
+        .current-quiz-display.no-quiz {
+            background: var(--warning-bg);
+            border-color: var(--warning-border);
+            color: var(--warning-color);
+        }
+
         .actions {
             text-align: center;
             margin-top: 20px;
@@ -1027,6 +1043,9 @@
                 <div class="selection-hint">
                     Ctrl+клік для вибору декількох, Shift+клік для діапазону
                 </div>
+                <div id="current-quiz-display" class="current-quiz-display no-quiz">
+                    Поточний quiz: не вибрано
+                </div>
             </div>
 
             <div class="actions" id="single-quiz-actions">
@@ -1335,13 +1354,16 @@
 
         function displayQuizzes(quizzes) {
             const quizSelect = document.getElementById('quiz-select');
+            const currentQuizDisplay = document.getElementById('current-quiz-display');
 
             if (quizzes.length === 0) {
                 quizSelect.innerHTML = '<option disabled>Файли quiz не знайдені</option>';
+                updateCurrentQuizDisplay(null, null);
                 return;
             }
 
             quizSelect.innerHTML = '';
+            let currentQuizTitle = null;
             quizzes.forEach(quiz => {
                 const option = document.createElement('option');
                 const filename = quiz.filename;
@@ -1356,16 +1378,35 @@
                 if (filename === currentQuiz) {
                     displayText += ' (поточний)';
                     option.classList.add('current-quiz');
+                    currentQuizTitle = title;
                 }
                 option.textContent = displayText;
                 quizSelect.appendChild(option);
             });
+
+            // Update current quiz display
+            updateCurrentQuizDisplay(currentQuiz, currentQuizTitle);
 
             // Add change event listener
             quizSelect.onchange = handleQuizSelectionChange;
 
             // Update button visibility based on current selection state
             updateButtonVisibility();
+        }
+
+        function updateCurrentQuizDisplay(quizFilename, quizTitle) {
+            const display = document.getElementById('current-quiz-display');
+            if (quizFilename) {
+                let text = `Поточний quiz: ${quizFilename}`;
+                if (quizTitle) {
+                    text += ` - ${quizTitle}`;
+                }
+                display.textContent = text;
+                display.classList.remove('no-quiz');
+            } else {
+                display.textContent = 'Поточний quiz: не вибрано';
+                display.classList.add('no-quiz');
+            }
         }
 
         function handleQuizSelectionChange() {
