@@ -191,4 +191,4 @@ webquiz-stress-test -c 50
 
 **Process**: Build binaries (Linux, macOS Intel/ARM64, Windows) → Update versions → Generate PDFs (uk/en) → Publish to PyPI → Create GitHub release with 8 assets (2 Python packages + 4 zipped binaries + 2 PDFs)
 
-**Note**: macOS builds on separate runners (macos-13-large Intel, macos-15 ARM64)
+**Note**: macOS builds on separate runners (macos-15-intel Intel, macos-15 ARM64)
