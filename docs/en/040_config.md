@@ -7,6 +7,8 @@
 server:
   host: "0.0.0.0"
   port: 8080
+  include_ipv6: false
+  url_format: "http://{IP}:{PORT}/"
 ```
 
 - **host** — determines which network interfaces the server accepts connections on.
@@ -15,6 +17,11 @@ server:
   Use `"0.0.0.0"` if other devices on your local network will be connecting to the quiz.
 - **port** — the port on which the server runs.
   By default, `8080` is used. If this port is occupied, you can change it to another, such as `8000`.
+- **include_ipv6** — whether to include IPv6 addresses in the network interfaces list.
+  Default is `false`. If set to `true`, IPv6 addresses will be shown in the list of URLs for accessing from other devices.
+- **url_format** — URL format for displaying in the admin panel.
+  Default is `"http://{IP}:{PORT}/"`. Use placeholders `{IP}` and `{PORT}`.
+  Example for reverse proxy: `"http://{IP}/webquiz/"`
 
 ---
 

@@ -428,6 +428,8 @@ Optional server configuration file (`webquiz.yaml`):
 server:
   host: "0.0.0.0"
   port: 8080
+  include_ipv6: false  # Include IPv6 addresses in network interfaces list
+  url_format: "http://{IP}:{PORT}/"  # URL format for admin panel (use {IP} and {PORT} placeholders)
 
 registration:
   approve: false  # Set to true to require admin approval

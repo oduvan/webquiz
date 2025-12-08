@@ -187,7 +187,7 @@ def load_config_with_overrides(config_path: Optional[str] = None, **cli_override
     # Apply CLI overrides
     for key, value in cli_overrides.items():
         if value is not None:  # Only override if CLI parameter was provided
-            if key in ["host", "port"]:
+            if key in ["host", "port", "url_format"]:
                 setattr(config.server, key, value)
             elif key in ["quizzes_dir", "logs_dir", "csv_dir", "static_dir"]:
                 setattr(config.paths, key, value)
@@ -290,7 +290,7 @@ def log_startup_environment(config: WebQuizConfig):
 
     # Network interfaces
     try:
-        interfaces = get_network_interfaces()
+        interfaces = get_network_interfaces(include_ipv6=config.server.include_ipv6)
         if interfaces:
             logger.info(f"Network interfaces: {', '.join(interfaces)}")
         else:
@@ -347,11 +347,14 @@ def is_loopback_address(ip_str: str) -> bool:
         return True
 
 
-def get_network_interfaces():
+def get_network_interfaces(include_ipv6=False):
     """Get all network interfaces and their IP addresses.
 
     Returns list of non-localhost IP addresses available on the system.
     Excludes all loopback addresses (127.0.0.0/8 and ::1).
+
+    Args:
+        include_ipv6: If True, include IPv6 addresses. Default is False.
 
     Returns:
         List of IP address strings (excludes loopback addresses)
@@ -378,6 +381,10 @@ def get_network_interfaces():
                         interfaces.append(ip)
         except (subprocess.TimeoutExpired, subprocess.CalledProcessError, FileNotFoundError):
             pass
+
+    # Filter out IPv6 addresses if not included
+    if not include_ipv6:
+        interfaces = [ip for ip in interfaces if ":" not in ip]
 
     return list(set(interfaces))  # Remove duplicates
 
@@ -3567,13 +3574,15 @@ class TestingServer:
         is_trusted_ip = client_ip in self.admin_config.trusted_ips if hasattr(self, "admin_config") else False
 
         # Get network information (external interfaces only)
-        interfaces = get_network_interfaces()  # This already excludes localhost
+        interfaces = get_network_interfaces(include_ipv6=self.config.server.include_ipv6)
         port = self.config.server.port
+        url_format = self.config.server.url_format
 
         # Generate URLs for external network interfaces only
         urls = []
         for ip in interfaces:
-            urls.append({"label": f"Network Access ({ip})", "quiz_url": f"http://{ip}:{port}/"})
+            url = url_format.replace("{IP}", ip).replace("{PORT}", str(port))
+            urls.append({"label": f"Network Access ({ip})", "quiz_url": url})
 
         # Prepare network info for JavaScript (only what's actually used)
         network_info = {"urls": urls}

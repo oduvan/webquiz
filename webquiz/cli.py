@@ -268,6 +268,8 @@ CLI parameters always override config file values
 
     parser.add_argument("--static", help="Path to static files directory (default: static)")
 
+    parser.add_argument("--url-format", help="URL format for admin panel (default: http://{IP}:{PORT}/)")
+
     parser.add_argument("--version", action="version", version=f"%(prog)s 1.0.0")
 
     args = parser.parse_args()
@@ -280,6 +282,7 @@ CLI parameters always override config file values
         logs_dir=args.logs_dir,
         csv_dir=args.csv_dir,
         static_dir=args.static,
+        url_format=args.url_format,
     )
 
     # Handle daemon stop
