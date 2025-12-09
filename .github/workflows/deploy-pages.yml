@@ -1,0 +1,79 @@
+name: Deploy GitHub Pages
+
+on:
+  push:
+    branches: [master]
+    paths:
+      - 'docs/**'
+      - 'gh-pages/**'
+  workflow_dispatch:
+  workflow_call:
+    inputs:
+      version:
+        description: 'Version to display (optional, reads from pyproject.toml if not provided)'
+        required: false
+        type: string
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Determine version
+      id: version
+      run: |
+        if [ -n "${{ inputs.version }}" ]; then
+          echo "version=${{ inputs.version }}" >> $GITHUB_OUTPUT
+        else
+          VERSION=$(grep -Po '(?<=^version = ")[^"]*' pyproject.toml)
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+        fi
+
+    - name: Build site
+      run: |
+        VERSION="${{ steps.version.outputs.version }}"
+
+        mkdir -p _site/docs/en _site/docs/uk _site/docs/imgs
+
+        # Prevent Jekyll processing (needed for _sidebar.md files)
+        touch _site/.nojekyll
+
+        # Copy main page with version
+        sed "s/{{VERSION}}/$VERSION/g" gh-pages/index.html > _site/index.html
+
+        # Copy Docsify config files
+        cp gh-pages/docs/en/index.html _site/docs/en/
+        cp gh-pages/docs/en/_sidebar.md _site/docs/en/
+        cp gh-pages/docs/uk/index.html _site/docs/uk/
+        cp gh-pages/docs/uk/_sidebar.md _site/docs/uk/
+
+        # Copy markdown docs
+        cp docs/en/*.md _site/docs/en/
+        cp docs/uk/*.md _site/docs/uk/
+
+        # Copy images
+        cp -r docs/imgs/* _site/docs/imgs/
+
+    - name: Setup Pages
+      uses: actions/configure-pages@v4
+
+    - name: Upload artifact
+      uses: actions/upload-pages-artifact@v3
+      with:
+        path: '_site'
+
+    - name: Deploy to GitHub Pages
+      id: deployment
+      uses: actions/deploy-pages@v4

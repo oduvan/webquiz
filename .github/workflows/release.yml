@@ -351,3 +351,9 @@ jobs:
           git push origin master
           echo "Successfully updated webquiz-ansible repository"
         fi
+
+  deploy-pages:
+    needs: release
+    uses: ./.github/workflows/deploy-pages.yml
+    with:
+      version: ${{ github.event.inputs.version }}

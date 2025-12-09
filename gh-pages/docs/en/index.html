@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>WebQuiz Documentation</title>
+  <link rel="stylesheet" href="//cdn.jsdelivr.net/npm/docsify/themes/vue.css">
+  <style>
+    .sidebar-nav > ul > li > a {
+      font-weight: 600;
+    }
+    .lang-switch {
+      position: fixed;
+      top: 10px;
+      right: 20px;
+      z-index: 100;
+    }
+    .lang-switch a {
+      padding: 4px 10px;
+      margin-left: 5px;
+      border-radius: 4px;
+      text-decoration: none;
+      font-size: 14px;
+      background: #f0f0f0;
+      color: #333;
+    }
+    .lang-switch a.active {
+      background: #42b983;
+      color: white;
+    }
+  </style>
+</head>
+<body>
+  <div class="lang-switch">
+    <a href="../en/" class="active">EN</a>
+    <a href="../uk/">UA</a>
+  </div>
+  <div id="app"></div>
+  <script>
+    window.$docsify = {
+      name: 'WebQuiz',
+      repo: 'https://github.com/oduvan/webquiz',
+      basePath: '/webquiz/docs/en/',
+      loadSidebar: true,
+      subMaxLevel: 2,
+      homepage: '010_index.md',
+      auto2top: true,
+      relativePath: true
+    }
+  </script>
+  <script src="//cdn.jsdelivr.net/npm/docsify/lib/docsify.min.js"></script>
+  <script src="//cdn.jsdelivr.net/npm/prismjs/components/prism-bash.min.js"></script>
+  <script src="//cdn.jsdelivr.net/npm/prismjs/components/prism-yaml.min.js"></script>
+  <script src="//cdn.jsdelivr.net/npm/prismjs/components/prism-python.min.js"></script>
+</body>
+</html>

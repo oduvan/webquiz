@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WebQuiz - Download</title>
+    <style>
+        :root {
+            --bg-color: #f5f5f5;
+            --card-bg: #ffffff;
+            --text-color: #333333;
+            --accent-color: #2563eb;
+            --accent-hover: #1d4ed8;
+            --border-color: #e5e7eb;
+            --section-bg: #f9fafb;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            line-height: 1.6;
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 40px 20px;
+        }
+
+        header {
+            text-align: center;
+            margin-bottom: 40px;
+        }
+
+        h1 {
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+        }
+
+        .version-badge {
+            display: inline-block;
+            background-color: var(--accent-color);
+            color: white;
+            padding: 6px 16px;
+            border-radius: 20px;
+            font-size: 1rem;
+            font-weight: 500;
+        }
+
+        .description {
+            color: #666;
+            margin-top: 15px;
+            font-size: 1.1rem;
+        }
+
+        .section {
+            background: var(--card-bg);
+            border-radius: 12px;
+            padding: 24px;
+            margin-bottom: 24px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+
+        .section h2 {
+            font-size: 1.3rem;
+            margin-bottom: 16px;
+            padding-bottom: 12px;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .download-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 16px;
+        }
+
+        .download-item {
+            display: flex;
+            flex-direction: column;
+            padding: 16px;
+            background: var(--section-bg);
+            border-radius: 8px;
+            border: 1px solid var(--border-color);
+            transition: border-color 0.2s, box-shadow 0.2s;
+        }
+
+        .download-item:hover {
+            border-color: var(--accent-color);
+            box-shadow: 0 2px 8px rgba(37, 99, 235, 0.1);
+        }
+
+        .download-item .platform {
+            font-weight: 600;
+            margin-bottom: 4px;
+        }
+
+        .download-item .arch {
+            font-size: 0.85rem;
+            color: #666;
+            margin-bottom: 12px;
+        }
+
+        .download-item a {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            color: var(--accent-color);
+            text-decoration: none;
+            font-weight: 500;
+            font-size: 0.9rem;
+        }
+
+        .download-item a:hover {
+            text-decoration: underline;
+        }
+
+        .doc-list {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .doc-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 12px 16px;
+            background: var(--section-bg);
+            border-radius: 8px;
+            border: 1px solid var(--border-color);
+        }
+
+        .doc-item .doc-name {
+            font-weight: 500;
+        }
+
+        .doc-item a {
+            color: var(--accent-color);
+            text-decoration: none;
+            font-weight: 500;
+        }
+
+        .doc-item a:hover {
+            text-decoration: underline;
+        }
+
+        .pip-install {
+            background: #1e293b;
+            color: #e2e8f0;
+            padding: 16px 20px;
+            border-radius: 8px;
+            font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+            font-size: 0.95rem;
+            overflow-x: auto;
+        }
+
+        .pip-install code {
+            color: #a5f3fc;
+        }
+
+        footer {
+            text-align: center;
+            margin-top: 40px;
+            padding-top: 20px;
+            border-top: 1px solid var(--border-color);
+            color: #666;
+            font-size: 0.9rem;
+        }
+
+        footer a {
+            color: var(--accent-color);
+            text-decoration: none;
+        }
+
+        footer a:hover {
+            text-decoration: underline;
+        }
+
+        @media (max-width: 600px) {
+            h1 {
+                font-size: 1.8rem;
+            }
+
+            .download-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .doc-item {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 8px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>WebQuiz</h1>
+            <span class="version-badge">v{{VERSION}}</span>
+            <p class="description">Python/aiohttp quiz system with real-time stats and admin panel</p>
+        </header>
+
+        <section class="section">
+            <h2>Pre-built Binaries</h2>
+            <div class="download-grid">
+                <div class="download-item">
+                    <span class="platform">Linux</span>
+                    <span class="arch">x86_64</span>
+                    <a href="https://github.com/oduvan/webquiz/releases/download/v{{VERSION}}/webquiz-linux.zip">
+                        Download .zip
+                    </a>
+                </div>
+                <div class="download-item">
+                    <span class="platform">macOS Intel</span>
+                    <span class="arch">x86_64</span>
+                    <a href="https://github.com/oduvan/webquiz/releases/download/v{{VERSION}}/webquiz-macos-intel.zip">
+                        Download .zip
+                    </a>
+                </div>
+                <div class="download-item">
+                    <span class="platform">macOS Apple Silicon</span>
+                    <span class="arch">ARM64 (M1/M2/M3)</span>
+                    <a href="https://github.com/oduvan/webquiz/releases/download/v{{VERSION}}/webquiz-macos-apple-silicon.zip">
+                        Download .zip
+                    </a>
+                </div>
+                <div class="download-item">
+                    <span class="platform">Windows</span>
+                    <span class="arch">x86_64</span>
+                    <a href="https://github.com/oduvan/webquiz/releases/download/v{{VERSION}}/webquiz-windows.exe.zip">
+                        Download .zip
+                    </a>
+                </div>
+            </div>
+        </section>
+
+        <section class="section">
+            <h2>Python Package</h2>
+            <div class="pip-install">
+                $ pip install <code>webquiz=={{VERSION}}</code>
+            </div>
+            <div class="doc-list" style="margin-top: 16px;">
+                <div class="doc-item">
+                    <span class="doc-name">Wheel Package</span>
+                    <a href="https://github.com/oduvan/webquiz/releases/download/v{{VERSION}}/webquiz-{{VERSION}}-py3-none-any.whl">Download .whl</a>
+                </div>
+                <div class="doc-item">
+                    <span class="doc-name">Source Distribution</span>
+                    <a href="https://github.com/oduvan/webquiz/releases/download/v{{VERSION}}/webquiz-{{VERSION}}.tar.gz">Download .tar.gz</a>
+                </div>
+            </div>
+        </section>
+
+        <section class="section">
+            <h2>Documentation</h2>
+            <div class="download-grid">
+                <div class="download-item">
+                    <span class="platform">English</span>
+                    <span class="arch">Online documentation</span>
+                    <a href="docs/en/">Read Online</a>
+                </div>
+                <div class="download-item">
+                    <span class="platform">Ukrainian</span>
+                    <span class="arch">Online documentation</span>
+                    <a href="docs/uk/">Read Online</a>
+                </div>
+            </div>
+            <div class="doc-list" style="margin-top: 16px;">
+                <div class="doc-item">
+                    <span class="doc-name">PDF (English)</span>
+                    <a href="https://github.com/oduvan/webquiz/releases/download/v{{VERSION}}/webquiz-documentation-en.pdf">Download</a>
+                </div>
+                <div class="doc-item">
+                    <span class="doc-name">PDF (Ukrainian)</span>
+                    <a href="https://github.com/oduvan/webquiz/releases/download/v{{VERSION}}/webquiz-documentation-uk.pdf">Download</a>
+                </div>
+            </div>
+        </section>
+
+        <footer>
+            <p>
+                <a href="https://github.com/oduvan/webquiz">GitHub Repository</a> |
+                <a href="https://github.com/oduvan/webquiz/releases/tag/v{{VERSION}}">Release Notes</a> |
+                <a href="https://pypi.org/project/webquiz/">PyPI</a>
+            </p>
+        </footer>
+    </div>
+</body>
+</html>

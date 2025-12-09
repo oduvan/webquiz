@@ -29,6 +29,8 @@ WebQuiz - Python/aiohttp quiz system with multi-quiz management, real-time WebSo
 - `webquiz/templates/` - index.html, admin.html, files.html, live_stats.html
 - `tests/` - Test suite
 - `docs/uk/`, `docs/en/` - Documentation (compiled to PDF with version)
+- `gh-pages/index.html` - GitHub Pages download page template (version placeholder: `{{VERSION}}`)
+- `gh-pages/docs/` - Docsify config files for online documentation (en/, uk/)
 
 ## API Endpoints
 
@@ -189,6 +191,11 @@ webquiz-stress-test -c 50
 ## Release
 **Trigger**: GitHub Actions → "Release and Deploy to PyPI" → Enter version (X.Y.Z)
 
-**Process**: Build binaries (Linux, macOS Intel/ARM64, Windows) → Update versions → Generate PDFs (uk/en) → Publish to PyPI → Create GitHub release with 8 assets (2 Python packages + 4 zipped binaries + 2 PDFs)
+**Process**: Build binaries (Linux, macOS Intel/ARM64, Windows) → Update versions → Generate PDFs (uk/en) → Publish to PyPI → Create GitHub release with 8 assets (2 Python packages + 4 zipped binaries + 2 PDFs) → Deploy GitHub Pages
 
 **Note**: macOS builds on separate runners (macos-15-intel Intel, macos-15 ARM64)
+
+**GitHub Pages**: https://oduvan.github.io/webquiz/ - Static site with download page and online documentation
+- `deploy-pages.yml` - Triggers on docs/gh-pages changes OR called by release.yml
+- Documentation uses Docsify (no build step, renders markdown on-the-fly)
+- Docsify config in `gh-pages/docs/` with `_sidebar.md` for navigation
