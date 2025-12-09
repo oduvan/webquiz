@@ -48,10 +48,10 @@ jobs:
         # Copy main page with version
         sed "s/{{VERSION}}/$VERSION/g" gh-pages/index.html > _site/index.html
 
-        # Copy Docsify config files
-        cp gh-pages/docs/en/index.html _site/docs/en/
+        # Copy Docsify config (shared index.html for both languages)
+        cp gh-pages/docs/index.html _site/docs/en/
+        cp gh-pages/docs/index.html _site/docs/uk/
         cp gh-pages/docs/en/_sidebar.md _site/docs/en/
-        cp gh-pages/docs/uk/index.html _site/docs/uk/
         cp gh-pages/docs/uk/_sidebar.md _site/docs/uk/
 
         # Copy markdown docs

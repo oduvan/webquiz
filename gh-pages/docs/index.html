@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>WebQuiz Documentation</title>
+  <link rel="stylesheet" href="//cdn.jsdelivr.net/npm/docsify/themes/vue.css">
+  <style>
+    :root {
+      --theme-color: #42b983;
+      --base-background-color: #fff;
+      --text-color: #333;
+      --sidebar-background: #fff;
+      --code-background: #f8f8f8;
+    }
+
+    [data-theme="dark"] {
+      --theme-color: #60a5fa;
+      --base-background-color: #1a1a2e;
+      --text-color: #e4e4e7;
+      --sidebar-background: #16213e;
+      --code-background: #1e293b;
+    }
+
+    body {
+      background-color: var(--base-background-color) !important;
+      color: var(--text-color) !important;
+    }
+
+    .sidebar {
+      background-color: var(--sidebar-background) !important;
+      color: var(--text-color) !important;
+    }
+
+    .sidebar-nav a {
+      color: var(--text-color) !important;
+    }
+
+    .sidebar-nav a:hover,
+    .sidebar-nav a.active {
+      color: var(--theme-color) !important;
+    }
+
+    .sidebar-nav > ul > li > a {
+      font-weight: 600;
+    }
+
+    .markdown-section {
+      color: var(--text-color) !important;
+    }
+
+    .markdown-section h1,
+    .markdown-section h2,
+    .markdown-section h3,
+    .markdown-section h4 {
+      color: var(--text-color) !important;
+    }
+
+    .markdown-section a {
+      color: var(--theme-color) !important;
+    }
+
+    .markdown-section code {
+      background-color: var(--code-background) !important;
+      color: var(--text-color) !important;
+    }
+
+    .markdown-section pre {
+      background-color: var(--code-background) !important;
+    }
+
+    .markdown-section pre > code {
+      color: var(--text-color) !important;
+    }
+
+    .top-controls {
+      position: fixed;
+      top: 10px;
+      right: 20px;
+      z-index: 100;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .lang-switch a {
+      padding: 4px 10px;
+      border-radius: 4px;
+      text-decoration: none;
+      font-size: 14px;
+      background: var(--code-background);
+      color: var(--text-color);
+    }
+
+    .lang-switch a.active {
+      background: var(--theme-color);
+      color: white;
+    }
+
+    .theme-toggle {
+      background: var(--code-background);
+      border: none;
+      border-radius: 50%;
+      width: 32px;
+      height: 32px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 16px;
+    }
+
+    .theme-toggle:hover {
+      opacity: 0.8;
+    }
+
+    .app-nav {
+      color: var(--text-color) !important;
+    }
+
+    .search input {
+      background-color: var(--code-background) !important;
+      color: var(--text-color) !important;
+    }
+  </style>
+</head>
+<body>
+  <div class="top-controls">
+    <div class="lang-switch">
+      <a href="../en/" id="lang-en">EN</a>
+      <a href="../uk/" id="lang-uk">UA</a>
+    </div>
+    <button class="theme-toggle" onclick="toggleTheme()" aria-label="Toggle theme">
+      <span id="theme-icon">&#9790;</span>
+    </button>
+  </div>
+  <div id="app"></div>
+  <script>
+    // Detect language from URL path
+    const path = window.location.pathname;
+    const lang = path.includes('/uk/') ? 'uk' : 'en';
+
+    // Set document language and title
+    document.documentElement.lang = lang;
+    document.title = lang === 'uk' ? 'WebQuiz - Документація' : 'WebQuiz Documentation';
+
+    // Highlight active language
+    document.getElementById('lang-' + lang).classList.add('active');
+
+    // Configure Docsify
+    window.$docsify = {
+      name: 'WebQuiz',
+      repo: 'https://github.com/oduvan/webquiz',
+      basePath: '/webquiz/docs/' + lang + '/',
+      loadSidebar: true,
+      subMaxLevel: 2,
+      homepage: '010_index.md',
+      auto2top: true,
+      relativePath: true
+    }
+
+    function toggleTheme() {
+      const html = document.documentElement;
+      const currentTheme = html.getAttribute('data-theme');
+      const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
+      html.setAttribute('data-theme', newTheme);
+      localStorage.setItem('theme', newTheme);
+      updateThemeIcon(newTheme);
+    }
+
+    function updateThemeIcon(theme) {
+      const icon = document.getElementById('theme-icon');
+      icon.innerHTML = theme === 'dark' ? '&#9788;' : '&#9790;';
+    }
+
+    (function() {
+      const savedTheme = localStorage.getItem('theme') ||
+        (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+      if (savedTheme === 'dark') {
+        document.documentElement.setAttribute('data-theme', 'dark');
+      }
+      updateThemeIcon(savedTheme);
+    })();
+  </script>
+  <script src="//cdn.jsdelivr.net/npm/docsify/lib/docsify.min.js"></script>
+  <script src="//cdn.jsdelivr.net/npm/prismjs/components/prism-bash.min.js"></script>
+  <script src="//cdn.jsdelivr.net/npm/prismjs/components/prism-yaml.min.js"></script>
+  <script src="//cdn.jsdelivr.net/npm/prismjs/components/prism-python.min.js"></script>
+</body>
+</html>

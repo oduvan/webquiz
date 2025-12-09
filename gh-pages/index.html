@@ -13,6 +13,18 @@
             --accent-hover: #1d4ed8;
             --border-color: #e5e7eb;
             --section-bg: #f9fafb;
+            --secondary-text: #666666;
+        }
+
+        [data-theme="dark"] {
+            --bg-color: #1a1a2e;
+            --card-bg: #16213e;
+            --text-color: #e4e4e7;
+            --accent-color: #60a5fa;
+            --accent-hover: #93c5fd;
+            --border-color: #374151;
+            --section-bg: #1e293b;
+            --secondary-text: #9ca3af;
         }
 
         * {
@@ -56,7 +68,7 @@
         }
 
         .description {
-            color: #666;
+            color: var(--secondary-text);
             margin-top: 15px;
             font-size: 1.1rem;
         }
@@ -104,7 +116,7 @@
 
         .download-item .arch {
             font-size: 0.85rem;
-            color: #666;
+            color: var(--secondary-text);
             margin-bottom: 12px;
         }
 
@@ -171,7 +183,7 @@
             margin-top: 40px;
             padding-top: 20px;
             border-top: 1px solid var(--border-color);
-            color: #666;
+            color: var(--secondary-text);
             font-size: 0.9rem;
         }
 
@@ -182,6 +194,30 @@
 
         footer a:hover {
             text-decoration: underline;
+        }
+
+        .theme-toggle {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 50%;
+            width: 44px;
+            height: 44px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 20px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            transition: transform 0.2s, box-shadow 0.2s;
+            z-index: 100;
+        }
+
+        .theme-toggle:hover {
+            transform: scale(1.1);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
         }
 
         @media (max-width: 600px) {
@@ -202,6 +238,9 @@
     </style>
 </head>
 <body>
+    <button class="theme-toggle" onclick="toggleTheme()" aria-label="Toggle theme">
+        <span id="theme-icon">&#9790;</span>
+    </button>
     <div class="container">
         <header>
             <h1>WebQuiz</h1>
@@ -295,5 +334,29 @@
             </p>
         </footer>
     </div>
+    <script>
+        function toggleTheme() {
+            const html = document.documentElement;
+            const currentTheme = html.getAttribute('data-theme');
+            const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
+            html.setAttribute('data-theme', newTheme);
+            localStorage.setItem('theme', newTheme);
+            updateThemeIcon(newTheme);
+        }
+
+        function updateThemeIcon(theme) {
+            const icon = document.getElementById('theme-icon');
+            icon.innerHTML = theme === 'dark' ? '&#9788;' : '&#9790;';
+        }
+
+        (function() {
+            const savedTheme = localStorage.getItem('theme') ||
+                (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+            if (savedTheme === 'dark') {
+                document.documentElement.setAttribute('data-theme', 'dark');
+            }
+            updateThemeIcon(savedTheme);
+        })();
+    </script>
 </body>
 </html>
