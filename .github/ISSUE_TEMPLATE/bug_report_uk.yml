@@ -63,27 +63,6 @@ body:
       required: true
 
   - type: textarea
-    id: steps
-    attributes:
-      label: Кроки для відтворення
-      description: Як ми можемо відтворити цю проблему?
-      placeholder: |
-        1. Запустіть WebQuiz з...
-        2. Відкрийте браузер і перейдіть до...
-        3. Натисніть на...
-        4. Побачите помилку
-    validations:
-      required: true
-
-  - type: textarea
-    id: expected
-    attributes:
-      label: Очікувана поведінка
-      description: Що ви очікували, що станеться?
-    validations:
-      required: false
-
-  - type: textarea
     id: config
     attributes:
       label: Конфігурація (webquiz.yaml)
@@ -104,13 +83,5 @@ body:
       description: Вставте будь-які відповідні логи або повідомлення про помилки
       render: text
       placeholder: Вставте логи тут...
-    validations:
-      required: false
-
-  - type: textarea
-    id: additional
-    attributes:
-      label: Додатковий контекст
-      description: Будь-який інший контекст, скріншоти або інформація, яка може допомогти
     validations:
       required: false
