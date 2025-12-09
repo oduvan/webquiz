@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Documentation (English)
+    url: https://oduvan.github.io/webquiz/docs/en/
+    about: Read the documentation before reporting an issue
+  - name: Документація (Українська)
+    url: https://oduvan.github.io/webquiz/docs/uk/
+    about: Прочитайте документацію перед створенням запиту

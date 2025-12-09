@@ -1,0 +1,116 @@
+name: Звіт про помилку (Українська)
+description: Повідомити про помилку або проблему з WebQuiz
+title: "[Помилка]: "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Дякуємо, що повідомляєте про помилку! Будь ласка, заповніть інформацію нижче, щоб допомогти нам дослідити проблему.
+
+  - type: dropdown
+    id: os
+    attributes:
+      label: Операційна система
+      description: Яку операційну систему ви використовуєте?
+      options:
+        - Windows
+        - macOS (Intel)
+        - macOS (Apple Silicon)
+        - Linux
+        - Raspberry Pi
+        - Інше
+    validations:
+      required: true
+
+  - type: input
+    id: os-version
+    attributes:
+      label: Версія ОС
+      description: Яка версія операційної системи? (напр., Windows 11, macOS 14.0, Ubuntu 22.04, Raspberry Pi OS Bookworm)
+      placeholder: "напр., Windows 11, macOS 14.0, Ubuntu 22.04"
+    validations:
+      required: false
+
+  - type: input
+    id: webquiz-version
+    attributes:
+      label: Версія WebQuiz
+      description: Яку версію WebQuiz ви використовуєте? (видно в панелі адміністратора або запустіть `webquiz --version`)
+      placeholder: "напр., 1.11.4"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: installation
+    attributes:
+      label: Спосіб встановлення
+      description: Як ви встановили WebQuiz?
+      options:
+        - Готовий бінарний файл
+        - pip install
+        - З вихідного коду
+    validations:
+      required: true
+
+  - type: textarea
+    id: description
+    attributes:
+      label: Опис помилки
+      description: Чіткий опис того, в чому полягає помилка
+      placeholder: Опишіть, що сталося...
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Кроки для відтворення
+      description: Як ми можемо відтворити цю проблему?
+      placeholder: |
+        1. Запустіть WebQuiz з...
+        2. Відкрийте браузер і перейдіть до...
+        3. Натисніть на...
+        4. Побачите помилку
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Очікувана поведінка
+      description: Що ви очікували, що станеться?
+    validations:
+      required: false
+
+  - type: textarea
+    id: config
+    attributes:
+      label: Конфігурація (webquiz.yaml)
+      description: Вставте вміст вашого конфігураційного файлу (видаліть конфіденційні дані, такі як master_key)
+      render: yaml
+      placeholder: |
+        server:
+          host: 0.0.0.0
+          port: 8080
+        # ...
+    validations:
+      required: false
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Логи
+      description: Вставте будь-які відповідні логи або повідомлення про помилки
+      render: text
+      placeholder: Вставте логи тут...
+    validations:
+      required: false
+
+  - type: textarea
+    id: additional
+    attributes:
+      label: Додатковий контекст
+      description: Будь-який інший контекст, скріншоти або інформація, яка може допомогти
+    validations:
+      required: false
