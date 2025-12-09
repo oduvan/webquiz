@@ -196,6 +196,6 @@ webquiz-stress-test -c 50
 **Note**: macOS builds on separate runners (macos-15-intel Intel, macos-15 ARM64)
 
 **GitHub Pages**: https://oduvan.github.io/webquiz/ - Static site with download page and online documentation
-- `deploy-pages.yml` - Triggers on docs/gh-pages changes OR called by release.yml
+- `deploy-pages.yml` - Manual trigger or called by release.yml (no auto-deploy on commit)
 - Documentation uses Docsify (no build step, renders markdown on-the-fly)
 - Docsify config in `gh-pages/docs/` with `_sidebar.md` for navigation

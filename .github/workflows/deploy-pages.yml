@@ -1,11 +1,6 @@
 name: Deploy GitHub Pages
 
 on:
-  push:
-    branches: [master]
-    paths:
-      - 'docs/**'
-      - 'gh-pages/**'
   workflow_dispatch:
   workflow_call:
     inputs:
