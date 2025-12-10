@@ -10,6 +10,7 @@
       --theme-color: #42b983;
       --base-background-color: #fff;
       --text-color: #333;
+      --heading-color: #333;
       --sidebar-background: #fff;
       --code-background: #f8f8f8;
     }
@@ -18,6 +19,7 @@
       --theme-color: #60a5fa;
       --base-background-color: #1a1a2e;
       --text-color: #e4e4e7;
+      --heading-color: #fff;
       --sidebar-background: #16213e;
       --code-background: #1e293b;
     }
@@ -52,8 +54,10 @@
     .markdown-section h1,
     .markdown-section h2,
     .markdown-section h3,
-    .markdown-section h4 {
-      color: var(--text-color) !important;
+    .markdown-section h4,
+    .markdown-section h5,
+    .markdown-section h6 {
+      color: var(--heading-color) !important;
     }
 
     .markdown-section a {
