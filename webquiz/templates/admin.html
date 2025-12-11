@@ -1073,6 +1073,22 @@
                 </div>
             </div>
 
+            <!-- Show Answers Control Section -->
+            <div id="show-answers-section" class="show-answers-control hidden" style="margin-top: 20px;">
+                <div style="background: var(--light-bg); padding: 15px; border-radius: 5px; border-left: 4px solid var(--button-bg);">
+                    <p style="margin: 0 0 10px 0; color: var(--text-muted); font-size: 14px;">
+                        Дозволяє відкрити правильні відповіді для всіх учнів, не чекаючи поки всі завершать тест.
+                    </p>
+                    <div id="answers-status" style="margin-bottom: 10px; padding: 8px; border-radius: 4px; font-weight: bold; display: none;">
+                        <!-- Status will be shown here when answers are forced -->
+                    </div>
+                    <button id="show-answers-btn" onclick="forceShowAnswers()"
+                            style="background: #ff9800; color: white; border: 2px solid #f57c00; padding: 10px 20px; border-radius: 5px; cursor: pointer; font-weight: bold; font-size: 14px;">
+                        🔓 Відкрити Відповіді для Всіх
+                    </button>
+                </div>
+            </div>
+
             <!-- Downloadable Quizzes Section -->
             <div id="downloadable-quizzes-section" class="downloadable-quizzes hidden">
                 <div class="form-group">
@@ -1344,6 +1360,17 @@
                 if (response.ok) {
                     currentQuiz = data.current_quiz;
                     displayQuizzes(data.quizzes);
+                    // Initialize button state based on force_all_completed flag
+                    if (data.force_all_completed !== undefined) {
+                        updateAnswersForcedStatus(data.force_all_completed);
+                    }
+                    // Show/hide answer control section based on show_answers_on_completion flag
+                    const showAnswersSection = document.getElementById('show-answers-section');
+                    if (data.show_answers_on_completion === true) {
+                        showAnswersSection.classList.remove('hidden');
+                    } else {
+                        showAnswersSection.classList.add('hidden');
+                    }
                 } else {
                     showMessage(data.error || 'Не вдалося завантажити quiz', 'error');
                 }
@@ -3134,6 +3161,12 @@
                     delete pendingUsers[user_id];
                     displayPendingUsers();
                 }
+            } else if (data.type === 'answers_forced') {
+                // Admin forced answers to be shown
+                updateAnswersForcedStatus(data.forced);
+                if (data.message) {
+                    showMessage(data.message, 'success');
+                }
             }
         }
 
@@ -3209,6 +3242,62 @@
                 }
             } catch (error) {
                 showMessage('Помилка з\'єднання: ' + error.message, 'error');
+            }
+        }
+
+        async function forceShowAnswers() {
+            if (!currentMasterKey) {
+                showMessage('Потрібна автентифікація', 'error');
+                return;
+            }
+
+            if (!confirm('Ви впевнені, що хочете відкрити відповіді для всіх учнів?\n\nЦю дію неможливо скасувати (до перезапуску quiz).')) {
+                return;
+            }
+
+            try {
+                const response = await fetch('/api/admin/force-show-answers', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    credentials: 'same-origin'
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    showMessage(`Відповіді відкрито! (${data.completed_count}/${data.total_count} учнів завершили тест)`, 'success');
+                    updateAnswersForcedStatus(true);
+                } else {
+                    showMessage(data.error || 'Помилка відкриття відповідей', 'error');
+                }
+            } catch (error) {
+                showMessage('Помилка з\'єднання: ' + error.message, 'error');
+            }
+        }
+
+        function updateAnswersForcedStatus(forced) {
+            const statusDiv = document.getElementById('answers-status');
+            const button = document.getElementById('show-answers-btn');
+
+            if (forced) {
+                statusDiv.style.display = 'block';
+                statusDiv.style.background = '#4caf50';
+                statusDiv.style.color = 'white';
+                statusDiv.style.border = '1px solid #45a049';
+                statusDiv.textContent = '✓ Відповіді відкрито для всіх учнів';
+
+                button.disabled = true;
+                button.style.background = '#ccc';
+                button.style.cursor = 'not-allowed';
+                button.textContent = '✓ Відповіді Вже Відкриті';
+            } else {
+                statusDiv.style.display = 'none';
+                button.disabled = false;
+                button.style.background = '#ff9800';
+                button.style.cursor = 'pointer';
+                button.textContent = '🔓 Відкрити Відповіді для Всіх';
             }
         }
 

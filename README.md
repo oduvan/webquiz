@@ -10,6 +10,7 @@ A modern web-based quiz and testing system built with Python and aiohttp that al
 - **Registration Approval**: Optional admin approval workflow for new registrations with real-time notifications
 - **Question Randomization**: Configurable per-student question order randomization for fair testing
 - **Dynamic Answer Visibility**: Optional delayed answer reveal - show correct answers only after all students complete
+- **Manual Answer Control**: Admin button to reveal answers immediately without waiting for all students
 - **Dynamic Quiz Switching**: Real-time quiz switching with automatic server state reset
 - **Config File Editor**: Web-based configuration editor with real-time validation
 - **Live Statistics**: Real-time WebSocket-powered dashboard showing user progress

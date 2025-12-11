@@ -40,7 +40,7 @@ WebQuiz - Python/aiohttp quiz system with multi-quiz management, real-time WebSo
 
 **Admin (session cookie required, local network only):**
 - `POST /api/admin/auth` - Authenticate with master key in request body (`{"master_key": "..."}`)
-- `GET /api/admin/check-session`, `GET /api/admin/version-check`, `PUT /api/admin/approve-user`, `GET /api/admin/list-quizzes`, `POST /api/admin/switch-quiz`, `PUT /api/admin/config`
+- `GET /api/admin/check-session`, `GET /api/admin/version-check`, `PUT /api/admin/approve-user`, `POST /api/admin/force-show-answers`, `GET /api/admin/list-quizzes`, `POST /api/admin/switch-quiz`, `PUT /api/admin/config`
 - Quiz management: `GET /api/admin/quiz/{filename}`, `POST /api/admin/create-quiz`, `PUT /api/admin/quiz/{filename}`, `DELETE /api/admin/quiz/{filename}`, `POST /api/admin/download-quiz`, `POST /api/admin/unite-quizzes`
 - Quiz file attachments: `GET /api/admin/list-files` (list files in quizzes/attach/)
 - Checker templates: `GET /api/admin/list-checker-templates` (list configured checker templates for text questions)
@@ -151,6 +151,7 @@ webquiz-stress-test -c 50
 - **Text input questions** - Questions with `checker` field are automatically detected as text input questions (no `type` field needed). Fields: `default_value` (initial textarea value), `correct_value` (shown when wrong), `checker` (Python code for validation). Checker code is validated for Python syntax on quiz save. Checker code runs in sandboxed environment with limited builtins (math functions, basic types) plus helper functions: `to_int(str)` - convert to integer, `distance(str)` - parse distance (supports "2km", "2000m", "2км"), `direction_angle(str)` - parse direction angle ("20-30" = 2030). If checker is empty, exact match with `correct_value` is used. Returns `checker_error` message on failure.
 - **Checker templates** - Admin-configurable code templates for text question validation. Defined in config as `checker_templates: [{name: "...", code: "..."}]`. Templates available in admin quiz editor for quick insertion.
 - **Dark/Light theme switcher** - All pages (quiz, admin, live stats, file manager) support dark/light theme toggle via button in top-right corner. Theme preference persisted in localStorage (`theme` key), shared across all pages. CSS uses CSS variables (`:root` for light, `[data-theme="dark"]` for dark) with smooth 0.3s transitions.
+- **Manual answer revelation** - Admin can click "Show Answers" button to force `all_students_completed()` to return true, triggering existing answer visibility logic. Button only visible when quiz has `show_answers_on_completion: true`. Affects all students who complete after button click (including new registrations). One-way action (cannot be undone until quiz switch). Endpoint: `POST /api/admin/force-show-answers` (admin-auth required). Flag `force_all_completed` resets on quiz switch.
 
 ## Key Flows
 
