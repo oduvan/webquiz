@@ -512,6 +512,7 @@ class TestingServer:
         self.user_csv_file = None  # Will be set when quiz is selected (users CSV)
         self.quiz_title = "Система Тестування"  # Default title, updated when quiz is loaded
         self.show_right_answer = True  # Default setting, updated when quiz is loaded
+        self.show_answers_on_completion = False  # Default setting, updated when quiz is loaded
         self.users: Dict[str, Dict[str, Any]] = {}  # user_id -> user data
         self.questions: List[Dict[str, Any]] = []
         self.user_responses: List[Dict[str, Any]] = []
