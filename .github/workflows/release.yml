@@ -354,6 +354,10 @@ jobs:
 
   deploy-pages:
     needs: release
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
     uses: ./.github/workflows/deploy-pages.yml
     with:
       version: ${{ github.event.inputs.version }}
