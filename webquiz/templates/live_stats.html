@@ -1045,8 +1045,8 @@
             }
 
             updateUserStats(userId) {
-                const userStats = this.userStatistics[userId] || { correct_count: 0, total_answered: 0 };
-                const userStatsText = `${userStats.correct_count}/${userStats.total_answered}`;
+                const userStats = this.userStatistics[userId] || { correct_count: 0, total_answered: 0, earned_points: 0, attempted_points: 0 };
+                const userStatsText = `${userStats.earned_points}/${this.totalPoints}`;
 
                 // Find the user stats element
                 const userRow = document.getElementById(`user-${userId}`);
