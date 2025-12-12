@@ -3,6 +3,7 @@
 * [Панель адміністратора](030_admin.md)
 * [Налаштування](040_config.md)
 * [Формат вікторини](050_quiz_format.md)
+* [Використаня ШІ](060_ai_usage.md)
 * [Raspberry Pi](090_raspberry.md)
 
 ---

@@ -18,6 +18,7 @@ A modern web-based quiz and testing system built with Python and aiohttp that al
 - **Session Persistence**: Cookie-based user sessions for seamless experience
 - **Performance Tracking**: Server-side timing for accurate response measurement
 - **Data Export**: Automatic CSV export with quiz-prefixed filenames and unique suffixes
+- **AI Integration**: Use ChatGPT/Claude for analyzing quiz results and generating questions from existing materials
 - **Responsive UI**: Clean web interface with dark/light theme support
 - **SSH Tunnel Support**: Optional public access via SSH reverse tunnel with auto-reconnect
 - **Binary Distribution**: Standalone PyInstaller executable with auto-configuration
