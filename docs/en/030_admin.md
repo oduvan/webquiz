@@ -30,6 +30,23 @@ The main administrative panel page contains essential tools for managing quizzes
   It displays requests from users who have registered but have not yet been allowed to take the quiz.
   Each can be approved with the **"Approve"** button.
 
+- **Answer Management**
+  This section appears only for quizzes with `show_answers_on_completion: true` enabled (see "Quiz File Format" section for details about this option).
+
+  Allows the administrator to force open correct answers for all students without waiting for everyone to complete the test.
+
+  **When this is useful:**
+  - Most students have completed the test, but 2-3 students are lagging
+  - You don't want to wait for stragglers and are ready to show answers to everyone
+
+  **How it works:**
+  1. Click the **"Show Answers for All"** button
+  2. Confirm the action in the dialog box
+  3. All students (including those who haven't finished yet) will see the correct answers after completing the test
+  4. New students who register later will also see the answers
+
+  > ⚠️ **Important:** This is a one-way action — it can only be undone by restarting the quiz or switching to another test.
+
 - **Available Quizzes for Download**
   If the `quizzes` section with links (`download_path`) is defined in the configuration, available quizzes that can be downloaded from external sources are shown here.
   The **"Download"** button automatically saves the archive and extracts it to the specified folder.

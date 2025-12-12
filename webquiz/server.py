@@ -512,6 +512,7 @@ class TestingServer:
         self.user_csv_file = None  # Will be set when quiz is selected (users CSV)
         self.quiz_title = "Система Тестування"  # Default title, updated when quiz is loaded
         self.show_right_answer = True  # Default setting, updated when quiz is loaded
+        self.show_answers_on_completion = False  # Default setting, updated when quiz is loaded
         self.users: Dict[str, Dict[str, Any]] = {}  # user_id -> user data
         self.questions: List[Dict[str, Any]] = []
         self.user_responses: List[Dict[str, Any]] = []
@@ -519,6 +520,7 @@ class TestingServer:
         self.question_start_times: Dict[str, datetime] = {}  # user_id -> question_start_time
         self.user_stats: Dict[str, Dict[str, Any]] = {}  # user_id -> final stats for completed users
         self.user_answers: Dict[str, List[Dict[str, Any]]] = {}  # user_id -> list of answers for stats calculation
+        self.force_all_completed: bool = False  # Admin-triggered flag to force show answers
 
         # Live stats WebSocket infrastructure
         self.websocket_clients: List[web.WebSocketResponse] = []  # Connected WebSocket clients (live stats)
@@ -622,6 +624,7 @@ class TestingServer:
         self.user_stats.clear()
         self.user_answers.clear()
         self.live_stats.clear()
+        self.force_all_completed = False
         logger.info("Server state reset for new quiz")
 
     def reload_config_from_file(self) -> Optional[WebQuizConfig]:
@@ -1950,10 +1953,15 @@ class TestingServer:
 
         Counts only approved students when approval is required.
         Dynamically evaluates based on current state.
+        Can be forced to True by admin for manual answer revelation.
 
         Returns:
             bool: True if all students have completed, False otherwise
         """
+        # If admin manually marked as completed, return True immediately
+        if self.force_all_completed:
+            return True
+
         # Get count of approved students (or all students if approval not required)
         requires_approval = hasattr(self.config, "registration") and self.config.registration.approve
 
@@ -2143,6 +2151,8 @@ class TestingServer:
             {
                 "quizzes": quizzes,
                 "current_quiz": os.path.basename(self.current_quiz_file) if self.current_quiz_file else None,
+                "force_all_completed": self.force_all_completed,
+                "show_answers_on_completion": self.show_answers_on_completion,
             }
         )
 
@@ -2326,6 +2336,46 @@ class TestingServer:
 
         logger.info(f"Approved user: {user_id}")
         return web.json_response({"success": True, "message": "User approved successfully", "user_id": user_id})
+
+    @admin_auth_required
+    async def admin_force_show_answers(self, request):
+        """Force showing answers to all students by marking quiz as completed.
+
+        Sets the force_all_completed flag to True, which makes all_students_completed()
+        return True, triggering the existing answer visibility logic.
+
+        This is a one-way toggle - once set, answers remain visible until
+        quiz is switched or server is restarted.
+
+        Args:
+            request: aiohttp request
+
+        Returns:
+            JSON response with success status
+        """
+        # Set the flag
+        self.force_all_completed = True
+
+        logger.info(
+            f"Admin force-enabled answer visibility. "
+            f"Completed students: {len(self.user_stats)}, "
+            f"Total students: {len(self.users)}"
+        )
+
+        # Broadcast to admin WebSocket clients
+        await self.broadcast_to_admin_websockets(
+            {"type": "answers_forced", "forced": True, "message": "Відповіді тепер доступні для всіх учнів"}
+        )
+
+        return web.json_response(
+            {
+                "success": True,
+                "forced": True,
+                "message": "Відповіді успішно відкриті для всіх учнів",
+                "completed_count": len(self.user_stats),
+                "total_count": len(self.users),
+            }
+        )
 
     @admin_auth_required
     async def admin_get_quiz(self, request):
@@ -3822,6 +3872,7 @@ async def create_app(config: WebQuizConfig):
     app.router.add_get("/api/admin/check-session", server.admin_check_session)
     app.router.add_get("/api/admin/version-check", server.admin_version_check)
     app.router.add_put("/api/admin/approve-user", server.admin_approve_user)
+    app.router.add_post("/api/admin/force-show-answers", server.admin_force_show_answers)
     app.router.add_get("/api/admin/list-quizzes", server.admin_list_quizzes)
     app.router.add_post("/api/admin/switch-quiz", server.admin_switch_quiz)
     app.router.add_get("/api/admin/quiz/{filename}", server.admin_get_quiz)

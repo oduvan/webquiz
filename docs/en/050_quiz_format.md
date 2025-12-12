@@ -82,6 +82,8 @@ show_answers_on_completion: true    # Reveal after all complete
 
 > **Tip:** Using `show_answers_on_completion: true` is useful for group learning environments where you want students to discuss answers together after everyone has completed the quiz independently.
 
+> **Manual Control:** Administrators can force reveal answers without waiting for stragglers using the "Show Answers for All" button in the admin panel. See the "Administrative Interface" section for details.
+
 > ⚠️ **Important:** If approval mode is enabled (`registration.approve: true`), only **approved** students are counted. Students waiting for approval do not affect answer visibility.
 
 ---
