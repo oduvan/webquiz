@@ -152,6 +152,7 @@ webquiz-stress-test -c 50
 - **Checker templates** - Admin-configurable code templates for text question validation. Defined in config as `checker_templates: [{name: "...", code: "..."}]`. Templates available in admin quiz editor for quick insertion.
 - **Dark/Light theme switcher** - All pages (quiz, admin, live stats, file manager) support dark/light theme toggle via button in top-right corner. Theme preference persisted in localStorage (`theme` key), shared across all pages. CSS uses CSS variables (`:root` for light, `[data-theme="dark"]` for dark) with smooth 0.3s transitions.
 - **Manual answer revelation** - Admin can click "Show Answers" button to force `all_students_completed()` to return true, triggering existing answer visibility logic. Button only visible when quiz has `show_answers_on_completion: true`. Affects all students who complete after button click (including new registrations). One-way action (cannot be undone until quiz switch). Endpoint: `POST /api/admin/force-show-answers` (admin-auth required). Flag `force_all_completed` resets on quiz switch.
+- **Quiz renaming** - Admin can rename quizzes via editor modal. Backend renames physical file with validation. **Active quiz cannot be renamed** (must switch to different quiz first, returns 409 error). CSV files retain old quiz name prefix (historical data preservation). Prevents filename conflicts with 409 status code.
 
 ## Key Flows
 

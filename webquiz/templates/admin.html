@@ -1589,7 +1589,7 @@
             editingQuizName = selectedQuiz;
             document.getElementById('modal-title').textContent = `Редагувати Quiz: ${selectedQuiz}`;
             document.getElementById('quiz-filename').value = selectedQuiz.replace('.yaml', '');
-            document.getElementById('quiz-filename').disabled = true;
+            document.getElementById('quiz-filename').disabled = false;
 
             try {
                 const response = await fetch(`/api/admin/quiz/${selectedQuiz}`, {
@@ -2623,6 +2623,11 @@
                 const data = await response.json();
 
                 if (response.ok) {
+                    // Update editingQuizName if quiz was renamed
+                    if (isEditMode && data.renamed) {
+                        editingQuizName = data.filename;
+                        document.getElementById('modal-title').textContent = `Редагувати Quiz: ${data.filename}`;
+                    }
                     showMessage(data.message, 'success');
                     closeQuizEditor();
                     await loadQuizzes();
@@ -2682,7 +2687,13 @@
                         isEditMode = true;
                         editingQuizName = filename + '.yaml';
                         document.getElementById('modal-title').textContent = `Редагувати Quiz: ${editingQuizName}`;
-                        document.getElementById('quiz-filename').disabled = true;
+                        document.getElementById('quiz-filename').disabled = false;
+                    }
+                    // If quiz was renamed in edit mode, update tracking variables
+                    else if (data.renamed) {
+                        editingQuizName = data.filename;
+                        document.getElementById('modal-title').textContent = `Редагувати Quiz: ${data.filename}`;
+                        document.getElementById('quiz-filename').value = data.filename.replace('.yaml', '');
                     }
                     // Reload quiz list in background
                     loadQuizzes();

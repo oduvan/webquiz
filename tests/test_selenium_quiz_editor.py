@@ -422,9 +422,9 @@ def test_save_and_continue_keeps_editor_open(temp_dir, browser):
         editor_modal = browser.find_element(By.ID, "quiz-editor-modal")
         assert editor_modal.is_displayed(), "Editor should still be open after Save and Continue"
 
-        # Verify we're now in edit mode (filename should be disabled)
+        # Verify we're now in edit mode (filename should be enabled for renaming)
         filename_input = browser.find_element(By.ID, "quiz-filename")
-        assert filename_input.get_attribute("disabled") == "true", "Filename should be disabled in edit mode"
+        assert filename_input.is_enabled(), "Filename should be enabled in edit mode for renaming"
 
         # Verify modal title changed to edit mode
         modal_title = browser.find_element(By.ID, "modal-title")
