@@ -1577,13 +1577,14 @@
             document.getElementById('quiz-editor-modal').style.display = 'block';
         }
 
-        async function editSelectedQuiz() {
-            if (selectedQuizzes.length !== 1) {
+        async function editSelectedQuiz(quizFilename = null) {
+            // If quizFilename is provided, use it; otherwise check selection
+            if (!quizFilename && selectedQuizzes.length !== 1) {
                 showMessage('Будь ласка, виберіть один quiz для редагування', 'warning');
                 return;
             }
 
-            const selectedQuiz = selectedQuizzes[0];
+            const selectedQuiz = quizFilename || selectedQuizzes[0];
             isEditMode = true;
             editingQuizName = selectedQuiz;
             document.getElementById('modal-title').textContent = `Редагувати Quiz: ${selectedQuiz}`;
@@ -1655,6 +1656,8 @@
                 if (createResponse.ok) {
                     showMessage(`Quiz duplicated successfully as "${createResult.filename}"`, 'success');
                     await loadQuizzes();
+                    // Automatically open the duplicated quiz for editing
+                    await editSelectedQuiz(createResult.filename);
                 } else {
                     showMessage(createResult.error || 'Не вдалося дублювати quiz', 'error');
                 }
@@ -1761,6 +1764,8 @@
                     showMessage(message, 'success');
                     selectedQuizzes = [];
                     await loadQuizzes();
+                    // Automatically open the united quiz for editing
+                    await editSelectedQuiz(data.filename);
                 } else {
                     showMessage(data.error || 'Не вдалося об\'єднати quizzes', 'error');
                 }
