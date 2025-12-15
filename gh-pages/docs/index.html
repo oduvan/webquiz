@@ -56,8 +56,25 @@
     .markdown-section h3,
     .markdown-section h4,
     .markdown-section h5,
-    .markdown-section h6 {
+    .markdown-section h6,
+    .markdown-section h1 a,
+    .markdown-section h2 a,
+    .markdown-section h3 a,
+    .markdown-section h4 a {
       color: var(--heading-color) !important;
+    }
+
+    [data-theme="dark"] .markdown-section h1,
+    [data-theme="dark"] .markdown-section h2,
+    [data-theme="dark"] .markdown-section h3,
+    [data-theme="dark"] .markdown-section h4,
+    [data-theme="dark"] .markdown-section h5,
+    [data-theme="dark"] .markdown-section h6 {
+      color: #fff !important;
+    }
+
+    [data-theme="dark"] .markdown-section strong {
+      color: #fff !important;
     }
 
     .markdown-section a {
