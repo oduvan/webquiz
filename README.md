@@ -9,6 +9,7 @@ A modern web-based quiz and testing system built with Python and aiohttp that al
 - **Admin Interface**: Web-based admin panel with master key authentication for quiz management
 - **Registration Approval**: Optional admin approval workflow for new registrations with real-time notifications
 - **Question Randomization**: Configurable per-student question order randomization for fair testing
+- **Question Grouping**: Keep related questions together during randomization with `stick_to_the_previous` attribute
 - **Dynamic Answer Visibility**: Optional delayed answer reveal - show correct answers only after all students complete
 - **Manual Answer Control**: Admin button to reveal answers immediately without waiting for all students
 - **Dynamic Quiz Switching**: Real-time quiz switching with automatic server state reset
@@ -345,6 +346,14 @@ questions:
 - Each student receives a randomized order that persists across sessions
 - Helps prevent cheating and ensures fair testing
 - Default is `false` (questions appear in YAML order)
+
+**Question Grouping (stick_to_the_previous):**
+- Use `stick_to_the_previous: true` on questions that should stay adjacent to their predecessor during randomization
+- Useful for reading passages followed by related questions
+- Groups are shuffled as units while preserving internal order
+- Example: Q1→Q2(sticky)→Q3(sticky) always appear together as [Q1,Q2,Q3]
+- First question cannot have this flag (no previous question)
+- Admin panel shows 🔗 indicator on grouped questions
 
 **Question Points:**
 - Each question can have a custom point value using the `points` field (default: 1)

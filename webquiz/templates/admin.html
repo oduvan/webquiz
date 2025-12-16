@@ -1891,6 +1891,12 @@
                         <label for="points-${questionCounter}" style="display: inline-block;">Бали за питання:</label>
                         <input type="number" id="points-${questionCounter}" class="points-input" min="1" value="1" placeholder="1" style="width: 80px;" oninput="updateQuestionPreview(this)">
                     </div>
+                    <div class="form-group">
+                        <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+                            <input type="checkbox" class="stick-to-previous-checkbox" onchange="updateQuestionPreview(this)">
+                            <span>Прив'язати до попереднього питання (при рандомізації)</span>
+                        </label>
+                    </div>
                 </div>
             `;
 
@@ -1998,13 +2004,18 @@
             const questionFile = questionDiv.querySelector('.question-file').value.trim();
             const pointsInput = questionDiv.querySelector('.points-input');
             const points = pointsInput ? parseInt(pointsInput.value) || 1 : 1;
+            const stickCheckbox = questionDiv.querySelector('.stick-to-previous-checkbox');
+            const stickToPrevious = stickCheckbox ? stickCheckbox.checked : false;
 
             // Set preview text (full text, no truncation)
             previewSpan.textContent = questionText || '';
 
-            // Set indicators for image, file, and points
+            // Set indicators for image, file, points, and stick_to_the_previous
             if (indicatorsSpan) {
                 let indicators = '';
+                if (stickToPrevious) {
+                    indicators += '<span class="question-indicator" title="Прив\'язано до попереднього">🔗</span>';
+                }
                 if (questionImage) {
                     indicators += '<span class="question-indicator" title="Має зображення">🖼️</span>';
                 }
@@ -2364,8 +2375,11 @@
                     // Build preview text (full text, no truncation)
                     const previewText = question.question || '';
 
-                    // Build indicators for image, file, and points
+                    // Build indicators for stick_to_the_previous, image, file, and points
                     let indicatorsHtml = '';
+                    if (question.stick_to_the_previous) {
+                        indicatorsHtml += '<span class="question-indicator" title="Прив\'язано до попереднього">🔗</span>';
+                    }
                     if (question.image) {
                         indicatorsHtml += '<span class="question-indicator" title="Має зображення">🖼️</span>';
                     }
@@ -2456,6 +2470,12 @@
                             <div class="form-group">
                                 <label for="points-${questionCounter}" style="display: inline-block;">Бали за питання:</label>
                                 <input type="number" id="points-${questionCounter}" class="points-input" min="1" value="${pointsValue}" placeholder="1" style="width: 80px;" oninput="updateQuestionPreview(this)">
+                            </div>
+                            <div class="form-group">
+                                <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+                                    <input type="checkbox" class="stick-to-previous-checkbox" ${question.stick_to_the_previous ? 'checked' : ''} onchange="updateQuestionPreview(this)">
+                                    <span>Прив'язати до попереднього питання (при рандомізації)</span>
+                                </label>
                             </div>
                         </div>
                     `;
@@ -2565,6 +2585,12 @@
                     if (points > 1) {
                         questionData.points = points;
                     }
+                }
+
+                // Include stick_to_the_previous if checked
+                const stickCheckbox = div.querySelector('.stick-to-previous-checkbox');
+                if (stickCheckbox && stickCheckbox.checked) {
+                    questionData.stick_to_the_previous = true;
                 }
 
                 questions.push(questionData);

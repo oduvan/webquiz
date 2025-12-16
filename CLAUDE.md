@@ -120,6 +120,7 @@ webquiz-stress-test -c 50
 - **Mobile-first** with `width: 100%; max-width: [size]` and @media ≤768px
 - **UTF-8 Content-Type** for Ukrainian/multilingual text support
 - **Server-side question randomization** generated at registration, stored per-user as `question_order` array, client reorders via JS
+- **Sticky question groups** - Questions with `stick_to_the_previous: true` stay adjacent during randomization. Groups are formed by consecutive sticky flags and shuffled as units. First question cannot be sticky (no previous to stick to). UI shows 🔗 indicator on collapsed questions.
 - **Test completion detection** uses answer count (`len(user_answers[user_id])`) instead of question ID to support randomization
 - **Live stats first question** uses user's actual first from `question_order` (prevents duplicates)
 - **Two-group live stats** - Users split into "In Progress" and "Completed" groups, automatically move on completion
