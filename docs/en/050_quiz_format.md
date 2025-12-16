@@ -103,6 +103,36 @@ randomize_questions: true  # Each student gets a unique question order
 
 ---
 
+#### `stick_to_the_previous` (optional, per question)
+
+Determines whether a question should stay adjacent to the previous question during randomization. This is useful for related questions that must appear consecutively (e.g., a reading passage followed by questions about it).
+
+- **`true`** — question always follows directly after the previous one (forms a group)
+- **`false`** (default) — question can be shuffled independently
+
+```yaml
+questions:
+  - question: "Read the text and answer questions 1-3"
+    options: ["A", "B", "C"]
+    correct_answer: 0
+  - question: "Question 2 about the text"
+    options: ["A", "B", "C"]
+    correct_answer: 1
+    stick_to_the_previous: true
+  - question: "Question 3 about the text"
+    options: ["A", "B", "C"]
+    correct_answer: 2
+    stick_to_the_previous: true
+```
+
+> **How it works:** Questions with `stick_to_the_previous: true` form groups with their predecessors. During randomization, groups are shuffled as whole blocks while preserving internal order. For example, if Q1→Q2→Q3 form a group, they will always appear in that order, but the group can end up anywhere in the quiz.
+
+> ⚠️ **Important:** The first question cannot have `stick_to_the_previous: true` (no previous question to stick to).
+
+> **In the admin panel:** Questions with `stick_to_the_previous: true` are marked with a 🔗 indicator in collapsed view.
+
+---
+
 ### `questions` Section
 
 The `questions` section contains a list of test questions.

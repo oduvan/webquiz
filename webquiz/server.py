@@ -1437,7 +1437,16 @@ class TestingServer:
     def generate_random_question_order(self) -> list:
         """Generate a random question order for a user.
 
-        Returns a list of question IDs in random order.
+        Returns a list of question IDs in random order, respecting stick_to_the_previous
+        groupings. Questions with stick_to_the_previous: true stay adjacent to their
+        predecessor, and groups are shuffled as units.
+
+        Algorithm:
+        1. Build groups by iterating through questions - non-sticky questions start
+           new groups, sticky questions join previous group
+        2. Shuffle the groups (not individual questions)
+        3. Flatten groups back to a single question order list
+
         Only called if self.randomize_questions is True.
 
         Returns:
@@ -1445,14 +1454,36 @@ class TestingServer:
         """
         import random
 
-        # Create a list of all question IDs
-        question_ids = [q["id"] for q in self.questions]
+        # Build groups respecting stick_to_the_previous
+        groups = []
+        current_group = []
 
-        # Shuffle the list to create random order
-        shuffled_ids = question_ids.copy()
-        random.shuffle(shuffled_ids)
+        for question in self.questions:
+            question_id = question["id"]
+            is_sticky = question.get("stick_to_the_previous", False)
 
-        logger.info(f"Generated random question order: {shuffled_ids}")
+            if is_sticky and current_group:
+                # Add to current group
+                current_group.append(question_id)
+            else:
+                # Start new group (also handles first question or non-sticky)
+                if current_group:
+                    groups.append(current_group)
+                current_group = [question_id]
+
+        # Don't forget the last group
+        if current_group:
+            groups.append(current_group)
+
+        # Shuffle groups
+        random.shuffle(groups)
+
+        # Flatten to final order
+        shuffled_ids = []
+        for group in groups:
+            shuffled_ids.extend(group)
+
+        logger.info(f"Generated random question order with sticky groups: {shuffled_ids}")
         return shuffled_ids
 
     def update_live_stats(self, user_id: str, question_id: int, state: str, time_taken: float = None):
@@ -2893,6 +2924,16 @@ class TestingServer:
                     errors.append(f"Question {i+1} min_correct must be at least 1")
                 elif min_correct > len(question["correct_answer"]):
                     errors.append(f"Question {i+1} min_correct cannot exceed number of correct answers")
+
+            # Validate stick_to_the_previous (valid for all question types)
+            if "stick_to_the_previous" in question:
+                stick_value = question["stick_to_the_previous"]
+                if not isinstance(stick_value, bool):
+                    errors.append(f"Question {i+1} 'stick_to_the_previous' must be a boolean (true or false)")
+                elif i == 0 and stick_value is True:
+                    errors.append(
+                        "Question 1 cannot have 'stick_to_the_previous: true' (no previous question to stick to)"
+                    )
 
         # Validate optional top-level fields
         if "show_right_answer" in data and not isinstance(data["show_right_answer"], bool):
