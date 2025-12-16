@@ -2473,6 +2473,7 @@ class TestingServer:
         """Update existing quiz.
 
         Creates backup before updating. Reloads quiz if it's currently active.
+        Supports renaming by providing different filename in request body.
 
         Args:
             request: aiohttp request with filename in path and quiz data
@@ -2480,14 +2481,38 @@ class TestingServer:
         Returns:
             JSON response with success status and backup filename
         """
-        filename = request.match_info["filename"]
+        old_filename = request.match_info["filename"]
         data = await request.json()
         mode = data.get("mode", "wizard")
 
-        quiz_path = os.path.join(self.quizzes_dir, filename)
+        # Get and validate new filename from request body
+        new_filename = data.get("filename", "").strip()
+        if not new_filename:
+            new_filename = old_filename.replace(".yaml", "").replace(".yml", "")
+        if not (new_filename.endswith(".yaml") or new_filename.endswith(".yml")):
+            new_filename += ".yaml"
 
-        if not os.path.exists(quiz_path):
+        old_path = os.path.join(self.quizzes_dir, old_filename)
+        new_path = os.path.join(self.quizzes_dir, new_filename)
+
+        if not os.path.exists(old_path):
             return web.json_response({"error": "Quiz file not found"}, status=404)
+
+        # Check if filename is being changed
+        filename_changed = old_filename != new_filename
+        if filename_changed:
+            # Prevent renaming of currently active quiz
+            if self.current_quiz_file and os.path.basename(self.current_quiz_file) == old_filename:
+                return web.json_response(
+                    {"error": "Cannot rename active quiz. Please switch to a different quiz first."}, status=409
+                )
+
+            # Check for filename conflicts
+            if os.path.exists(new_path):
+                return web.json_response({"error": f"Quiz file already exists: {new_filename}"}, status=409)
+
+        # Use old_path for all operations until rename
+        quiz_path = old_path
 
         # Create backup
         backup_path = quiz_path + ".backup"
@@ -2520,16 +2545,26 @@ class TestingServer:
             await f.flush()
             os.fsync(f.fileno())
 
-        # If this is the current quiz, reload it
-        if self.current_quiz_file and os.path.basename(self.current_quiz_file) == filename:
-            await self.switch_quiz(filename)
+        # Rename file if filename changed (only for inactive quizzes)
+        if filename_changed:
+            os.rename(old_path, new_path)
+            logger.info(f"Renamed quiz: {old_filename} -> {new_filename}")
 
-        logger.info(f"Updated quiz: {filename}")
+        # Determine final filename for reload check
+        final_filename = new_filename if filename_changed else old_filename
+
+        # If this is the current quiz, reload it
+        if self.current_quiz_file and os.path.basename(self.current_quiz_file) == final_filename:
+            await self.switch_quiz(final_filename)
+
+        logger.info(f"Updated quiz: {final_filename}")
         return web.json_response(
             {
                 "success": True,
-                "message": f'Quiz "{filename}" updated successfully',
+                "message": f'Quiz "{final_filename}" updated successfully',
                 "backup_created": os.path.basename(backup_path),
+                "filename": final_filename,
+                "renamed": filename_changed,
             }
         )
 

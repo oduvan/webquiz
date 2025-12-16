@@ -1577,18 +1577,19 @@
             document.getElementById('quiz-editor-modal').style.display = 'block';
         }
 
-        async function editSelectedQuiz() {
-            if (selectedQuizzes.length !== 1) {
+        async function editSelectedQuiz(quizFilename = null) {
+            // If quizFilename is provided, use it; otherwise check selection
+            if (!quizFilename && selectedQuizzes.length !== 1) {
                 showMessage('Будь ласка, виберіть один quiz для редагування', 'warning');
                 return;
             }
 
-            const selectedQuiz = selectedQuizzes[0];
+            const selectedQuiz = quizFilename || selectedQuizzes[0];
             isEditMode = true;
             editingQuizName = selectedQuiz;
             document.getElementById('modal-title').textContent = `Редагувати Quiz: ${selectedQuiz}`;
             document.getElementById('quiz-filename').value = selectedQuiz.replace('.yaml', '');
-            document.getElementById('quiz-filename').disabled = true;
+            document.getElementById('quiz-filename').disabled = false;
 
             try {
                 const response = await fetch(`/api/admin/quiz/${selectedQuiz}`, {
@@ -1655,6 +1656,8 @@
                 if (createResponse.ok) {
                     showMessage(`Quiz duplicated successfully as "${createResult.filename}"`, 'success');
                     await loadQuizzes();
+                    // Automatically open the duplicated quiz for editing
+                    await editSelectedQuiz(createResult.filename);
                 } else {
                     showMessage(createResult.error || 'Не вдалося дублювати quiz', 'error');
                 }
@@ -1761,6 +1764,8 @@
                     showMessage(message, 'success');
                     selectedQuizzes = [];
                     await loadQuizzes();
+                    // Automatically open the united quiz for editing
+                    await editSelectedQuiz(data.filename);
                 } else {
                     showMessage(data.error || 'Не вдалося об\'єднати quizzes', 'error');
                 }
@@ -2618,6 +2623,11 @@
                 const data = await response.json();
 
                 if (response.ok) {
+                    // Update editingQuizName if quiz was renamed
+                    if (isEditMode && data.renamed) {
+                        editingQuizName = data.filename;
+                        document.getElementById('modal-title').textContent = `Редагувати Quiz: ${data.filename}`;
+                    }
                     showMessage(data.message, 'success');
                     closeQuizEditor();
                     await loadQuizzes();
@@ -2677,7 +2687,13 @@
                         isEditMode = true;
                         editingQuizName = filename + '.yaml';
                         document.getElementById('modal-title').textContent = `Редагувати Quiz: ${editingQuizName}`;
-                        document.getElementById('quiz-filename').disabled = true;
+                        document.getElementById('quiz-filename').disabled = false;
+                    }
+                    // If quiz was renamed in edit mode, update tracking variables
+                    else if (data.renamed) {
+                        editingQuizName = data.filename;
+                        document.getElementById('modal-title').textContent = `Редагувати Quiz: ${data.filename}`;
+                        document.getElementById('quiz-filename').value = data.filename.replace('.yaml', '');
                     }
                     // Reload quiz list in background
                     loadQuizzes();
