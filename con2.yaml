@@ -1,0 +1,63 @@
+# WebQuiz Server Configuration
+# Copy this file to server_config.yaml and customize as needed
+
+server:
+  host: "0.0.0.0"  # Listen on all interfaces (use "127.0.0.1" for localhost only)
+  port: 8080       # Server port
+
+paths:
+  quizzes_dir: "/tmp/quizzes"  # Directory containing quiz YAML files
+  logs_dir: "logs"        # Directory for server log files (auto-created)
+  csv_dir: "data"         # Directory for CSV response files (auto-created)
+  static_dir: "static"    # Directory for static web files (auto-created)
+
+admin:
+  master_key: a1        # Set to enable admin interface (e.g., "your-secret-key")
+                          # Can also use WEBQUIZ_MASTER_KEY environment variable
+  # trusted_ips:        # List of IP addresses allowed to access admin interface
+  #   - "127.0.0.1"     # Default: only localhost (127.0.0.1)
+  #   - "192.168.1.10"  # Add additional trusted IPs as needed
+
+# Optional: Registration configuration
+# Uncomment and configure to collect additional user information
+# registration:
+#   approve: false                     # Set to true to require admin approval before users can start
+#   username_label: "Ім'я користувача" # Label for username field (default: Ukrainian)
+#   fields:                            # Additional registration fields (supports Cyrillic)
+#     - Grade
+#     - School
+
+# Optional: Downloadable quizzes configuration
+# Uncomment and configure to enable quiz downloads in admin panel
+# quizzes:
+#   - name: "Basic Math Quiz"
+#     download_path: "https://example.com/quizzes/math.zip"
+#     folder: "math_questions/"
+#   - name: "Geography Quiz"
+#     download_path: "https://example.com/quizzes/geography.zip"
+#     folder: "geography/"
+
+# Optional: SSH Tunnel configuration for public access
+# Uncomment and configure to enable SSH tunnel for remote access
+# tunnel:
+#   server: "tunnel.example.com"           # SSH tunnel server hostname or IP address
+#                                          # Note: Uses HTTPS for domains, HTTP for IP addresses
+#   public_key: "keys/id_ed25519.pub"      # SSH public key path (auto-generated if missing)
+#   private_key: "keys/id_ed25519"         # SSH private key path (auto-generated if missing)
+#   socket_name: "my-quiz-socket"          # Optional: Fixed socket name (default: random 6-8 hex chars)
+#                                          # Use for predictable URLs or server-side management
+#
+#   # Option 1: Fetch config from server (default)
+#   # Config will be fetched from https://tunnel.example.com/tunnel_config.yaml
+#
+#   # Option 2: Provide local config (bypasses server fetch)
+#   # Uncomment to use local configuration instead of fetching from server
+#   # config:
+#   #   username: "tunneluser"
+#   #   socket_directory: "/var/run/tunnels"
+#   #   base_url: "https://tunnel.example.com/tests"
+
+# Usage examples:
+# webquiz --config server_config.yaml
+# webquiz --config server_config.yaml --master-key override-key
+# WEBQUIZ_MASTER_KEY=secret webquiz --config server_config.yaml

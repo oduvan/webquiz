@@ -15,7 +15,11 @@ The main administrative panel page contains essential tools for managing quizzes
 
 - **Available Quiz Files**
   The top of the page displays a list of all quizzes available in the `quizzes` folder.
-  The current active quiz is marked as **(current)**.
+  Each quiz shows its filename and title (if set), for example: `default.yaml - My Quiz Title`.
+  The current active quiz is highlighted with a yellow background and marked as **(current)**.
+
+  You can select multiple quizzes using **Ctrl+click** (or **Cmd+click** on macOS) for individual selection, or **Shift+click** to select a range. When multiple quizzes are selected, you can unite them into a single quiz or delete them together.
+
   You can switch between quizzes or create new ones.
 
 - **"Create New Quiz" Button**
@@ -26,9 +30,10 @@ The main administrative panel page contains essential tools for managing quizzes
   Allows you to delete the selected quiz from the file system.
 
 - **Pending Approvals**
-  This block appears if manual user approval is enabled in the configuration (`registration.approve: true`).
-  It displays requests from users who have registered but have not yet been allowed to take the quiz.
-  Each can be approved with the **"Approve"** button.
+  This panel appears if manual user approval is enabled in the configuration (`registration.approve: true`, see [Configuration](040_config.md) for details).
+  It displays a list of users who have registered but are waiting for approval to start the quiz.
+  Each user shows their name and registration time. Click the **"Approve"** button to allow them to begin.
+  The quiz timer starts only after approval, ensuring fair timing for all participants.
 
 - **Answer Management**
   This section appears only for quizzes with `show_answers_on_completion: true` enabled (see "Quiz File Format" section for details about this option).
@@ -48,12 +53,26 @@ The main administrative panel page contains essential tools for managing quizzes
   > ⚠️ **Important:** This is a one-way action — it can only be undone by restarting the quiz or switching to another test.
 
 - **Available Quizzes for Download**
-  If the `quizzes` section with links (`download_path`) is defined in the configuration, available quizzes that can be downloaded from external sources are shown here.
-  The **"Download"** button automatically saves the archive and extracts it to the specified folder.
+  This section appears only if the `quizzes` section is configured in `webquiz.yaml` (see [Configuration](040_config.md) for details).
+  It shows quizzes available for download from external sources (e.g., GitHub repositories).
+  The **"Download"** button automatically downloads the archive and extracts it to the `quizzes` folder.
 
 - **URL for Access from Other Devices**
-  At the bottom of the panel, a link is displayed that other participants on the local network can use to connect to the quiz.
-  Example: `http://10.10.100.104:8080/`.
+  At the bottom of the panel, links are displayed that other participants can use to connect to the quiz.
+  This includes the local network address (e.g., `http://192.168.1.100:8080/`).
+  When an SSH tunnel is connected, an external URL is also shown with a green background.
+
+- **SSH Tunnel**
+  This section appears only if the `tunnel` section is configured in `webquiz.yaml` (see [Configuration](040_config.md) for details).
+  It allows you to expose your local quiz server to the internet via SSH reverse tunnel.
+  - **Server** — displays the tunnel server hostname
+  - **Public Key** — your SSH public key that needs to be registered on the tunnel server. Use the **Copy** button to copy it to the clipboard.
+  - **Connect/Disconnect** — click to establish or terminate the tunnel connection
+
+  When connected, a public URL appears in the "URL for Access from Other Devices" section with a green background, allowing participants outside your local network to join the quiz.
+
+- **Theme Switcher**
+  In the top-right corner of the page, there's a button to toggle between light and dark themes. The preference is saved in your browser and applies to all WebQuiz pages.
 
 ---
 
@@ -62,21 +81,52 @@ The main administrative panel page contains essential tools for managing quizzes
 ![WebQuiz File Manager](../imgs/file_manager.png)
 
 The File Manager is accessed via the **File Manager** link at the bottom of the admin panel.
-It allows you to quickly view, download, and diagnose files created by the server.
+It allows you to quickly view, download, edit, and diagnose files created by the server.
+
+At the top of the page, there's a **search field** to filter files by name, and a **Refresh** button to reload the file list.
 
 #### Main Tabs
 
 - **CSV Files** — list of quiz result files.
   Each item shows the file name, size, and last modification date.
-  You can click **View** to see the contents directly in the browser, or **Download** to save the file locally.
+  Three buttons are available for each file:
+  - **Text** — view the raw CSV content in the browser
+  - **Table** — view the data in a formatted table (see below)
+  - **Download** — save the file locally
 
 - **Log Files** — server launch logs.
   Useful for finding technical errors or checking how the server performed in previous sessions.
 
-- **Config** — the current configuration file `server_config.yaml` or `webquiz.yaml`, which can be viewed directly in the interface.
+- **Quiz Files** — list of quiz YAML files from the `quizzes` folder.
+  You can view and edit quiz files directly. When editing, a **Validate** button checks the YAML syntax before saving.
 
-At the bottom of the page, the administrator's authorization status is displayed.
-If you're connected from a local address or "trusted IP", the system automatically performs authentication.
+- **Config** — the server configuration file (`webquiz.yaml`).
+  You can edit the configuration directly in the browser with syntax highlighting.
+
+#### Table View
+
+![CSV Table View](../imgs/file_manager_table.png)
+
+When you click the **Table** button for a CSV file, a modal window opens displaying the data in a formatted table. The table shows columns such as:
+- **user_id** — the participant's ID
+- **question** — the question text
+- **selected_answer** — the answer chosen by the participant
+- **correct_answer** — the correct answer
+- **is_correct** — whether the answer was correct (True/False)
+- **time_taken** — time spent on the question in seconds
+
+This view makes it easy to analyze quiz results without downloading the file.
+
+#### Config Tab
+
+![Config Tab](../imgs/file_manager_config.png)
+
+The **Config** tab displays the server configuration file in a YAML editor. You can:
+- View and edit all configuration settings
+- Click **Save Configuration** to save changes
+- Changes are validated before saving, and a backup is created automatically
+
+At the bottom of the page, there are quick navigation links: **Back to Admin Panel**, **Quiz Home**, and **Live Stats**.
 
 ---
 
@@ -85,28 +135,85 @@ If you're connected from a local address or "trusted IP", the system automatical
 ![Quiz Editor in Wizard Mode](../imgs/edit_quiz.png)
 
 The Quiz Editor allows you to create or modify questions in the selected quiz.
-Available in two modes: **Wizard** (visual editor) and **Text** (working directly with YAML code).
+The editor uses a visual wizard interface for easy question management.
 
-#### Main Editor Features
+#### Quiz Settings
 
-- **Quiz Name**
-  Can be set in the "Quiz Name (optional)" field. If not specified, the system uses the standard file name.
+- **Quiz Filename**
+  The filename for the quiz (without the `.yaml` extension).
+
+- **Quiz Name (optional)**
+  A human-readable title for the quiz. If not specified, the filename is used.
 
 - **Show Correct Answers**
-  If this option is enabled, participants see the correct answers during the quiz and in the final summary table.
+  If enabled, participants see the correct answers during the quiz and in the final summary table.
 
-- **Questions**
-  For each question, you can specify:
-  - question text;
-  - path to image (for example, `/imgs/diagram.png`);
-  - question type — **single correct answer** or **multiple correct answers**;
-  - list of answer options (text or images).
+- **Randomize Question Order**
+  If enabled, questions are shuffled for each participant. Each student sees questions in a different random order.
 
-  If options are images, their paths start with `/imgs/` or `/static/`.
+#### Question Editor
 
-- **Editing Modes**
-  - **Wizard Mode** — convenient for visually filling in fields and creating new questions.
-  - **Text Mode** — opens the source YAML file for manual editing of the quiz structure.
+For each question, you can configure:
+
+- **Question Text** — the question to ask (required if no image is provided)
+
+- **Question Image** — path to an image file (e.g., `/imgs/diagram.png`). Click the folder icon to browse available images. Images are stored in the `quizzes/imgs/` folder.
+
+- **File for Download** — attach a file that participants can download when answering the question (e.g., `data.xlsx`). Click the paperclip icon to browse available files. Files are stored in the `quizzes/attach/` folder.
+
+- **Question Type** — three types are available:
+  - **Single correct answer** — participants select one option from a list
+  - **Multiple correct answers** — participants can select multiple options
+  - **Text answer** — participants type their answer in a text field (validated using checker code). *This feature is currently in beta testing.*
+
+- **Answer Options** — for single/multiple choice questions, add answer options. Each option can be text or an image path. Mark the correct answer(s) with the radio button or checkbox.
+
+- **Points per Question** — the number of points awarded for a correct answer (default: 1). Questions with more than 1 point show a trophy indicator.
+
+- **Stick to Previous Question** — when randomization is enabled, this keeps the question adjacent to the previous one. Useful for grouping related questions together.
+
+Questions can be reordered by dragging the handle on the left, and collapsed/expanded by clicking the arrow.
+
+#### Saving
+
+- **Save Quiz** — save the quiz and close the editor
+- **Save and Continue** — save the quiz and continue editing
+- **Cancel** — discard changes and close the editor
+
+---
+
+### Live Statistics
+
+![Live Statistics](../imgs/livestats.png)
+
+The Live Statistics page provides real-time monitoring of quiz progress for all participants. Access it via the **Live Stats** link at the bottom of any admin page.
+
+#### Filter Buttons
+
+At the top of the page, filter buttons allow you to view:
+- **All** — all registered participants
+- **In Progress** — participants currently taking the quiz
+- **Completed** — participants who have finished the quiz
+
+Each button shows the count of participants in that category.
+
+#### Statistics Grid
+
+The main area displays a grid with:
+- **User column** — participant names and their IDs
+- **Question columns** — each question text (truncated for display)
+
+#### Color Coding
+
+Each cell shows the participant's answer status:
+- **Red circle** — incorrect answer
+- **Green background** — correct answer
+- **Yellow background** — currently answering this question
+- **Empty/white** — not yet answered
+
+Each answered cell also displays the time taken to answer that question.
+
+This view allows you to monitor quiz progress in real-time and identify participants who may be struggling or need assistance.
 
 ---
 
