@@ -143,6 +143,31 @@
       background-color: var(--code-background) !important;
       color: var(--text-color) !important;
     }
+
+    /* Table styles for dark theme */
+    [data-theme="dark"] .markdown-section table {
+      border-collapse: collapse;
+    }
+
+    [data-theme="dark"] .markdown-section table tr {
+      background-color: var(--base-background-color) !important;
+      border-color: #374151 !important;
+    }
+
+    [data-theme="dark"] .markdown-section table tr:nth-child(2n) {
+      background-color: #1e293b !important;
+    }
+
+    [data-theme="dark"] .markdown-section table th,
+    [data-theme="dark"] .markdown-section table td {
+      color: var(--text-color) !important;
+      border-color: #374151 !important;
+    }
+
+    [data-theme="dark"] .markdown-section table th {
+      background-color: #334155 !important;
+      color: #fff !important;
+    }
   </style>
 </head>
 <body>
