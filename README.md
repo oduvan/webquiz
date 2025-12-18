@@ -367,12 +367,19 @@ Example:
 ```yaml
 questions:
   - question: "Easy question"
-    options: ["A", "B", "C", "D"]
+    options:
+      - "A"
+      - "B"
+      - "C"
+      - "D"
     correct_answer: 0
     # points: 1  (default, can be omitted)
 
   - question: "Hard question worth 3 points"
-    options: ["X", "Y", "Z"]
+    options:
+      - "X"
+      - "Y"
+      - "Z"
     correct_answer: 2
     points: 3  # This question is worth 3 points
 ```
@@ -565,7 +572,11 @@ CSV files are created with proper escaping and include all user response data. F
    title: "Science Quiz"
    questions:
      - question: "What is H2O?"
-       options: ["Water", "Hydrogen", "Oxygen", "Salt"]
+       options:
+         - "Water"
+         - "Hydrogen"
+         - "Oxygen"
+         - "Salt"
        correct_answer: 0
    ```
 
