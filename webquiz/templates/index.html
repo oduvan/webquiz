@@ -1003,8 +1003,9 @@
             }
         }
 
-        // Initialize theme and check for stored user ID on page load
+        // Initialize theme, preload images, and check for stored user ID on page load
         initializeTheme();
+        preloadQuizImages();  // Start preloading immediately while user fills registration form
         checkStoredUserId();
 
         async function checkStoredUserId() {
@@ -1025,9 +1026,6 @@
                         if (data.question_order) {
                             applyQuestionOrder(data.question_order);
                         }
-
-                        // Preload images for instant display during quiz
-                        preloadQuizImages();
 
                         // Show username on page
                         showUsername(currentUsername);
@@ -1132,9 +1130,6 @@
                     if (data.question_order) {
                         applyQuestionOrder(data.question_order);
                     }
-
-                    // Preload images for instant display during quiz
-                    preloadQuizImages();
 
                     // Check if approval is required
                     if (data.requires_approval && !data.approved) {

@@ -460,7 +460,7 @@ def test_very_long_quiz_titles(temp_dir):
 
 
 def test_image_preloading_function_exists(temp_dir):
-    """Test that preloadQuizImages function is defined and called after registration."""
+    """Test that preloadQuizImages function is defined and called on page load."""
     quiz_data = {
         "image_quiz.yaml": {
             "title": "Image Preload Test",
@@ -498,17 +498,10 @@ def test_image_preloading_function_exists(temp_dir):
         # Verify function creates Image objects for preloading
         assert "new Image()" in html_content, "Function should create Image objects for preloading"
 
-        # Verify preloadQuizImages is called after registration
+        # Verify preloadQuizImages is called on page load (immediately after initializeTheme)
         assert "preloadQuizImages();" in html_content, "preloadQuizImages should be called"
 
-        # Verify it's called in both registerUser and checkStoredUserId contexts
-        # Check for the comment that precedes the preload call
-        assert "// Preload images for instant display during quiz" in html_content, (
-            "preloadQuizImages should be called after registration"
-        )
-
-        # Count occurrences to ensure it's called in both registration paths
-        preload_calls = html_content.count("preloadQuizImages();")
-        assert preload_calls >= 2, (
-            f"preloadQuizImages should be called in both registerUser and checkStoredUserId, found {preload_calls} calls"
+        # Verify it's called on page load with the initialization code
+        assert "initializeTheme();\n        preloadQuizImages();" in html_content, (
+            "preloadQuizImages should be called on page load after initializeTheme"
         )
