@@ -242,3 +242,50 @@ class TestUrlFormat:
         url = config.url_format.replace("{IP}", ip).replace("{PORT}", str(port))
         # Lowercase placeholders should NOT be replaced
         assert url == "http://{ip}:{port}/"
+
+
+class TestPort80Normalization:
+    """Tests for port 80 URL normalization in admin page."""
+
+    def test_admin_page_urls_include_port_for_non_80(self):
+        """Test that admin page URLs include port number for non-80 ports."""
+        import requests
+        import re
+        from conftest import custom_webquiz_server
+
+        with custom_webquiz_server() as (proc, port):
+            # Fetch admin page
+            response = requests.get(f"http://localhost:{port}/admin/")
+            assert response.status_code == 200
+
+            # Extract NETWORK_INFO from HTML
+            html = response.text
+            match = re.search(r"const NETWORK_INFO = ({.*?});", html, re.DOTALL)
+            assert match, "NETWORK_INFO not found in admin page"
+
+            network_info = match.group(1)
+            # Verify port is included in URLs (for non-80 ports)
+            assert f":{port}/" in network_info, f"Port {port} should be in URL"
+
+    def test_normalize_url_removes_port_80(self):
+        """Test that normalize_url helper removes :80 from URLs."""
+        from webquiz.server import normalize_url
+
+        assert normalize_url("http://192.168.1.100:80/") == "http://192.168.1.100/"
+        assert normalize_url("http://10.0.0.5:80/quiz/") == "http://10.0.0.5/quiz/"
+
+    def test_normalize_url_preserves_other_ports(self):
+        """Test that normalize_url preserves non-80 ports."""
+        from webquiz.server import normalize_url
+
+        assert normalize_url("http://192.168.1.100:8080/") == "http://192.168.1.100:8080/"
+        assert normalize_url("http://10.0.0.5:3000/") == "http://10.0.0.5:3000/"
+        assert normalize_url("http://10.0.0.5:81/") == "http://10.0.0.5:81/"
+
+    def test_normalize_url_does_not_affect_8080(self):
+        """Test that :8080 in URL is not affected by :80 replacement."""
+        from webquiz.server import normalize_url
+
+        # :8080 should not be touched because we replace ":80/" not ":80"
+        assert normalize_url("http://192.168.1.100:8080/") == "http://192.168.1.100:8080/"
+        assert normalize_url("http://192.168.1.100:800/") == "http://192.168.1.100:800/"

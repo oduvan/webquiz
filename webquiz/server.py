@@ -347,6 +347,18 @@ def is_loopback_address(ip_str: str) -> bool:
         return True
 
 
+def normalize_url(url: str) -> str:
+    """Normalize URL by removing default port 80.
+
+    Args:
+        url: The URL to normalize
+
+    Returns:
+        URL with :80/ removed if present
+    """
+    return url.replace(":80/", "/")
+
+
 def get_network_interfaces(include_ipv6=False):
     """Get all network interfaces and their IP addresses.
 
@@ -3708,6 +3720,7 @@ class TestingServer:
         urls = []
         for ip in interfaces:
             url = url_format.replace("{IP}", ip).replace("{PORT}", str(port))
+            url = normalize_url(url)
             urls.append({"label": f"Network Access ({ip})", "quiz_url": url})
 
         # Prepare network info for JavaScript (only what's actually used)
