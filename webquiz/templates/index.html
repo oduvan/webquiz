@@ -1478,13 +1478,14 @@
                 if (!response.ok) {
                     // Try to parse error response as JSON
                     const errorText = await response.text();
+                    let errorMessage = errorText;
                     try {
                         const errorData = JSON.parse(errorText);
-                        throw new Error(errorData.error || errorText);
+                        errorMessage = errorData.error || errorText;
                     } catch (parseError) {
                         // If JSON parsing fails, use the raw text
-                        throw new Error(errorText);
                     }
+                    throw new Error(errorMessage);
                 }
 
                 const responseText = await response.text();
