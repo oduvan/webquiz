@@ -457,3 +457,58 @@ def test_very_long_quiz_titles(temp_dir):
         # Verify HTML structure is still valid
         assert html_content.count("<title>") == 1
         assert html_content.count("</title>") == 1
+
+
+def test_image_preloading_function_exists(temp_dir):
+    """Test that preloadQuizImages function is defined and called after registration."""
+    quiz_data = {
+        "image_quiz.yaml": {
+            "title": "Image Preload Test",
+            "questions": [
+                {
+                    "question": "Question with image?",
+                    "options": ["Yes", "No"],
+                    "correct_answer": 0,
+                    "image": "/imgs/test.jpg",
+                },
+                {
+                    # Image-based options
+                    "question": "Which option?",
+                    "options": ["/imgs/a.png", "/imgs/b.png", "/imgs/c.png"],
+                    "correct_answer": 1,
+                },
+            ],
+        }
+    }
+
+    with custom_webquiz_server(quizzes=quiz_data) as (proc, port):
+        static_path = Path(temp_dir) / f"static_{port}"
+        index_path = static_path / "index.html"
+
+        with open(index_path, "r", encoding="utf-8") as f:
+            html_content = f.read()
+
+        # Verify preloadQuizImages function is defined
+        assert "function preloadQuizImages()" in html_content, "preloadQuizImages function should be defined"
+
+        # Verify function collects image URLs from questions
+        assert "question.image" in html_content, "Function should check question.image field"
+        assert "option.startsWith('/')" in html_content, "Function should detect image options by / prefix"
+
+        # Verify function creates Image objects for preloading
+        assert "new Image()" in html_content, "Function should create Image objects for preloading"
+
+        # Verify preloadQuizImages is called after registration
+        assert "preloadQuizImages();" in html_content, "preloadQuizImages should be called"
+
+        # Verify it's called in both registerUser and checkStoredUserId contexts
+        # Check for the comment that precedes the preload call
+        assert "// Preload images for instant display during quiz" in html_content, (
+            "preloadQuizImages should be called after registration"
+        )
+
+        # Count occurrences to ensure it's called in both registration paths
+        preload_calls = html_content.count("preloadQuizImages();")
+        assert preload_calls >= 2, (
+            f"preloadQuizImages should be called in both registerUser and checkStoredUserId, found {preload_calls} calls"
+        )
