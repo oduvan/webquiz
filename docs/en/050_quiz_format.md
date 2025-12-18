@@ -17,7 +17,10 @@ show_right_answer: false
 randomize_questions: false  # true for randomized question order for each student
 questions:
   - question: "Question text"
-    options: ["Option 1", "Option 2", "Option 3"]
+    options:
+      - "Option 1"
+      - "Option 2"
+      - "Option 3"
     correct_answer: 0
 ```
 
@@ -113,14 +116,23 @@ Determines whether a question should stay adjacent to the previous question duri
 ```yaml
 questions:
   - question: "Read the text and answer questions 1-3"
-    options: ["A", "B", "C"]
+    options:
+      - "A"
+      - "B"
+      - "C"
     correct_answer: 0
   - question: "Question 2 about the text"
-    options: ["A", "B", "C"]
+    options:
+      - "A"
+      - "B"
+      - "C"
     correct_answer: 1
     stick_to_the_previous: true
   - question: "Question 3 about the text"
-    options: ["A", "B", "C"]
+    options:
+      - "A"
+      - "B"
+      - "C"
     correct_answer: 2
     stick_to_the_previous: true
 ```
@@ -144,9 +156,13 @@ Each question is a separate list item with its own parameters.
 
 The simplest form of question with text, answer options, and the correct answer index:
 
-```
+```yaml
 - question: "What is 2 + 2?"
-  options: ["3", "4", "5", "6"]
+  options:
+    - "3"
+    - "4"
+    - "5"
+    - "6"
   correct_answer: 1
 ```
 
@@ -163,9 +179,13 @@ In this example, the correct answer is `"4"` (index 1).
 Each question can have its own point value using the **`points`** parameter.
 By default, each question is worth **1 point**.
 
-```
+```yaml
 - question: "Difficult question"
-  options: ["A", "B", "C", "D"]
+  options:
+    - "A"
+    - "B"
+    - "C"
+    - "D"
   correct_answer: 2
   points: 3  # This question is worth 3 points
 ```
@@ -183,9 +203,13 @@ By default, each question is worth **1 point**.
 WebQuiz supports questions with multiple correct answers.
 In this case, the user must select **all correct options**.
 
-```
+```yaml
 - question: "Which of these are programming languages?"
-  options: ["Python", "HTML", "JavaScript", "CSS"]
+  options:
+    - "Python"
+    - "HTML"
+    - "JavaScript"
+    - "CSS"
   correct_answer: [0, 2]
 ```
 
@@ -199,9 +223,13 @@ In this example, the correct answers are `"Python"` (index 0) and `"JavaScript"`
 
 If you want the question to be considered correct when selecting a **minimum number** of all correct answers, use the **`min_correct`** parameter:
 
-```
+```yaml
 - question: "Select at least 2 primary colors:"
-  options: ["Red", "Green", "Blue", "Yellow"]
+  options:
+    - "Red"
+    - "Green"
+    - "Blue"
+    - "Yellow"
   correct_answer: [0, 2, 3]
   min_correct: 2
 ```
@@ -218,10 +246,14 @@ In this example:
 You can add an image to a question using the **`image`** parameter.
 Images should be stored in the **`quizzes/imgs/`** folder.
 
-```
+```yaml
 - question: "What is the capital of Ukraine?"
   image: "/imgs/ukraine_map.png"
-  options: ["Kyiv", "Lviv", "Odesa", "Kharkiv"]
+  options:
+    - "Kyiv"
+    - "Lviv"
+    - "Odesa"
+    - "Kharkiv"
   correct_answer: 0
 ```
 
@@ -233,9 +265,13 @@ The image path is specified relative to the web root (`/imgs/`).
 
 If a question consists only of an image (e.g., "What is shown in the picture?"), you can **omit the `question` field**:
 
-```
+```yaml
 - image: "/imgs/coordinate_system.png"
-  options: ["MGRS", "UTM", "UCS-2000", "WGS84"]
+  options:
+    - "MGRS"
+    - "UTM"
+    - "UCS-2000"
+    - "WGS84"
   correct_answer: 2
 ```
 
@@ -263,10 +299,14 @@ To do this, instead of text in the `options` list, specify paths to images:
 
 You can combine an image in the question with text answer options:
 
-```
+```yaml
 - question: "What coordinate system is shown in the picture?"
   image: "/imgs/coordinate_grid.png"
-  options: ["Cartesian", "Polar", "Cylindrical", "Spherical"]
+  options:
+    - "Cartesian"
+    - "Polar"
+    - "Cylindrical"
+    - "Spherical"
   correct_answer: 1
 ```
 
@@ -277,10 +317,14 @@ You can combine an image in the question with text answer options:
 You can add a downloadable file to a question using the **`file`** parameter.
 Files should be stored in the **`quizzes/attach/`** folder.
 
-```
+```yaml
 - question: "Analyze the data from the file and find the average"
   file: "data.xlsx"
-  options: ["42", "56", "78", "91"]
+  options:
+    - "42"
+    - "56"
+    - "78"
+    - "91"
   correct_answer: 1
 ```
 
@@ -293,11 +337,14 @@ Clicking it will automatically download the file to the student's device.
 
 You can combine an image and a file in the same question:
 
-```
+```yaml
 - question: "Compare the diagram with the data in the file"
   image: "/imgs/diagram.png"
   file: "analysis.csv"
-  options: ["Data matches", "Data differs", "Insufficient data"]
+  options:
+    - "Data matches"
+    - "Data differs"
+    - "Insufficient data"
   correct_answer: 0
 ```
 
@@ -377,29 +424,51 @@ randomize_questions: false  # Set to true for randomized question order
 questions:
   # Simple question with one correct option
   - question: "What is 5 × 3?"
-    options: ["8", "12", "15", "18"]
+    options:
+      - "8"
+      - "12"
+      - "15"
+      - "18"
     correct_answer: 2
 
   # Question with multiple correct answers
   - question: "Which of these are programming languages?"
-    options: ["Python", "HTML", "JavaScript", "CSS", "Ruby"]
+    options:
+      - "Python"
+      - "HTML"
+      - "JavaScript"
+      - "CSS"
+      - "Ruby"
     correct_answer: [0, 2, 4]
 
   # Question with minimum number of correct answers
   - question: "Select at least 2 European capitals:"
-    options: ["Paris", "New York", "London", "Tokyo", "Berlin"]
+    options:
+      - "Paris"
+      - "New York"
+      - "London"
+      - "Tokyo"
+      - "Berlin"
     correct_answer: [0, 2, 4]
     min_correct: 2
 
   # Question with image
   - question: "Which country is shown on the map?"
     image: "/imgs/france_map.png"
-    options: ["Germany", "France", "Spain", "Italy"]
+    options:
+      - "Germany"
+      - "France"
+      - "Spain"
+      - "Italy"
     correct_answer: 1
 
   # Image-only question (no text)
   - image: "/imgs/python_logo.png"
-    options: ["Java", "Python", "Ruby", "JavaScript"]
+    options:
+      - "Java"
+      - "Python"
+      - "Ruby"
+      - "JavaScript"
     correct_answer: 1
 
   # Question with image-based answer options
@@ -413,7 +482,10 @@ questions:
   # Question with downloadable file
   - question: "Analyze the data from the spreadsheet"
     file: "sales_data.xlsx"
-    options: ["Growth 15%", "Growth 25%", "Decline 10%"]
+    options:
+      - "Growth 15%"
+      - "Growth 25%"
+      - "Decline 10%"
     correct_answer: 1
 ```
 
@@ -515,18 +587,22 @@ The new test will appear in the list of available tests in the **Administration*
 YAML is sensitive to indentation. All elements at the same level must have the same indentation.
 
 **Incorrect:**
-```
+```yaml
 questions:
 - question: "Text"
-   options: ["A", "B"]
+   options:
+     - "A"
+     - "B"
   correct_answer: 0
 ```
 
 **Correct:**
-```
+```yaml
 questions:
   - question: "Text"
-    options: ["A", "B"]
+    options:
+      - "A"
+      - "B"
     correct_answer: 0
 ```
 
@@ -537,14 +613,20 @@ questions:
 If `correct_answer` specifies an index that doesn't exist in `options`, the test won't load.
 
 **Incorrect:**
-```
-options: ["A", "B", "C"]
+```yaml
+options:
+  - "A"
+  - "B"
+  - "C"
 correct_answer: 3  # Index 3 doesn't exist (only 0, 1, 2)
 ```
 
 **Correct:**
-```
-options: ["A", "B", "C"]
+```yaml
+options:
+  - "A"
+  - "B"
+  - "C"
 correct_answer: 2  # Index 2 = option "C"
 ```
 
@@ -601,21 +683,33 @@ When changing tests:
 
 #### Math Test
 
-```
+```yaml
 title: "Basic Arithmetic"
 description: "Test on arithmetic operations knowledge"
 
 questions:
   - question: "What is 7 + 5?"
-    options: ["10", "11", "12", "13"]
+    options:
+      - "10"
+      - "11"
+      - "12"
+      - "13"
     correct_answer: 2
 
   - question: "What is 9 × 6?"
-    options: ["45", "54", "63", "72"]
+    options:
+      - "45"
+      - "54"
+      - "63"
+      - "72"
     correct_answer: 1
 
   - question: "What is 20 ÷ 4?"
-    options: ["4", "5", "6", "8"]
+    options:
+      - "4"
+      - "5"
+      - "6"
+      - "8"
     correct_answer: 1
 ```
 
@@ -623,21 +717,33 @@ questions:
 
 #### Geography Test with Images
 
-```
+```yaml
 title: "Countries and Flags"
 description: "Recognizing flags of world countries"
 
 questions:
   - image: "/imgs/flag_france.png"
-    options: ["Italy", "France", "Belgium", "Netherlands"]
+    options:
+      - "Italy"
+      - "France"
+      - "Belgium"
+      - "Netherlands"
     correct_answer: 1
 
   - image: "/imgs/flag_japan.png"
-    options: ["China", "Korea", "Japan", "Vietnam"]
+    options:
+      - "China"
+      - "Korea"
+      - "Japan"
+      - "Vietnam"
     correct_answer: 2
 
   - question: "What is the capital of Germany?"
-    options: ["Munich", "Berlin", "Frankfurt", "Hamburg"]
+    options:
+      - "Munich"
+      - "Berlin"
+      - "Frankfurt"
+      - "Hamburg"
     correct_answer: 1
 ```
 
@@ -645,17 +751,27 @@ questions:
 
 #### Programming Test with Multiple Choice
 
-```
+```yaml
 title: "Programming Basics"
 show_right_answer: true
 
 questions:
   - question: "Which languages are object-oriented?"
-    options: ["Python", "C", "Java", "Assembly", "C#"]
+    options:
+      - "Python"
+      - "C"
+      - "Java"
+      - "Assembly"
+      - "C#"
     correct_answer: [0, 2, 4]
 
   - question: "Which data structures are linear?"
-    options: ["Array", "Tree", "List", "Graph", "Stack"]
+    options:
+      - "Array"
+      - "Tree"
+      - "List"
+      - "Graph"
+      - "Stack"
     correct_answer: [0, 2, 4]
     min_correct: 2
 ```
