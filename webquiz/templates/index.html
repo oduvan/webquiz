@@ -812,6 +812,36 @@
             return path;
         }
 
+        // Preload all quiz images for instant display during questions
+        function preloadQuizImages() {
+            const imageUrls = new Set();
+
+            // Collect all image URLs from questions
+            for (const question of questions) {
+                // Question image
+                if (question.image) {
+                    imageUrls.add(makeRelativePath(question.image));
+                }
+
+                // Option images (options starting with '/')
+                if (question.options && Array.isArray(question.options)) {
+                    for (const option of question.options) {
+                        if (typeof option === 'string' && option.startsWith('/')) {
+                            imageUrls.add(makeRelativePath(option));
+                        }
+                    }
+                }
+            }
+
+            // Preload each unique image
+            for (const url of imageUrls) {
+                const img = new Image();
+                img.src = url;
+            }
+
+            console.log(`Preloading ${imageUrls.size} quiz images`);
+        }
+
         // Notify server when question starts (for timing and live stats)
         async function notifyQuestionStart(questionId) {
             try {
@@ -973,8 +1003,9 @@
             }
         }
 
-        // Initialize theme and check for stored user ID on page load
+        // Initialize theme, preload images, and check for stored user ID on page load
         initializeTheme();
+        preloadQuizImages();  // Start preloading immediately while user fills registration form
         checkStoredUserId();
 
         async function checkStoredUserId() {
