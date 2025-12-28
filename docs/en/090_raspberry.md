@@ -8,7 +8,11 @@ As a result, you will have a device that automatically launches a local testing 
 ### Downloading the Ready-Made Image
 
 [Download **Raspberry Pi Image**](https://drive.google.com/file/d/1WGOqSV0EW4xdvod2N4VoU_q6p2plXO9z/view?usp=sharing).
-Use the standard **Raspberry Pi Imager** program or any other image writer to write it to an SD card.
+Use the **Raspberry Pi Imager** program or any other image writer to write it to an SD card.
+
+> ⚠️ **Important:** Use [**Raspberry Pi Imager version 1.9.6**](https://github.com/raspberrypi/rpi-imager/releases/tag/v1.9.6).
+> Starting with version 2.0, Raspberry Pi Imager no longer allows OS customization (Wi-Fi, SSH, user settings) for custom images.
+> This is an intentional change by the Raspberry Pi team — they consider such customization for custom images unsupported.
 
 During setup in **Raspberry Pi Imager**, don't forget to:
 - set the correct Wi-Fi network (SSID and password);
