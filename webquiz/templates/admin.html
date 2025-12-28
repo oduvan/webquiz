@@ -342,7 +342,6 @@
             background: var(--question-bg, #e9ecef);
             border-radius: 5px;
             cursor: pointer;
-            user-select: none;
         }
 
         .question-header:hover {
@@ -1797,7 +1796,6 @@
             const questionDiv = document.createElement('div');
             questionDiv.className = collapsed ? 'question-item collapsed' : 'question-item';
             questionDiv.dataset.questionId = questionCounter;
-            questionDiv.draggable = true;
 
             questionDiv.innerHTML = `
                 <div class="question-header" onclick="toggleQuestionCollapse(${questionCounter}, event)">
@@ -1927,6 +1925,17 @@
             questionDiv.addEventListener('dragenter', handleDragEnter);
             questionDiv.addEventListener('dragleave', handleDragLeave);
             questionDiv.addEventListener('drop', handleDrop);
+
+            // Only enable dragging when initiated from the drag handle
+            const dragHandle = questionDiv.querySelector('.drag-handle');
+            if (dragHandle) {
+                dragHandle.addEventListener('mousedown', function(e) {
+                    questionDiv.draggable = true;
+                });
+            }
+            questionDiv.addEventListener('mouseup', function() {
+                questionDiv.draggable = false;
+            });
         }
 
         function handleDragStart(e) {
@@ -1938,6 +1947,7 @@
 
         function handleDragEnd(e) {
             this.classList.remove('dragging');
+            this.draggable = false;  // Reset draggable state after drag
             document.querySelectorAll('.question-item').forEach(item => {
                 item.classList.remove('drag-over');
             });
@@ -2325,7 +2335,6 @@
                     // Start collapsed when editing existing quiz
                     questionDiv.className = 'question-item collapsed';
                     questionDiv.dataset.questionId = questionCounter;
-                    questionDiv.draggable = true;
 
                     // Check if this is a text question (has checker)
                     const isTextQuestion = 'checker' in question;
