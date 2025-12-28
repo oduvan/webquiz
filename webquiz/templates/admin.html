@@ -415,10 +415,17 @@
             font-size: 16px;
             padding: 2px 4px;
             user-select: none;
+            /* Enable dragging only from handle */
+            touch-action: none;
         }
 
         .drag-handle:active {
             cursor: grabbing;
+        }
+        
+        /* Allow text selection in question items */
+        .question-item {
+            user-select: auto;
         }
 
         .question-item.dragging {
@@ -1797,7 +1804,6 @@
             const questionDiv = document.createElement('div');
             questionDiv.className = collapsed ? 'question-item collapsed' : 'question-item';
             questionDiv.dataset.questionId = questionCounter;
-            questionDiv.draggable = true;
 
             questionDiv.innerHTML = `
                 <div class="question-header" onclick="toggleQuestionCollapse(${questionCounter}, event)">
@@ -1921,8 +1927,15 @@
         let draggedQuestion = null;
 
         function setupDragEvents(questionDiv) {
-            questionDiv.addEventListener('dragstart', handleDragStart);
-            questionDiv.addEventListener('dragend', handleDragEnd);
+            // Make only the drag handle draggable, not the entire div
+            const dragHandle = questionDiv.querySelector('.drag-handle');
+            if (dragHandle) {
+                dragHandle.draggable = true;
+                dragHandle.addEventListener('dragstart', (e) => handleDragStart.call(questionDiv, e));
+                dragHandle.addEventListener('dragend', (e) => handleDragEnd.call(questionDiv, e));
+            }
+            
+            // Drop target events on the question div
             questionDiv.addEventListener('dragover', handleDragOver);
             questionDiv.addEventListener('dragenter', handleDragEnter);
             questionDiv.addEventListener('dragleave', handleDragLeave);
@@ -1930,6 +1943,7 @@
         }
 
         function handleDragStart(e) {
+            // 'this' is the questionDiv
             draggedQuestion = this;
             this.classList.add('dragging');
             e.dataTransfer.effectAllowed = 'move';
@@ -1937,6 +1951,7 @@
         }
 
         function handleDragEnd(e) {
+            // 'this' is the questionDiv
             this.classList.remove('dragging');
             document.querySelectorAll('.question-item').forEach(item => {
                 item.classList.remove('drag-over');
@@ -2325,7 +2340,6 @@
                     // Start collapsed when editing existing quiz
                     questionDiv.className = 'question-item collapsed';
                     questionDiv.dataset.questionId = questionCounter;
-                    questionDiv.draggable = true;
 
                     // Check if this is a text question (has checker)
                     const isTextQuestion = 'checker' in question;
