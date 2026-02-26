@@ -180,7 +180,7 @@ def load_config_from_yaml(config_path: str) -> WebQuizConfig:
         WebQuizConfig object with loaded configuration or defaults if file not found
     """
     try:
-        with open(config_path, "r") as f:
+        with open(config_path, "r", encoding="utf-8") as f:
             config_data = yaml.safe_load(f)
 
         if not config_data:
