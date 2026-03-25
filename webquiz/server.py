@@ -3273,14 +3273,17 @@ class TestingServer:
         Validates YAML syntax and structure, writes to file, then hot-reloads
         configuration and restarts current quiz if one is active.
 
+        Accepts two formats:
+        - {"content": "yaml string"} — direct YAML content (existing flow)
+        - {"data": {section: {...}}} — JSON partial update (merges into existing config)
+
         Args:
             request: aiohttp request with config content
 
         Returns:
-            JSON response with success status
+            JSON response with success status, config_content and config_data
         """
-        data = await request.json()
-        content = data.get("content", "").strip()
+        request_data = await request.json()
 
         # Get config file path (use the actual path that was loaded)
         config_path = self.config.config_path
@@ -3288,6 +3291,37 @@ class TestingServer:
             return web.json_response(
                 {"error": "No config file was specified. Server started without --config parameter."}, status=400
             )
+
+        # Determine format: JSON data merge or direct YAML content
+        if "data" in request_data:
+            # JSON partial update: merge into existing config
+            merge_data = request_data["data"]
+            if not isinstance(merge_data, dict):
+                return web.json_response({"error": "data must be a dictionary"}, status=400)
+
+            # Read current config
+            current_config = {}
+            if os.path.exists(config_path):
+                try:
+                    async with aiofiles.open(config_path, "r", encoding="utf-8") as f:
+                        current_content = await f.read()
+                    current_config = yaml.safe_load(current_content) if current_content.strip() else {}
+                    if not isinstance(current_config, dict):
+                        current_config = {}
+                except Exception:
+                    current_config = {}
+
+            # Deep merge provided data into current config
+            for section_key, section_value in merge_data.items():
+                if isinstance(section_value, dict) and isinstance(current_config.get(section_key), dict):
+                    current_config[section_key].update(section_value)
+                else:
+                    current_config[section_key] = section_value
+
+            # Serialize merged config to YAML
+            content = yaml.dump(current_config, default_flow_style=False, allow_unicode=True, sort_keys=False)
+        else:
+            content = request_data.get("content", "").strip()
 
         # Validate YAML syntax
         try:
@@ -3357,12 +3391,29 @@ class TestingServer:
         else:
             message = "Configuration saved and applied."
 
+        # Read back saved content and parse for response
+        saved_content = ""
+        saved_data = {"registration": {}}
+        try:
+            async with aiofiles.open(config_path, "r", encoding="utf-8") as f:
+                saved_content = await f.read()
+            parsed = yaml.safe_load(saved_content) if saved_content.strip() else {}
+            if parsed and isinstance(parsed, dict):
+                registration = parsed.get("registration", {})
+                if not isinstance(registration, dict):
+                    registration = {}
+                saved_data = {"registration": registration}
+        except Exception:
+            pass
+
         return web.json_response(
             {
                 "success": True,
                 "message": message,
                 "config_path": config_path,
                 "restart_required": restart_reasons,
+                "config_content": saved_content,
+                "config_data": saved_data,
             }
         )
 
@@ -3423,10 +3474,20 @@ class TestingServer:
         # Read config file content (only if config file was provided)
         config_path = self.config.config_path
         config_content = ""
+        config_data_json = "null"
         if config_path and os.path.exists(config_path):
             try:
                 with open(config_path, "r", encoding="utf-8") as f:
                     config_content = f.read()
+                # Parse config to provide structured JSON data for form editor
+                parsed = yaml.safe_load(config_content) if config_content.strip() else {}
+                if parsed and isinstance(parsed, dict):
+                    registration = parsed.get("registration", {})
+                    if not isinstance(registration, dict):
+                        registration = {}
+                    config_data_json = json.dumps({"registration": registration})
+                else:
+                    config_data_json = json.dumps({"registration": {}})
             except Exception as e:
                 logger.warning(f"Could not read config file: {e}")
 
@@ -3435,6 +3496,7 @@ class TestingServer:
             const IS_TRUSTED_IP = {str(is_trusted_ip).lower()};
             const CONFIG_CONTENT = {json.dumps(config_content) if config_path else 'null'};
             const CONFIG_PATH = {json.dumps(config_path) if config_path else 'null'};
+            const CONFIG_DATA = {config_data_json if config_path else 'null'};
         """
 
         # Inject the JavaScript variables before </head>

@@ -40,7 +40,7 @@ WebQuiz - Python/aiohttp quiz system with multi-quiz management, real-time WebSo
 
 **Admin (session cookie required, local network only):**
 - `POST /api/admin/auth` - Authenticate with master key in request body (`{"master_key": "..."}`)
-- `GET /api/admin/check-session`, `GET /api/admin/version-check`, `PUT /api/admin/approve-user`, `POST /api/admin/force-show-answers`, `GET /api/admin/list-quizzes`, `POST /api/admin/switch-quiz`, `PUT /api/admin/config`
+- `GET /api/admin/check-session`, `GET /api/admin/version-check`, `PUT /api/admin/approve-user`, `POST /api/admin/force-show-answers`, `GET /api/admin/list-quizzes`, `POST /api/admin/switch-quiz`, `PUT /api/admin/config` (accepts `{content: yaml}` or `{data: {section: {...}}}` for JSON partial update; response includes `config_content` and `config_data`)
 - Quiz management: `GET /api/admin/quiz/{filename}`, `POST /api/admin/create-quiz`, `PUT /api/admin/quiz/{filename}`, `DELETE /api/admin/quiz/{filename}`, `POST /api/admin/download-quiz`, `POST /api/admin/unite-quizzes`
 - Quiz file attachments: `GET /api/admin/list-files` (list files in quizzes/attach/)
 - Checker templates: `GET /api/admin/list-checker-templates` (list configured checker templates for text questions)
@@ -155,6 +155,7 @@ webquiz-stress-test -c 50
 - **Manual answer revelation** - Admin can click "Show Answers" button to force `all_students_completed()` to return true, triggering existing answer visibility logic. Button only visible when quiz has `show_answers_on_completion: true`. Affects all students who complete after button click (including new registrations). One-way action (cannot be undone until quiz switch). Endpoint: `POST /api/admin/force-show-answers` (admin-auth required). Flag `force_all_completed` resets on quiz switch.
 - **Quiz renaming** - Admin can rename quizzes via editor modal. Backend renames physical file with validation. **Active quiz cannot be renamed** (must switch to different quiz first, returns 409 error). CSV files retain old quiz name prefix (historical data preservation). Prevents filename conflicts with 409 status code.
 - **Image preloading** - All quiz images (question images and image options) are preloaded immediately on page load. Uses `new Image()` to cache images in browser while user fills registration form. Images from options starting with `/` are detected as image paths. Ensures instant image display during quiz.
+- **Config form editor** - File manager Config tab has Form/YAML toggle. Form view provides structured editing for registration config (approve, username_label, fields). Form sends JSON partial updates via `PUT /api/admin/config` with `{data: {section: {...}}}` format — backend merges into existing YAML config. YAML view remains for direct editing. Both views sync after save (response includes `config_content` and `config_data`). Switching views with unsaved changes triggers confirm dialog. No external JS dependencies — server injects `CONFIG_DATA` as parsed JSON alongside `CONFIG_CONTENT`.
 
 ## Key Flows
 

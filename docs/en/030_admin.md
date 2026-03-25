@@ -121,8 +121,17 @@ This view makes it easy to analyze quiz results without downloading the file.
 
 ![Config Tab](../imgs/file_manager_config.png)
 
-The **Config** tab displays the server configuration file in a YAML editor. You can:
-- View and edit all configuration settings
+The **Config** tab provides two ways to edit the server configuration:
+
+**Form view** (default) — a structured form for editing registration settings:
+- **Require admin approval** — checkbox to enable/disable approval workflow
+- **Username label** — customize the label for the username field
+- **Additional registration fields** — add/remove extra fields (e.g., Grade, School)
+
+**YAML view** — a text editor for direct YAML editing with full access to all configuration options.
+
+Use the **Form** / **YAML** toggle to switch between views. If you have unsaved changes, you will be asked to confirm before switching. After saving, both views are automatically updated.
+
 - Click **Save Configuration** to save changes
 - Changes are validated before saving, and a backup is created automatically
 

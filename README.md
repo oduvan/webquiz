@@ -13,7 +13,7 @@ A modern web-based quiz and testing system built with Python and aiohttp that al
 - **Dynamic Answer Visibility**: Optional delayed answer reveal - show correct answers only after all students complete
 - **Manual Answer Control**: Admin button to reveal answers immediately without waiting for all students
 - **Dynamic Quiz Switching**: Real-time quiz switching with automatic server state reset
-- **Config File Editor**: Web-based configuration editor with real-time validation
+- **Config File Editor**: Web-based configuration editor with Form and YAML views, real-time validation
 - **Live Statistics**: Real-time WebSocket-powered dashboard showing user progress
 - **Real-time Validation**: Server-side answer checking with immediate feedback
 - **Session Persistence**: Cookie-based user sessions for seamless experience
@@ -259,7 +259,7 @@ The project has **222+ tests** across **15 test files** covering:
 - **Admin API** (14 tests): Admin interface and authentication
 - **Admin Quiz Management** (18 tests): Quiz switching and management
 - **Admin Quiz Editor** (7 tests): Wizard mode quiz creation with randomize_questions and show_answers_on_completion
-- **Config Management** (16 tests): Config editor and validation
+- **Config Management** (23 tests): Config editor, validation, and form-based JSON updates
 - **Registration Approval** (20 tests): Approval workflow and timing
 - **Files Management** (32 tests): File manager interface
 - **Index Generation** (13 tests): Template generation tests

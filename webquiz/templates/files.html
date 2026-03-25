@@ -514,6 +514,152 @@
         .theme-toggle:hover {
             background: var(--border-color);
         }
+
+        /* Config Form Editor */
+        .config-view-toggle {
+            display: flex;
+            gap: 0;
+            margin-bottom: 20px;
+            border-bottom: 2px solid var(--border-color);
+        }
+
+        .config-toggle-btn {
+            padding: 10px 20px;
+            cursor: pointer;
+            background: transparent;
+            border: none;
+            border-bottom: 3px solid transparent;
+            font-size: 14px;
+            font-weight: 500;
+            color: var(--tab-inactive);
+            transition: all 0.3s ease;
+            margin: 0;
+        }
+
+        .config-toggle-btn:hover {
+            background: var(--light-bg);
+            color: var(--text-color);
+        }
+
+        .config-toggle-btn.active {
+            color: var(--tab-active);
+            border-bottom-color: var(--tab-active);
+        }
+
+        .config-form-section {
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 15px;
+            background: var(--light-bg);
+        }
+
+        .config-form-section h3 {
+            margin: 0 0 15px 0;
+            color: var(--text-color);
+            font-size: 16px;
+        }
+
+        .config-form-group {
+            margin-bottom: 15px;
+        }
+
+        .config-form-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: 500;
+            color: var(--text-color);
+        }
+
+        .config-form-group input[type="text"] {
+            width: 100%;
+            padding: 8px 10px;
+            border: 1px solid var(--border-color);
+            border-radius: 5px;
+            font-size: 14px;
+            box-sizing: border-box;
+            background: var(--container-bg);
+            color: var(--text-color);
+        }
+
+        .config-checkbox-group {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 15px;
+        }
+
+        .config-checkbox-group input[type="checkbox"] {
+            width: 18px;
+            height: 18px;
+            cursor: pointer;
+        }
+
+        .config-checkbox-group label {
+            font-weight: 500;
+            color: var(--text-color);
+            cursor: pointer;
+            margin-bottom: 0;
+        }
+
+        .config-list-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 8px;
+        }
+
+        .config-list-item input[type="text"] {
+            flex: 1;
+            padding: 8px 10px;
+            border: 1px solid var(--border-color);
+            border-radius: 5px;
+            font-size: 14px;
+            box-sizing: border-box;
+            background: var(--container-bg);
+            color: var(--text-color);
+        }
+
+        .config-list-remove-btn {
+            background: var(--danger-red);
+            color: white;
+            border: none;
+            border-radius: 5px;
+            padding: 6px 10px;
+            cursor: pointer;
+            font-size: 14px;
+            min-width: auto;
+            margin: 0;
+        }
+
+        .config-list-remove-btn:hover {
+            background: var(--danger-red-hover);
+        }
+
+        .config-list-add-btn {
+            background: var(--success-green);
+            color: white;
+            border: none;
+            border-radius: 5px;
+            padding: 8px 16px;
+            cursor: pointer;
+            font-size: 14px;
+            margin: 5px 0 0 0;
+        }
+
+        .config-list-add-btn:hover {
+            background: var(--success-green-hover);
+        }
+
+        @media (max-width: 768px) {
+            .config-form-section {
+                padding: 15px;
+            }
+
+            .config-view-toggle {
+                overflow-x: auto;
+            }
+        }
     </style>
 </head>
 <body>
@@ -577,7 +723,40 @@
             <div id="config-tab" class="tab-content">
 
                 <div class="form-group">
-                    <label for="config-editor">Configuration File: <span id="config-file-path" style="font-weight: normal; color: var(--text-muted);"></span></label>
+                    <label>Configuration File: <span id="config-file-path" style="font-weight: normal; color: var(--text-muted);"></span></label>
+                </div>
+
+                <!-- View Toggle -->
+                <div class="config-view-toggle">
+                    <button class="config-toggle-btn active" data-view="form" onclick="switchConfigView('form')">Form</button>
+                    <button class="config-toggle-btn" data-view="yaml" onclick="switchConfigView('yaml')">YAML</button>
+                </div>
+
+                <!-- Form View -->
+                <div id="config-form-view">
+                    <div class="config-form-section">
+                        <h3>Registration</h3>
+
+                        <div class="config-checkbox-group">
+                            <input type="checkbox" id="cfg-reg-approve">
+                            <label for="cfg-reg-approve">Require admin approval</label>
+                        </div>
+
+                        <div class="config-form-group">
+                            <label for="cfg-reg-username-label">Username label:</label>
+                            <input type="text" id="cfg-reg-username-label" placeholder="Ім'я користувача">
+                        </div>
+
+                        <div class="config-form-group">
+                            <label>Additional registration fields:</label>
+                            <div id="cfg-reg-fields-list"></div>
+                            <button class="config-list-add-btn" onclick="addRegistrationField()">+ Add Field</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- YAML View -->
+                <div id="config-yaml-view" style="display: none;">
                     <textarea id="config-editor" rows="25" style="width: 100%; font-family: 'Courier New', monospace; font-size: 14px; padding: 10px; border: 1px solid var(--border-color); border-radius: 5px; box-sizing: border-box;"></textarea>
                 </div>
 
@@ -1042,6 +1221,11 @@
             }
         });
 
+        // Config editor state
+        let currentConfigView = 'form';
+        let formDirty = false;
+        let yamlDirty = false;
+
         // Config editor functions
         function initializeConfigEditor() {
             // Only show config tab if a config file was provided
@@ -1051,13 +1235,127 @@
                     document.getElementById('config-editor').value = CONFIG_CONTENT;
                 }
                 document.getElementById('config-file-path').textContent = CONFIG_PATH;
+
+                // Populate form from CONFIG_DATA
+                if (typeof CONFIG_DATA !== 'undefined' && CONFIG_DATA !== null) {
+                    populateRegistrationForm(CONFIG_DATA.registration || {});
+                }
+
+                // Track dirty state for YAML textarea
+                document.getElementById('config-editor').addEventListener('input', function() {
+                    yamlDirty = true;
+                });
             }
         }
 
+        function populateRegistrationForm(reg) {
+            document.getElementById('cfg-reg-approve').checked = !!reg.approve;
+            document.getElementById('cfg-reg-username-label').value = reg.username_label || '';
+
+            // Populate fields list
+            const container = document.getElementById('cfg-reg-fields-list');
+            container.innerHTML = '';
+            if (reg.fields && Array.isArray(reg.fields)) {
+                reg.fields.forEach(function(fieldName) {
+                    addRegistrationField(fieldName);
+                });
+            }
+            formDirty = false;
+        }
+
+        function addRegistrationField(value) {
+            const container = document.getElementById('cfg-reg-fields-list');
+            const item = document.createElement('div');
+            item.className = 'config-list-item';
+
+            const input = document.createElement('input');
+            input.type = 'text';
+            input.value = value || '';
+            input.placeholder = 'Field name';
+            input.addEventListener('input', function() { formDirty = true; });
+
+            const removeBtn = document.createElement('button');
+            removeBtn.className = 'config-list-remove-btn';
+            removeBtn.textContent = '\u2715';
+            removeBtn.onclick = function() {
+                item.remove();
+                formDirty = true;
+            };
+
+            item.appendChild(input);
+            item.appendChild(removeBtn);
+            container.appendChild(item);
+            formDirty = true;
+        }
+
+        function getFormData() {
+            const reg = {};
+            reg.approve = document.getElementById('cfg-reg-approve').checked;
+            reg.username_label = document.getElementById('cfg-reg-username-label').value;
+
+            const fieldInputs = document.querySelectorAll('#cfg-reg-fields-list .config-list-item input');
+            reg.fields = [];
+            fieldInputs.forEach(function(input) {
+                const val = input.value.trim();
+                if (val) {
+                    reg.fields.push(val);
+                }
+            });
+
+            return { registration: reg };
+        }
+
+        function switchConfigView(view) {
+            if (view === currentConfigView) return;
+
+            // Check for unsaved changes in current view
+            const isDirty = currentConfigView === 'form' ? formDirty : yamlDirty;
+            if (isDirty) {
+                if (!confirm('You have unsaved changes. Switch anyway?')) {
+                    return;
+                }
+            }
+
+            currentConfigView = view;
+
+            // Toggle view visibility
+            document.getElementById('config-form-view').style.display = view === 'form' ? '' : 'none';
+            document.getElementById('config-yaml-view').style.display = view === 'yaml' ? '' : 'none';
+
+            // Toggle active button
+            document.querySelectorAll('.config-toggle-btn').forEach(function(btn) {
+                btn.classList.toggle('active', btn.getAttribute('data-view') === view);
+            });
+        }
+
+        function trackFormDirty() {
+            document.getElementById('cfg-reg-approve').addEventListener('change', function() { formDirty = true; });
+            document.getElementById('cfg-reg-username-label').addEventListener('input', function() { formDirty = true; });
+        }
+
+        function updateBothViews(configContent, configData) {
+            // Update YAML textarea
+            if (configContent !== undefined) {
+                document.getElementById('config-editor').value = configContent;
+            }
+            // Update form
+            if (configData && configData.registration !== undefined) {
+                populateRegistrationForm(configData.registration);
+            }
+            formDirty = false;
+            yamlDirty = false;
+        }
+
         async function saveConfig() {
-            const content = document.getElementById('config-editor').value;
             const messageArea = document.getElementById('config-message-area');
             messageArea.innerHTML = '';
+
+            let body;
+            if (currentConfigView === 'form') {
+                body = { data: getFormData() };
+            } else {
+                body = { content: document.getElementById('config-editor').value };
+            }
 
             try {
                 const response = await fetch('/api/admin/config', {
@@ -1065,23 +1363,25 @@
                     headers: {
                         'Content-Type': 'application/json'
                     },
-                    body: JSON.stringify({ content }),
+                    body: JSON.stringify(body),
                     credentials: 'same-origin'
                 });
 
                 const data = await response.json();
 
                 if (response.ok) {
-                    messageArea.innerHTML = `<div class="message success">${data.message}</div>`;
+                    messageArea.innerHTML = '<div class="message success">' + data.message + '</div>';
+                    // Update both views from response
+                    updateBothViews(data.config_content, data.config_data);
                 } else {
                     let errorMessage = data.error || 'Failed to save configuration';
                     if (data.errors && data.errors.length > 0) {
-                        errorMessage += ':<ul>' + data.errors.map(err => `<li>${err}</li>`).join('') + '</ul>';
+                        errorMessage += ':<ul>' + data.errors.map(function(err) { return '<li>' + err + '</li>'; }).join('') + '</ul>';
                     }
-                    messageArea.innerHTML = `<div class="message error">${errorMessage}</div>`;
+                    messageArea.innerHTML = '<div class="message error">' + errorMessage + '</div>';
                 }
             } catch (error) {
-                messageArea.innerHTML = `<div class="message error">Error: ${error.message}</div>`;
+                messageArea.innerHTML = '<div class="message error">Error: ' + error.message + '</div>';
             }
         }
 
@@ -1089,6 +1389,7 @@
         function initializePanelData() {
             loadFiles();
             initializeConfigEditor();
+            trackFormDirty();
         }
 
         // Auto-authenticate function that shows files panel
