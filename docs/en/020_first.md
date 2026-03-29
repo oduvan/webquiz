@@ -13,7 +13,8 @@ The easiest way to start using **WebQuiz** is by running the prebuilt binary fil
 2. Download the binary file that matches your operating system (Windows, macOS, or Linux).
 3. If the file comes as an archive, extract it into any folder you prefer.
 4. Run the file:
-   - **Windows:** double-click `webquiz.exe` or run it from the command line.
+   - **Windows (Installer):** download `webquiz-windows-setup.exe`, run the installer, and launch WebQuiz from the Start Menu.
+   - **Windows (Portable):** extract `webquiz-windows.exe.zip`, then double-click `webquiz.exe` or run it from the command line.
    - **macOS / Linux:** first grant execution permission:
      ```
      chmod +x webquiz

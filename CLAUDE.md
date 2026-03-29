@@ -26,6 +26,7 @@ WebQuiz - Python/aiohttp quiz system with multi-quiz management, real-time WebSo
 - `webquiz/tunnel.py` - SSH tunnel manager for public access
 - `webquiz/cli.py` - CLI with daemon support
 - `webquiz/build.py` - PyInstaller build script
+- `installer/webquiz.iss` - Inno Setup script for Windows installer
 - `webquiz/templates/` - index.html, admin.html, files.html, live_stats.html
 - `tests/` - Test suite
 - `docs/uk/`, `docs/en/` - Documentation (compiled to PDF with version)
@@ -125,6 +126,7 @@ webquiz-stress-test -c 50
 - **Live stats first question** uses user's actual first from `question_order` (prevents duplicates)
 - **Two-group live stats** - Users split into "In Progress" and "Completed" groups, automatically move on completion
 - **Multi-platform binaries** via GitHub Actions (macOS-13 Intel, macOS-14 ARM64, Linux, Windows)
+- **Windows installer** - Inno Setup script (`installer/webquiz.iss`) builds `webquiz-windows-setup.exe` with Start Menu shortcut and Add/Remove Programs uninstaller. Built in CI alongside portable ZIP. Version injected via `/DMyAppVersion` flag.
 - **Coverage excludes build tools**: build.py and binary_entry.py omitted from coverage (not runtime code)
 - **Wizard-only quiz editor** - Admin panel uses wizard mode only; YAML editing available in file manager with validation
 - **File manager quiz editing** - Direct YAML editing with validation button, automatic backup, and active quiz reload
@@ -196,7 +198,7 @@ webquiz-stress-test -c 50
 ## Release
 **Trigger**: GitHub Actions → "Release and Deploy to PyPI" → Enter version (X.Y.Z)
 
-**Process**: Build binaries (Linux, macOS Intel/ARM64, Windows) → Update versions → Generate PDFs (uk/en) → Publish to PyPI → Create GitHub release with 8 assets (2 Python packages + 4 zipped binaries + 2 PDFs) → Deploy GitHub Pages
+**Process**: Build binaries (Linux, macOS Intel/ARM64, Windows) → Build Windows installer (Inno Setup) → Update versions → Generate PDFs (uk/en) → Publish to PyPI → Create GitHub release with 9 assets (2 Python packages + 4 zipped binaries + 1 Windows installer + 2 PDFs) → Deploy GitHub Pages
 
 **Note**: macOS builds on separate runners (macos-15-intel Intel, macos-15 ARM64)
 

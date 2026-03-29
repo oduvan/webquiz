@@ -126,11 +126,26 @@ jobs:
         cd dist
         Compress-Archive -Path ${{ matrix.binary_name }} -DestinationPath ${{ matrix.binary_name }}.zip
 
+    - name: Build Windows installer
+      if: runner.os == 'Windows'
+      run: |
+        choco install innosetup --yes
+        Copy-Item "dist\${{ matrix.binary_name }}" "installer\webquiz.exe"
+        & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" /DMyAppVersion="${{ github.event.inputs.version }}" installer\webquiz.iss
+
     - name: Upload binary artifact
       uses: actions/upload-artifact@v4
       with:
         name: ${{ matrix.artifact_name }}
         path: dist/${{ matrix.binary_name }}.zip
+        retention-days: 1
+
+    - name: Upload installer artifact
+      if: runner.os == 'Windows'
+      uses: actions/upload-artifact@v4
+      with:
+        name: webquiz-windows-setup
+        path: installer/webquiz-windows-setup.exe
         retention-days: 1
 
   release:
@@ -250,6 +265,7 @@ jobs:
         - **macOS Intel**: `webquiz-macos-intel.zip` (x86_64, no Python required)
         - **macOS Apple Silicon**: `webquiz-macos-apple-silicon.zip` (ARM64/M1/M2/M3, no Python required)
         - **Windows**: `webquiz-windows.exe.zip` (x86_64, no Python required)
+        - **Windows Installer**: `webquiz-windows-setup.exe` (x86_64, installs with Start Menu shortcut and uninstaller)
 
         ### 📖 Documentation
         - Ukrainian: `webquiz-documentation-uk.pdf`
@@ -289,7 +305,11 @@ jobs:
         ./webquiz-macos-apple-silicon --help
         ```
 
-        **Windows:**
+        **Windows (Installer - Recommended):**
+        Download `webquiz-windows-setup.exe` and run the installer.
+        WebQuiz will be available from the Start Menu.
+
+        **Windows (Portable):**
         ```powershell
         # Download webquiz-windows.exe.zip from assets, extract, then run:
         webquiz-windows.exe --help
@@ -318,7 +338,8 @@ jobs:
           binaries/webquiz-linux/webquiz-linux.zip \
           binaries/webquiz-macos-intel/webquiz-macos-intel.zip \
           binaries/webquiz-macos-apple-silicon/webquiz-macos-apple-silicon.zip \
-          binaries/webquiz-windows.exe/webquiz-windows.exe.zip
+          binaries/webquiz-windows.exe/webquiz-windows.exe.zip \
+          binaries/webquiz-windows-setup/webquiz-windows-setup.exe
 
     - name: Update webquiz-ansible repository
       env:
