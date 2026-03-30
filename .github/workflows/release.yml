@@ -263,8 +263,8 @@ jobs:
         ### 🖥️ Pre-built Binaries (Zipped)
         - **Linux**: `webquiz-linux.zip` (x86_64, no Python required)
         - **macOS Intel**: `webquiz-macos-intel.zip` (x86_64, no Python required)
-        - **macOS Apple Silicon**: `webquiz-macos-apple-silicon.zip` (ARM64/M1/M2/M3, no Python required)
-        - **Windows**: `webquiz-windows.exe.zip` (x86_64, no Python required)
+        - **macOS Apple Silicon**: `webquiz-macos-apple-silicon.zip` (ARM64/M1-M5, no Python required)
+        - **Windows Portable**: `webquiz-windows.exe.zip` (x86_64, no Python required)
         - **Windows Installer**: `webquiz-windows-setup.exe` (x86_64, installs with Start Menu shortcut and uninstaller)
 
         ### 📖 Documentation
@@ -297,7 +297,7 @@ jobs:
         ./webquiz-macos-intel --help
         ```
 
-        **macOS Apple Silicon (ARM64/M1/M2/M3):**
+        **macOS Apple Silicon (ARM64/M1-M5):**
         ```bash
         wget https://github.com/oduvan/webquiz/releases/download/v${{ github.event.inputs.version }}/webquiz-macos-apple-silicon.zip
         unzip webquiz-macos-apple-silicon.zip
