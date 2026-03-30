@@ -28,6 +28,9 @@ PrivilegesRequiredOverridesAllowed=dialog
 [Languages]
 Name: "english"; MessagesFile: "compiler:Default.isl"
 
+[Dirs]
+Name: "{app}"; Permissions: users-modify
+
 [Files]
 Source: "{#MyAppExeName}"; DestDir: "{app}"; Flags: ignoreversion
 
