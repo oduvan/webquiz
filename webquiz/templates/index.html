@@ -809,6 +809,7 @@
         let currentUserId = null;
         let questions = {{QUESTIONS_DATA}};
         let showRightAnswer = {{SHOW_RIGHT_ANSWER}};
+        let showFinalList = {{SHOW_FINAL_LIST}};
         let currentQuestionIndex = 0;
         let selectedAnswer = null;
         let selectedAnswers = []; // For multiple choice questions
@@ -1793,43 +1794,48 @@
             const totalTime = testResults.reduce((sum, r) => sum + r.timeTaken, 0);
             const avgTime = totalTime / totalCount;
 
-            // Build table with results using CSS classes
+            // Build results content
             let tableContent = `
                 <p><strong>Результат:</strong> ${correctCount}/${totalCount} (${percentage}%)</p>
-                <table class="results-table">
-                    <thead>
-                        <tr>
-                            <th>Питання</th>
-                            <th>Ваша відповідь</th>
-                            <th style="text-align: center;">Зараховано</th>
-                        </tr>
-                    </thead>
-                    <tbody>
             `;
 
-            testResults.forEach((result, index) => {
-                // Note: testResults uses different property names than server data
-                const correctAnswer = (questions[index] && questions[index].correct_answer !== undefined) ? questions[index].options[questions[index].correct_answer] : null;
+            if (showFinalList) {
                 tableContent += `
-                    <tr>
-                        <td data-label="Питання">${formatQuestionForDisplay(result.question, result.image, result.file)}</td>
-                        <td data-label="Ваша відповідь">
-                            <span class="${result.isCorrect === true ? 'answer-correct' : (result.isCorrect === false ? 'answer-incorrect' : '')}">
-                                ${formatAnswerForDisplay(result.selectedAnswer)}
-                            </span>
-                            ${result.isCorrect === false && correctAnswer && showRightAnswer ? `<div class="correct-answer-hint">Правильна: ${formatAnswerForDisplay(correctAnswer)}</div>` : ''}
-                        </td>
-                        <td data-label="Правильно" style="text-align: center;">
-                            ${result.isCorrect !== null ? `<span class="${result.isCorrect ? 'correct' : 'incorrect'}" style="font-size: 18px;">${result.isCorrect ? '✓' : '✗'}</span>` : '<span style="color: #666;">—</span>'}
-                        </td>
-                    </tr>
+                    <table class="results-table">
+                        <thead>
+                            <tr>
+                                <th>Питання</th>
+                                <th>Ваша відповідь</th>
+                                <th style="text-align: center;">Зараховано</th>
+                            </tr>
+                        </thead>
+                        <tbody>
                 `;
-            });
 
-            tableContent += `
-                    </tbody>
-                </table>
-            `;
+                testResults.forEach((result, index) => {
+                    // Note: testResults uses different property names than server data
+                    const correctAnswer = (questions[index] && questions[index].correct_answer !== undefined) ? questions[index].options[questions[index].correct_answer] : null;
+                    tableContent += `
+                        <tr>
+                            <td data-label="Питання">${formatQuestionForDisplay(result.question, result.image, result.file)}</td>
+                            <td data-label="Ваша відповідь">
+                                <span class="${result.isCorrect === true ? 'answer-correct' : (result.isCorrect === false ? 'answer-incorrect' : '')}">
+                                    ${formatAnswerForDisplay(result.selectedAnswer)}
+                                </span>
+                                ${result.isCorrect === false && correctAnswer && showRightAnswer ? `<div class="correct-answer-hint">Правильна: ${formatAnswerForDisplay(correctAnswer)}</div>` : ''}
+                            </td>
+                            <td data-label="Правильно" style="text-align: center;">
+                                ${result.isCorrect !== null ? `<span class="${result.isCorrect ? 'correct' : 'incorrect'}" style="font-size: 18px;">${result.isCorrect ? '✓' : '✗'}</span>` : '<span style="color: #666;">—</span>'}
+                            </td>
+                        </tr>
+                    `;
+                });
+
+                tableContent += `
+                        </tbody>
+                    </table>
+                `;
+            }
 
             container.innerHTML = tableContent;
 
@@ -1866,7 +1872,7 @@
                 ? `<p><strong>Бали:</strong> ${earnedPoints}/${totalPoints} (${pointsPercentage}%)</p>`
                 : '';
 
-            container.innerHTML = `
+            let resultsHtml = `
                 <p><strong>Результат:</strong> ${correctCount}/${totalCount} (${percentage}%)</p>
                 ${pointsDisplay}
                 ${shouldShowWaitingMessage ? `
@@ -1878,34 +1884,41 @@
                         </button>
                     </div>
                 ` : ''}
-                <table class="results-table">
-                    <thead>
-                        <tr>
-                            <th>Питання</th>
-                            <th>Ваша відповідь</th>
-                            <th style="text-align: center;">Правильно</th>
-                            ${hasCustomPoints ? '<th style="text-align: center;">Бали</th>' : ''}
-                        </tr>
-                    </thead>
-                    <tbody>
-                        ${finalResults.test_results.map((result, index) => `
-                            <tr>
-                                <td data-label="Питання">${formatQuestionForDisplay(result.question, result.image, result.file)}</td>
-                                <td data-label="Ваша відповідь">
-                                    <span class="${result.is_correct === true ? 'answer-correct' : (result.is_correct === false ? 'answer-incorrect' : '')}">
-                                        ${formatAnswerForDisplay(result.selected_answer)}
-                                    </span>
-                                    ${result.is_correct === false && result.correct_answer && (showRightAnswer || hasCorrectAnswers) ? `<div class="correct-answer-hint">Правильна: ${formatAnswerForDisplay(result.correct_answer)}</div>` : ''}
-                                </td>
-                                <td data-label="Правильно" style="text-align: center;">
-                                    ${result.is_correct !== undefined ? `<span class="${result.is_correct ? 'correct' : 'incorrect'}" style="font-size: 18px;">${result.is_correct ? '✓' : '✗'}</span>` : '<span style="color: #666;">не відомо</span>'}
-                                </td>
-                                ${hasCustomPoints ? `<td data-label="Бали" style="text-align: center;">${result.earned_points !== undefined ? result.earned_points : (result.is_correct ? (result.points || 1) : 0)}/${result.points || 1}</td>` : ''}
-                            </tr>
-                        `).join('')}
-                    </tbody>
-                </table>
             `;
+
+            if (showFinalList) {
+                resultsHtml += `
+                    <table class="results-table">
+                        <thead>
+                            <tr>
+                                <th>Питання</th>
+                                <th>Ваша відповідь</th>
+                                <th style="text-align: center;">Правильно</th>
+                                ${hasCustomPoints ? '<th style="text-align: center;">Бали</th>' : ''}
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${finalResults.test_results.map((result, index) => `
+                                <tr>
+                                    <td data-label="Питання">${formatQuestionForDisplay(result.question, result.image, result.file)}</td>
+                                    <td data-label="Ваша відповідь">
+                                        <span class="${result.is_correct === true ? 'answer-correct' : (result.is_correct === false ? 'answer-incorrect' : '')}">
+                                            ${formatAnswerForDisplay(result.selected_answer)}
+                                        </span>
+                                        ${result.is_correct === false && result.correct_answer && (showRightAnswer || hasCorrectAnswers) ? `<div class="correct-answer-hint">Правильна: ${formatAnswerForDisplay(result.correct_answer)}</div>` : ''}
+                                    </td>
+                                    <td data-label="Правильно" style="text-align: center;">
+                                        ${result.is_correct !== undefined ? `<span class="${result.is_correct ? 'correct' : 'incorrect'}" style="font-size: 18px;">${result.is_correct ? '✓' : '✗'}</span>` : '<span style="color: #666;">не відомо</span>'}
+                                    </td>
+                                    ${hasCustomPoints ? `<td data-label="Бали" style="text-align: center;">${result.earned_points !== undefined ? result.earned_points : (result.is_correct ? (result.points || 1) : 0)}/${result.points || 1}</td>` : ''}
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+                `;
+            }
+
+            container.innerHTML = resultsHtml;
 
             document.getElementById('results').classList.remove('hidden');
         }

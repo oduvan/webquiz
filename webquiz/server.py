@@ -525,6 +525,7 @@ class TestingServer:
         self.quiz_title = "Система Тестування"  # Default title, updated when quiz is loaded
         self.show_right_answer = True  # Default setting, updated when quiz is loaded
         self.show_answers_on_completion = False  # Default setting, updated when quiz is loaded
+        self.show_final_list = True  # Default setting, updated when quiz is loaded
         self.users: Dict[str, Dict[str, Any]] = {}  # user_id -> user data
         self.questions: List[Dict[str, Any]] = []
         self.user_responses: List[Dict[str, Any]] = []
@@ -938,6 +939,9 @@ class TestingServer:
             # Store show_answers_on_completion setting (default: False)
             self.show_answers_on_completion = data.get("show_answers_on_completion", False)
 
+            # Store show_final_list setting (default: True)
+            self.show_final_list = data.get("show_final_list", True)
+
             # Add automatic IDs based on array index (for quiz execution only)
             for i, question in enumerate(self.questions):
                 question["id"] = i + 1
@@ -945,7 +949,8 @@ class TestingServer:
             logger.info(
                 f"Loaded {len(self.questions)} questions from {quiz_file_path}, "
                 f"show_right_answer: {self.show_right_answer}, randomize_questions: {self.randomize_questions}, "
-                f"show_answers_on_completion: {self.show_answers_on_completion}"
+                f"show_answers_on_completion: {self.show_answers_on_completion}, "
+                f"show_final_list: {self.show_final_list}"
             )
 
     async def load_questions(self):
@@ -1077,6 +1082,7 @@ class TestingServer:
         html_content = html_content.replace("{{REGISTRATION_FIELDS}}", registration_fields_html)
         html_content = html_content.replace("{{USERNAME_LABEL}}", username_label)
         html_content = html_content.replace("{{SHOW_RIGHT_ANSWER}}", "true" if self.show_right_answer else "false")
+        html_content = html_content.replace("{{SHOW_FINAL_LIST}}", "true" if self.show_final_list else "false")
         html_content = html_content.replace("{{WEBQUIZ_VERSION}}", get_package_version())
 
         # Write to destination
@@ -2735,6 +2741,7 @@ class TestingServer:
             "randomize_questions",
             "min_correct",
             "show_answers_on_completion",
+            "show_final_list",
         ]
         for field in optional_fields:
             if field in quizzes_data[0]:
@@ -2953,6 +2960,9 @@ class TestingServer:
 
         if "randomize_questions" in data and not isinstance(data["randomize_questions"], bool):
             errors.append("'randomize_questions' must be a boolean (true or false)")
+
+        if "show_final_list" in data and not isinstance(data["show_final_list"], bool):
+            errors.append("'show_final_list' must be a boolean (true or false)")
 
         if "title" in data and not isinstance(data["title"], str):
             errors.append("'title' must be a string")

@@ -14,6 +14,7 @@ The basic structure of a test file looks like this:
 title: "Test Title"
 description: "Test description (optional)"
 show_right_answer: false
+show_final_list: true        # false to hide question list on results screen
 randomize_questions: false  # true for randomized question order for each student
 questions:
   - question: "Question text"
@@ -88,6 +89,21 @@ show_answers_on_completion: true    # Reveal after all complete
 > **Manual Control:** Administrators can force reveal answers without waiting for stragglers using the "Show Answers for All" button in the admin panel. See the "Administrative Interface" section for details.
 
 > ⚠️ **Important:** If approval mode is enabled (`registration.approve: true`), only **approved** students are counted. Students waiting for approval do not affect answer visibility.
+
+---
+
+#### `show_final_list` (optional)
+
+Controls whether the question-by-question results table is displayed on the final results screen.
+
+- **`true`** (default) — shows the score summary and a table with each question, the student's answer, and correctness
+- **`false`** — shows only the score summary (e.g., "3/5 (60%)")
+
+```
+show_final_list: false  # Only show score, hide question list
+```
+
+> **Tip:** Use `show_final_list: false` when you want students to see only their overall score without reviewing individual questions.
 
 ---
 

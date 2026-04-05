@@ -157,6 +157,7 @@ webquiz-stress-test -c 50
 - **Manual answer revelation** - Admin can click "Show Answers" button to force `all_students_completed()` to return true, triggering existing answer visibility logic. Button only visible when quiz has `show_answers_on_completion: true`. Affects all students who complete after button click (including new registrations). One-way action (cannot be undone until quiz switch). Endpoint: `POST /api/admin/force-show-answers` (admin-auth required). Flag `force_all_completed` resets on quiz switch.
 - **Quiz renaming** - Admin can rename quizzes via editor modal. Backend renames physical file with validation. **Active quiz cannot be renamed** (must switch to different quiz first, returns 409 error). CSV files retain old quiz name prefix (historical data preservation). Prevents filename conflicts with 409 status code.
 - **Question text copy prevention** - Quiz questions have `user-select: none` CSS and a `copy` event handler on the question container to prevent students from copying question text. Text input fields for text questions remain selectable.
+- **Show final list** - `show_final_list` quiz option (default: true) controls whether the question-by-question results table is displayed on the final screen. When false, only the score summary (e.g., "3/5 (60%)") is shown. Setting is loaded from YAML, injected as `showFinalList` JS variable, validated as boolean, and editable in admin quiz editor.
 - **Image preloading** - All quiz images (question images and image options) are preloaded immediately on page load. Uses `new Image()` to cache images in browser while user fills registration form. Images from options starting with `/` are detected as image paths. Ensures instant image display during quiz.
 - **Config form editor** - File manager Config tab has Form/YAML toggle. Form view provides structured editing for registration config (approve, username_label, fields). Form sends JSON partial updates via `PUT /api/admin/config` with `{data: {section: {...}}}` format — backend merges into existing YAML config. YAML view remains for direct editing. Both views sync after save (response includes `config_content` and `config_data`). Switching views with unsaved changes triggers confirm dialog. No external JS dependencies — server injects `CONFIG_DATA` as parsed JSON alongside `CONFIG_CONTENT`.
 
@@ -185,6 +186,7 @@ webquiz-stress-test -c 50
   - `randomize_questions: true` - Per-student random order, stored as `question_order` array (default: false)
   - `show_right_answer: false` - Auto-advance without continue button (seamless flow)
   - `show_answers_on_completion: true` - Reveal correct answers dynamically after all approved students complete, with waiting message and reload prompt (default: false)
+  - `show_final_list: false` - Hide the list of questions with answers on the results screen, showing only the score summary (default: true)
   - `tunnel.server` - SSH tunnel server hostname (e.g., "tunnel.example.com")
   - `tunnel.public_key` - Path to SSH public key file (auto-generated if missing)
   - `tunnel.private_key` - Path to SSH private key file (auto-generated if missing)

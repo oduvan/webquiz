@@ -482,6 +482,18 @@ WebQuiz offers flexible control over when students can see correct answers:
 
 **Example Use Case**: Useful for collaborative learning environments where you want students to discuss answers together after everyone has completed the quiz independently.
 
+### Final Results Display
+
+By default, the results screen shows the score summary and a table listing each question with the student's answer. You can hide the question list:
+
+- **`show_final_list: true`** (default): Shows score summary and question-by-question results table
+- **`show_final_list: false`**: Shows only the score summary (e.g., "3/5 (60%)")
+
+This is a quiz-level setting configured in the quiz YAML file:
+```yaml
+show_final_list: false
+```
+
 ### SSH Tunnel for Public Access
 
 WebQuiz can expose your local server to the internet via an SSH reverse tunnel, making it accessible from a public URL. This is useful for:
