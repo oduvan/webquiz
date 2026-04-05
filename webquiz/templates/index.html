@@ -342,6 +342,17 @@
             margin: 20px 0;
             border: 2px solid #007bff;
             transition: background-color 0.3s ease;
+            -webkit-user-select: none;
+            -moz-user-select: none;
+            -ms-user-select: none;
+            user-select: none;
+        }
+
+        .current-question .text-answer-input {
+            -webkit-user-select: text;
+            -moz-user-select: text;
+            -ms-user-select: text;
+            user-select: text;
         }
 
         /* Question transition animations */
@@ -803,6 +814,12 @@
         let selectedAnswers = []; // For multiple choice questions
         let textAnswer = ''; // For text input questions
         let testResults = [];
+
+        // Prevent copying question text
+        const questionContainer = document.getElementById('current-question-container');
+        questionContainer.addEventListener('copy', function(e) {
+            e.preventDefault();
+        });
 
         // Helper function to convert absolute paths to relative paths
         function makeRelativePath(path) {

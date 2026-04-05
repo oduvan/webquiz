@@ -788,6 +788,7 @@ The YAML format for tests in **WebQuiz** allows:
 ✅ Setting minimum number of correct answers
 ✅ Showing or hiding correct answers after completion
 ✅ Randomizing question order for each student to prevent cheating
+✅ Copy protection — students cannot select or copy question text
 ✅ Setting different point values for each question
 ✅ Using checker templates for text questions
 ✅ Easily editing tests in web interface with automatic validation

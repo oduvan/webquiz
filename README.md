@@ -347,6 +347,10 @@ questions:
 - Helps prevent cheating and ensures fair testing
 - Default is `false` (questions appear in YAML order)
 
+**Copy Protection:**
+- Question text and answer options cannot be selected or copied by students
+- Prevents sharing quiz content via copy-paste
+
 **Question Grouping (stick_to_the_previous):**
 - Use `stick_to_the_previous: true` on questions that should stay adjacent to their predecessor during randomization
 - Useful for reading passages followed by related questions

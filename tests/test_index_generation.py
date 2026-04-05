@@ -432,6 +432,26 @@ def test_special_characters_in_quiz_data(temp_dir):
         assert "Option with <html> tags" in q["options"]
 
 
+def test_question_text_copy_prevention(temp_dir):
+    """Test that question text has copy prevention (user-select: none and copy event handler)."""
+    with custom_webquiz_server() as (proc, port):
+        static_path = Path(temp_dir) / f"static_{port}"
+        index_path = static_path / "index.html"
+
+        with open(index_path, "r", encoding="utf-8") as f:
+            html_content = f.read()
+
+        # Verify CSS user-select: none on .current-question
+        assert "user-select: none" in html_content, "Should have user-select: none to prevent text selection"
+
+        # Verify copy event listener on question container
+        assert "addEventListener('copy'" in html_content or 'addEventListener("copy"' in html_content, \
+            "Should have copy event listener to prevent copying"
+
+        # Verify text-answer-input still allows selection
+        assert ".text-answer-input" in html_content, "Text answer input should have user-select override"
+
+
 def test_very_long_quiz_titles(temp_dir):
     """Test handling of extremely long quiz titles."""
     long_title = "This is a very " * 50 + "long quiz title!"
