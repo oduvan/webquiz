@@ -358,6 +358,9 @@ jobs:
         # Update the version in playbooks/raspberry-pi.yml (GitHub release URL format)
         sed -i 's|https://github.com/oduvan/webquiz/releases/download/v[0-9]\+\(\.[0-9]\+\)\{0,2\}/webquiz-[0-9]\+\(\.[0-9]\+\)\{0,2\}\.tar\.gz|https://github.com/oduvan/webquiz/releases/download/v${{ github.event.inputs.version }}/webquiz-${{ github.event.inputs.version }}.tar.gz|g' playbooks/raspberry-pi.yml
 
+        # Update the version check condition so ansible-pull actually triggers the upgrade
+        sed -i "s|'Version: [0-9]\+\(\.[0-9]\+\)\{0,2\}' not in|'Version: ${{ github.event.inputs.version }}' not in|g" playbooks/raspberry-pi.yml
+
         # Check if there are any changes to commit
         if git diff --quiet; then
           echo "No changes to commit - version may already be up to date"
