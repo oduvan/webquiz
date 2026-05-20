@@ -160,6 +160,7 @@ class TunnelConfig:
 class WebQuizConfig:
     """Main configuration data class"""
 
+    language: str = "uk"
     server: ServerConfig = field(default_factory=ServerConfig)
     paths: PathsConfig = field(default_factory=PathsConfig)
     admin: AdminConfig = field(default_factory=AdminConfig)
@@ -223,7 +224,11 @@ def load_config_from_yaml(config_path: str) -> WebQuizConfig:
                 checker_templates.append(CheckerTemplate(name=template_data["name"], code=template_data["code"]))
         checker_templates_config = CheckerTemplatesConfig(templates=checker_templates)
 
+        # Parse language setting
+        language = config_data.get("language", "uk")
+
         return WebQuizConfig(
+            language=language,
             server=server_config,
             paths=paths_config,
             admin=admin_config,

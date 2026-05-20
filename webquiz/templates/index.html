@@ -120,7 +120,7 @@
         }
 
         .option.feedback-correct::after {
-            content: '✓ Правильна відповідь';
+            content: '{{T_CORRECT_ANSWER_LABEL}}';
             position: absolute;
             top: -25px;
             right: 0;
@@ -143,7 +143,7 @@
         }
 
         .option.feedback-incorrect::after {
-            content: '✗ Ваша відповідь';
+            content: '{{T_YOUR_ANSWER_LABEL}}';
             position: absolute;
             top: -25px;
             right: 0;
@@ -167,7 +167,7 @@
         }
 
         .option.feedback-missed::after {
-            content: '✓ Теж правильна відповідь';
+            content: '{{T_ALSO_CORRECT_LABEL}}';
             position: absolute;
             top: -25px;
             right: 0;
@@ -749,38 +749,38 @@
             <div class="user-info" id="user-info">
                 👤 <span id="username-display"></span>
             </div>
-            <button class="theme-toggle" onclick="toggleTheme()" title="Перемкнути тему">🌙</button>
+            <button class="theme-toggle" onclick="toggleTheme()" title="{{T_TOGGLE_THEME}}">🌙</button>
         </div>
         <h1>{{QUIZ_TITLE}}</h1>
 
         <!-- Loading State -->
         <div id="loading" class="section">
-            <h2>Завантаження...</h2>
-            <p>Перевірка ваших даних...</p>
+            <h2>{{T_LOADING}}</h2>
+            <p>{{T_CHECKING_DATA}}</p>
         </div>
 
         <!-- Registration Form -->
         <div id="registration" class="section hidden">
-            <h2>Зареєструйтеся для початку тесту</h2>
+            <h2>{{T_REGISTER_TITLE}}</h2>
             <div id="registration-error" class="error-message hidden"></div>
             {{REGISTRATION_FIELDS}}
             <div style="text-align: center; margin-top: 15px;">
-                <button class="register-btn" onclick="registerUser()">Зареєструватися</button>
+                <button class="register-btn" onclick="registerUser()">{{T_REGISTER_BUTTON}}</button>
             </div>
         </div>
 
         <!-- Waiting for Approval Section -->
         <div id="waiting-approval" class="section hidden">
-            <h2>Очікування підтвердження</h2>
+            <h2>{{T_WAITING_TITLE}}</h2>
             <p style="text-align: center; color: var(--text-color); margin: 20px 0;">
-                Ваша реєстрація очікує підтвердження адміністратором.<br>
-                Ви можете змінити свої дані нижче та натиснути кнопку "Перевірити", щоб дізнатися чи вас підтвердили.
+                {{T_WAITING_DESCRIPTION}}<br>
+                {{T_WAITING_HINT}}
             </p>
             <div id="waiting-error" class="error-message hidden"></div>
             <div id="waiting-registration-fields"></div>
             <div style="text-align: center; margin-top: 20px;">
-                <button onclick="updateRegistrationData()" style="margin-right: 10px;">💾 Зберегти зміни</button>
-                <button onclick="checkApprovalStatus()">🔄 Перевірити</button>
+                <button onclick="updateRegistrationData()" style="margin-right: 10px;">{{T_SAVE_CHANGES}}</button>
+                <button onclick="checkApprovalStatus()">{{T_CHECK_STATUS}}</button>
             </div>
         </div>
 
@@ -788,13 +788,13 @@
         <div id="test-section" class="section hidden">
             <div id="progress-bar" class="progress">
                 <div id="progress-fill"></div>
-                <span id="progress-text">Питання 1 з 5</span>
+                <span id="progress-text"></span>
             </div>
             <div id="test-error" class="error-message hidden"></div>
             <div id="current-question-container"></div>
             <div class="button-container">
-                <button id="submit-answer-btn" onclick="submitCurrentAnswer()" disabled>Відправити відповідь</button>
-                <button id="continue-btn" onclick="continueToNextQuestion()" class="hidden">Продовжити</button>
+                <button id="submit-answer-btn" onclick="submitCurrentAnswer()" disabled>{{T_SUBMIT_ANSWER}}</button>
+                <button id="continue-btn" onclick="continueToNextQuestion()" class="hidden">{{T_CONTINUE_BUTTON}}</button>
             </div>
         </div>
 
@@ -810,6 +810,7 @@
         let questions = {{QUESTIONS_DATA}};
         let showRightAnswer = {{SHOW_RIGHT_ANSWER}};
         let showFinalList = {{SHOW_FINAL_LIST}};
+        const T = {{TRANSLATIONS_JSON}};
         let currentQuestionIndex = 0;
         let selectedAnswer = null;
         let selectedAnswers = []; // For multiple choice questions
@@ -1096,7 +1097,7 @@
         async function registerUser() {
             const username = document.getElementById('username').value.trim();
             if (!username) {
-                showError('registration-error', 'Будь ласка, введіть ім\'я користувача');
+                showError('registration-error', T.please_enter_username);
                 return;
             }
 
@@ -1114,7 +1115,7 @@
                 const fieldLabel = fieldRow ? fieldRow.querySelector('td:first-child')?.textContent.replace(':', '').trim() : fieldName;
 
                 if (!fieldValue) {
-                    showError('registration-error', `Будь ласка, заповніть поле "${fieldLabel}"`);
+                    showError('registration-error', T.please_fill_field.replace('{field}', fieldLabel));
                     return;
                 }
                 registrationData[fieldName] = fieldValue;
@@ -1162,10 +1163,10 @@
                         await notifyQuestionStart(questions[currentQuestionIndex].id);
                     }
                 } else {
-                    showError('registration-error', data.error || 'Помилка реєстрації');
+                    showError('registration-error', data.error || T.registration_error);
                 }
             } catch (error) {
-                showError('registration-error', 'Помилка: ' + error.message);
+                showError('registration-error', T.error_prefix + error.message);
             }
         }
 
@@ -1196,7 +1197,7 @@
         async function updateRegistrationData() {
             const username = document.getElementById('waiting-username').value.trim();
             if (!username) {
-                showError('waiting-error', 'Будь ласка, введіть ім\'я користувача');
+                showError('waiting-error', T.please_enter_username);
                 return;
             }
 
@@ -1228,7 +1229,7 @@
                 if (response.ok) {
                     // Show success message
                     const errorElement = document.getElementById('waiting-error');
-                    errorElement.textContent = '✓ Дані успішно оновлено!';
+                    errorElement.textContent = T.data_updated;
                     errorElement.style.backgroundColor = '#d4edda';
                     errorElement.style.color = '#155724';
                     errorElement.style.borderColor = '#c3e6cb';
@@ -1246,10 +1247,10 @@
                     // Save updated registration data to localStorage for future use
                     saveRegistrationData(updatedData);
                 } else {
-                    showError('waiting-error', data.error || 'Помилка оновлення даних');
+                    showError('waiting-error', data.error || T.update_error);
                 }
             } catch (error) {
-                showError('waiting-error', 'Помилка: ' + error.message);
+                showError('waiting-error', T.error_prefix + error.message);
             }
         }
 
@@ -1280,13 +1281,13 @@
                         await notifyQuestionStart(questions[currentQuestionIndex].id);
                     } else {
                         // Still waiting for approval
-                        showError('waiting-error', 'Ви ще не підтверджені. Будь ласка, зачекайте.');
+                        showError('waiting-error', T.not_approved_yet);
                     }
                 } else {
-                    showError('waiting-error', data.message || 'Помилка перевірки статусу');
+                    showError('waiting-error', data.message || T.status_check_error);
                 }
             } catch (error) {
-                showError('waiting-error', 'Помилка: ' + error.message);
+                showError('waiting-error', T.error_prefix + error.message);
             }
         }
 
@@ -1313,7 +1314,7 @@
             // Update progress
             const progress = ((currentQuestionIndex + 1) / questions.length) * 100;
             document.getElementById('progress-fill').style.width = progress + '%';
-            document.getElementById('progress-text').textContent = `Питання ${currentQuestionIndex + 1} з ${questions.length}`;
+            document.getElementById('progress-text').textContent = T.question_n_of_m.replace('{n}', currentQuestionIndex + 1).replace('{m}', questions.length);
 
             // Show current question
             const container = document.getElementById('current-question-container');
@@ -1325,8 +1326,8 @@
                 // Text input question
                 questionContent = `
                     <div class="text-input-container">
-                        <p style="font-size: 14px; color: var(--text-muted); margin-bottom: 10px;">✍️ Введіть вашу відповідь:</p>
-                        <textarea id="text-answer-input" class="text-answer-input" placeholder="Введіть відповідь..." oninput="onTextAnswerInput(this)">${question.default_value || ''}</textarea>
+                        <p style="font-size: 14px; color: var(--text-muted); margin-bottom: 10px;">${T.enter_answer_label}</p>
+                        <textarea id="text-answer-input" class="text-answer-input" placeholder="${T.enter_answer_placeholder}" oninput="onTextAnswerInput(this)">${question.default_value || ''}</textarea>
                         <div id="checker-feedback"></div>
                     </div>
                 `;
@@ -1334,7 +1335,7 @@
                 // Choice question (single or multiple)
                 questionContent = `
                     <div class="options">
-                        ${question.is_multiple_choice ? '<p class="multiple-choice-hint" style="font-size: 14px; color: var(--text-muted); margin-bottom: 10px;">📋 Можна обрати кілька відповідей</p>' : ''}
+                        ${question.is_multiple_choice ? `<p class="multiple-choice-hint" style="font-size: 14px; color: var(--text-muted); margin-bottom: 10px;">${T.multiple_choice_hint}</p>` : ''}
                         ${question.options.map((option, optionIndex) => {
                             const isImageOption = option.startsWith('/');
 
@@ -1360,7 +1361,7 @@
 
             container.innerHTML = `
                 <div class="current-question active-question" style="position: relative;">
-                    ${questionPoints > 1 ? `<div class="question-points-badge">🏆 ${questionPoints} ${questionPoints >= 2 && questionPoints <= 4 ? 'бали' : 'балів'}</div>` : ''}
+                    ${questionPoints > 1 ? `<div class="question-points-badge">🏆 ${questionPoints} ${questionPoints >= 2 && questionPoints <= 4 ? T.points_2_4 : T.points_other}</div>` : ''}
                     ${question.question ? `<h3 class="question-text">${question.question}</h3>` : ''}
                     ${question.image ? `<a href="${makeRelativePath(question.image)}" target="_blank"><img src="${makeRelativePath(question.image)}" alt="Question image" class="question-image quiz-question-img"></a>` : ''}
                     ${question.file ? `<a href="${makeRelativePath(question.file)}" download class="question-file"><span class="question-file-icon">📎</span><span class="question-file-name">${question.file.split('/').pop()}</span></a>` : ''}
@@ -1448,17 +1449,17 @@
             // Validate selection based on question type
             if (isTextQuestion) {
                 if (!textAnswer.trim()) {
-                    showError('test-error', 'Будь ласка, введіть відповідь');
+                    showError('test-error', T.please_enter_answer);
                     return;
                 }
             } else if (question.is_multiple_choice) {
                 if (selectedAnswers.length === 0) {
-                    showError('test-error', 'Будь ласка, оберіть хоча б одну відповідь');
+                    showError('test-error', T.please_select_at_least_one);
                     return;
                 }
             } else {
                 if (selectedAnswer === null) {
-                    showError('test-error', 'Будь ласка, оберіть відповідь');
+                    showError('test-error', T.please_select_answer);
                     return;
                 }
             }
@@ -1544,7 +1545,7 @@
                 showAnswerFeedback(data.is_correct, data.correct_answer, data.is_text_question, data.checker_error, data.correct_value);
 
             } catch (error) {
-                showError('test-error', 'Помилка відправки відповіді: ' + error.message);
+                showError('test-error', T.submit_error + error.message);
                 // Re-enable submit button on error so user can retry
                 submitBtn.disabled = false;
             }
@@ -1600,7 +1601,7 @@
 
                     // Show correct value if answer is incorrect and correct value is available
                     if (!isCorrect && correctValue) {
-                        feedbackHtml += `<div class="correct-value-display">✓ Правильна відповідь: <pre style="margin: 5px 0 0 0; white-space: pre-wrap;">${correctValue}</pre></div>`;
+                        feedbackHtml += `<div class="correct-value-display">${T.correct_answer_value}<pre style="margin: 5px 0 0 0; white-space: pre-wrap;">${correctValue}</pre></div>`;
                     }
 
                     feedbackContainer.innerHTML = feedbackHtml;
@@ -1748,7 +1749,7 @@
 
             // Fallback if nothing present
             if (!html) {
-                return questionImage || questionFile || 'Немає контенту питання';
+                return questionImage || questionFile || T.no_question_content;
             }
 
             return html;
@@ -1796,7 +1797,7 @@
 
             // Build results content
             let tableContent = `
-                <p><strong>Результат:</strong> ${correctCount}/${totalCount} (${percentage}%)</p>
+                <p><strong>${T.result_label}</strong> ${correctCount}/${totalCount} (${percentage}%)</p>
             `;
 
             if (showFinalList) {
@@ -1804,9 +1805,9 @@
                     <table class="results-table">
                         <thead>
                             <tr>
-                                <th>Питання</th>
-                                <th>Ваша відповідь</th>
-                                <th style="text-align: center;">Зараховано</th>
+                                <th>${T.question_header}</th>
+                                <th>${T.your_answer_header}</th>
+                                <th style="text-align: center;">${T.correct_header}</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -1817,14 +1818,14 @@
                     const correctAnswer = (questions[index] && questions[index].correct_answer !== undefined) ? questions[index].options[questions[index].correct_answer] : null;
                     tableContent += `
                         <tr>
-                            <td data-label="Питання">${formatQuestionForDisplay(result.question, result.image, result.file)}</td>
-                            <td data-label="Ваша відповідь">
+                            <td data-label="${T.question_header}">${formatQuestionForDisplay(result.question, result.image, result.file)}</td>
+                            <td data-label="${T.your_answer_header}">
                                 <span class="${result.isCorrect === true ? 'answer-correct' : (result.isCorrect === false ? 'answer-incorrect' : '')}">
                                     ${formatAnswerForDisplay(result.selectedAnswer)}
                                 </span>
-                                ${result.isCorrect === false && correctAnswer && showRightAnswer ? `<div class="correct-answer-hint">Правильна: ${formatAnswerForDisplay(correctAnswer)}</div>` : ''}
+                                ${result.isCorrect === false && correctAnswer && showRightAnswer ? `<div class="correct-answer-hint">${T.result_correct_header}${formatAnswerForDisplay(correctAnswer)}</div>` : ''}
                             </td>
-                            <td data-label="Правильно" style="text-align: center;">
+                            <td data-label="${T.correct_header_alt}" style="text-align: center;">
                                 ${result.isCorrect !== null ? `<span class="${result.isCorrect ? 'correct' : 'incorrect'}" style="font-size: 18px;">${result.isCorrect ? '✓' : '✗'}</span>` : '<span style="color: #666;">—</span>'}
                             </td>
                         </tr>
@@ -1869,18 +1870,18 @@
             // Build results display - show points if there are questions with non-default points
             const hasCustomPoints = totalPoints !== totalCount;
             const pointsDisplay = hasCustomPoints
-                ? `<p><strong>Бали:</strong> ${earnedPoints}/${totalPoints} (${pointsPercentage}%)</p>`
+                ? `<p><strong>${T.points_label}</strong> ${earnedPoints}/${totalPoints} (${pointsPercentage}%)</p>`
                 : '';
 
             let resultsHtml = `
-                <p><strong>Результат:</strong> ${correctCount}/${totalCount} (${percentage}%)</p>
+                <p><strong>${T.result_label}</strong> ${correctCount}/${totalCount} (${percentage}%)</p>
                 ${pointsDisplay}
                 ${shouldShowWaitingMessage ? `
                     <div style="background: var(--stats-bg); padding: 15px; border-radius: 5px; margin: 15px 0; border-left: 4px solid #2196f3;">
-                        <p style="margin: 0 0 10px 0;"><strong>ℹ️ Правильні відповіді будуть доступні після завершення тесту всіма учнями.</strong></p>
-                        <p style="margin: 0 0 10px 0; font-size: 14px;">Перезавантажте сторінку пізніше, щоб побачити правильні відповіді.</p>
+                        <p style="margin: 0 0 10px 0;"><strong>${T.answers_available_later}</strong></p>
+                        <p style="margin: 0 0 10px 0; font-size: 14px;">${T.reload_later}</p>
                         <button onclick="location.reload()" style="background: #2196f3; color: white; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer; font-size: 14px;">
-                            🔄 Перезавантажити сторінку
+                            ${T.reload_page}
                         </button>
                     </div>
                 ` : ''}
@@ -1891,26 +1892,26 @@
                     <table class="results-table">
                         <thead>
                             <tr>
-                                <th>Питання</th>
-                                <th>Ваша відповідь</th>
-                                <th style="text-align: center;">Правильно</th>
-                                ${hasCustomPoints ? '<th style="text-align: center;">Бали</th>' : ''}
+                                <th>${T.question_header}</th>
+                                <th>${T.your_answer_header}</th>
+                                <th style="text-align: center;">${T.correct_header_alt}</th>
+                                ${hasCustomPoints ? `<th style="text-align: center;">${T.points_header}</th>` : ''}
                             </tr>
                         </thead>
                         <tbody>
                             ${finalResults.test_results.map((result, index) => `
                                 <tr>
-                                    <td data-label="Питання">${formatQuestionForDisplay(result.question, result.image, result.file)}</td>
-                                    <td data-label="Ваша відповідь">
+                                    <td data-label="${T.question_header}">${formatQuestionForDisplay(result.question, result.image, result.file)}</td>
+                                    <td data-label="${T.your_answer_header}">
                                         <span class="${result.is_correct === true ? 'answer-correct' : (result.is_correct === false ? 'answer-incorrect' : '')}">
                                             ${formatAnswerForDisplay(result.selected_answer)}
                                         </span>
-                                        ${result.is_correct === false && result.correct_answer && (showRightAnswer || hasCorrectAnswers) ? `<div class="correct-answer-hint">Правильна: ${formatAnswerForDisplay(result.correct_answer)}</div>` : ''}
+                                        ${result.is_correct === false && result.correct_answer && (showRightAnswer || hasCorrectAnswers) ? `<div class="correct-answer-hint">${T.result_correct_header}${formatAnswerForDisplay(result.correct_answer)}</div>` : ''}
                                     </td>
-                                    <td data-label="Правильно" style="text-align: center;">
-                                        ${result.is_correct !== undefined ? `<span class="${result.is_correct ? 'correct' : 'incorrect'}" style="font-size: 18px;">${result.is_correct ? '✓' : '✗'}</span>` : '<span style="color: #666;">не відомо</span>'}
+                                    <td data-label="${T.correct_header_alt}" style="text-align: center;">
+                                        ${result.is_correct !== undefined ? `<span class="${result.is_correct ? 'correct' : 'incorrect'}" style="font-size: 18px;">${result.is_correct ? '✓' : '✗'}</span>` : `<span style="color: #666;">${T.unknown}</span>`}
                                     </td>
-                                    ${hasCustomPoints ? `<td data-label="Бали" style="text-align: center;">${result.earned_points !== undefined ? result.earned_points : (result.is_correct ? (result.points || 1) : 0)}/${result.points || 1}</td>` : ''}
+                                    ${hasCustomPoints ? `<td data-label="${T.points_header}" style="text-align: center;">${result.earned_points !== undefined ? result.earned_points : (result.is_correct ? (result.points || 1) : 0)}/${result.points || 1}</td>` : ''}
                                 </tr>
                             `).join('')}
                         </tbody>

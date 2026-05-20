@@ -23,6 +23,7 @@ WebQuiz - Python/aiohttp quiz system with multi-quiz management, real-time WebSo
 ## Key Files
 - `webquiz/server.py` - Main aiohttp server
 - `webquiz/config.py` - Configuration dataclasses and loading functions
+- `webquiz/translations.py` - UI and error message translations (uk/en)
 - `webquiz/tunnel.py` - SSH tunnel manager for public access
 - `webquiz/cli.py` - CLI with daemon support
 - `webquiz/build.py` - PyInstaller build script
@@ -160,6 +161,7 @@ webquiz-stress-test -c 50
 - **Show final list** - `show_final_list` quiz option (default: true) controls whether the question-by-question results table is displayed on the final screen. When false, only the score summary (e.g., "3/5 (60%)") is shown. Setting is loaded from YAML, injected as `showFinalList` JS variable, validated as boolean, and editable in admin quiz editor.
 - **Image preloading** - All quiz images (question images and image options) are preloaded immediately on page load. Uses `new Image()` to cache images in browser while user fills registration form. Images from options starting with `/` are detected as image paths. Ensures instant image display during quiz.
 - **Config form editor** - File manager Config tab has Form/YAML toggle. Form view provides structured editing for registration config (approve, username_label, fields). Form sends JSON partial updates via `PUT /api/admin/config` with `{data: {section: {...}}}` format — backend merges into existing YAML config. YAML view remains for direct editing. Both views sync after save (response includes `config_content` and `config_data`). Switching views with unsaved changes triggers confirm dialog. No external JS dependencies — server injects `CONFIG_DATA` as parsed JSON alongside `CONFIG_CONTENT`.
+- **Quiz interface language** - `language` config option (`"uk"` or `"en"`, default `"uk"`) controls all user-facing strings in quiz interface and API error messages. Translations stored in `webquiz/translations.py`. HTML static text uses server-side `{{PLACEHOLDER}}` replacement. JS dynamic strings use injected `T` object (`const T = {{TRANSLATIONS_JSON}}`). CSS `content:` properties use server-side placeholders. Server-side error messages use `self.translations["key"]`. Hot-reloadable — applied on config save (quiz restart regenerates template).
 
 ## Key Flows
 
@@ -179,6 +181,7 @@ webquiz-stress-test -c 50
 - **CSV files** (2 per session): `{quiz_name}_user_responses.csv` (submissions) + `{quiz_name}_user_responses.users.csv` (user stats with total_time in MM:SS format, earned_points, total_points)
 - **Config** (`webquiz.yaml`): All sections optional, editable via `/files/` or admin panel, hot-reloaded on save (returns `restart_required` list if server/paths/master_key changed), UTF-8 charset header
 - **Config options**:
+  - `language: en` - Quiz interface and error message language, `"uk"` (Ukrainian, default) or `"en"` (English). Hot-reloadable.
   - `server.include_ipv6: true` - Include IPv6 addresses in network interfaces list (default: false)
   - `server.url_format` - URL format for admin panel network access URLs (default: `http://{IP}:{PORT}/`). Placeholders: `{IP}`, `{PORT}`. Example for reverse proxy: `http://{IP}/webquiz/`
   - `registration.approve: true` - Admin approval required, timing starts on approval (default: false)

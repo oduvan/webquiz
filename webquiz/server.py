@@ -22,6 +22,7 @@ from io import StringIO
 import ipaddress
 
 from .config import WebQuizConfig, load_config_from_yaml
+from .translations import get_translations
 from .tunnel import TunnelManager
 
 from webquiz import __version__ as package_version
@@ -424,10 +425,10 @@ def admin_auth_required(func):
         try:
             ip_obj = ipaddress.ip_address(client_ip)
             if not ip_obj.is_private:
-                return web.json_response({"error": "Доступ заборонено: тільки для локальної мережі"}, status=403)
+                return web.json_response({"error": self.translations["server_access_denied_local"]}, status=403)
         except ValueError:
             # Invalid IP format - deny access
-            return web.json_response({"error": "Доступ заборонено: невірна IP адреса"}, status=403)
+            return web.json_response({"error": self.translations["server_access_denied_ip"]}, status=403)
 
         # Check if it's in trusted list (bypass authentication)
         if hasattr(self, "admin_config") and client_ip in self.admin_config.trusted_ips:
@@ -442,7 +443,7 @@ def admin_auth_required(func):
         if session_token and hasattr(self, "admin_sessions") and session_token in self.admin_sessions:
             return await func(self, request)
 
-        return web.json_response({"error": "Недійсний або відсутній сеанс"}, status=401)
+        return web.json_response({"error": self.translations["server_invalid_session"]}, status=401)
 
     return wrapper
 
@@ -469,10 +470,10 @@ def local_network_only(func):
 
             # Check if IP is private/local
             if not ip_obj.is_private:
-                return web.json_response({"error": "Доступ заборонено: тільки для локальної мережі"}, status=403)
+                return web.json_response({"error": self.translations["server_access_denied_local"]}, status=403)
         except ValueError:
             # Invalid IP format - deny access
-            return web.json_response({"error": "Доступ заборонено: невірна IP адреса"}, status=403)
+            return web.json_response({"error": self.translations["server_access_denied_ip"]}, status=403)
 
         return await func(self, request)
 
@@ -545,6 +546,9 @@ class TestingServer:
 
         # Admin session storage for cookie-based authentication
         self.admin_sessions: Dict[str, datetime] = {}  # session_token -> creation_time
+
+        # Load translations based on language config
+        self.translations = get_translations(config.language)
 
         # Preload templates
         self.templates = self._load_templates()
@@ -704,6 +708,10 @@ class TestingServer:
         Args:
             new_config: New configuration loaded from file
         """
+        # Update language and translations
+        self.config.language = new_config.language
+        self.translations = get_translations(new_config.language)
+
         # Update registration config
         self.config.registration = new_config.registration
 
@@ -1084,6 +1092,25 @@ class TestingServer:
         html_content = html_content.replace("{{SHOW_RIGHT_ANSWER}}", "true" if self.show_right_answer else "false")
         html_content = html_content.replace("{{SHOW_FINAL_LIST}}", "true" if self.show_final_list else "false")
         html_content = html_content.replace("{{WEBQUIZ_VERSION}}", get_package_version())
+
+        # Inject translations as JSON for JS and as individual placeholders for HTML/CSS
+        t = self.translations
+        html_content = html_content.replace("{{TRANSLATIONS_JSON}}", json.dumps(t, ensure_ascii=False))
+        html_content = html_content.replace("{{T_CORRECT_ANSWER_LABEL}}", t["correct_answer_label"])
+        html_content = html_content.replace("{{T_YOUR_ANSWER_LABEL}}", t["your_answer_label"])
+        html_content = html_content.replace("{{T_ALSO_CORRECT_LABEL}}", t["also_correct_label"])
+        html_content = html_content.replace("{{T_LOADING}}", t["loading"])
+        html_content = html_content.replace("{{T_CHECKING_DATA}}", t["checking_data"])
+        html_content = html_content.replace("{{T_REGISTER_TITLE}}", t["register_title"])
+        html_content = html_content.replace("{{T_REGISTER_BUTTON}}", t["register_button"])
+        html_content = html_content.replace("{{T_WAITING_TITLE}}", t["waiting_title"])
+        html_content = html_content.replace("{{T_WAITING_DESCRIPTION}}", t["waiting_description"])
+        html_content = html_content.replace("{{T_WAITING_HINT}}", t["waiting_hint"])
+        html_content = html_content.replace("{{T_SAVE_CHANGES}}", t["save_changes"])
+        html_content = html_content.replace("{{T_CHECK_STATUS}}", t["check_status"])
+        html_content = html_content.replace("{{T_SUBMIT_ANSWER}}", t["submit_answer"])
+        html_content = html_content.replace("{{T_CONTINUE_BUTTON}}", t["continue_button"])
+        html_content = html_content.replace("{{T_TOGGLE_THEME}}", t["toggle_theme"])
 
         # Write to destination
         async with aiofiles.open(index_path, "w", encoding="utf-8") as f:
@@ -1535,12 +1562,12 @@ class TestingServer:
         username = data["username"].strip()
 
         if not username:
-            return web.json_response({"error": "Ім'я користувача не може бути порожнім"}, status=400)
+            return web.json_response({"error": self.translations["server_username_empty"]}, status=400)
 
         # Check if username already exists
         for existing_user in self.users.values():
             if existing_user["username"] == username:
-                return web.json_response({"error": "Ім'я користувача вже існує"}, status=400)
+                return web.json_response({"error": self.translations["server_username_exists"]}, status=400)
 
         # Generate unique 6-digit user ID
         max_attempts = 100
@@ -1549,7 +1576,7 @@ class TestingServer:
             if user_id not in self.users:
                 break
         else:
-            return web.json_response({"error": "Could not generate unique user ID"}, status=500)
+            return web.json_response({"error": self.translations["server_user_id_generation_failed"]}, status=500)
 
         # Check if approval is required
         requires_approval = hasattr(self.config, "registration") and self.config.registration.approve
@@ -1570,7 +1597,7 @@ class TestingServer:
                 # Get value from request data
                 field_value = data.get(field_name, "").strip()
                 if not field_value:
-                    return web.json_response({"error": f'Поле "{field_label}" не може бути порожнім'}, status=400)
+                    return web.json_response({"error": self.translations["server_field_empty"].format(field=field_label)}, status=400)
                 user_data[field_name] = field_value
 
         # Generate random question order if randomization is enabled
@@ -1650,13 +1677,13 @@ class TestingServer:
 
         # Check if user exists
         if user_id not in self.users:
-            return web.json_response({"error": "User not found"}, status=404)
+            return web.json_response({"error": self.translations["server_update_not_found"]}, status=404)
 
         user_data = self.users[user_id]
 
         # Check if user is already approved
         if user_data.get("approved", False):
-            return web.json_response({"error": "Cannot update registration data after approval"}, status=400)
+            return web.json_response({"error": self.translations["server_update_after_approval"]}, status=400)
 
         # Update username if provided
         username = data.get("username", "").strip()
@@ -1664,7 +1691,7 @@ class TestingServer:
             # Check if new username already exists (exclude current user)
             for existing_user_id, existing_user in self.users.items():
                 if existing_user_id != user_id and existing_user["username"] == username:
-                    return web.json_response({"error": "Ім'я користувача вже існує"}, status=400)
+                    return web.json_response({"error": self.translations["server_username_exists"]}, status=400)
             user_data["username"] = username
 
         # Update additional registration fields if configured
@@ -1714,7 +1741,7 @@ class TestingServer:
 
         # Find user by user_id
         if user_id not in self.users:
-            return web.json_response({"error": "Користувача не знайдено"}, status=404)
+            return web.json_response({"error": self.translations["server_user_not_found"]}, status=404)
 
         username = self.users[user_id]["username"]
         user_data = self.users[user_id]
@@ -1736,13 +1763,13 @@ class TestingServer:
 
                     # Check if user has finished all questions
                     if next_index >= len(question_order):
-                        return web.json_response({"error": "Ви вже відповіли на всі питання"}, status=400)
+                        return web.json_response({"error": self.translations["server_all_answered"]}, status=400)
 
                     expected_question_id = question_order[next_index]
                 except ValueError:
                     # Last answered question not in order (shouldn't happen)
                     logger.error(f"User {user_id} last_answered_id {last_answered_id} not found in question_order")
-                    return web.json_response({"error": "Помилка валідації порядку питань"}, status=500)
+                    return web.json_response({"error": self.translations["server_question_order_error"]}, status=500)
 
             # Validate submitted question matches expected
             if question_id != expected_question_id:
@@ -1752,7 +1779,7 @@ class TestingServer:
                 )
                 return web.json_response(
                     {
-                        "error": "Ви можете відповідати лише на поточне питання",
+                        "error": self.translations["server_only_current_question"],
                         "expected_question_id": expected_question_id,
                     },
                     status=403,
@@ -1761,7 +1788,7 @@ class TestingServer:
         # Find the question
         question = next((q for q in self.questions if q["id"] == question_id), None)
         if not question:
-            return web.json_response({"error": "Питання не знайдено"}, status=404)
+            return web.json_response({"error": self.translations["server_question_not_found"]}, status=404)
 
         # Calculate time taken server-side from when question was displayed
         time_taken = 0
@@ -1920,7 +1947,7 @@ class TestingServer:
 
         # Verify user exists
         if user_id not in self.users:
-            return web.json_response({"error": "Користувача не знайдено"}, status=404)
+            return web.json_response({"error": self.translations["server_user_not_found"]}, status=404)
 
         if user_id not in self.question_start_times:
             self.question_start_times[user_id] = datetime.now()
@@ -2260,7 +2287,7 @@ class TestingServer:
                 logger.exception(f"Unexpected error reading admin auth request body: {e}")
 
             if not provided_key or provided_key != self.master_key:
-                return web.json_response({"error": "Недійсний або відсутній головний ключ"}, status=401)
+                return web.json_response({"error": self.translations["server_invalid_master_key"]}, status=401)
 
         # Generate a new session token
         session_token = secrets.token_urlsafe(32)
@@ -2992,6 +3019,11 @@ class TestingServer:
         if not isinstance(data, dict):
             errors.append("Config must be a dictionary")
             return False
+
+        # Validate language (optional)
+        if "language" in data:
+            if data["language"] not in ("uk", "en"):
+                errors.append("'language' must be 'uk' or 'en'")
 
         # Validate server section (optional)
         if "server" in data:

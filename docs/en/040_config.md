@@ -1,5 +1,16 @@
 ## Server Configuration File
 
+### Language
+
+```
+language: en
+```
+
+- **language** — quiz interface language. Supported values: `"uk"` (Ukrainian, default) and `"en"` (English).
+  This setting controls all user-facing text: registration form labels, quiz buttons, progress indicators, validation error messages, and results display.
+  Hot-reloadable — changes are applied immediately when saved via the admin panel.
+
+---
 
 ### Section `server`
 
