@@ -164,6 +164,7 @@ class WebQuizConfig:
     """Main configuration data class"""
 
     language: str = "uk"
+    extra_answers_with_users_csv: bool = False
     server: ServerConfig = field(default_factory=ServerConfig)
     paths: PathsConfig = field(default_factory=PathsConfig)
     admin: AdminConfig = field(default_factory=AdminConfig)
@@ -230,8 +231,12 @@ def load_config_from_yaml(config_path: str) -> WebQuizConfig:
         # Parse language setting
         language = config_data.get("language", "uk")
 
+        # Parse extra_answers_with_users_csv setting
+        extra_answers_with_users_csv = bool(config_data.get("extra_answers_with_users_csv", False))
+
         return WebQuizConfig(
             language=language,
+            extra_answers_with_users_csv=extra_answers_with_users_csv,
             server=server_config,
             paths=paths_config,
             admin=admin_config,

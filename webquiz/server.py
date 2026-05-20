@@ -283,6 +283,11 @@ def log_startup_environment(config: WebQuizConfig):
     )
     logger.info(f"  Custom fields: {config.registration.fields}")
 
+    # CSV configuration
+    logger.info(
+        f"Extra answers-with-users CSV (per-answer + user info): {config.extra_answers_with_users_csv}"
+    )
+
     # Tunnel configuration
     if config.tunnel.server:
         logger.info("Tunnel Configuration:")
@@ -526,6 +531,9 @@ class TestingServer:
         self.log_file = None  # Will be set during initialization
         self.csv_file = None  # Will be set when quiz is selected (answers CSV)
         self.user_csv_file = None  # Will be set when quiz is selected (users CSV)
+        # Optional third CSV: per-answer rows with user_id, username and registration
+        # fields prepended. Generated only when ``extra_answers_with_users_csv`` is set.
+        self.answers_with_users_csv_file = None
         self.quiz_title = "Система Тестування"  # Default title, updated when quiz is loaded
         self.show_right_answer = True  # Default setting, updated when quiz is loaded
         self.show_answers_on_completion = False  # Default setting, updated when quiz is loaded
@@ -602,14 +610,17 @@ class TestingServer:
     def generate_csv_path(self, quiz_name: str, csv_type: str = "answers") -> str:
         """Generate CSV file path in CSV directory with quiz name and numeric naming.
 
-        Ensures both answers and users CSVs use the same numeric suffix.
+        Ensures all three CSV types use the same numeric suffix.
 
         Args:
             quiz_name: Name of the quiz file
-            csv_type: Type of CSV - 'answers' or 'users'
+            csv_type: Type of CSV - 'answers', 'users', or 'answers_with_users'
 
         Returns:
-            Path to CSV file (answers: quiz_0001.csv, users: quiz_0001.users.csv)
+            Path to CSV file:
+              - answers:             quiz_0001.csv
+              - users:               quiz_0001.users.csv
+              - answers_with_users:  quiz_0001.answers_with_users.csv
         """
         ensure_directory_exists(self.csv_dir)
 
@@ -619,16 +630,25 @@ class TestingServer:
         # Find the next available number for this quiz
         suffix = 1
         while True:
-            if csv_type == "users":
-                csv_path = os.path.join(self.csv_dir, f"{quiz_prefix}_{suffix:04d}.users.csv")
-            else:  # answers
-                csv_path = os.path.join(self.csv_dir, f"{quiz_prefix}_{suffix:04d}.csv")
-
-            # Check both files to ensure they use the same number
             answers_csv = os.path.join(self.csv_dir, f"{quiz_prefix}_{suffix:04d}.csv")
             users_csv = os.path.join(self.csv_dir, f"{quiz_prefix}_{suffix:04d}.users.csv")
+            answers_with_users_csv = os.path.join(
+                self.csv_dir, f"{quiz_prefix}_{suffix:04d}.answers_with_users.csv"
+            )
 
-            if not os.path.exists(answers_csv) and not os.path.exists(users_csv):
+            if csv_type == "users":
+                csv_path = users_csv
+            elif csv_type == "answers_with_users":
+                csv_path = answers_with_users_csv
+            else:  # answers
+                csv_path = answers_csv
+
+            # Use the same numeric suffix across all three file types
+            if (
+                not os.path.exists(answers_csv)
+                and not os.path.exists(users_csv)
+                and not os.path.exists(answers_with_users_csv)
+            ):
                 return csv_path
             suffix += 1
 
@@ -715,6 +735,9 @@ class TestingServer:
         self.config.language = new_config.language
         self.translations = get_translations(new_config.language)
 
+        # Update extra_answers_with_users_csv flag (takes effect on next quiz switch / quiz restart)
+        self.config.extra_answers_with_users_csv = new_config.extra_answers_with_users_csv
+
         # Update registration config
         self.config.registration = new_config.registration
 
@@ -798,10 +821,14 @@ class TestingServer:
         # Reset server state
         self.reset_server_state()
 
-        # Update current quiz and CSV filenames (both answers and users)
+        # Update current quiz and CSV filenames (answers, users, optional extra)
         self.current_quiz_file = quiz_path
         self.csv_file = self.generate_csv_path(quiz_filename, "answers")
         self.user_csv_file = self.generate_csv_path(quiz_filename, "users")
+        if self.config.extra_answers_with_users_csv:
+            self.answers_with_users_csv_file = self.generate_csv_path(quiz_filename, "answers_with_users")
+        else:
+            self.answers_with_users_csv_file = None
 
         # Load new questions
         await self.load_questions_from_file(quiz_path)
@@ -1125,6 +1152,10 @@ class TestingServer:
 
         Writes accumulated responses to CSV, creating file with headers if needed.
         Clears in-memory responses after writing.
+
+        When ``extra_answers_with_users_csv`` is enabled, the same rows are also
+        appended to a third CSV that prepends user info (user_id, username,
+        registration fields) to each per-answer row.
         """
         if not self.user_responses:
             return
@@ -1155,6 +1186,9 @@ class TestingServer:
                 ]
             )
 
+        # Snapshot responses for the answers_with_users CSV before clearing
+        responses_snapshot = list(self.user_responses) if self.answers_with_users_csv_file else None
+
         # Write buffer content to file
         csv_content = csv_buffer.getvalue()
         csv_buffer.close()
@@ -1169,6 +1203,74 @@ class TestingServer:
 
         action = "Created" if not file_exists else "Updated"
         logger.info(f"{action} CSV file with {total_responses} responses: {self.csv_file}")
+
+        # Also write the answers_with_users CSV (per-answer rows enriched with user info)
+        if self.answers_with_users_csv_file and responses_snapshot:
+            await self._append_answers_with_users_csv(responses_snapshot)
+
+    async def _append_answers_with_users_csv(self, responses):
+        """Append per-answer rows enriched with user info to the answers_with_users CSV.
+
+        Headers (written once when the file is first created):
+            user_id, username, [registration_fields...], question,
+            selected_answer, correct_answer, is_correct, time_taken_seconds
+
+        Args:
+            responses: List of response dicts (as stored in ``self.user_responses``)
+        """
+        if not responses:
+            return
+
+        registration_fields = []
+        if hasattr(self.config, "registration") and self.config.registration.fields:
+            registration_fields = list(self.config.registration.fields)
+
+        file_exists = os.path.exists(self.answers_with_users_csv_file)
+
+        csv_buffer = StringIO()
+        csv_writer = csv.writer(csv_buffer)
+
+        if not file_exists:
+            headers = ["user_id", "username"]
+            for field_label in registration_fields:
+                headers.append(field_label.lower().replace(" ", "_"))
+            headers.extend(
+                ["question", "selected_answer", "correct_answer", "is_correct", "time_taken_seconds"]
+            )
+            csv_writer.writerow(headers)
+
+        for response in responses:
+            user_id = response["user_id"]
+            user_data = self.users.get(user_id, {})
+            row = [user_id, user_data.get("username", response.get("username", ""))]
+            for field_label in registration_fields:
+                field_name = field_label.lower().replace(" ", "_")
+                row.append(user_data.get(field_name, ""))
+            row.extend(
+                [
+                    response["question"],
+                    response["selected_answer"],
+                    response["correct_answer"],
+                    response["is_correct"],
+                    response["time_taken_seconds"],
+                ]
+            )
+            csv_writer.writerow(row)
+
+        csv_content = csv_buffer.getvalue()
+        csv_buffer.close()
+
+        mode = "w" if not file_exists else "a"
+        async with aiofiles.open(self.answers_with_users_csv_file, mode, encoding="utf-8") as f:
+            await f.write(csv_content)
+            await f.flush()
+            os.fsync(f.fileno())
+
+        action = "Created" if not file_exists else "Updated"
+        logger.info(
+            f"{action} answers_with_users CSV file with {len(responses)} rows: "
+            f"{self.answers_with_users_csv_file}"
+        )
 
     async def flush_users_to_csv(self):
         """Flush user registration data to separate CSV file.
@@ -3029,6 +3131,11 @@ class TestingServer:
             if data["language"] not in ("uk", "en"):
                 errors.append("'language' must be 'uk' or 'en'")
 
+        # Validate extra_answers_with_users_csv (optional)
+        if "extra_answers_with_users_csv" in data:
+            if not isinstance(data["extra_answers_with_users_csv"], bool):
+                errors.append("'extra_answers_with_users_csv' must be a boolean")
+
         # Validate server section (optional)
         if "server" in data:
             server = data["server"]
@@ -3456,7 +3563,11 @@ class TestingServer:
 
         # Read back saved content and parse for response
         saved_content = ""
-        saved_data = {"language": self.config.language, "registration": {}}
+        saved_data = {
+            "language": self.config.language,
+            "extra_answers_with_users_csv": self.config.extra_answers_with_users_csv,
+            "registration": {},
+        }
         try:
             async with aiofiles.open(config_path, "r", encoding="utf-8") as f:
                 saved_content = await f.read()
@@ -3467,6 +3578,7 @@ class TestingServer:
                     registration = {}
                 saved_data = {
                     "language": parsed.get("language", "uk"),
+                    "extra_answers_with_users_csv": bool(parsed.get("extra_answers_with_users_csv", False)),
                     "registration": registration,
                 }
         except Exception:
@@ -3552,10 +3664,16 @@ class TestingServer:
                     if not isinstance(registration, dict):
                         registration = {}
                     config_data_json = json.dumps(
-                        {"language": parsed.get("language", "uk"), "registration": registration}
+                        {
+                            "language": parsed.get("language", "uk"),
+                            "extra_answers_with_users_csv": bool(parsed.get("extra_answers_with_users_csv", False)),
+                            "registration": registration,
+                        }
                     )
                 else:
-                    config_data_json = json.dumps({"language": "uk", "registration": {}})
+                    config_data_json = json.dumps(
+                        {"language": "uk", "extra_answers_with_users_csv": False, "registration": {}}
+                    )
             except Exception as e:
                 logger.warning(f"Could not read config file: {e}")
 

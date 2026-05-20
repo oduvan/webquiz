@@ -180,10 +180,11 @@ webquiz-stress-test -c 50
 **Setup**: Parallel testing with ports 8080-8087, `custom_webquiz_server` fixture auto-cleans directories, `conftest.py` for shared fixtures
 
 ## Important Notes
-- **CSV files** (2 per session): `{quiz_name}_user_responses.csv` (submissions) + `{quiz_name}_user_responses.users.csv` (user stats with total_time in MM:SS format, earned_points, total_points)
+- **CSV files** (2 per session, 3 with `extra_answers_with_users_csv: true`): `{quiz_name}_{NNNN}.csv` (per-answer submissions) + `{quiz_name}_{NNNN}.users.csv` (one row per user with stats: total_time in MM:SS format, earned_points, total_points) + optional `{quiz_name}_{NNNN}.answers_with_users.csv` (per-answer rows with `user_id`, `username`, and registration fields prepended). All three share the same `{NNNN}` suffix; `generate_csv_path` advances the suffix only when all candidate files for that number are free.
 - **Config** (`webquiz.yaml`): All sections optional, editable via `/files/` or admin panel, hot-reloaded on save (returns `restart_required` list if server/paths/master_key changed), UTF-8 charset header
 - **Config options**:
   - `language: en` - Quiz interface and error message language, `"uk"` (Ukrainian, default) or `"en"` (English). Hot-reloadable.
+  - `extra_answers_with_users_csv: true` - Generate an additional **third** CSV (`{quiz}_{NNNN}.answers_with_users.csv`) with one row per submitted answer, prefixed by `user_id`, `username`, and registration field columns (default: false). The `extra_` prefix highlights that it is generated alongside the standard answers + users CSVs; the `answers_with_users` part names exactly what is combined. Useful for downstream analysis where you want answers and user attributes joined. Hot-reloadable (takes effect on next quiz switch / quiz restart).
   - `server.include_ipv6: true` - Include IPv6 addresses in network interfaces list (default: false)
   - `server.url_format` - URL format for admin panel network access URLs (default: `http://{IP}:{PORT}/`). Placeholders: `{IP}`, `{PORT}`. Example for reverse proxy: `http://{IP}/webquiz/`
   - `registration.approve: true` - Admin approval required, timing starts on approval (default: false)

@@ -761,6 +761,14 @@
                                 Controls all user-facing text (registration form, buttons, errors, results). Hot-reloadable.
                             </div>
                         </div>
+
+                        <div class="config-checkbox-group">
+                            <input type="checkbox" id="cfg-extra-answers-with-users-csv">
+                            <label for="cfg-extra-answers-with-users-csv">Generate extra answers-with-users CSV</label>
+                        </div>
+                        <div style="font-size: 12px; color: var(--text-muted); margin: -4px 0 8px 24px;">
+                            When enabled, a third CSV file <code>&lt;quiz&gt;_NNNN.answers_with_users.csv</code> is created alongside the standard answers and users CSVs. Each row is a submitted answer with <code>user_id</code>, <code>username</code>, and registration fields prepended. Takes effect on next quiz switch / quiz restart.
+                        </div>
                     </div>
 
                     <div class="config-form-section">
@@ -1284,6 +1292,8 @@
         function populateGeneralForm(cfg) {
             const lang = cfg && cfg.language ? cfg.language : 'uk';
             document.getElementById('cfg-language').value = lang === 'en' ? 'en' : 'uk';
+            document.getElementById('cfg-extra-answers-with-users-csv').checked =
+                !!(cfg && cfg.extra_answers_with_users_csv);
         }
 
         function populateRegistrationForm(reg) {
@@ -1365,8 +1375,13 @@
             });
 
             const language = document.getElementById('cfg-language').value;
+            const extraAnswersWithUsersCsv = document.getElementById('cfg-extra-answers-with-users-csv').checked;
 
-            return { language: language, registration: reg };
+            return {
+                language: language,
+                extra_answers_with_users_csv: extraAnswersWithUsersCsv,
+                registration: reg,
+            };
         }
 
         function switchConfigView(view) {
@@ -1394,6 +1409,7 @@
 
         function trackFormDirty() {
             document.getElementById('cfg-language').addEventListener('change', function() { formDirty = true; });
+            document.getElementById('cfg-extra-answers-with-users-csv').addEventListener('change', function() { formDirty = true; });
             document.getElementById('cfg-reg-approve').addEventListener('change', function() { formDirty = true; });
             document.getElementById('cfg-reg-username-label').addEventListener('input', function() { formDirty = true; });
         }

@@ -585,6 +585,26 @@ user_id,username,registered_at,total_questions_asked,correct_answers,earned_poin
 - `earned_points` - Points earned from correct answers
 - `total_points` - Maximum possible points for questions answered
 
+### Extra answers-with-users CSV (per-answer rows with user info)
+
+If you set `extra_answers_with_users_csv: true` in `webquiz.yaml`, a **third**
+CSV file is generated with the suffix `.answers_with_users.csv`. It has one row
+per submitted answer (like the answers CSV) but the user-identifying columns
+(`user_id`, `username`, and any registration fields configured under
+`registration.fields`) are prepended to each row. This avoids having to join
+the two existing CSVs in a spreadsheet or analysis tool.
+
+**Example:** `math_quiz_0001.answers_with_users.csv`
+
+```csv
+user_id,username,school,question,selected_answer,correct_answer,is_correct,time_taken_seconds
+123456,student1,Lyceum 1,"What is 2 + 2?","4","4",True,3.45
+123456,student1,Lyceum 1,"What is 5 × 3?","15","15",True,2.87
+```
+
+The option is hot-reloadable — toggling it on or off takes effect on the next
+quiz switch or quiz restart.
+
 CSV files are created with proper escaping and include all user response data. Files are flushed periodically (every 5 seconds) to ensure data persistence.
 
 ## 🎨 Customization

@@ -10,6 +10,24 @@ language: en
   This setting controls all user-facing text: registration form labels, quiz buttons, progress indicators, validation error messages, and results display.
   Hot-reloadable — changes are applied immediately when saved via the admin panel.
 
+### Extra answers-with-users CSV export
+
+```
+extra_answers_with_users_csv: true
+```
+
+- **extra_answers_with_users_csv** — when set to `true`, the server generates
+  a **third** CSV file alongside the standard answers and users CSVs. The
+  `extra_` prefix signals that this is generated in addition to the two
+  default files; `answers_with_users` describes exactly what is combined.
+  The file is named `<quiz>_<NNNN>.answers_with_users.csv` and has one row
+  per submitted answer, with `user_id`, `username`, and any registration
+  fields configured under `registration.fields` prepended to the usual
+  answer columns. This makes downstream analysis easier — you don't have to
+  join the two existing CSVs yourself.
+  Default is `false`. Hot-reloadable — the change takes effect on the next
+  quiz switch or quiz restart.
+
 ---
 
 ### Section `server`
@@ -60,10 +78,11 @@ The `paths` section defines the location of service folders. If the specified di
 
 - **csv_dir: "data"**
   Directory where quiz results are stored in CSV format.
-  For each quiz, two files are created:
+  For each quiz, two files are created (three when `extra_answers_with_users_csv: true`):
   - `default_0001.csv` — user answers without personal data;
-  - `default_0001.users.csv` — user data with registration fields, including total quiz completion time in `MM:SS` format (minutes:seconds).
-  Both files can be opened in any spreadsheet editor (Excel, Google Sheets).
+  - `default_0001.users.csv` — user data with registration fields, including total quiz completion time in `MM:SS` format (minutes:seconds);
+  - `default_0001.answers_with_users.csv` — only when `extra_answers_with_users_csv: true`: per-answer rows with `user_id`, `username`, and registration fields prepended to each answer.
+  All files can be opened in any spreadsheet editor (Excel, Google Sheets).
 
 - **static_dir: "static"**
   Directory with static web files.
