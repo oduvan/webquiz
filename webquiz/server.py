@@ -3,6 +3,7 @@ import httpx
 import json
 import csv
 import yaml
+from ruamel.yaml import YAML as RuamelYAML
 import os
 import socket
 import subprocess
@@ -3344,27 +3345,39 @@ class TestingServer:
             if not isinstance(merge_data, dict):
                 return web.json_response({"error": "data must be a dictionary"}, status=400)
 
-            # Read current config
-            current_config = {}
+            # Use ruamel.yaml in round-trip mode so comments and blank lines
+            # between sections survive partial saves from the admin web form.
+            rt_yaml = RuamelYAML()
+            rt_yaml.preserve_quotes = True
+            rt_yaml.allow_unicode = True
+            rt_yaml.indent(mapping=2, sequence=4, offset=2)
+
+            # Read current config preserving comments/structure
+            current_config = None
             if os.path.exists(config_path):
                 try:
                     async with aiofiles.open(config_path, "r", encoding="utf-8") as f:
                         current_content = await f.read()
-                    current_config = yaml.safe_load(current_content) if current_content.strip() else {}
-                    if not isinstance(current_config, dict):
-                        current_config = {}
+                    if current_content.strip():
+                        current_config = rt_yaml.load(current_content)
                 except Exception:
-                    current_config = {}
+                    current_config = None
 
-            # Deep merge provided data into current config
+            if not isinstance(current_config, dict):
+                current_config = rt_yaml.load("{}\n") or {}
+
+            # Shallow-merge each section so existing keys/comments inside a
+            # section are kept when the form only sets some of them.
             for section_key, section_value in merge_data.items():
                 if isinstance(section_value, dict) and isinstance(current_config.get(section_key), dict):
-                    current_config[section_key].update(section_value)
+                    for k, v in section_value.items():
+                        current_config[section_key][k] = v
                 else:
                     current_config[section_key] = section_value
 
-            # Serialize merged config to YAML
-            content = yaml.dump(current_config, default_flow_style=False, allow_unicode=True, sort_keys=False)
+            buf = StringIO()
+            rt_yaml.dump(current_config, buf)
+            content = buf.getvalue()
         else:
             content = request_data.get("content", "").strip()
 

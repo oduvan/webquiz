@@ -494,6 +494,74 @@ def test_save_config_json_data_must_be_dict():
         assert "dictionary" in data["error"].lower()
 
 
+def test_save_config_json_preserves_comments_and_blank_lines():
+    """Partial JSON config save must keep comments and section spacing."""
+    with custom_webquiz_server() as (proc, port):
+        cookies = get_admin_session(port)
+
+        # Trigger a no-op save to learn the config_path used by the server.
+        response = requests.put(
+            f"http://localhost:{port}/api/admin/config", cookies=cookies, json={"data": {}}
+        )
+        assert response.status_code == 200
+        config_path = response.json()["config_path"]
+
+        # Overwrite the file with a hand-formatted YAML that has comments and
+        # blank lines between sections — exactly the kind of thing PyYAML
+        # would have erased on round-trip.
+        commented_config = (
+            "# Top-of-file comment\n"
+            "\n"
+            "server:\n"
+            "  # port the server listens on\n"
+            f"  port: {port}\n"
+            "\n"
+            "paths:\n"
+            f"  quizzes_dir: quizzes_{port}\n"
+            f"  logs_dir: logs_{port}\n"
+            f"  csv_dir: data_{port}\n"
+            f"  static_dir: static_{port}\n"
+            "\n"
+            "admin:\n"
+            "  master_key: test123  # do not share\n"
+            "  trusted_ips: []\n"
+            "\n"
+            "# Student registration settings\n"
+            "registration:\n"
+            "  approve: false\n"
+        )
+        with open(config_path, "w", encoding="utf-8") as f:
+            f.write(commented_config)
+
+        # Partial update changes only registration.approve.
+        response = requests.put(
+            f"http://localhost:{port}/api/admin/config",
+            cookies=cookies,
+            json={"data": {"registration": {"approve": True}}},
+        )
+        assert response.status_code == 200, response.text
+
+        with open(config_path, "r", encoding="utf-8") as f:
+            saved = f.read()
+
+        # Comments survive
+        assert "# Top-of-file comment" in saved
+        assert "# port the server listens on" in saved
+        assert "# do not share" in saved
+        assert "# Student registration settings" in saved
+        # Blank lines between sections survive
+        assert "\n\nserver:" in saved
+        assert "\n\npaths:" in saved
+        assert "\n\nadmin:" in saved
+        # Blank line before the standalone section comment is also preserved
+        assert "\n\n# Student registration settings\nregistration:" in saved
+        # And the requested change was actually applied
+        parsed = yaml.safe_load(saved)
+        assert parsed["registration"]["approve"] is True
+        assert parsed["server"]["port"] == port
+        assert parsed["admin"]["master_key"] == "test123"
+
+
 def test_save_config_yaml_returns_both_formats():
     """Test that YAML save also returns config_content and config_data."""
     with custom_webquiz_server() as (proc, port):
