@@ -456,11 +456,13 @@ server:
   url_format: "http://{IP}:{PORT}/"  # URL format for admin panel (use {IP} and {PORT} placeholders)
 
 registration:
-  approve: false  # Set to true to require admin approval
-  fields:
-    - name: "full_name"
-      label: "Full Name"
-      required: true
+  approve: false           # Set to true to require admin approval
+  username_label: ""       # Custom username field label (empty = use language default)
+  fields:                  # Extra fields shown on the registration form
+    - Grade
+    - School
+  disabled_fields:         # Fields preserved in config but hidden from the form
+    - Teacher              # Toggle on/off from the file manager Config tab
 
 quiz:
   show_right_answer: false          # Show correct answer after submission

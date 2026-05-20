@@ -3080,6 +3080,11 @@ class TestingServer:
                         errors.append("'registration.fields' must be a list")
                     elif not all(isinstance(field, str) for field in registration["fields"]):
                         errors.append("'registration.fields' must contain only strings")
+                if "disabled_fields" in registration:
+                    if not isinstance(registration["disabled_fields"], list):
+                        errors.append("'registration.disabled_fields' must be a list")
+                    elif not all(isinstance(field, str) for field in registration["disabled_fields"]):
+                        errors.append("'registration.disabled_fields' must contain only strings")
                 if "approve" in registration:
                     if not isinstance(registration["approve"], bool):
                         errors.append("'registration.approve' must be a boolean")

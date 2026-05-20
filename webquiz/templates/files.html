@@ -620,6 +620,20 @@
             color: var(--text-color);
         }
 
+        .config-list-item input[type="checkbox"] {
+            width: 18px;
+            height: 18px;
+            cursor: pointer;
+            margin: 0;
+            flex-shrink: 0;
+        }
+
+        .config-list-item.disabled input[type="text"] {
+            background: var(--disabled-bg);
+            color: var(--text-muted);
+            text-decoration: line-through;
+        }
+
         .config-list-remove-btn {
             background: var(--danger-red);
             color: white;
@@ -749,6 +763,9 @@
 
                         <div class="config-form-group">
                             <label>Additional registration fields:</label>
+                            <div style="font-size: 12px; color: var(--text-muted); margin-bottom: 8px;">
+                                Uncheck the box to disable a field without deleting its name. Disabled fields are kept in the config and can be re-enabled anytime.
+                            </div>
                             <div id="cfg-reg-fields-list"></div>
                             <button class="config-list-add-btn" onclick="addRegistrationField()">+ Add Field</button>
                         </div>
@@ -1252,21 +1269,38 @@
             document.getElementById('cfg-reg-approve').checked = !!reg.approve;
             document.getElementById('cfg-reg-username-label').value = reg.username_label || '';
 
-            // Populate fields list
+            // Populate unified fields list (enabled + disabled)
             const container = document.getElementById('cfg-reg-fields-list');
             container.innerHTML = '';
             if (reg.fields && Array.isArray(reg.fields)) {
                 reg.fields.forEach(function(fieldName) {
-                    addRegistrationField(fieldName);
+                    addRegistrationField(fieldName, true);
+                });
+            }
+            if (reg.disabled_fields && Array.isArray(reg.disabled_fields)) {
+                reg.disabled_fields.forEach(function(fieldName) {
+                    addRegistrationField(fieldName, false);
                 });
             }
             formDirty = false;
         }
 
-        function addRegistrationField(value) {
+        function addRegistrationField(value, enabled) {
+            // New fields default to enabled when added via "+ Add Field"
+            if (enabled === undefined) enabled = true;
+
             const container = document.getElementById('cfg-reg-fields-list');
             const item = document.createElement('div');
-            item.className = 'config-list-item';
+            item.className = 'config-list-item' + (enabled ? '' : ' disabled');
+
+            const checkbox = document.createElement('input');
+            checkbox.type = 'checkbox';
+            checkbox.checked = enabled;
+            checkbox.title = 'Enable/disable this field';
+            checkbox.addEventListener('change', function() {
+                item.classList.toggle('disabled', !checkbox.checked);
+                formDirty = true;
+            });
 
             const input = document.createElement('input');
             input.type = 'text';
@@ -1282,6 +1316,7 @@
                 formDirty = true;
             };
 
+            item.appendChild(checkbox);
             item.appendChild(input);
             item.appendChild(removeBtn);
             container.appendChild(item);
@@ -1293,12 +1328,18 @@
             reg.approve = document.getElementById('cfg-reg-approve').checked;
             reg.username_label = document.getElementById('cfg-reg-username-label').value;
 
-            const fieldInputs = document.querySelectorAll('#cfg-reg-fields-list .config-list-item input');
+            const items = document.querySelectorAll('#cfg-reg-fields-list .config-list-item');
             reg.fields = [];
-            fieldInputs.forEach(function(input) {
-                const val = input.value.trim();
-                if (val) {
+            reg.disabled_fields = [];
+            items.forEach(function(item) {
+                const textInput = item.querySelector('input[type="text"]');
+                const checkbox = item.querySelector('input[type="checkbox"]');
+                const val = textInput.value.trim();
+                if (!val) return;
+                if (checkbox.checked) {
                     reg.fields.push(val);
+                } else {
+                    reg.disabled_fields.push(val);
                 }
             });
 

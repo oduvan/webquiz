@@ -224,6 +224,29 @@ def test_load_config_from_yaml_with_registration():
         assert config.registration.fields == ["grade", "school"]
         assert config.registration.approve is True
         assert config.registration.username_label == "Student Name"
+        # disabled_fields should default to empty list when omitted
+        assert config.registration.disabled_fields == []
+    finally:
+        os.unlink(config_path)
+
+
+def test_load_config_from_yaml_with_disabled_fields():
+    """Test loading config with both enabled and disabled registration fields."""
+    config_data = {
+        "registration": {
+            "fields": ["Grade"],
+            "disabled_fields": ["School", "Teacher"],
+        }
+    }
+
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
+        yaml.dump(config_data, f)
+        config_path = f.name
+
+    try:
+        config = load_config_from_yaml(config_path)
+        assert config.registration.fields == ["Grade"]
+        assert config.registration.disabled_fields == ["School", "Teacher"]
     finally:
         os.unlink(config_path)
 
@@ -352,6 +375,7 @@ def test_dataclass_defaults():
     # RegistrationConfig
     registration = RegistrationConfig()
     assert registration.fields == []
+    assert registration.disabled_fields == []
     assert registration.approve is False
     assert registration.username_label == ""  # Empty = use translation for current language
 

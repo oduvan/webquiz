@@ -94,6 +94,9 @@ registration:
   fields:
     - Grade
     - School
+  disabled_fields:
+    - Teacher
+    - City
 ```
 
 This section defines how users register before taking quizzes.
@@ -124,6 +127,11 @@ This section defines how users register before taking quizzes.
     - City
   ```
   All collected data is automatically saved to the CSV results file.
+
+- **disabled_fields**
+  Additional registration fields that are kept in the config but are not shown on the registration form. Use this to "park" fields you toggle on and off often without losing their names.
+
+  In the admin file manager (Config → Form view), every additional field shows a checkbox: uncheck it to move the field from `fields` to `disabled_fields`, check it to move the field back. Saving the form simply shuffles each field between the two lists — nothing is deleted, so you can re-enable a field in one click later.
 
 ---
 

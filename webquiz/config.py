@@ -82,12 +82,15 @@ class RegistrationConfig:
     """Registration configuration data class"""
 
     fields: List[str] = None
+    disabled_fields: List[str] = None
     approve: bool = False
     username_label: str = ""  # Empty = use translation for current language
 
     def __post_init__(self):
         if self.fields is None:
             self.fields = []
+        if self.disabled_fields is None:
+            self.disabled_fields = []
 
 
 @dataclass
