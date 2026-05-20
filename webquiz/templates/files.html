@@ -749,6 +749,21 @@
                 <!-- Form View -->
                 <div id="config-form-view">
                     <div class="config-form-section">
+                        <h3>General</h3>
+
+                        <div class="config-form-group">
+                            <label for="cfg-language">Quiz interface language:</label>
+                            <select id="cfg-language" style="padding: 6px; border: 1px solid var(--border-color); border-radius: 4px;">
+                                <option value="uk">Ukrainian (Українська)</option>
+                                <option value="en">English</option>
+                            </select>
+                            <div style="font-size: 12px; color: var(--text-muted); margin-top: 4px;">
+                                Controls all user-facing text (registration form, buttons, errors, results). Hot-reloadable.
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="config-form-section">
                         <h3>Registration</h3>
 
                         <div class="config-checkbox-group">
@@ -1255,6 +1270,7 @@
 
                 // Populate form from CONFIG_DATA
                 if (typeof CONFIG_DATA !== 'undefined' && CONFIG_DATA !== null) {
+                    populateGeneralForm(CONFIG_DATA);
                     populateRegistrationForm(CONFIG_DATA.registration || {});
                 }
 
@@ -1263,6 +1279,11 @@
                     yamlDirty = true;
                 });
             }
+        }
+
+        function populateGeneralForm(cfg) {
+            const lang = cfg && cfg.language ? cfg.language : 'uk';
+            document.getElementById('cfg-language').value = lang === 'en' ? 'en' : 'uk';
         }
 
         function populateRegistrationForm(reg) {
@@ -1343,7 +1364,9 @@
                 }
             });
 
-            return { registration: reg };
+            const language = document.getElementById('cfg-language').value;
+
+            return { language: language, registration: reg };
         }
 
         function switchConfigView(view) {
@@ -1370,6 +1393,7 @@
         }
 
         function trackFormDirty() {
+            document.getElementById('cfg-language').addEventListener('change', function() { formDirty = true; });
             document.getElementById('cfg-reg-approve').addEventListener('change', function() { formDirty = true; });
             document.getElementById('cfg-reg-username-label').addEventListener('input', function() { formDirty = true; });
         }
@@ -1380,8 +1404,11 @@
                 document.getElementById('config-editor').value = configContent;
             }
             // Update form
-            if (configData && configData.registration !== undefined) {
-                populateRegistrationForm(configData.registration);
+            if (configData) {
+                populateGeneralForm(configData);
+                if (configData.registration !== undefined) {
+                    populateRegistrationForm(configData.registration);
+                }
             }
             formDirty = false;
             yamlDirty = false;

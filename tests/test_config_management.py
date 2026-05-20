@@ -407,6 +407,53 @@ def test_save_config_json_registration():
         assert saved["registration"]["username_label"] == "Student"
 
 
+def test_save_config_json_language():
+    """Test saving language via JSON partial update (used by the config form dropdown)."""
+    with custom_webquiz_server() as (proc, port):
+        cookies = get_admin_session(port)
+
+        # Save language: en via JSON partial update
+        response = requests.put(
+            f"http://localhost:{port}/api/admin/config",
+            cookies=cookies,
+            json={"data": {"language": "en"}},
+        )
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["success"] is True
+        assert data["config_data"]["language"] == "en"
+
+        # Verify file was written with language at top level
+        config_path = data["config_path"]
+        with open(config_path, "r", encoding="utf-8") as f:
+            saved = yaml.safe_load(f.read())
+        assert saved["language"] == "en"
+
+        # Verify hot-reload applied: the rendered index.html now uses English
+        page = requests.get(f"http://localhost:{port}/")
+        assert page.status_code == 200
+        assert "Register to start the quiz" in page.text
+        assert "Зареєструйтеся для початку тесту" not in page.text
+
+
+def test_save_config_json_language_rejects_invalid():
+    """Test that the form rejects unsupported language values."""
+    with custom_webquiz_server() as (proc, port):
+        cookies = get_admin_session(port)
+
+        response = requests.put(
+            f"http://localhost:{port}/api/admin/config",
+            cookies=cookies,
+            json={"data": {"language": "fr"}},
+        )
+
+        assert response.status_code == 400
+        data = response.json()
+        assert "errors" in data
+        assert any("language" in err.lower() for err in data["errors"])
+
+
 def test_save_config_json_preserves_other_sections():
     """Test that JSON save preserves existing config sections not in the update."""
     with custom_webquiz_server() as (proc, port):

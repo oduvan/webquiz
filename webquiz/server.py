@@ -3456,7 +3456,7 @@ class TestingServer:
 
         # Read back saved content and parse for response
         saved_content = ""
-        saved_data = {"registration": {}}
+        saved_data = {"language": self.config.language, "registration": {}}
         try:
             async with aiofiles.open(config_path, "r", encoding="utf-8") as f:
                 saved_content = await f.read()
@@ -3465,7 +3465,10 @@ class TestingServer:
                 registration = parsed.get("registration", {})
                 if not isinstance(registration, dict):
                     registration = {}
-                saved_data = {"registration": registration}
+                saved_data = {
+                    "language": parsed.get("language", "uk"),
+                    "registration": registration,
+                }
         except Exception:
             pass
 
@@ -3548,9 +3551,11 @@ class TestingServer:
                     registration = parsed.get("registration", {})
                     if not isinstance(registration, dict):
                         registration = {}
-                    config_data_json = json.dumps({"registration": registration})
+                    config_data_json = json.dumps(
+                        {"language": parsed.get("language", "uk"), "registration": registration}
+                    )
                 else:
-                    config_data_json = json.dumps({"registration": {}})
+                    config_data_json = json.dumps({"language": "uk", "registration": {}})
             except Exception as e:
                 logger.warning(f"Could not read config file: {e}")
 
