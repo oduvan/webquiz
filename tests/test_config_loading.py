@@ -299,10 +299,15 @@ def test_load_config_with_overrides_env_variable():
     old_value = os.environ.get("WEBQUIZ_MASTER_KEY")
     os.environ["WEBQUIZ_MASTER_KEY"] = "env_key_123"
 
+    # Run from a clean cwd so a stray repo-local webquiz.yaml can't influence the result
+    original_cwd = os.getcwd()
     try:
-        config = load_config_with_overrides()
-        assert config.admin.master_key == "env_key_123"
+        with tempfile.TemporaryDirectory() as tmpdir:
+            os.chdir(tmpdir)
+            config = load_config_with_overrides()
+            assert config.admin.master_key == "env_key_123"
     finally:
+        os.chdir(original_cwd)
         # Restore environment
         if old_value is not None:
             os.environ["WEBQUIZ_MASTER_KEY"] = old_value
@@ -311,11 +316,20 @@ def test_load_config_with_overrides_env_variable():
 
 
 def test_load_config_with_overrides_no_config_file():
-    """Test loading config without a config file (uses defaults)."""
-    config = load_config_with_overrides(config_path=None)
-    assert config is not None
-    assert isinstance(config, WebQuizConfig)
-    assert config.server.port == 8080
+    """Test loading config without a config file (uses defaults from bundled example)."""
+    # Run from a clean cwd so a stray repo-local webquiz.yaml can't influence the result.
+    # With no file found, load_config_with_overrides() creates one from the bundled
+    # server_config.yaml.example (port 8080) in cwd and loads that.
+    original_cwd = os.getcwd()
+    try:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            os.chdir(tmpdir)
+            config = load_config_with_overrides(config_path=None)
+            assert config is not None
+            assert isinstance(config, WebQuizConfig)
+            assert config.server.port == 8080
+    finally:
+        os.chdir(original_cwd)
 
 
 def test_dataclass_defaults():
