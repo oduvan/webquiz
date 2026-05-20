@@ -185,7 +185,7 @@ webquiz-stress-test -c 50
   - `server.include_ipv6: true` - Include IPv6 addresses in network interfaces list (default: false)
   - `server.url_format` - URL format for admin panel network access URLs (default: `http://{IP}:{PORT}/`). Placeholders: `{IP}`, `{PORT}`. Example for reverse proxy: `http://{IP}/webquiz/`
   - `registration.approve: true` - Admin approval required, timing starts on approval (default: false)
-  - `registration.username_label` - Customize username field label (default: "Ім'я користувача")
+  - `registration.username_label` - Customize username field label (default: empty = falls back to language translation, "Ім'я користувача" for uk / "Username" for en)
   - `randomize_questions: true` - Per-student random order, stored as `question_order` array (default: false)
   - `show_right_answer: false` - Auto-advance without continue button (seamless flow)
   - `show_answers_on_completion: true` - Reveal correct answers dynamically after all approved students complete, with waiting message and reload prompt (default: false)

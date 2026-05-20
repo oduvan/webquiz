@@ -339,7 +339,7 @@ def test_dataclass_defaults():
     registration = RegistrationConfig()
     assert registration.fields == []
     assert registration.approve is False
-    assert registration.username_label == "Ім'я користувача"
+    assert registration.username_label == ""  # Empty = use translation for current language
 
     # WebQuizConfig
     config = WebQuizConfig()

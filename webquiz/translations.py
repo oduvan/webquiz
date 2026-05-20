@@ -9,6 +9,7 @@ TRANSLATIONS = {
         # Registration
         "register_title": "Зареєструйтеся для початку тесту",
         "register_button": "Зареєструватися",
+        "username_label": "Ім'я користувача",
         "please_enter_username": "Будь ласка, введіть ім'я користувача",
         "please_fill_field": 'Будь ласка, заповніть поле "{field}"',
 
@@ -96,6 +97,7 @@ TRANSLATIONS = {
         # Registration
         "register_title": "Register to start the quiz",
         "register_button": "Register",
+        "username_label": "Username",
         "please_enter_username": "Please enter your username",
         "please_fill_field": 'Please fill in the "{field}" field',
 

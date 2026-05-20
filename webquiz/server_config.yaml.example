@@ -22,7 +22,7 @@ admin:
 # Uncomment and configure to collect additional user information
 # registration:
 #   approve: false                     # Set to true to require admin approval before users can start
-#   username_label: "Ім'я користувача" # Label for username field (default: Ukrainian)
+#   username_label: "Ім'я користувача" # Label for username field (default: follows `language` — "Ім'я користувача" for uk, "Username" for en)
 #   fields:                            # Additional registration fields (supports Cyrillic)
 #     - Grade
 #     - School

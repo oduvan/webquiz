@@ -36,3 +36,29 @@ def test_custom_username_label_ukrainian():
 
         assert response.status_code == 200
         assert "Логін учня:" in response.text
+
+
+def test_default_username_label_follows_language_en():
+    """When language=en and username_label is not overridden, label is the English translation."""
+    config = {"language": "en"}
+
+    with custom_webquiz_server(config=config) as (proc, port):
+        time.sleep(1)  # Wait for static files to be generated
+        response = requests.get(f"http://localhost:{port}/")
+
+        assert response.status_code == 200
+        assert "Username:" in response.text
+        assert "Ім'я користувача:" not in response.text
+
+
+def test_custom_username_label_overrides_language():
+    """Explicit username_label wins over language-based default."""
+    config = {"language": "en", "registration": {"username_label": "Логін учня"}}
+
+    with custom_webquiz_server(config=config) as (proc, port):
+        time.sleep(1)  # Wait for static files to be generated
+        response = requests.get(f"http://localhost:{port}/")
+
+        assert response.status_code == 200
+        assert "Логін учня:" in response.text
+        assert "Username:" not in response.text

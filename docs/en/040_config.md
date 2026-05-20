@@ -104,7 +104,7 @@ This section defines how users register before taking quizzes.
 
 - **username_label**
   Customizes the label text for the username input field in the registration form.
-  Default: `"Ім'я користувача"` (Ukrainian for "Username").
+  Default: follows the `language` setting — `"Ім'я користувача"` for `uk`, `"Username"` for `en`.
   Usage examples:
   ```
   username_label: "Full Name"

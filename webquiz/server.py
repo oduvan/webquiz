@@ -277,7 +277,9 @@ def log_startup_environment(config: WebQuizConfig):
     # Registration configuration
     logger.info("Registration Configuration:")
     logger.info(f"  Approval required: {config.registration.approve}")
-    logger.info(f"  Username label: {config.registration.username_label}")
+    logger.info(
+        f"  Username label: {config.registration.username_label or get_translations(config.language)['username_label']}"
+    )
     logger.info(f"  Custom fields: {config.registration.fields}")
 
     # Tunnel configuration
@@ -1056,10 +1058,11 @@ class TestingServer:
         # Generate registration fields HTML as a table (always include username)
         registration_fields_html = '<table class="registration-table">'
 
-        # Get username label from config
-        username_label = "Ім'я користувача"
+        # Get username label from config; fall back to translation if not customized
+        username_label = self.translations["username_label"]
         if hasattr(self.config, "registration") and hasattr(self.config.registration, "username_label"):
-            username_label = self.config.registration.username_label
+            if self.config.registration.username_label:
+                username_label = self.config.registration.username_label
 
         # Add username field as first row
         registration_fields_html += f"""

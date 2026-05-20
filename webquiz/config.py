@@ -83,7 +83,7 @@ class RegistrationConfig:
 
     fields: List[str] = None
     approve: bool = False
-    username_label: str = "Ім'я користувача"
+    username_label: str = ""  # Empty = use translation for current language
 
     def __post_init__(self):
         if self.fields is None:
