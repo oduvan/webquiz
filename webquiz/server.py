@@ -3128,7 +3128,9 @@ class TestingServer:
 
         # Validate language (optional)
         if "language" in data:
-            if data["language"] not in ("uk", "en"):
+            if data["language"] == "ru":
+                errors.append("російська мова не підтримується, але ти москалику попався")
+            elif data["language"] not in ("uk", "en"):
                 errors.append("'language' must be 'uk' or 'en'")
 
         # Validate extra_answers_with_users_csv (optional)

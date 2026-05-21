@@ -230,6 +230,9 @@ def load_config_from_yaml(config_path: str) -> WebQuizConfig:
 
         # Parse language setting
         language = config_data.get("language", "uk")
+        if language == "ru":
+            logger.error("російська мова не підтримується, але ти москалику попався")
+            language = "uk"
 
         # Parse extra_answers_with_users_csv setting
         extra_answers_with_users_csv = bool(config_data.get("extra_answers_with_users_csv", False))

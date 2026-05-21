@@ -245,3 +245,71 @@ def test_valid_language_en_accepted():
             json={"content": "language: en\n"},
         )
         assert response.status_code == 200
+
+
+# --- Russian language rejection tests ---
+
+RUSSIAN_REJECTION_MESSAGE = "російська мова не підтримується, але ти москалику попався"
+
+
+def test_russian_language_rejected_via_yaml_content():
+    """Setting language to 'ru' via raw YAML content returns the special rejection message."""
+    with custom_webquiz_server() as (proc, port):
+        session = requests.Session()
+        session.post(f"http://127.0.0.1:{port}/api/admin/auth", json={"master_key": "test123"})
+        session.post(f"http://127.0.0.1:{port}/api/admin/switch-quiz", json={"filename": "test_quiz.yaml"})
+
+        response = session.put(
+            f"http://127.0.0.1:{port}/api/admin/config",
+            json={"content": "language: ru\n"},
+        )
+        assert response.status_code == 400
+        data = response.json()
+        assert RUSSIAN_REJECTION_MESSAGE in str(data.get("errors", ""))
+
+
+def test_russian_language_rejected_via_wizard_data():
+    """Setting language to 'ru' via wizard JSON partial update returns the special rejection message."""
+    with custom_webquiz_server() as (proc, port):
+        session = requests.Session()
+        session.post(f"http://127.0.0.1:{port}/api/admin/auth", json={"master_key": "test123"})
+        session.post(f"http://127.0.0.1:{port}/api/admin/switch-quiz", json={"filename": "test_quiz.yaml"})
+
+        response = session.put(
+            f"http://127.0.0.1:{port}/api/admin/config",
+            json={"data": {"language": "ru"}},
+        )
+        assert response.status_code == 400
+        data = response.json()
+        assert RUSSIAN_REJECTION_MESSAGE in str(data.get("errors", ""))
+
+
+def test_russian_language_in_yaml_file_falls_back_to_uk():
+    """If 'language: ru' is set directly in the YAML file, loader falls back to 'uk' and logs the rejection."""
+    import logging
+
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
+        yaml.dump({"language": "ru"}, f)
+        f.flush()
+        path = f.name
+
+    try:
+        # Capture the logger output
+        records = []
+
+        class ListHandler(logging.Handler):
+            def emit(self, record):
+                records.append(record.getMessage())
+
+        handler = ListHandler(level=logging.ERROR)
+        config_logger = logging.getLogger("webquiz.config")
+        config_logger.addHandler(handler)
+        try:
+            config = load_config_from_yaml(path)
+        finally:
+            config_logger.removeHandler(handler)
+    finally:
+        os.unlink(path)
+
+    assert config.language == "uk"
+    assert any(RUSSIAN_REJECTION_MESSAGE in msg for msg in records)
