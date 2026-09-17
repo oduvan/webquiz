@@ -206,11 +206,34 @@ By default, each question is worth **1 point**.
   points: 3  # This question is worth 3 points
 ```
 
+Points can also be decimal numbers with **at most two decimal places**:
+
+```yaml
+- question: "Worth half a point"
+  options:
+    - "A"
+    - "B"
+  correct_answer: 0
+  points: 0.5
+
+- question: "Worth one and a quarter points"
+  options:
+    - "A"
+    - "B"
+  correct_answer: 1
+  points: 1.25
+```
+
+**Rules for `points`:**
+- Must be a number greater than 0
+- At most two decimal places. `1.234` is rejected when the quiz is saved
+- The default is `1`
+
 **Features:**
 - Points are displayed in **live stats** as earned/total points
 - **Final results** show earned points
 - **Users CSV file** includes `earned_points` and `total_points` columns
-- Questions worth more than 1 point show a 🏆 indicator during the quiz
+- Questions whose value is not 1 point show a 🏆 indicator during the quiz
 
 ---
 
@@ -383,7 +406,7 @@ In addition to multiple choice questions, WebQuiz supports text input questions 
 - **checker** — required to identify as text question (can be empty for exact match)
 - **default_value** — initial value shown in the textarea (optional)
 - **correct_value** — correct answer shown when student is wrong (optional)
-- **points** — points for correct answer (default: 1)
+- **points** — points for correct answer, a number with at most 2 decimals (default: 1)
 
 **Checker Code:**
 - Uses variable `user_answer` (the student's text input)

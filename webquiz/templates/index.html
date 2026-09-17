@@ -831,6 +831,13 @@
             return path;
         }
 
+        // Points can be decimals (up to 2 places), so round away binary float noise
+        // and drop trailing zeros: 0.30000000000000004 -> "0.3", 2 -> "2"
+        function formatPoints(value) {
+            const number = Number(value) || 0;
+            return String(Math.round(number * 100) / 100);
+        }
+
         // Preload all quiz images for instant display during questions
         function preloadQuizImages() {
             const imageUrls = new Set();
@@ -1361,7 +1368,7 @@
 
             container.innerHTML = `
                 <div class="current-question active-question" style="position: relative;">
-                    ${questionPoints > 1 ? `<div class="question-points-badge">🏆 ${questionPoints} ${questionPoints >= 2 && questionPoints <= 4 ? T.points_2_4 : T.points_other}</div>` : ''}
+                    ${questionPoints !== 1 ? `<div class="question-points-badge">🏆 ${formatPoints(questionPoints)} ${Number.isInteger(questionPoints) && questionPoints >= 2 && questionPoints <= 4 ? T.points_2_4 : T.points_other}</div>` : ''}
                     ${question.question ? `<h3 class="question-text">${question.question}</h3>` : ''}
                     ${question.image ? `<a href="${makeRelativePath(question.image)}" target="_blank"><img src="${makeRelativePath(question.image)}" alt="Question image" class="question-image quiz-question-img"></a>` : ''}
                     ${question.file ? `<a href="${makeRelativePath(question.file)}" download class="question-file"><span class="question-file-icon">📎</span><span class="question-file-name">${question.file.split('/').pop()}</span></a>` : ''}
@@ -1868,9 +1875,9 @@
                                       finalResults.test_results[0].is_correct !== undefined;
 
             // Build results display - show points if there are questions with non-default points
-            const hasCustomPoints = totalPoints !== totalCount;
+            const hasCustomPoints = finalResults.test_results.some(r => (r.points || 1) !== 1);
             const pointsDisplay = hasCustomPoints
-                ? `<p><strong>${T.points_label}</strong> ${earnedPoints}/${totalPoints} (${pointsPercentage}%)</p>`
+                ? `<p><strong>${T.points_label}</strong> ${formatPoints(earnedPoints)}/${formatPoints(totalPoints)} (${pointsPercentage}%)</p>`
                 : '';
 
             let resultsHtml = `
@@ -1911,7 +1918,7 @@
                                     <td data-label="${T.correct_header_alt}" style="text-align: center;">
                                         ${result.is_correct !== undefined ? `<span class="${result.is_correct ? 'correct' : 'incorrect'}" style="font-size: 18px;">${result.is_correct ? '✓' : '✗'}</span>` : `<span style="color: #666;">${T.unknown}</span>`}
                                     </td>
-                                    ${hasCustomPoints ? `<td data-label="${T.points_header}" style="text-align: center;">${result.earned_points !== undefined ? result.earned_points : (result.is_correct ? (result.points || 1) : 0)}/${result.points || 1}</td>` : ''}
+                                    ${hasCustomPoints ? `<td data-label="${T.points_header}" style="text-align: center;">${formatPoints(result.earned_points !== undefined ? result.earned_points : (result.is_correct ? (result.points || 1) : 0))}/${formatPoints(result.points || 1)}</td>` : ''}
                                 </tr>
                             `).join('')}
                         </tbody>

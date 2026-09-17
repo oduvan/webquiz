@@ -111,6 +111,42 @@ def ensure_directory_exists(path: str) -> str:
     return path
 
 
+#: Question points may carry at most this many decimal places
+POINTS_DECIMAL_PLACES = 2
+
+
+def normalize_points(value) -> float:
+    """Round a points value to POINTS_DECIMAL_PLACES, returning an int when whole.
+
+    Points can be decimals (e.g. 0.5, 1.25), so sums of them accumulate binary
+    floating point error: 0.1 + 0.2 would otherwise be reported as
+    0.30000000000000004. Rounding keeps scores exact to two decimals, and whole
+    values stay ints so they serialize as `3` rather than `3.0`.
+
+    Args:
+        value: A points value or a sum of them
+
+    Returns:
+        int if the rounded value is whole, otherwise float
+    """
+    rounded = round(float(value), POINTS_DECIMAL_PLACES)
+    if rounded == int(rounded):
+        return int(rounded)
+    return rounded
+
+
+def sum_points(values) -> float:
+    """Sum points values and normalize the result.
+
+    Args:
+        values: Iterable of points values
+
+    Returns:
+        Normalized sum (int when whole, otherwise float rounded to 2 decimals)
+    """
+    return normalize_points(sum(values))
+
+
 def get_default_config_path() -> Optional[str]:
     """Get default config file path, creating one if it doesn't exist.
 
@@ -1049,7 +1085,7 @@ class TestingServer:
                     "id": q["id"],
                     "type": "text",
                     "default_value": q.get("default_value", ""),
-                    "points": q.get("points", 1),
+                    "points": normalize_points(q.get("points", 1)),
                 }
             else:
                 # Choice question
@@ -1057,7 +1093,7 @@ class TestingServer:
                     "id": q["id"],
                     "options": q["options"],
                     "is_multiple_choice": isinstance(q["correct_answer"], list),
-                    "points": q.get("points", 1),  # Default 1 point per question
+                    "points": normalize_points(q.get("points", 1)),  # Default 1 point per question
                 }
                 # Include min_correct for multiple choice questions
                 if isinstance(q["correct_answer"], list):
@@ -1314,10 +1350,10 @@ class TestingServer:
             user_answer_list = self.user_answers.get(user_id, [])
             total_questions_asked = len(user_answer_list)
             correct_answers = sum(answer["is_correct"] for answer in user_answer_list)
-            earned_points = sum(
+            earned_points = sum_points(
                 answer.get("earned_points", 1 if answer["is_correct"] else 0) for answer in user_answer_list
             )
-            total_points = sum(answer.get("points", 1) for answer in user_answer_list)
+            total_points = sum_points(answer.get("points", 1) for answer in user_answer_list)
             total_time_seconds = sum(answer.get("time_taken", 0) for answer in user_answer_list)
             # Format total_time as MM:SS
             minutes = int(total_time_seconds // 60)
@@ -1735,7 +1771,7 @@ class TestingServer:
                         "state": "think",
                         "time_taken": None,
                         "total_questions": len(self.questions),
-                        "total_points": sum(q.get("points", 1) for q in self.questions),
+                        "total_points": sum_points(q.get("points", 1) for q in self.questions),
                     }
                 )
         else:
@@ -1952,8 +1988,8 @@ class TestingServer:
         if file_value and not file_value.startswith("/attach/"):
             file_value = f"/attach/{file_value}"
 
-        # Get points for this question (default: 1)
-        question_points = question.get("points", 1)
+        # Get points for this question (default: 1, may be a decimal)
+        question_points = normalize_points(question.get("points", 1))
         earned_points = question_points if is_correct else 0
 
         answer_data = {
@@ -2002,7 +2038,7 @@ class TestingServer:
                 "state": state,
                 "time_taken": time_taken,
                 "total_questions": len(self.questions),
-                "total_points": sum(q.get("points", 1) for q in self.questions),
+                "total_points": sum_points(q.get("points", 1) for q in self.questions),
                 "earned_points": earned_points,
                 "question_points": question_points,
                 "completed": test_completed,
@@ -2061,7 +2097,7 @@ class TestingServer:
 
         # Get points for current question
         question = next((q for q in self.questions if q["id"] == question_id), None)
-        question_points = question.get("points", 1) if question else 1
+        question_points = normalize_points(question.get("points", 1)) if question else 1
 
         await self.broadcast_to_websockets(
             {
@@ -2072,7 +2108,7 @@ class TestingServer:
                 "state": "think",
                 "time_taken": None,
                 "total_questions": len(self.questions),
-                "total_points": sum(q.get("points", 1) for q in self.questions),
+                "total_points": sum_points(q.get("points", 1) for q in self.questions),
                 "question_points": question_points,
             }
         )
@@ -2107,6 +2143,10 @@ class TestingServer:
             total_time += answer["time_taken"]
             earned_points += answer.get("earned_points", 1 if answer["is_correct"] else 0)
             total_points += answer.get("points", 1)
+
+        # Points can be decimals, so round the running sums back to 2 decimals
+        earned_points = normalize_points(earned_points)
+        total_points = normalize_points(total_points)
 
         total_count = len(user_answer_list)
         percentage = round((correct_count / total_count) * 100) if total_count > 0 else 0
@@ -2509,7 +2549,7 @@ class TestingServer:
                     "state": "think",
                     "time_taken": None,
                     "total_questions": len(self.questions),
-                    "total_points": sum(q.get("points", 1) for q in self.questions),
+                    "total_points": sum_points(q.get("points", 1) for q in self.questions),
                 }
             )
 
@@ -3017,11 +3057,6 @@ class TestingServer:
                     except SyntaxError as e:
                         errors.append(f"Question {i+1} checker has invalid Python syntax: {e.msg} (line {e.lineno})")
 
-                # Validate points if specified
-                if "points" in question:
-                    points = question["points"]
-                    if not isinstance(points, int) or points < 1:
-                        errors.append(f"Question {i+1} points must be a positive integer")
             else:
                 # Choice question validation
                 # Validate required fields
@@ -3076,6 +3111,16 @@ class TestingServer:
                     errors.append(f"Question {i+1} min_correct must be at least 1")
                 elif min_correct > len(question["correct_answer"]):
                     errors.append(f"Question {i+1} min_correct cannot exceed number of correct answers")
+
+            # Validate points (valid for all question types)
+            if "points" in question:
+                points = question["points"]
+                if isinstance(points, bool) or not isinstance(points, (int, float)):
+                    errors.append(f"Question {i+1} points must be a positive number")
+                elif points <= 0:
+                    errors.append(f"Question {i+1} points must be greater than 0")
+                elif round(points, POINTS_DECIMAL_PLACES) != points:
+                    errors.append(f"Question {i+1} points can have at most {POINTS_DECIMAL_PLACES} decimal places")
 
             # Validate stick_to_the_previous (valid for all question types)
             if "stick_to_the_previous" in question:
@@ -4121,7 +4166,7 @@ class TestingServer:
             "completion_times": completion_times,
             "questions": self.questions,
             "total_questions": len(self.questions),
-            "total_points": sum(q.get("points", 1) for q in self.questions),
+            "total_points": sum_points(q.get("points", 1) for q in self.questions),
             "current_quiz": os.path.basename(self.current_quiz_file) if self.current_quiz_file else None,
         }
         return await self._handle_websocket_connection(request, self.websocket_clients, initial_data, "WebSocket")
