@@ -10,14 +10,33 @@ import tempfile
 import shutil
 import os
 import subprocess
+import sys
 import time
+
+# CLI tests start a real server, so they need ports outside the 8080-8087 range
+# used by the custom_webquiz_server fixture in conftest.py. Otherwise a CLI test
+# running on one xdist worker holds a port another worker is trying to bind.
+CLI_TEST_PORTS = [8090, 8091, 8092, 8093, 8094, 8095, 8096, 8097]
+
+
+def cli_test_port():
+    """Get a CLI-test port unique to the current pytest-xdist worker."""
+    worker_id = os.environ.get("PYTEST_XDIST_WORKER", "master")
+    if isinstance(worker_id, str) and worker_id.startswith("gw"):
+        try:
+            return CLI_TEST_PORTS[int(worker_id[2:]) % len(CLI_TEST_PORTS)]
+        except ValueError:
+            pass
+    return CLI_TEST_PORTS[0]
 
 
 def run_webquiz_cli_briefly(args=None):
     """Helper to start webquiz CLI briefly for directory creation tests."""
-    cmd = ["python", "-m", "webquiz.cli"]
-    if args:
-        cmd += args
+    args = list(args) if args else []
+    # Always bind a worker-specific port unless the test sets one itself
+    if "--port" not in args:
+        args += ["--port", str(cli_test_port())]
+    cmd = [sys.executable, "-m", "webquiz.cli"] + args
     proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
     # Let it initialize
     time.sleep(2)
@@ -211,3 +230,27 @@ def test_webquiz_cli_creates_webquiz_yaml_config(temp_dir):
         expected_sections = ["server:", "paths:", "admin:"]
         for section in expected_sections:
             assert section in content, f"Config file missing {section} section"
+
+
+def test_webquiz_cli_port_override(temp_dir):
+    """Test that --port overrides the port coming from the config file."""
+    config_content = """
+server:
+  port: 9099
+"""
+    config_file = os.path.join(temp_dir, "test_config.yaml")
+    with open(config_file, "w") as f:
+        f.write(config_content)
+
+    override_port = cli_test_port()
+    run_webquiz_cli_briefly(["--config", config_file, "--port", str(override_port)])
+
+    logs_dir = os.path.join(temp_dir, "logs")
+    log_files = [f for f in os.listdir(logs_dir) if f.endswith(".log")]
+    assert log_files, "No log file was created"
+
+    with open(os.path.join(logs_dir, log_files[0]), "r") as f:
+        log_content = f.read()
+
+    assert f"Port: {override_port}" in log_content, "CLI --port was not applied"
+    assert "Port: 9099" not in log_content, "Config port was used instead of the CLI override"

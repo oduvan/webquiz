@@ -143,6 +143,9 @@ webquiz
 # Start server with admin interface (requires master key)
 webquiz --master-key secret123
 
+# Start server on a custom port
+webquiz --port 9090
+
 # Start server with custom directories
 webquiz --quizzes-dir my_quizzes
 webquiz --logs-dir /var/log
@@ -176,6 +179,7 @@ webquiz --version
 ### Key Options
 
 - `--master-key`: Enable admin interface with authentication
+- `--port`: Port to listen on (default: `8080`)
 - `--quizzes-dir`: Directory containing quiz YAML files (default: `./quizzes`)
 - `--logs-dir`: Directory for server logs (default: current directory)
 - `--csv-dir`: Directory for CSV exports (default: current directory)

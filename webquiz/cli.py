@@ -230,6 +230,7 @@ Examples:
   webquiz                              Start server with defaults
   webquiz -d                           Start server as daemon
   webquiz --config server.yaml        Use configuration file
+  webquiz --port 9090                  Listen on a custom port
   webquiz --quizzes-dir my_quizzes     Use custom quizzes directory
   webquiz --master-key secret123       Set admin master key
   webquiz --logs-dir /var/log          Use custom logs directory
@@ -258,6 +259,8 @@ CLI parameters always override config file values
 
     parser.add_argument("--config", help="Path to YAML configuration file")
 
+    parser.add_argument("--port", type=int, help="Port to listen on (default: 8080)")
+
     parser.add_argument("--quizzes-dir", help="Path to quizzes directory (default: quizzes)")
 
     parser.add_argument("--master-key", help="Master key for admin access (can also use WEBQUIZ_MASTER_KEY env var)")
@@ -277,6 +280,7 @@ CLI parameters always override config file values
     # Load configuration with CLI overrides
     config = load_config_with_overrides(
         config_path=args.config,
+        port=args.port,
         quizzes_dir=args.quizzes_dir,
         master_key=args.master_key,
         logs_dir=args.logs_dir,
