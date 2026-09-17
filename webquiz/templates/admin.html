@@ -1893,7 +1893,7 @@
                     </div>
                     <div class="form-group">
                         <label for="points-${questionCounter}" style="display: inline-block;">Бали за питання:</label>
-                        <input type="number" id="points-${questionCounter}" class="points-input" min="1" value="1" placeholder="1" style="width: 80px;" oninput="updateQuestionPreview(this)">
+                        <input type="number" id="points-${questionCounter}" class="points-input" min="0.01" step="0.01" value="1" placeholder="1" style="width: 80px;" oninput="updateQuestionPreview(this)">
                     </div>
                     <div class="form-group">
                         <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
@@ -2007,6 +2007,12 @@
             }
         }
 
+        // Points may be decimals with at most 2 places. Round to kill binary float
+        // noise (0.1 + 0.2) and keep the value a Number so it saves as YAML number.
+        function roundPoints(value) {
+            return Math.round(Number(value) * 100) / 100;
+        }
+
         function updateQuestionPreview(input) {
             const questionDiv = input.closest('.question-item');
             if (!questionDiv) return;
@@ -2019,7 +2025,7 @@
             const questionImage = questionDiv.querySelector('.question-image').value.trim();
             const questionFile = questionDiv.querySelector('.question-file').value.trim();
             const pointsInput = questionDiv.querySelector('.points-input');
-            const points = pointsInput ? parseInt(pointsInput.value) || 1 : 1;
+            const points = pointsInput ? roundPoints(parseFloat(pointsInput.value) || 1) : 1;
             const stickCheckbox = questionDiv.querySelector('.stick-to-previous-checkbox');
             const stickToPrevious = stickCheckbox ? stickCheckbox.checked : false;
 
@@ -2038,7 +2044,7 @@
                 if (questionFile) {
                     indicators += '<span class="question-indicator" title="Має файл">📎</span>';
                 }
-                if (points > 1) {
+                if (points !== 1) {
                     indicators += `<span class="question-indicator points-indicator" title="${points} балів"> 🏆${points}</span>`;
                 }
                 indicatorsSpan.innerHTML = indicators;
@@ -2404,8 +2410,8 @@
                     if (question.file) {
                         indicatorsHtml += '<span class="question-indicator" title="Має файл">📎</span>';
                     }
-                    if (pointsValue > 1) {
-                        indicatorsHtml += `<span class="question-indicator points-indicator" title="${pointsValue} балів">🏆 ${pointsValue}</span>`;
+                    if (pointsValue !== 1) {
+                        indicatorsHtml += `<span class="question-indicator points-indicator" title="${pointsValue} балів">🏆 ${roundPoints(pointsValue)}</span>`;
                     }
 
                     questionDiv.innerHTML = `
@@ -2487,7 +2493,7 @@
                             </div>
                             <div class="form-group">
                                 <label for="points-${questionCounter}" style="display: inline-block;">Бали за питання:</label>
-                                <input type="number" id="points-${questionCounter}" class="points-input" min="1" value="${pointsValue}" placeholder="1" style="width: 80px;" oninput="updateQuestionPreview(this)">
+                                <input type="number" id="points-${questionCounter}" class="points-input" min="0.01" step="0.01" value="${pointsValue}" placeholder="1" style="width: 80px;" oninput="updateQuestionPreview(this)">
                             </div>
                             <div class="form-group">
                                 <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
@@ -2599,8 +2605,8 @@
                 // Include points if different from default (1)
                 const pointsInput = div.querySelector('.points-input');
                 if (pointsInput && pointsInput.value.trim()) {
-                    const points = parseInt(pointsInput.value);
-                    if (points > 1) {
+                    const points = roundPoints(parseFloat(pointsInput.value));
+                    if (!isNaN(points) && points !== 1) {
                         questionData.points = points;
                     }
                 }

@@ -365,11 +365,13 @@ questions:
 
 **Question Points:**
 - Each question can have a custom point value using the `points` field (default: 1)
+- Points may be whole or decimal numbers with **at most two decimal places** (e.g. `0.5`, `1.25`, `2.75`)
+- Points must be greater than 0. A value with more than two decimals (e.g. `1.234`) is rejected when the quiz is saved
 - Points are tracked and displayed in:
   - Live stats: shows earned points / total points for each user
   - Final results: displays points earned along with correct/incorrect count
   - Users CSV: includes `earned_points` and `total_points` columns
-- Questions with more than 1 point show a trophy indicator (🏆) during the quiz
+- Questions worth something other than 1 point show a trophy indicator (🏆) during the quiz
 
 Example:
 ```yaml
@@ -390,6 +392,13 @@ questions:
       - "Z"
     correct_answer: 2
     points: 3  # This question is worth 3 points
+
+  - question: "Easy question worth half a point"
+    options:
+      - "Yes"
+      - "No"
+    correct_answer: 0
+    points: 0.5  # Decimal points are allowed (up to 2 decimals)
 ```
 
 **Text Input Questions:**
@@ -418,7 +427,7 @@ questions:
 - `checker` - Required to identify as text question (can be empty for exact match)
 - `default_value` - Initial value shown in textarea (optional)
 - `correct_value` - Correct answer shown when student is wrong (optional)
-- `points` - Points for correct answer (default: 1)
+- `points` - Points for correct answer, a number > 0 with at most 2 decimals (default: 1)
 
 **Checker Code:**
 - Uses variable `user_answer` (the student's text input)

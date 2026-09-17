@@ -500,6 +500,16 @@
         // Initialize theme on page load
         initializeTheme();
 
+        // Points may be decimals with at most 2 places. Round to kill binary
+        // float noise from repeated adding/subtracting of values like 0.1.
+        function roundPoints(value) {
+            return Math.round((Number(value) || 0) * 100) / 100;
+        }
+
+        function formatPoints(value) {
+            return String(roundPoints(value));
+        }
+
         class LiveStatsClient {
             constructor() {
                 this.ws = null;
@@ -657,7 +667,7 @@
                 this.completionTimes = data.completion_times || {};
                 this.questions = data.questions || [];
                 this.totalQuestions = data.total_questions || 0;
-                this.totalPoints = data.total_points || this.questions.reduce((sum, q) => sum + (q.points || 1), 0);
+                this.totalPoints = roundPoints(data.total_points || this.questions.reduce((sum, q) => sum + (q.points || 1), 0));
                 this.currentQuiz = data.current_quiz || 'No quiz selected';
 
                 // Calculate statistics client-side
@@ -797,8 +807,8 @@
                     this.userStatistics[userId] = {
                         correct_count: correctCount,
                         total_answered: totalAnswered,
-                        earned_points: earnedPoints,
-                        attempted_points: attemptedPoints
+                        earned_points: roundPoints(earnedPoints),
+                        attempted_points: roundPoints(attemptedPoints)
                     };
                 }
 
@@ -861,6 +871,9 @@
                         this.questionStatistics[questionId].correct_count++;
                     }
                 }
+
+                this.userStatistics[userId].earned_points = roundPoints(this.userStatistics[userId].earned_points);
+                this.userStatistics[userId].attempted_points = roundPoints(this.userStatistics[userId].attempted_points);
             }
 
             buildTable() {
@@ -946,13 +959,13 @@
                     const fileIndicator = question.file ? `<span class="file-indicator" title="${question.file.split('/').pop()}">📎</span>` : '';
 
                     // Build points indicator if question has more than 1 point
-                    const pointsIndicator = questionPoints > 1 ? `<span class="points-indicator" title="${questionPoints} points">🏆 ${questionPoints}</span>` : '';
+                    const pointsIndicator = questionPoints !== 1 ? `<span class="points-indicator" title="${formatPoints(questionPoints)} points">🏆 ${formatPoints(questionPoints)}</span>` : '';
 
                     if (question.image && !question.question) {
                         // Image-only question: show filename and small image
                         const imagePath = question.image;
                         const filename = imagePath.split('/').pop().split('.').slice(0, -1).join('.');
-                        headerHtml += `<th title="${filename} - Correct: ${statsText}${questionPoints > 1 ? ` - ${questionPoints} points` : ''}">
+                        headerHtml += `<th title="${filename} - Correct: ${statsText}${questionPoints !== 1 ? ` - ${formatPoints(questionPoints)} points` : ''}">
                             <div class="image-header">
                                 <img src="${imagePath}" alt="${filename}" class="header-image">
                                 <div class="image-filename">${filename}${fileIndicator}${pointsIndicator}</div>
@@ -980,7 +993,7 @@
 
                     // Get user statistics - show points instead of question count
                     const userStats = this.userStatistics[userId] || { correct_count: 0, total_answered: 0, earned_points: 0, attempted_points: 0 };
-                    const userStatsText = `${userStats.earned_points}/${this.totalPoints}`;
+                    const userStatsText = `${formatPoints(userStats.earned_points)}/${formatPoints(this.totalPoints)}`;
 
                     bodyHtml += `<tr id="user-${userId}">`;
                     bodyHtml += `<td class="username-cell">
@@ -1046,7 +1059,7 @@
 
             updateUserStats(userId) {
                 const userStats = this.userStatistics[userId] || { correct_count: 0, total_answered: 0, earned_points: 0, attempted_points: 0 };
-                const userStatsText = `${userStats.earned_points}/${this.totalPoints}`;
+                const userStatsText = `${formatPoints(userStats.earned_points)}/${formatPoints(this.totalPoints)}`;
 
                 // Find the user stats element
                 const userRow = document.getElementById(`user-${userId}`);
