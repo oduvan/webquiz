@@ -125,22 +125,80 @@ def test_decimal_points_reload_into_editor(browser):
         assert values[1] == "2.5", f"Expected 2.5 in the second points input, got {values}"
 
 
+def click_save(browser):
+    """Click the editor's save button without waiting for the modal to close."""
+    save_btn = WebDriverWait(browser, 10).until(
+        EC.element_to_be_clickable((By.XPATH, "//button[contains(text(), 'Зберегти Quiz')]"))
+    )
+    browser.execute_script("arguments[0].click();", save_btn)
+
+
+def error_messages(browser):
+    """Text of the error messages currently shown in the message area."""
+    return [el.text for el in browser.find_elements(By.CSS_SELECTOR, "#message-area .message.error")]
+
+
 @skip_if_selenium_disabled
-def test_zero_points_falls_back_to_default(browser):
-    """Typing 0 points saves the default instead of a value the server rejects."""
+def test_more_than_two_decimals_shows_error(browser):
+    """Typing 0.255 is refused with a message instead of being rounded silently."""
+    with custom_webquiz_server(quizzes=QUIZ) as (proc, port):
+        admin_login(browser, port)
+        select_and_edit_quiz(browser)
+
+        set_points(browser, 0, "0.255")
+        click_save(browser)
+
+        WebDriverWait(browser, 10).until(lambda d: error_messages(d))
+        message = " ".join(error_messages(browser))
+
+        assert "Питання 1" in message, f"Error should name the question, got: {message}"
+        assert "2 знак" in message, f"Error should mention the 2 decimal limit, got: {message}"
+
+        # The editor stays open so the value can be corrected
+        assert browser.find_element(By.ID, "quiz-editor-modal").is_displayed(), "Editor should stay open"
+
+        # Nothing was saved
+        cookies = get_admin_session(port)
+        content = requests.get(f"http://localhost:{port}/api/admin/quiz/default.yaml", cookies=cookies).json()[
+            "content"
+        ]
+        assert "points:" not in content, f"Quiz should not have been saved. Quiz file:\n{content}"
+
+
+@skip_if_selenium_disabled
+def test_zero_points_shows_error(browser):
+    """Typing 0 is refused with a message naming the question."""
     with custom_webquiz_server(quizzes=QUIZ) as (proc, port):
         admin_login(browser, port)
         select_and_edit_quiz(browser)
 
         set_points(browser, 0, "0")
+        click_save(browser)
+
+        WebDriverWait(browser, 10).until(lambda d: error_messages(d))
+        message = " ".join(error_messages(browser))
+
+        assert "Питання 1" in message, f"Error should name the question, got: {message}"
+        assert browser.find_element(By.ID, "quiz-editor-modal").is_displayed(), "Editor should stay open"
+
+
+@skip_if_selenium_disabled
+def test_two_decimals_still_saves(browser):
+    """Exactly two decimals stay valid and save without an error."""
+    with custom_webquiz_server(quizzes=QUIZ) as (proc, port):
+        admin_login(browser, port)
+        select_and_edit_quiz(browser)
+
+        set_points(browser, 0, "0.25")
         save_quiz(browser)
+
+        assert not error_messages(browser), f"No error expected, got: {error_messages(browser)}"
 
         cookies = get_admin_session(port)
         content = requests.get(f"http://localhost:{port}/api/admin/quiz/default.yaml", cookies=cookies).json()[
             "content"
         ]
-
-        assert "points: 0" not in content, f"0 points should not be saved. Quiz file:\n{content}"
+        assert "points: 0.25" in content, f"0.25 should be saved. Quiz file:\n{content}"
 
 
 @skip_if_selenium_disabled
