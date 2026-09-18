@@ -2512,6 +2512,35 @@
             }
         }
 
+        // Check every question's points field. Returns an error message for the
+        // first bad value, or null when they are all fine. Points must be a number
+        // greater than 0 with at most 2 decimal places - the same rule the server
+        // enforces, checked here so the admin gets a message naming the question
+        // instead of a rejected save or a value silently rounded.
+        function validateWizardPoints() {
+            const questionDivs = document.querySelectorAll('.question-item');
+
+            for (let i = 0; i < questionDivs.length; i++) {
+                const pointsInput = questionDivs[i].querySelector('.points-input');
+                if (!pointsInput || !pointsInput.value.trim()) continue;
+
+                const raw = pointsInput.value.trim();
+                const points = parseFloat(raw);
+
+                if (isNaN(points)) {
+                    return `Питання ${i + 1}: бали мають бути числом`;
+                }
+                if (points <= 0) {
+                    return `Питання ${i + 1}: бали мають бути більше 0`;
+                }
+                if (roundPoints(points) !== points) {
+                    return `Питання ${i + 1}: бали можуть мати не більше 2 знаків після коми`;
+                }
+            }
+
+            return null;
+        }
+
         function getWizardData() {
             const questions = [];
             const questionDivs = document.querySelectorAll('.question-item');
@@ -2602,9 +2631,9 @@
                     questionData.file = questionFile;
                 }
 
-                // Include points if different from default (1). Values that are not
-                // a positive number fall back to the default instead of being sent,
-                // since the server rejects them and that would fail the whole save.
+                // Include points if different from default (1). validateWizardPoints()
+                // already blocked bad values before the save, so the guard here is
+                // only a backstop against sending something the server would reject.
                 const pointsInput = div.querySelector('.points-input');
                 if (pointsInput && pointsInput.value.trim()) {
                     const points = roundPoints(parseFloat(pointsInput.value));
@@ -2650,6 +2679,12 @@
 
             if (!filename) {
                 showMessage('Будь ласка, введіть ім\'я файлу', 'error');
+                return;
+            }
+
+            const pointsError = validateWizardPoints();
+            if (pointsError) {
+                showMessage(pointsError, 'error');
                 return;
             }
 
@@ -2699,6 +2734,12 @@
 
             if (!filename) {
                 showMessage('Будь ласка, введіть ім\'я файлу', 'error');
+                return;
+            }
+
+            const pointsError = validateWizardPoints();
+            if (pointsError) {
+                showMessage(pointsError, 'error');
                 return;
             }
 

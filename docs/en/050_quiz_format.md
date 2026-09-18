@@ -227,6 +227,7 @@ Points can also be decimal numbers with **at most two decimal places**:
 **Rules for `points`:**
 - Must be a number greater than 0
 - At most two decimal places. `1.234` is rejected when the quiz is saved
+- The admin quiz editor shows an error naming the question instead of rounding the value for you
 - The default is `1`
 
 **Features:**

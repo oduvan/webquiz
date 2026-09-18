@@ -367,6 +367,7 @@ questions:
 - Each question can have a custom point value using the `points` field (default: 1)
 - Points may be whole or decimal numbers with **at most two decimal places** (e.g. `0.5`, `1.25`, `2.75`)
 - Points must be greater than 0. A value with more than two decimals (e.g. `1.234`) is rejected when the quiz is saved
+- The admin quiz editor refuses such a value with a message naming the question, so nothing is rounded silently
 - Points are tracked and displayed in:
   - Live stats: shows earned points / total points for each user
   - Final results: displays points earned along with correct/incorrect count
