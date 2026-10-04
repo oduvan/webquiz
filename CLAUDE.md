@@ -140,6 +140,7 @@ webquiz-stress-test -c 50
 - **Admin-triggered connection** - No auto-connect on startup, admin clicks button to establish tunnel
 - **Tunnel URL in access list** - Public tunnel URL automatically added to "URL для доступу з інших пристроїв:" list with green background when connected
 - **IP address detection** - Automatically uses HTTP for IP addresses (IPv4/IPv6) and HTTPS for domain names when fetching tunnel_config.yaml
+- **Client IP behind proxies** - `get_client_ip()` trusts `X-Forwarded-For` / `X-Real-IP` only when the TCP peer is loopback (local reverse proxy or the SSH tunnel, which forwards to 127.0.0.1) and takes the **last** `X-Forwarded-For` entry (the tunnel server's nginx uses `$proxy_add_x_forwarded_for`, so earlier entries come from the client). Direct LAN clients cannot spoof their IP with headers.
 - **Local network restriction** - All admin functionality (API endpoints via @admin_auth_required, HTML pages, WebSockets) automatically restricted to private networks (RFC 1918: 127.0.0.0/8, 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16) with no configuration needed
 - **Quiz download folder validation** - Path traversal protection: blocks "..", absolute paths (Unix/Windows), normalizes paths, ensures extraction stays within quizzes directory; allows subfolder paths like "folder/subfolder/"
 - **Clipboard API fallback** - Copy public key button uses modern navigator.clipboard API for HTTPS/localhost, falls back to document.execCommand() for non-secure contexts (HTTP over IP)

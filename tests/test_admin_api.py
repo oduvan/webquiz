@@ -236,10 +236,15 @@ def test_trusted_ip_with_proxy_headers():
     config = {"admin": {"trusted_ips": ["192.168.1.50", "10.0.0.100"]}}
 
     with custom_webquiz_server(config=config) as (proc, port):
-        # Test X-Forwarded-For header with trusted IP
-        headers = {"X-Forwarded-For": "192.168.1.50, 192.168.1.1"}
+        # Test X-Forwarded-For header with trusted IP (the proxy appends the real IP last)
+        headers = {"X-Forwarded-For": "192.168.1.1, 192.168.1.50"}
         response = requests.post(f"http://localhost:{port}/api/admin/auth", headers=headers)
         assert response.status_code == 200  # Should succeed due to trusted forwarded IP
+
+        # A trusted IP placed first by the client must not count
+        headers = {"X-Forwarded-For": "192.168.1.50, 192.168.1.1"}
+        response = requests.post(f"http://localhost:{port}/api/admin/auth", headers=headers)
+        assert response.status_code == 401  # Spoofed first entry is ignored
 
         # Test X-Real-IP header with trusted IP
         headers = {"X-Real-IP": "10.0.0.100"}

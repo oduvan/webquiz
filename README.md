@@ -575,6 +575,7 @@ tunnel:
 - Keys are stored with proper permissions (600 for private key)
 - Connection is admin-initiated (no auto-connect on startup)
 - Connection status is shown in real-time via WebSocket
+- Tunnel traffic reaches WebQuiz from `127.0.0.1`. Proxy headers (`X-Forwarded-For`, `X-Real-IP`) are trusted only from loopback connections, and the **last** `X-Forwarded-For` entry is used, because the proxy appends the real address. Visitors through the tunnel therefore count as public IPs and cannot open admin pages.
 
 ## 📊 Data Export
 
