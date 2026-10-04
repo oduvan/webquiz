@@ -37,6 +37,7 @@ class TunnelManager:
         self.connection: Optional[asyncssh.SSHClientConnection] = None
         self.listener = None
         self.socket_id: Optional[str] = None
+        self.base_url: Optional[str] = None  # Public URL prefix of all sockets, e.g. https://host/start
         self.status = {
             "connected": False,
             "url": None,
@@ -269,6 +270,7 @@ class TunnelManager:
             # Construct public URL
             base_url = tunnel_config["base_url"].rstrip("/")
             public_url = f"{base_url}/{self.socket_id}/"
+            self.base_url = base_url
 
             # Update status
             self.status["connected"] = True
@@ -323,6 +325,7 @@ class TunnelManager:
         self.status["url"] = None
         self.status["error"] = None
         self.socket_id = None
+        self.base_url = None
 
         logger.info("SSH tunnel disconnected")
         await self._notify_status_change()
@@ -374,6 +377,19 @@ class TunnelManager:
             except Exception as e:
                 logger.error(f"Error during reconnect attempt: {e}")
                 self._reconnect_delay = min(self._reconnect_delay * 2, self._max_reconnect_delay)
+
+    def get_public_endpoint(self) -> Optional[tuple[str, str]]:
+        """Get the public address of this server while the tunnel is connected
+
+        Other WebQuiz servers on the same tunnel server are reachable at
+        "{base_url}/{their socket name}/".
+
+        Returns:
+            Tuple of (base_url, socket_id) or None if not connected
+        """
+        if self.status["connected"] and self.base_url and self.socket_id:
+            return self.base_url, self.socket_id
+        return None
 
     def get_status(self) -> Dict[str, Any]:
         """Get current tunnel status

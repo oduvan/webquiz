@@ -71,6 +71,12 @@ The main administrative panel page contains essential tools for managing quizzes
 
   When connected, a public URL appears in the "URL for Access from Other Devices" section with a green background, allowing participants outside your local network to join the quiz.
 
+- **File Transfer Requests**
+  This panel appears when another WebQuiz server on the same tunnel server wants to send files (see [Sending Files to Another Server](#sending-files-to-another-server)).
+  It shows the name of the sending server and the list of files.
+  - **Accept** — download the files. They appear in the File Manager. Existing files are never overwritten.
+  - **Reject** — refuse the files. The sender sees that the request was rejected.
+
 - **Theme Switcher**
   In the top-right corner of the page, there's a button to toggle between light and dark themes. The preference is saved in your browser and applies to all WebQuiz pages.
 
@@ -102,6 +108,25 @@ At the top of the page, there's a **search field** to filter files by name, and 
 
 - **Config** — the server configuration file (`webquiz.yaml`).
   You can edit the configuration directly in the browser with syntax highlighting.
+
+#### Sending Files to Another Server
+
+You can send quiz, log and CSV files to another WebQuiz server, for example from one classroom computer to another. Both servers must:
+- be connected to the **same tunnel server** with keys of the **same SSH user**;
+- have a fixed, different `socket_name` (see [Configuration](040_config.md));
+- have the SSH tunnel connected on the admin panel.
+
+When the tunnel is connected, the **Send files to another server** panel shows the name of this server and a checkbox next to every quiz, log and CSV file.
+
+1. Tick the files on any tab.
+2. Type the name of the other server (its `socket_name`) and click **Send**.
+3. The other server's admin panel shows the request. After **Accept**, the files are downloaded.
+4. Below the panel you see the status of your requests: waiting, accepted, rejected or expired.
+
+Notes:
+- A request expires if it is not answered in 30 minutes. Keep both servers connected until then.
+- Received quizzes keep their name if it is free, otherwise the sender name is added (`room-12_math.yaml`). Logs and CSV files always get the sender name (`room-12_0001.log`).
+- Quiz attachments and images are not sent.
 
 #### Table View
 

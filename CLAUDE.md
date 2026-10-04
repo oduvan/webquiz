@@ -25,6 +25,7 @@ WebQuiz - Python/aiohttp quiz system with multi-quiz management, real-time WebSo
 - `webquiz/config.py` - Configuration dataclasses and loading functions
 - `webquiz/translations.py` - UI and error message translations (uk/en)
 - `webquiz/tunnel.py` - SSH tunnel manager for public access
+- `webquiz/transfer.py` - File transfer between servers on the same tunnel server
 - `webquiz/cli.py` - CLI with daemon support
 - `webquiz/build.py` - PyInstaller build script
 - `installer/webquiz.iss` - Inno Setup script for Windows installer
@@ -47,7 +48,11 @@ WebQuiz - Python/aiohttp quiz system with multi-quiz management, real-time WebSo
 - Quiz file attachments: `GET /api/admin/list-files` (list files in quizzes/attach/)
 - Checker templates: `GET /api/admin/list-checker-templates` (list configured checker templates for text questions)
 - File management: `GET /api/files/list`, `GET /api/files/{type}/view/{filename}`, `GET /api/files/{type}/download/{filename}`, `PUT /api/files/quizzes/save/{filename}`
-- Tunnel management: `POST /api/admin/tunnel/connect`, `POST /api/admin/tunnel/disconnect`, `GET /api/admin/tunnel/public-key`
+- Tunnel management: `POST /api/admin/tunnel/connect`, `POST /api/admin/tunnel/disconnect`
+- File transfer: `GET /api/admin/transfer` (state: own name, sent offers, incoming requests), `POST /api/admin/transfer/send` (`{to, files: [{type, name}]}`), `POST /api/admin/transfer/{request_id}/accept`, `POST /api/admin/transfer/{request_id}/reject`
+
+**Server-to-server (through the tunnel, protected by the offer token, not by IP):**
+- `POST /api/transfer/offer`, `GET /api/transfer/download/{token}/{type}/{filename}`, `POST /api/transfer/result`
 
 **Admin Pages (local network only):**
 - `GET /admin/` - Admin interface page
@@ -55,7 +60,7 @@ WebQuiz - Python/aiohttp quiz system with multi-quiz management, real-time WebSo
 - `GET /files/` - File manager page
 
 **WebSockets:**
-- `WS /ws/live-stats` (local network only), `WS /ws/admin` (local network only, admin approval + tunnel status notifications)
+- `WS /ws/live-stats` (local network only), `WS /ws/admin` (local network only, admin approval + tunnel status + file transfer notifications: `transfer_request`, `transfer_request_removed`, `transfer_result`)
 
 ## Dev Commands
 
@@ -141,6 +146,7 @@ webquiz-stress-test -c 50
 - **Tunnel URL in access list** - Public tunnel URL automatically added to "URL для доступу з інших пристроїв:" list with green background when connected
 - **IP address detection** - Automatically uses HTTP for IP addresses (IPv4/IPv6) and HTTPS for domain names when fetching tunnel_config.yaml
 - **Client IP behind proxies** - `get_client_ip()` trusts `X-Forwarded-For` / `X-Real-IP` only when the TCP peer is loopback (local reverse proxy or the SSH tunnel, which forwards to 127.0.0.1) and takes the **last** `X-Forwarded-For` entry (the tunnel server's nginx uses `$proxy_add_x_forwarded_for`, so earlier entries come from the client). Direct LAN clients cannot spoof their IP with headers.
+- **File transfer between servers** - "Ask first, then send" over the public tunnel URLs (`{base_url}/{socket_name}/...`); direct SSH stream-local connections are blocked by the tunnel server (`AllowTcpForwarding remote`). Sender keeps an offer with a random token (30 min lifetime) and POSTs the file list; receiver admin accepts; receiver downloads from `{its own base_url}/{sender}/` with the token and reports the result. Only `.yaml/.yml` quizzes, `.log` logs, `.csv` files; names without path or Windows-invalid characters; never overwrites (quizzes keep the name if free, logs/CSV get `{sender}_` prefix, `_2`, `_3` suffix). State is in memory (`TransferManager`). `TunnelManager.get_public_endpoint()` returns `(base_url, socket_id)` while connected.
 - **Local network restriction** - All admin functionality (API endpoints via @admin_auth_required, HTML pages, WebSockets) automatically restricted to private networks (RFC 1918: 127.0.0.0/8, 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16) with no configuration needed
 - **Quiz download folder validation** - Path traversal protection: blocks "..", absolute paths (Unix/Windows), normalizes paths, ensures extraction stays within quizzes directory; allows subfolder paths like "folder/subfolder/"
 - **Clipboard API fallback** - Copy public key button uses modern navigator.clipboard API for HTTPS/localhost, falls back to document.execCommand() for non-secure contexts (HTTP over IP)
@@ -175,6 +181,7 @@ webquiz-stress-test -c 50
 **Admin**: Switch quiz → reset all state (users, progress, responses) → new CSV → session isolation
 **Live Stats Groups**: Users display in "In Progress" group → answer questions → complete final question → automatically move to "Completed" group with `completed: true` flag in WebSocket
 **Tunnel**: Initialize → check/generate keys → admin clicks connect → fetch server config → create SSH connection → forward remote Unix socket to local port (forward_remote_path_to_port) → broadcast public URL via WebSocket → auto-reconnect on disconnect
+**File Transfer**: Sender admin ticks files in `/files/` → `POST /api/admin/transfer/send` → offer + token stored → `POST {base_url}/{target}/api/transfer/offer` → receiver broadcasts `transfer_request` to admin WebSocket → admin accepts → receiver GETs each file from `{base_url}/{sender}/api/transfer/download/{token}/...` into a temp file, renames to a free name → `POST .../api/transfer/result` → sender marks offer accepted/rejected/failed (files page polls `GET /api/admin/transfer`)
 **Startup**: Load config → create TestingServer → initialize log file → configure logging → **log environment info** (version, Python, OS, config, paths, network) → initialize tunnel → load questions → start periodic flush → register routes
 **Config Hot-Reload**: Admin saves config → validate YAML → backup original config → write to file → reload config from file → detect restart-required changes (server, paths, master_key) → apply safe changes (registration, trusted_ips, quizzes, tunnel) → reload templates → disconnect tunnel if connected (admin can reconnect) → restart current quiz (reset users/state) → return message (either "saved and applied" or "restart required for: ..."). On failure: rollback config file to backup → return error
 **Text Question Validation**: Submit text answer → check question type → if text: execute checker code in sandboxed env (restricted builtins + math + helper functions: to_int, distance, direction_angle) → if exception: answer incorrect + return error message → if no exception: answer correct. No checker: exact match with `correct_value`
@@ -201,7 +208,7 @@ webquiz-stress-test -c 50
   - `tunnel.server` - SSH tunnel server hostname (e.g., "tunnel.example.com")
   - `tunnel.public_key` - Path to SSH public key file (auto-generated if missing)
   - `tunnel.private_key` - Path to SSH private key file (auto-generated if missing)
-  - `tunnel.socket_name` - Optional fixed socket name instead of random generation (default: random 6-8 hex chars)
+  - `tunnel.socket_name` - Optional fixed socket name instead of random generation (default: random 6-8 hex chars). Needed for file transfer (other servers address this one by it). After a disconnect the name can stay busy up to 5 min (stale socket file until the tunnel server's cleanup cron)
   - `tunnel.config` - Optional nested config subsection (username, socket_directory, base_url) - bypasses server fetch when provided
 - Questions use **0-indexed** `correct_answer` field and optional `points` field (default: 1)
 - Text questions are detected by `checker` field (no `type` field needed, no `options` or `correct_answer`)
