@@ -5,8 +5,64 @@ Tests that admin and live-stats pages are restricted to local/private networks o
 
 import requests
 import pytest
+from types import SimpleNamespace
 
 from conftest import custom_webquiz_server
+from webquiz.server import get_client_ip
+
+
+def make_request(remote, headers=None):
+    """Minimal stand-in for an aiohttp request (only what get_client_ip reads)."""
+    return SimpleNamespace(remote=remote, headers=headers or {})
+
+
+def test_client_ip_uses_last_forwarded_entry_from_loopback():
+    """Behind a local proxy or the SSH tunnel the proxy appends the real IP last."""
+    request = make_request("127.0.0.1", {"X-Forwarded-For": "127.0.0.1, 8.8.8.8"})
+    assert get_client_ip(request) == "8.8.8.8"
+
+
+def test_client_ip_prefers_forwarded_for_over_real_ip():
+    request = make_request("127.0.0.1", {"X-Forwarded-For": "8.8.8.8", "X-Real-IP": "192.168.1.5"})
+    assert get_client_ip(request) == "8.8.8.8"
+
+
+def test_client_ip_uses_real_ip_from_loopback():
+    request = make_request("127.0.0.1", {"X-Real-IP": " 8.8.4.4 "})
+    assert get_client_ip(request) == "8.8.4.4"
+
+
+def test_client_ip_ignores_headers_from_network_clients():
+    """A client on the LAN connects directly, so its headers cannot be trusted."""
+    request = make_request("192.168.1.20", {"X-Forwarded-For": "127.0.0.1", "X-Real-IP": "127.0.0.1"})
+    assert get_client_ip(request) == "192.168.1.20"
+
+
+def test_client_ip_without_headers():
+    assert get_client_ip(make_request("127.0.0.1")) == "127.0.0.1"
+    assert get_client_ip(make_request(None)) == "127.0.0.1"
+    assert get_client_ip(make_request("127.0.0.1", {"X-Forwarded-For": " , "})) == "127.0.0.1"
+
+
+def test_spoofed_localhost_through_tunnel_is_blocked():
+    """Tunnel traffic arrives from 127.0.0.1 with nginx headers.
+
+    nginx appends the real address to X-Forwarded-For, so a visitor who sends
+    "X-Forwarded-For: 127.0.0.1" must not be treated as the trusted localhost.
+    """
+    config = {"admin": {"trusted_ips": ["127.0.0.1"]}}
+    with custom_webquiz_server(config=config) as (proc, port):
+        headers = {"X-Forwarded-For": "127.0.0.1, 8.8.8.8", "X-Real-IP": "8.8.8.8"}
+
+        response = requests.get(f"http://localhost:{port}/api/files/list", headers=headers)
+        assert response.status_code == 403
+
+        response = requests.post(f"http://localhost:{port}/api/admin/auth", headers=headers)
+        assert response.status_code == 403
+
+        # The real localhost (no proxy headers) is still trusted
+        response = requests.get(f"http://localhost:{port}/api/files/list")
+        assert response.status_code == 200
 
 
 def test_admin_page_from_local_ip():

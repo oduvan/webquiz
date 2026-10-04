@@ -355,7 +355,14 @@ def log_startup_environment(config: WebQuizConfig):
 def get_client_ip(request):
     """Extract client IP address from request, handling proxies.
 
-    Checks X-Forwarded-For and X-Real-IP headers for proxied requests.
+    Proxy headers are trusted only when the connection itself comes from a
+    loopback address: a reverse proxy on the same machine, or the SSH tunnel,
+    which forwards public traffic to 127.0.0.1. A client connecting directly
+    over the network cannot fake its address with headers.
+
+    From X-Forwarded-For the LAST entry is used: a proxy appends the address
+    it saw, while earlier entries may come from the client
+    (e.g. nginx `$proxy_add_x_forwarded_for`).
 
     Args:
         request: aiohttp request object
@@ -364,11 +371,15 @@ def get_client_ip(request):
         Client IP address as string, defaults to "127.0.0.1"
     """
     client_ip = request.remote or "127.0.0.1"
-    if "X-Forwarded-For" in request.headers:
-        # Handle proxy/load balancer forwarded IPs (take the first one)
-        client_ip = request.headers["X-Forwarded-For"].split(",")[0].strip()
-    elif "X-Real-IP" in request.headers:
-        client_ip = request.headers["X-Real-IP"]
+    if not is_loopback_address(client_ip):
+        return client_ip
+
+    forwarded_for = request.headers.get("X-Forwarded-For", "")
+    forwarded_ips = [ip.strip() for ip in forwarded_for.split(",") if ip.strip()]
+    if forwarded_ips:
+        return forwarded_ips[-1]
+    if request.headers.get("X-Real-IP", "").strip():
+        return request.headers["X-Real-IP"].strip()
     return client_ip
 
 
