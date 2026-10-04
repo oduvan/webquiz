@@ -758,10 +758,11 @@ def test_files_page_csv_text_table_buttons():
         response = requests.get(f"http://localhost:{port}/files/", headers=headers)
 
         assert response.status_code == 200
-        # Check for Text button with 'text' viewMode
-        assert "viewFile('${type}', '${file.name}', 'text')" in response.text
+        # Check for Text button with 'text' viewMode (file name is read from the data-name attribute)
+        assert "viewFile('${type}', ${name}, 'text')" in response.text
         # Check for Table button with 'table' viewMode
-        assert "viewFile('${type}', '${file.name}', 'table')" in response.text
+        assert "viewFile('${type}', ${name}, 'table')" in response.text
+        assert "this.closest(\\'.file-item\\').dataset.name" in response.text
         # Check for button labels
         assert "📄 Text" in response.text
         assert "📊 Table" in response.text

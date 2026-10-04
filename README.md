@@ -265,7 +265,10 @@ The project has **222+ tests** across **15 test files** covering:
 - **Admin Quiz Editor** (7 tests): Wizard mode quiz creation with randomize_questions and show_answers_on_completion
 - **Config Management** (23 tests): Config editor, validation, and form-based JSON updates
 - **Registration Approval** (20 tests): Approval workflow and timing
-- **Files Management** (32 tests): File manager interface
+- **Files Management** (38 tests): File manager interface
+- **SSH Tunnel** (31 tests): Key generation, config fetch, connect/disconnect (`test_tunnel.py`)
+- **File Transfer** (38 tests): Sending files between servers through the tunnel (`test_transfer.py`, `test_transfer_api.py`)
+- **Network Access** (22 tests): Local network restriction and proxy header handling
 - **Index Generation** (13 tests): Template generation tests
 - **Registration Fields** (12 tests): Custom registration fields
 - **Show Right Answer** (5 tests): Answer display functionality
@@ -576,6 +579,26 @@ tunnel:
 - Connection is admin-initiated (no auto-connect on startup)
 - Connection status is shown in real-time via WebSocket
 - Tunnel traffic reaches WebQuiz from `127.0.0.1`. Proxy headers (`X-Forwarded-For`, `X-Real-IP`) are trusted only from loopback connections, and the **last** `X-Forwarded-For` entry is used, because the proxy appends the real address. Visitors through the tunnel therefore count as public IPs and cannot open admin pages.
+- With a fixed `socket_name`, a reconnect can fail for a few minutes: the tunnel server keeps the old socket file until its cleanup job removes it (every 5 minutes). Setting `StreamLocalBindUnlink yes` in the server's sshd config avoids this.
+
+### Sending Files Between Servers
+
+Servers connected to the **same tunnel server with the same SSH user** (one socket directory, e.g. all computers of one school) can send quiz, log and CSV files to each other through the tunnel.
+
+1. Give every server a fixed, unique `socket_name` (e.g. `room-12`) and connect the tunnel on both.
+2. **Sender**: open the File Manager (`/files/`), tick the files, type the name of the other server and click **Send**. Only a list of the files is sent at this point.
+3. **Receiver**: the admin panel shows the request with **Accept** / **Reject**.
+4. On **Accept**, the receiver downloads the files from the sender. The sender's File Manager shows the answer.
+
+Where the received files go:
+- Quizzes keep their name. If a quiz with this name exists, the sender name is added: `room-12_math.yaml`.
+- Logs and CSV files always get the sender name: `room-12_0001.log`, `room-12_math_0001.csv`.
+- Existing files are never overwritten (`_2`, `_3`, … is added if needed).
+
+Rules and limits:
+- Both servers must stay connected until the receiver accepts. A request expires after 30 minutes.
+- Only `.yaml`/`.yml` quizzes, `.log` logs and `.csv` files; at most 100 files per request and 50 MB per file. Quiz attachments and images are not included.
+- All traffic goes through the public tunnel URL (`https://[server]/start/[name]/api/transfer/...`). A request carries a random token; the sender serves only the offered files, only with this token, and only until the request is answered or expires. The receiver downloads only from its own tunnel server, so files can only come from a server connected with a key of the same SSH user.
 
 ## 📊 Data Export
 

@@ -635,12 +635,27 @@ async def test_connect_with_custom_socket_name():
             assert manager.status["connected"] is True
             assert manager.status["url"] == result
             assert manager.socket_id == "my-custom-socket"
+            assert manager.base_url == "https://example.com/tests"
+            assert manager.get_public_endpoint() == ("https://example.com/tests", "my-custom-socket")
 
             # Verify SSH connection was called correctly
             mock_connect.assert_called_once()
             call_kwargs = mock_connect.call_args.kwargs
             assert call_kwargs["username"] == "tunneluser"
             assert private_key_path in call_kwargs["client_keys"]
+
+
+def test_public_endpoint_requires_connection():
+    """The public endpoint is known only while the tunnel is connected."""
+    manager = TunnelManager(TunnelConfig(server="example.com"))
+    assert manager.get_public_endpoint() is None
+
+    manager.socket_id = "abc123"
+    manager.base_url = "https://example.com/tests"
+    assert manager.get_public_endpoint() is None  # Connection lost: status is not connected
+
+    manager.status["connected"] = True
+    assert manager.get_public_endpoint() == ("https://example.com/tests", "abc123")
 
 
 @pytest.mark.asyncio
@@ -662,6 +677,9 @@ async def test_disconnect():
     manager.listener = mock_listener
     manager.status["connected"] = True
     manager.status["url"] = "https://example.com/tests/abc123/"
+    manager.socket_id = "abc123"
+    manager.base_url = "https://example.com/tests"
+    assert manager.get_public_endpoint() == ("https://example.com/tests", "abc123")
 
     await manager.disconnect()
 
@@ -671,6 +689,8 @@ async def test_disconnect():
     assert manager.status["connected"] is False
     assert manager.status["url"] is None
     assert manager.socket_id is None
+    assert manager.base_url is None
+    assert manager.get_public_endpoint() is None
 
     mock_listener.close.assert_called_once()
     mock_connection.close.assert_called_once()

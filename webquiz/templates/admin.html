@@ -876,6 +876,71 @@
             background: var(--success-green-hover);
         }
 
+        /* Incoming File Transfer Requests */
+        .transfer-requests {
+            margin-top: 30px;
+            background: var(--light-bg);
+            border: 2px solid var(--button-bg);
+            border-radius: 8px;
+            padding: 20px;
+        }
+
+        .transfer-request-item {
+            background: var(--white);
+            border: 1px solid var(--border-color);
+            border-radius: 5px;
+            padding: 15px;
+            margin: 10px 0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .transfer-request-files {
+            margin: 5px 0 0 0;
+            padding-left: 20px;
+            color: var(--text-muted);
+            font-size: 14px;
+            word-break: break-word;
+        }
+
+        .transfer-actions {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+
+        .transfer-actions button:disabled {
+            opacity: 0.6;
+            cursor: wait;
+        }
+
+        .reject-btn {
+            background: var(--danger-red);
+            color: var(--white);
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-weight: bold;
+        }
+
+        .reject-btn:hover {
+            background: var(--danger-red-hover);
+        }
+
+        @media (max-width: 768px) {
+            .transfer-request-item {
+                flex-direction: column;
+                align-items: stretch;
+            }
+
+            .transfer-actions button {
+                flex: 1;
+            }
+        }
+
         /* Downloadable Quizzes Section */
         .downloadable-quizzes {
             margin-top: 30px;
@@ -1070,6 +1135,15 @@
                 <div id="pending-users-list">
                     <p style="text-align: center; color: var(--text-muted);">Немає користувачів, що очікують підтвердження</p>
                 </div>
+            </div>
+
+            <!-- Incoming File Transfer Requests (from other servers on the same tunnel server) -->
+            <div id="transfer-requests-section" class="transfer-requests hidden">
+                <h3 style="margin-top: 0;">📥 Запити на отримання файлів</h3>
+                <p style="margin: 0; color: var(--text-muted); font-size: 14px;">
+                    Інший сервер хоче надіслати файли. Після прийняття вони з'являться в менеджері файлів. Наявні файли не перезаписуються.
+                </p>
+                <div id="transfer-requests-list"></div>
             </div>
 
             <!-- Show Answers Control Section -->
@@ -3244,6 +3318,26 @@
                 if (data.tunnel) {
                     updateTunnelUI(data.tunnel);
                 }
+                transferRequests = {};
+                (data.transfer_requests || []).forEach(request => { transferRequests[request.id] = request; });
+                displayTransferRequests();
+            } else if (data.type === 'transfer_request') {
+                transferRequests[data.request.id] = data.request;
+                displayTransferRequests();
+                showMessage(`Новий запит на файли від ${data.request.from}`, 'success');
+            } else if (data.type === 'transfer_request_removed') {
+                delete transferRequests[data.id];
+                displayTransferRequests();
+            } else if (data.type === 'transfer_result') {
+                const resultText = {
+                    accepted: 'прийняв файли',
+                    rejected: 'відхилив файли',
+                    failed: 'не зміг отримати файли'
+                };
+                showMessage(
+                    `Сервер ${data.offer.to} ${resultText[data.offer.status] || data.offer.status}`,
+                    data.offer.status === 'accepted' ? 'success' : 'error'
+                );
             } else if (data.type === 'tunnel_status') {
                 // Tunnel status update
                 if (data.tunnel) {
@@ -3322,6 +3416,60 @@
             }
 
             listContainer.innerHTML = html;
+        }
+
+        // Incoming file transfer requests: request id -> request
+        let transferRequests = {};
+        const TRANSFER_TYPE_LABELS = { quizzes: 'тест', logs: 'лог', csv: 'CSV' };
+
+        function displayTransferRequests() {
+            const requests = Object.values(transferRequests);
+            document.getElementById('transfer-requests-section').classList.toggle('hidden', requests.length === 0);
+            document.getElementById('transfer-requests-list').innerHTML = requests.map(request => {
+                const files = request.files.map(file =>
+                    `<li>${escapeHtml(file.name)} (${TRANSFER_TYPE_LABELS[file.type] || escapeHtml(file.type)}, ${formatFileSize(file.size)})</li>`
+                ).join('');
+                return `
+                    <div class="transfer-request-item">
+                        <div class="pending-user-info">
+                            <div class="pending-user-name">🖥️ Від: ${escapeHtml(request.from)}</div>
+                            <ul class="transfer-request-files">${files}</ul>
+                        </div>
+                        <div class="transfer-actions">
+                            <button class="approve-btn" onclick="answerTransfer('${escapeHtml(request.id)}', 'accept', this)">✓ Прийняти</button>
+                            <button class="reject-btn" onclick="answerTransfer('${escapeHtml(request.id)}', 'reject', this)">✗ Відхилити</button>
+                        </div>
+                    </div>`;
+            }).join('');
+        }
+
+        async function answerTransfer(requestId, action, button) {
+            button.parentElement.querySelectorAll('button').forEach(b => { b.disabled = true; });
+            if (action === 'accept') {
+                button.textContent = 'Завантаження...';
+            }
+            try {
+                const response = await fetch(`/api/admin/transfer/${encodeURIComponent(requestId)}/${action}`, {
+                    method: 'POST',
+                    credentials: 'same-origin'
+                });
+                const data = await response.json();
+                if (!response.ok) {
+                    showMessage(data.error || 'Помилка обробки запиту', 'error');
+                } else if (action === 'reject') {
+                    showMessage('Запит відхилено', 'success');
+                } else {
+                    if (data.saved.length > 0) {
+                        const names = data.saved.map(file => file.saved_as).join(', ');
+                        showMessage(`Отримано файлів: ${data.saved.length} (${names})`, 'success');
+                    }
+                    data.failed.forEach(file => showMessage(`Не вдалося отримати ${file.name}: ${file.error}`, 'error'));
+                }
+            } catch (error) {
+                showMessage('Помилка з\'єднання: ' + error.message, 'error');
+            }
+            delete transferRequests[requestId];
+            displayTransferRequests();
         }
 
         async function approveUser(userId) {

@@ -242,6 +242,53 @@
             gap: 5px;
         }
 
+        /* Send files to another server (through the SSH tunnel) */
+        .transfer-panel {
+            margin-bottom: 20px;
+            padding: 15px;
+            background: var(--light-bg);
+            border: 1px solid var(--border-color);
+            border-left: 4px solid var(--button-bg);
+            border-radius: 5px;
+        }
+
+        .transfer-row {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 10px;
+            margin-top: 10px;
+        }
+
+        .transfer-row input[type="text"] {
+            flex: 1;
+            min-width: 180px;
+            max-width: 300px;
+        }
+
+        .transfer-note {
+            color: var(--text-muted);
+            font-size: 0.9em;
+        }
+
+        .transfer-outgoing-item {
+            font-size: 0.9em;
+            margin-top: 6px;
+            word-break: break-word;
+        }
+
+        .transfer-checkbox {
+            display: none;
+            margin-right: 8px;
+            width: 18px;
+            height: 18px;
+            vertical-align: middle;
+        }
+
+        .transfer-enabled .transfer-checkbox {
+            display: inline-block;
+        }
+
         .btn-small {
             padding: 6px 12px;
             font-size: 14px;
@@ -445,6 +492,15 @@
 
             .search-box {
                 max-width: none;
+            }
+
+            .transfer-row input[type="text"] {
+                max-width: none;
+                width: 100%;
+            }
+
+            .transfer-row button {
+                width: 100%;
             }
 
             .tabs {
@@ -702,6 +758,26 @@
                     <input type="text" id="search-input" placeholder="Search files..." onkeyup="filterFiles()">
                 </div>
                 <button class="refresh-btn" onclick="refreshFiles()">🔄 Refresh</button>
+            </div>
+
+            <!-- Send files to another server on the same tunnel server -->
+            <div id="transfer-panel" class="transfer-panel">
+                <strong>📤 Send files to another server</strong>
+                <div id="transfer-unavailable" class="transfer-note" style="margin-top: 5px;">
+                    Connect the SSH tunnel on the admin page to send files to another WebQuiz server.
+                </div>
+                <div id="transfer-form" class="hidden">
+                    <div class="transfer-note" style="margin-top: 5px;">
+                        Select files with the checkboxes. This server is <strong id="transfer-own-name"></strong>.
+                    </div>
+                    <div class="transfer-row">
+                        <span id="transfer-selected-count">0 files selected</span>
+                        <input type="text" id="transfer-target" placeholder="Name of the other server"
+                               autocapitalize="off" autocorrect="off" spellcheck="false">
+                        <button id="transfer-send-btn" onclick="sendSelectedFiles()">📤 Send</button>
+                    </div>
+                </div>
+                <div id="transfer-outgoing"></div>
             </div>
 
             <!-- Tabs -->
@@ -965,6 +1041,15 @@
 
                 if (response.ok) {
                     allFiles = data;
+                    // Forget selected files that do not exist anymore
+                    for (const key of [...selectedForTransfer]) {
+                        const slash = key.indexOf('/');
+                        const type = key.slice(0, slash);
+                        if (!(allFiles[type] || []).some(file => file.name === key.slice(slash + 1))) {
+                            selectedForTransfer.delete(key);
+                        }
+                    }
+                    updateTransferSelection();
                     displayFiles();
                 } else {
                     showMessage(data.error || 'Failed to load files', 'error');
@@ -999,26 +1084,35 @@
             files.forEach(file => {
                 const size = formatFileSize(file.size);
                 const date = formatDate(file.modified);
+                // The file name is read from the data-name attribute, so it never becomes part of JS code
+                const name = 'this.closest(\'.file-item\').dataset.name';
 
                 // Different buttons based on file type
                 let actionButtons;
                 if (type === 'quizzes') {
-                    actionButtons = `<button class="btn-small btn-view" onclick="editQuizFile('${file.name}')">✏️ Edit</button>
-                       <button class="btn-small btn-download" onclick="downloadFile('${type}', '${file.name}')">💾 Download</button>`;
+                    actionButtons = `<button class="btn-small btn-view" onclick="editQuizFile(${name})">✏️ Edit</button>
+                       <button class="btn-small btn-download" onclick="downloadFile('${type}', ${name})">💾 Download</button>`;
                 } else if (type === 'csv') {
                     // CSV files get Text and Table view buttons
-                    actionButtons = `<button class="btn-small btn-view" onclick="viewFile('${type}', '${file.name}', 'text')">📄 Text</button>
-                       <button class="btn-small btn-view" onclick="viewFile('${type}', '${file.name}', 'table')">📊 Table</button>
-                       <button class="btn-small btn-download" onclick="downloadFile('${type}', '${file.name}')">💾 Download</button>`;
+                    actionButtons = `<button class="btn-small btn-view" onclick="viewFile('${type}', ${name}, 'text')">📄 Text</button>
+                       <button class="btn-small btn-view" onclick="viewFile('${type}', ${name}, 'table')">📊 Table</button>
+                       <button class="btn-small btn-download" onclick="downloadFile('${type}', ${name})">💾 Download</button>`;
                 } else {
-                    actionButtons = `<button class="btn-small btn-view" onclick="viewFile('${type}', '${file.name}', 'text')">👁️ View</button>
-                       <button class="btn-small btn-download" onclick="downloadFile('${type}', '${file.name}')">💾 Download</button>`;
+                    actionButtons = `<button class="btn-small btn-view" onclick="viewFile('${type}', ${name}, 'text')">👁️ View</button>
+                       <button class="btn-small btn-download" onclick="downloadFile('${type}', ${name})">💾 Download</button>`;
                 }
 
+                const transferKey = `${type}/${file.name}`;
+                const checkbox = canTransfer(type, file.name)
+                    ? `<input type="checkbox" class="transfer-checkbox" title="Select to send to another server"
+                              ${selectedForTransfer.has(transferKey) ? 'checked' : ''}
+                              onchange="toggleTransferFile('${type}', ${name}, this.checked)">`
+                    : '';
+
                 html += `
-                    <div class="file-item" data-filename="${file.name.toLowerCase()}">
+                    <div class="file-item" data-filename="${escapeHtml(file.name.toLowerCase())}" data-name="${escapeHtml(file.name)}">
                         <div class="file-info">
-                            <div class="file-name">${file.name}</div>
+                            <div class="file-name">${checkbox}${escapeHtml(file.name)}</div>
                             <div class="file-meta">Size: ${size} | Modified: ${date}</div>
                         </div>
                         <div class="file-actions">
@@ -1169,7 +1263,7 @@
         function escapeHtml(text) {
             const div = document.createElement('div');
             div.textContent = text;
-            return div.innerHTML;
+            return div.innerHTML.replace(/"/g, '&quot;').replace(/'/g, '&#39;');
         }
 
         async function downloadFile(type, filename) {
@@ -1470,11 +1564,133 @@
             }
         }
 
+        // ----- Send files to another server (through the SSH tunnel) -----
+
+        // Must match FILE_TYPES in webquiz/transfer.py
+        const TRANSFER_EXTENSIONS = { quizzes: ['.yaml', '.yml'], logs: ['.log'], csv: ['.csv'] };
+        const TRANSFER_STATUS_TEXT = {
+            waiting: '⏳ waiting for an answer',
+            accepted: '✅ accepted',
+            rejected: '❌ rejected',
+            failed: '⚠️ the other server could not download the files',
+            expired: '⌛ expired (no answer in 30 minutes)'
+        };
+        const selectedForTransfer = new Set();  // "type/name"
+        let transferStatuses = {};  // offer id -> last known status
+        let transferPollTimer = null;
+
+        function canTransfer(type, filename) {
+            const lower = filename.toLowerCase();
+            return (TRANSFER_EXTENSIONS[type] || []).some(ext => lower.endsWith(ext)) && !filename.startsWith('.');
+        }
+
+        function toggleTransferFile(type, filename, checked) {
+            const key = `${type}/${filename}`;
+            if (checked) {
+                selectedForTransfer.add(key);
+            } else {
+                selectedForTransfer.delete(key);
+            }
+            updateTransferSelection();
+        }
+
+        function updateTransferSelection() {
+            const count = selectedForTransfer.size;
+            document.getElementById('transfer-selected-count').textContent =
+                `${count} file${count === 1 ? '' : 's'} selected`;
+        }
+
+        async function loadTransferState() {
+            try {
+                const response = await fetch('/api/admin/transfer', { credentials: 'same-origin' });
+                if (!response.ok) {
+                    return;
+                }
+                const state = await response.json();
+
+                document.getElementById('files-panel').classList.toggle('transfer-enabled', state.available);
+                document.getElementById('transfer-unavailable').classList.toggle('hidden', state.available);
+                document.getElementById('transfer-form').classList.toggle('hidden', !state.available);
+                document.getElementById('transfer-own-name').textContent = state.name || '';
+
+                // Tell the admin when the other server answers
+                state.outgoing.forEach(offer => {
+                    const previous = transferStatuses[offer.id];
+                    if (previous === 'waiting' && offer.status !== 'waiting') {
+                        showMessage(`${offer.to}: ${TRANSFER_STATUS_TEXT[offer.status] || offer.status}`,
+                                    offer.status === 'accepted' ? 'success' : 'error');
+                    }
+                    transferStatuses[offer.id] = offer.status;
+                });
+
+                document.getElementById('transfer-outgoing').innerHTML = state.outgoing.slice(0, 5).map(offer => {
+                    const count = offer.files.length;
+                    return `<div class="transfer-outgoing-item">→ <strong>${escapeHtml(offer.to)}</strong>:
+                        ${count} file${count === 1 ? '' : 's'}, ${TRANSFER_STATUS_TEXT[offer.status] || escapeHtml(offer.status)}</div>`;
+                }).join('');
+            } catch (error) {
+                // Ignore: the next poll will try again
+            }
+        }
+
+        async function sendSelectedFiles() {
+            const target = document.getElementById('transfer-target').value.trim();
+            if (selectedForTransfer.size === 0) {
+                showMessage('Select files with the checkboxes first', 'error');
+                return;
+            }
+            if (!target) {
+                showMessage('Enter the name of the other server', 'error');
+                return;
+            }
+
+            const files = [...selectedForTransfer].map(key => {
+                const slash = key.indexOf('/');
+                return { type: key.slice(0, slash), name: key.slice(slash + 1) };
+            });
+            const sendButton = document.getElementById('transfer-send-btn');
+            sendButton.disabled = true;
+            try {
+                const response = await fetch('/api/admin/transfer/send', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ to: target, files: files }),
+                    credentials: 'same-origin'
+                });
+                const data = await response.json();
+                if (response.ok) {
+                    showMessage(`Request sent to ${target}. Waiting for an answer there.`, 'success');
+                    try { localStorage.setItem('webquiz-transfer-target', target); } catch (e) {}
+                    selectedForTransfer.clear();
+                    updateTransferSelection();
+                    displayFiles();
+                    await loadTransferState();
+                } else {
+                    showMessage(data.error || 'Failed to send the request', 'error');
+                }
+            } catch (error) {
+                showMessage('Connection error: ' + error.message, 'error');
+            } finally {
+                sendButton.disabled = false;
+            }
+        }
+
+        function initializeTransfer() {
+            try {
+                document.getElementById('transfer-target').value = localStorage.getItem('webquiz-transfer-target') || '';
+            } catch (e) {}
+            loadTransferState();
+            if (!transferPollTimer) {
+                transferPollTimer = setInterval(loadTransferState, 5000);
+            }
+        }
+
         // Initialize config editor when panel is loaded
         function initializePanelData() {
             loadFiles();
             initializeConfigEditor();
             trackFormDirty();
+            initializeTransfer();
         }
 
         // Auto-authenticate function that shows files panel

@@ -217,6 +217,9 @@ The `tunnel` section allows you to configure an SSH tunnel for public access to 
 - **socket_name** (optional) — fixed socket name instead of random generation.
   Allows having a predictable URL for public access through the tunnel.
   If not specified, a random identifier of 6-8 characters is generated.
+  Required for sending files between servers: it is the name other servers use to reach this one.
+  Use letters, digits, `-`, `_` and `.`.
+  After a disconnect, the same name may be busy for up to 5 minutes, until the tunnel server removes the old socket file.
   Example: `"my-quiz-socket"`
 
 - **config** (optional subsection) — local tunnel configuration.

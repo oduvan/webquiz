@@ -25,6 +25,7 @@ import ipaddress
 from .config import WebQuizConfig, load_config_from_yaml
 from .translations import get_translations
 from .tunnel import TunnelManager
+from .transfer import TransferManager, TransferError
 
 from webquiz import __version__ as package_version
 from webquiz import checker as checker_module
@@ -601,6 +602,13 @@ class TestingServer:
 
         # SSH Tunnel infrastructure
         self.tunnel_manager = None  # Will be initialized if tunnel is configured
+
+        # File transfer between servers connected to the same tunnel server
+        self.transfer = TransferManager(
+            get_directories=lambda: {"quizzes": self.quizzes_dir, "logs": self.logs_dir, "csv": self.csv_dir},
+            get_endpoint=lambda: self.tunnel_manager.get_public_endpoint() if self.tunnel_manager else None,
+            notify=self.broadcast_to_admin_websockets,
+        )
 
         # Admin session storage for cookie-based authentication
         self.admin_sessions: Dict[str, datetime] = {}  # session_token -> creation_time
@@ -3692,6 +3700,47 @@ class TestingServer:
         logger.info("Tunnel disconnected")
         return web.json_response({"success": True})
 
+    @admin_auth_required
+    async def admin_transfer_state(self, request):
+        """Get file transfer state: own server name, sent offers, incoming requests."""
+        return web.json_response(self.transfer.get_state())
+
+    @admin_auth_required
+    async def admin_transfer_send(self, request):
+        """Offer files to another server on the same tunnel server.
+
+        Body: {"to": "socket-name", "files": [{"type": "quizzes|logs|csv", "name": "..."}]}
+        """
+        try:
+            data = await request.json()
+        except Exception:
+            return web.json_response({"error": "Invalid JSON"}, status=400)
+        if not isinstance(data, dict):
+            return web.json_response({"error": "Invalid request"}, status=400)
+        try:
+            offer = await self.transfer.send_offer(data.get("to"), data.get("files"))
+        except TransferError as e:
+            return web.json_response({"error": e.message}, status=e.status)
+        return web.json_response({"success": True, "offer": offer})
+
+    @admin_auth_required
+    async def admin_transfer_accept(self, request):
+        """Accept an incoming transfer request and download its files."""
+        try:
+            result = await self.transfer.accept(request.match_info["request_id"])
+        except TransferError as e:
+            return web.json_response({"error": e.message}, status=e.status)
+        return web.json_response({"success": True, **result})
+
+    @admin_auth_required
+    async def admin_transfer_reject(self, request):
+        """Reject an incoming transfer request."""
+        try:
+            await self.transfer.reject(request.match_info["request_id"])
+        except TransferError as e:
+            return web.json_response({"error": e.message}, status=e.status)
+        return web.json_response({"success": True})
+
     @local_network_only
     async def serve_files_page(self, request):
         """Serve the files management page.
@@ -4217,6 +4266,7 @@ class TestingServer:
             "pending_users": pending_users,
             "requires_approval": hasattr(self.config, "registration") and self.config.registration.approve,
             "tunnel": tunnel_info,
+            "transfer_requests": self.transfer.list_incoming(),
         }
         return await self._handle_websocket_connection(
             request, self.admin_websocket_clients, initial_data, "admin WebSocket"
@@ -4285,6 +4335,16 @@ async def create_app(config: WebQuizConfig):
     # Tunnel routes
     app.router.add_post("/api/admin/tunnel/connect", server.tunnel_connect)
     app.router.add_post("/api/admin/tunnel/disconnect", server.tunnel_disconnect)
+
+    # File transfer between servers on the same tunnel server
+    app.router.add_get("/api/admin/transfer", server.admin_transfer_state)
+    app.router.add_post("/api/admin/transfer/send", server.admin_transfer_send)
+    app.router.add_post("/api/admin/transfer/{request_id}/accept", server.admin_transfer_accept)
+    app.router.add_post("/api/admin/transfer/{request_id}/reject", server.admin_transfer_reject)
+    # Called by other servers through the tunnel (protected by the offer token, not by IP)
+    app.router.add_post("/api/transfer/offer", server.transfer.handle_offer)
+    app.router.add_get("/api/transfer/download/{token}/{type}/{filename}", server.transfer.handle_download)
+    app.router.add_post("/api/transfer/result", server.transfer.handle_result)
 
     app.router.add_get("/ws/admin", server.websocket_admin)
 
