@@ -891,24 +891,69 @@
             border-radius: 5px;
             padding: 15px;
             margin: 10px 0;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            gap: 15px;
         }
 
-        .transfer-request-files {
-            margin: 5px 0 0 0;
-            padding-left: 20px;
-            color: var(--text-muted);
-            font-size: 14px;
+        /* One incoming file: name | case | chosen action */
+        .transfer-file-row {
+            display: grid;
+            grid-template-columns: minmax(0, 2fr) minmax(0, 2fr) minmax(180px, 1.5fr);
+            gap: 8px 12px;
+            align-items: center;
+            padding: 10px 0;
+            border-top: 1px solid var(--border-color);
+        }
+
+        .transfer-file-name {
+            font-weight: bold;
             word-break: break-word;
+        }
+
+        .transfer-file-meta,
+        .transfer-case {
+            color: var(--text-muted);
+            font-size: 13px;
+            word-break: break-word;
+        }
+
+        .transfer-case-different {
+            color: var(--warning-color);
+        }
+
+        .transfer-case-in_use {
+            color: var(--danger-red);
+        }
+
+        .transfer-choice {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        .transfer-choice select,
+        .transfer-choice input {
+            width: 100%;
+            box-sizing: border-box;
+            padding: 6px 8px;
+            font-size: 14px;
         }
 
         .transfer-actions {
             display: flex;
             gap: 8px;
             flex-wrap: wrap;
+            justify-content: flex-end;
+            margin-top: 10px;
+        }
+
+        .transfer-error {
+            margin-top: 10px;
+            padding: 8px 10px;
+            background: var(--error-bg);
+            border: 1px solid var(--error-border);
+            border-radius: 4px;
+            color: var(--error-color);
+            font-size: 14px;
+            word-break: break-word;
         }
 
         .transfer-actions button:disabled {
@@ -931,9 +976,13 @@
         }
 
         @media (max-width: 768px) {
-            .transfer-request-item {
-                flex-direction: column;
-                align-items: stretch;
+            .transfer-file-row {
+                grid-template-columns: 1fr;
+            }
+
+            .transfer-choice select,
+            .transfer-choice input {
+                font-size: 16px; /* Prevent zoom on iOS */
             }
 
             .transfer-actions button {
@@ -1141,7 +1190,7 @@
             <div id="transfer-requests-section" class="transfer-requests hidden">
                 <h3 style="margin-top: 0;">📥 Запити на отримання файлів</h3>
                 <p style="margin: 0; color: var(--text-muted); font-size: 14px;">
-                    Інший сервер хоче надіслати файли. Після прийняття вони з'являться в менеджері файлів. Наявні файли не перезаписуються.
+                    Інший сервер хоче надіслати файли. Оберіть, що зробити з кожним файлом, і натисніть «Прийняти». Файли з'являться в менеджері файлів.
                 </p>
                 <div id="transfer-requests-list"></div>
             </div>
@@ -3420,21 +3469,63 @@
 
         // Incoming file transfer requests: request id -> request
         let transferRequests = {};
-        const TRANSFER_TYPE_LABELS = { quizzes: 'тест', logs: 'лог', csv: 'CSV' };
+        const TRANSFER_TYPE_LABELS = { quizzes: 'тест', logs: 'лог', csv: 'CSV', images: 'зображення', attachments: 'вкладення' };
+
+        // Admin's choices per request, kept when the list is drawn again: request id -> {"type/name": {action, new_name}}
+        let transferChoices = {};
+        // Last error per request, shown inside its card: request id -> message
+        let transferErrors = {};
+        const TRANSFER_CASE_TEXT = {
+            new: target => `🆕 Новий файл: ${target}`,
+            same: target => `✓ Такий самий файл вже є: ${target}`,
+            different: target => `⚠️ Вже є інший файл ${target}`,
+            in_use: target => `🔒 ${target} зараз використовується сервером`
+        };
+        const TRANSFER_ACTION_TEXT = {
+            save: 'Зберегти',
+            replace: 'Замінити',
+            rename: 'Перейменувати',
+            skip: 'Пропустити'
+        };
+
+        function transferChoice(requestId, file) {
+            const saved = (transferChoices[requestId] || {})[`${file.type}/${file.name}`];
+            return {
+                action: saved ? saved.action : file.default_action,
+                new_name: saved ? saved.new_name : file.suggested_name
+            };
+        }
 
         function displayTransferRequests() {
             const requests = Object.values(transferRequests);
             document.getElementById('transfer-requests-section').classList.toggle('hidden', requests.length === 0);
             document.getElementById('transfer-requests-list').innerHTML = requests.map(request => {
-                const files = request.files.map(file =>
-                    `<li>${escapeHtml(file.name)} (${TRANSFER_TYPE_LABELS[file.type] || escapeHtml(file.type)}, ${formatFileSize(file.size)})</li>`
-                ).join('');
+                const rows = request.files.map(file => {
+                    const choice = transferChoice(request.id, file);
+                    const options = file.actions.map(action =>
+                        `<option value="${action}" ${action === choice.action ? 'selected' : ''}>${TRANSFER_ACTION_TEXT[action] || action}</option>`
+                    ).join('');
+                    const caseText = (TRANSFER_CASE_TEXT[file.case] || (target => target))(file.target);
+                    return `
+                        <div class="transfer-file-row" data-type="${escapeHtml(file.type)}" data-name="${escapeHtml(file.name)}">
+                            <div>
+                                <div class="transfer-file-name">${escapeHtml(file.name)}</div>
+                                <div class="transfer-file-meta">${TRANSFER_TYPE_LABELS[file.type] || escapeHtml(file.type)}, ${formatFileSize(file.size)}</div>
+                            </div>
+                            <div class="transfer-case transfer-case-${escapeHtml(file.case)}">${escapeHtml(caseText)}</div>
+                            <div class="transfer-choice">
+                                <select onchange="saveTransferChoice('${escapeHtml(request.id)}', this)" aria-label="Дія для файлу">${options}</select>
+                                <input type="text" class="transfer-new-name ${choice.action === 'rename' ? '' : 'hidden'}"
+                                       value="${escapeHtml(choice.new_name)}" aria-label="Нова назва файлу"
+                                       oninput="saveTransferChoice('${escapeHtml(request.id)}', this)">
+                            </div>
+                        </div>`;
+                }).join('');
                 return `
-                    <div class="transfer-request-item">
-                        <div class="pending-user-info">
-                            <div class="pending-user-name">🖥️ Від: ${escapeHtml(request.from)}</div>
-                            <ul class="transfer-request-files">${files}</ul>
-                        </div>
+                    <div class="transfer-request-item" data-request-id="${escapeHtml(request.id)}">
+                        <div class="pending-user-name">🖥️ Від: ${escapeHtml(request.from)}</div>
+                        ${rows}
+                        ${transferErrors[request.id] ? `<div class="transfer-error" role="alert">${escapeHtml(transferErrors[request.id])}</div>` : ''}
                         <div class="transfer-actions">
                             <button class="approve-btn" onclick="answerTransfer('${escapeHtml(request.id)}', 'accept', this)">✓ Прийняти</button>
                             <button class="reject-btn" onclick="answerTransfer('${escapeHtml(request.id)}', 'reject', this)">✗ Відхилити</button>
@@ -3443,19 +3534,59 @@
             }).join('');
         }
 
+        function saveTransferChoice(requestId, element) {
+            const row = element.closest('.transfer-file-row');
+            const select = row.querySelector('select');
+            const nameInput = row.querySelector('.transfer-new-name');
+            nameInput.classList.toggle('hidden', select.value !== 'rename');
+            transferChoices[requestId] = transferChoices[requestId] || {};
+            transferChoices[requestId][`${row.dataset.type}/${row.dataset.name}`] = {
+                action: select.value,
+                new_name: nameInput.value.trim()
+            };
+        }
+
+        async function reloadTransferRequests() {
+            try {
+                const response = await fetch('/api/admin/transfer', { credentials: 'same-origin' });
+                if (response.ok) {
+                    const state = await response.json();
+                    transferRequests = {};
+                    state.incoming.forEach(request => { transferRequests[request.id] = request; });
+                }
+            } catch (error) {
+                // Keep the current list
+            }
+            displayTransferRequests();
+        }
+
         async function answerTransfer(requestId, action, button) {
-            button.parentElement.querySelectorAll('button').forEach(b => { b.disabled = true; });
+            const item = button.closest('.transfer-request-item');
+            item.querySelectorAll('button, select, input').forEach(element => { element.disabled = true; });
             if (action === 'accept') {
                 button.textContent = 'Завантаження...';
             }
+            const files = [...item.querySelectorAll('.transfer-file-row')].map(row => {
+                const choice = { type: row.dataset.type, name: row.dataset.name, action: row.querySelector('select').value };
+                if (choice.action === 'rename') {
+                    choice.new_name = row.querySelector('.transfer-new-name').value.trim();
+                }
+                return choice;
+            });
+            let keepRequest = false;
             try {
                 const response = await fetch(`/api/admin/transfer/${encodeURIComponent(requestId)}/${action}`, {
                     method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: action === 'accept' ? JSON.stringify({ files: files }) : '{}',
                     credentials: 'same-origin'
                 });
                 const data = await response.json();
                 if (!response.ok) {
                     showMessage(data.error || 'Помилка обробки запиту', 'error');
+                    // Invalid choices: nothing was downloaded, the request is still open
+                    keepRequest = response.status === 400;
+                    transferErrors[requestId] = data.error || 'Помилка обробки запиту';
                 } else if (action === 'reject') {
                     showMessage('Запит відхилено', 'success');
                 } else {
@@ -3463,13 +3594,24 @@
                         const names = data.saved.map(file => file.saved_as).join(', ');
                         showMessage(`Отримано файлів: ${data.saved.length} (${names})`, 'success');
                     }
+                    if (data.skipped.length > 0) {
+                        showMessage(`Пропущено файлів: ${data.skipped.length}`, 'success');
+                    }
                     data.failed.forEach(file => showMessage(`Не вдалося отримати ${file.name}: ${file.error}`, 'error'));
                 }
             } catch (error) {
                 showMessage('Помилка з\'єднання: ' + error.message, 'error');
+                keepRequest = true;
+                transferErrors[requestId] = 'Помилка з\'єднання: ' + error.message;
             }
-            delete transferRequests[requestId];
-            displayTransferRequests();
+            if (keepRequest) {
+                await reloadTransferRequests();
+            } else {
+                delete transferRequests[requestId];
+                delete transferChoices[requestId];
+                delete transferErrors[requestId];
+                displayTransferRequests();
+            }
         }
 
         async function approveUser(userId) {

@@ -761,14 +761,13 @@
             </div>
 
             <!-- Send files to another server on the same tunnel server -->
-            <div id="transfer-panel" class="transfer-panel">
+            <!-- Shown only while the SSH tunnel is connected -->
+            <div id="transfer-panel" class="transfer-panel hidden">
                 <strong>📤 Send files to another server</strong>
-                <div id="transfer-unavailable" class="transfer-note" style="margin-top: 5px;">
-                    Connect the SSH tunnel on the admin page to send files to another WebQuiz server.
-                </div>
-                <div id="transfer-form" class="hidden">
+                <div>
                     <div class="transfer-note" style="margin-top: 5px;">
-                        Select files with the checkboxes. This server is <strong id="transfer-own-name"></strong>.
+                        Select files with the checkboxes. Images and attachments used by a quiz are sent with it.
+                        This server is <strong id="transfer-own-name"></strong>.
                     </div>
                     <div class="transfer-row">
                         <span id="transfer-selected-count">0 files selected</span>
@@ -1609,8 +1608,7 @@
                 const state = await response.json();
 
                 document.getElementById('files-panel').classList.toggle('transfer-enabled', state.available);
-                document.getElementById('transfer-unavailable').classList.toggle('hidden', state.available);
-                document.getElementById('transfer-form').classList.toggle('hidden', !state.available);
+                document.getElementById('transfer-panel').classList.toggle('hidden', !state.available);
                 document.getElementById('transfer-own-name').textContent = state.name || '';
 
                 // Tell the admin when the other server answers
@@ -1659,7 +1657,9 @@
                 });
                 const data = await response.json();
                 if (response.ok) {
-                    showMessage(`Request sent to ${target}. Waiting for an answer there.`, 'success');
+                    const media = data.offer.files.filter(file => file.type === 'images' || file.type === 'attachments').length;
+                    const mediaNote = media > 0 ? ` (plus ${media} image/attachment file${media === 1 ? '' : 's'} used by the quizzes)` : '';
+                    showMessage(`Request sent to ${target}${mediaNote}. Waiting for an answer there.`, 'success');
                     try { localStorage.setItem('webquiz-transfer-target', target); } catch (e) {}
                     selectedForTransfer.clear();
                     updateTransferSelection();

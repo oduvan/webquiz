@@ -16,8 +16,18 @@ The receiver downloads only from "{its own base_url}/{sender name}/", so files
 can only come from a server connected to the same tunnel server. The token
 protects the sender: only offered files are served, only with the token, and
 only until the offer is finished or expired.
+
+Images (quizzes/imgs/) and attachments (quizzes/attach/) used by an offered
+quiz are added to the offer automatically.
+
+For every incoming file the receiver shows its case (new file, the same file
+already exists, a different file exists, or the file is used by the running
+server) and the admin chooses an action: save, replace, rename or skip. Images
+and attachments are saved first; if one gets a new name, the references in
+the received quiz are updated.
 """
 
+import hashlib
 import logging
 import os
 import re
@@ -28,16 +38,25 @@ from typing import Any, Awaitable, Callable, Dict, List, Optional, Tuple
 from urllib.parse import quote
 
 import httpx
+import yaml
 from aiohttp import web
+from ruamel.yaml import YAML as RuamelYAML
 
 logger = logging.getLogger(__name__)
 
-# File types that can be transferred and their allowed extensions
+# File types that can be transferred and their allowed extensions (None: any)
 FILE_TYPES = {
     "quizzes": (".yaml", ".yml"),
     "logs": (".log",),
     "csv": (".csv",),
+    "images": (".png", ".jpg", ".jpeg", ".gif", ".bmp", ".svg", ".webp"),
+    "attachments": None,
 }
+
+# Files used by quizzes: sent together with the quizzes that reference them
+MEDIA_TYPES = ("images", "attachments")
+IMAGES_URL_PREFIX = "/imgs/"
+ATTACHMENTS_URL_PREFIX = "/attach/"
 
 # Socket names become a URL path segment and a file name prefix
 SERVER_NAME_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$")
@@ -49,6 +68,10 @@ MAX_FILES_PER_OFFER = 100
 MAX_FILE_SIZE = 50 * 1024 * 1024  # 50 MB
 MAX_INCOMING_REQUESTS = 20
 HTTP_TIMEOUT = 30.0
+SHA256_PATTERN = re.compile(r"^[0-9a-f]{64}$")
+
+# Logs and CSV files have the same names on every server, so they get the sender name
+PREFIXED_TYPES = ("logs", "csv")
 
 
 class TransferError(Exception):
@@ -78,7 +101,104 @@ def is_allowed_file(file_type: Any, filename: Any) -> bool:
         return False
     if any(ord(char) < 32 or char in '<>:"/\\|?*' for char in filename):
         return False
-    return filename.lower().endswith(FILE_TYPES[file_type])
+    extensions = FILE_TYPES[file_type]
+    return extensions is None or filename.lower().endswith(extensions)
+
+
+def file_sha256(path: str) -> str:
+    """SHA-256 of a file's content as hex"""
+    digest = hashlib.sha256()
+    with open(path, "rb") as f:
+        for block in iter(lambda: f.read(1024 * 1024), b""):
+            digest.update(block)
+    return digest.hexdigest()
+
+
+def _media_file_name(file_type: str, value: Any) -> Optional[str]:
+    """File name of the image or attachment that a quiz value points to
+
+    Images are referenced as "/imgs/name.png" (in "image" and in "options"),
+    attachments as "name.pdf" or "/attach/name.pdf" (in "file").
+    """
+    if not isinstance(value, str):
+        return None
+    if file_type == "images":
+        if not value.startswith(IMAGES_URL_PREFIX):
+            return None
+        name = value[len(IMAGES_URL_PREFIX) :]
+    else:
+        name = value[len(ATTACHMENTS_URL_PREFIX) :] if value.startswith(ATTACHMENTS_URL_PREFIX) else value
+    return name if is_allowed_file(file_type, name) else None
+
+
+def _media_fields(quiz: Any):
+    """Yield (container, key, file_type) for every quiz field that can point to a file"""
+    questions = quiz.get("questions") if isinstance(quiz, dict) else None
+    for question in questions if isinstance(questions, list) else []:
+        if not isinstance(question, dict):
+            continue
+        if "image" in question:
+            yield question, "image", "images"
+        if "file" in question:
+            yield question, "file", "attachments"
+        options = question.get("options")
+        if isinstance(options, list):
+            for index in range(len(options)):
+                yield options, index, "images"
+
+
+def quiz_media_files(quiz_path: str) -> List[Tuple[str, str]]:
+    """Images and attachments used by a quiz file
+
+    Returns:
+        List of (file type, file name), without duplicates
+    """
+    try:
+        with open(quiz_path, encoding="utf-8") as f:
+            quiz = yaml.safe_load(f)
+    except Exception:
+        return []
+    found = []
+    for container, key, file_type in _media_fields(quiz):
+        name = _media_file_name(file_type, container[key])
+        if name and (file_type, name) not in found:
+            found.append((file_type, name))
+    return found
+
+
+def rewrite_quiz_media(quiz_path: str, renamed: Dict[Tuple[str, str], str]) -> bool:
+    """Point quiz references to images and attachments that were saved under a new name
+
+    Uses a round-trip YAML parser, so comments and formatting are kept.
+
+    Args:
+        quiz_path: Quiz file to change in place
+        renamed: {(file type, original name): saved name}
+
+    Returns:
+        True if the file was changed
+    """
+    parser = RuamelYAML()
+    parser.preserve_quotes = True
+    try:
+        with open(quiz_path, encoding="utf-8") as f:
+            quiz = parser.load(f)
+    except Exception as e:
+        logger.warning(f"Cannot update file references in received quiz: {e}")
+        return False
+
+    changed = False
+    for container, key, file_type in _media_fields(quiz):
+        value = container[key]
+        name = _media_file_name(file_type, value)
+        new_name = renamed.get((file_type, name)) if name else None
+        if new_name:
+            container[key] = value[: len(value) - len(name)] + new_name
+            changed = True
+    if changed:
+        with open(quiz_path, "w", encoding="utf-8") as f:
+            parser.dump(quiz, f)
+    return changed
 
 
 class TransferManager:
@@ -89,18 +209,23 @@ class TransferManager:
         get_directories: Callable[[], Dict[str, str]],
         get_endpoint: Callable[[], Optional[Tuple[str, str]]],
         notify: Optional[Callable[[Dict[str, Any]], Awaitable[None]]] = None,
+        get_files_in_use: Optional[Callable[[], List[Optional[str]]]] = None,
     ):
         """Initialize transfer manager
 
         Args:
-            get_directories: Returns {"quizzes": dir, "logs": dir, "csv": dir}
+            get_directories: Returns {"quizzes": dir, "logs": dir, "csv": dir,
+                "images": dir, "attachments": dir}
             get_endpoint: Returns (base_url, own socket name) while the tunnel
                 is connected, otherwise None
             notify: Async function called with admin WebSocket messages
+            get_files_in_use: Returns paths the running server writes or uses
+                (current log, CSV files, active quiz); they cannot be replaced
         """
         self.get_directories = get_directories
         self.get_endpoint = get_endpoint
         self.notify = notify
+        self.get_files_in_use = get_files_in_use or (lambda: [])
         self.outgoing: Dict[str, Dict[str, Any]] = {}  # token -> offer
         self.incoming: Dict[str, Dict[str, Any]] = {}  # request id -> request
 
@@ -141,13 +266,15 @@ class TransferManager:
             "status": offer["status"],
         }
 
-    @staticmethod
-    def _request_view(request: Dict[str, Any]) -> Dict[str, Any]:
-        """Incoming request without the token"""
+    def _request_view(self, request: Dict[str, Any]) -> Dict[str, Any]:
+        """Incoming request without the token, with the case and actions of every file"""
+        files = []
+        for entry, plan in zip(request["files"], self._plan_files(request)):
+            files.append({"type": entry["type"], "name": entry["name"], "size": entry["size"], **plan})
         return {
             "id": request["id"],
             "from": request["from"],
-            "files": request["files"],
+            "files": files,
             "received": request["received"].isoformat(),
             "status": request["status"],
         }
@@ -195,9 +322,11 @@ class TransferManager:
     async def send_offer(self, target: Any, files: Any) -> Dict[str, Any]:
         """Offer files to another server
 
+        Images and attachments used by offered quizzes are added automatically.
+
         Args:
             target: Socket name of the receiving server
-            files: List of {"type": "quizzes"|"logs"|"csv", "name": filename}
+            files: List of {"type": "quizzes"|"logs"|"csv"|..., "name": filename}
 
         Returns:
             Outgoing offer view
@@ -210,14 +339,35 @@ class TransferManager:
 
         directories = self.get_directories()
         entries = []
-        seen = set()
         for item in self._parse_file_list(files):
             path = os.path.join(directories[item["type"]], item["name"])
             if not os.path.isfile(path):
                 raise TransferError(f"File not found: {item['name']}", 404)
-            if (item["type"], item["name"]) not in seen:
-                seen.add((item["type"], item["name"]))
-                entries.append({**item, "size": os.path.getsize(path)})
+            entries.append({**item, "path": path})
+
+        # Files used by the quizzes; a missing file is skipped (the quiz shows it as broken anyway)
+        quizzes = [entry for entry in entries if entry["type"] == "quizzes"]
+        for quiz in quizzes:
+            for file_type, name in quiz_media_files(os.path.join(directories["quizzes"], quiz["name"])):
+                path = os.path.join(directories[file_type], name)
+                if os.path.isfile(path):
+                    entries.append({"type": file_type, "name": name, "path": path})
+
+        unique = {}
+        for entry in entries:
+            unique.setdefault((entry["type"], entry["name"]), entry)
+        if len(unique) > MAX_FILES_PER_OFFER:
+            raise TransferError(f"Too many files with images and attachments (maximum {MAX_FILES_PER_OFFER})")
+        # The checksum lets the receiver see if it already has the same file
+        entries = [
+            {
+                "type": entry["type"],
+                "name": entry["name"],
+                "size": os.path.getsize(entry["path"]),
+                "sha256": file_sha256(entry["path"]),
+            }
+            for entry in unique.values()
+        ]
 
         self._remove_expired()
         token = secrets.token_urlsafe(32)
@@ -312,6 +462,8 @@ class TransferManager:
         for entry, item in zip(entries, data["files"]):
             size = item.get("size")
             entry["size"] = size if isinstance(size, int) and not isinstance(size, bool) and size >= 0 else 0
+            checksum = item.get("sha256")
+            entry["sha256"] = checksum if isinstance(checksum, str) and SHA256_PATTERN.match(checksum) else None
 
         self._remove_expired()
         if len(self.incoming) >= MAX_INCOMING_REQUESTS:
@@ -343,31 +495,131 @@ class TransferManager:
         await self._notify({"type": "transfer_request", "request": self._request_view(incoming)})
         return web.json_response({"success": True}, status=202)
 
-    def _target_file_name(self, file_type: str, name: str, sender: str) -> str:
-        """Choose a file name that does not overwrite an existing file
+    def _is_in_use(self, path: str) -> bool:
+        in_use = {os.path.abspath(p) for p in self.get_files_in_use() if p}
+        return os.path.abspath(path) in in_use
 
-        Quizzes keep their name when it is free. Logs and CSV files always get
-        the sender name as prefix, because every server uses the same names.
-        """
-        directory = self.get_directories()[file_type]
-        prefixed = f"{sender}_{name}"
-        if len(prefixed) > 250:
-            raise TransferError("File name is too long")
-        candidates = [name, prefixed] if file_type == "quizzes" else [prefixed]
-        for candidate in candidates:
-            if not os.path.exists(os.path.join(directory, candidate)):
-                return candidate
-
+    @staticmethod
+    def _free_name(directory: str, name: str, sender: str, taken: set) -> str:
+        """First name for a renamed file that is not used yet: "{sender}_{name}", then "_2", "_3", ..."""
+        prefixed = name if name.startswith(f"{sender}_") else f"{sender}_{name}"
         stem, extension = os.path.splitext(prefixed)
+        candidate = prefixed
         counter = 2
-        while os.path.exists(os.path.join(directory, f"{stem}_{counter}{extension}")):
+        while candidate in taken or os.path.exists(os.path.join(directory, candidate)):
+            candidate = f"{stem}_{counter}{extension}"
             counter += 1
-        return f"{stem}_{counter}{extension}"
+        return candidate
+
+    def _plan_files(self, request: Dict[str, Any]) -> List[Dict[str, Any]]:
+        """Case, possible actions, default action and suggested new name of every incoming file
+
+        Cases:
+            new        - no file with this name: save (default), rename, skip
+            same       - a file with the same content exists: skip (default), replace, rename
+            different  - another file with this name exists: rename (default), replace, skip
+            in_use     - the running server uses this file: rename (default), skip
+        """
+        directories = self.get_directories()
+        sender = request["from"]
+        targets = [
+            f"{sender}_{entry['name']}" if entry["type"] in PREFIXED_TYPES else entry["name"]
+            for entry in request["files"]
+        ]
+        taken = {(entry["type"], target) for entry, target in zip(request["files"], targets)}
+
+        plans = []
+        for entry, target in zip(request["files"], targets):
+            directory = directories[entry["type"]]
+            path = os.path.join(directory, target)
+            if not os.path.exists(path):
+                case, actions, default = "new", ["save", "rename", "skip"], "save"
+            elif not os.path.isfile(path) or self._is_in_use(path):
+                case, actions, default = "in_use", ["rename", "skip"], "rename"
+            elif entry.get("sha256") and file_sha256(path) == entry["sha256"]:
+                case, actions, default = "same", ["replace", "rename", "skip"], "skip"
+            else:
+                case, actions, default = "different", ["replace", "rename", "skip"], "rename"
+            same_type_taken = {name for file_type, name in taken if file_type == entry["type"]}
+            plans.append(
+                {
+                    "target": target,
+                    "case": case,
+                    "actions": actions,
+                    "default_action": default,
+                    "suggested_name": self._free_name(directory, target, sender, same_type_taken),
+                }
+            )
+        return plans
+
+    def _build_plan(self, request: Dict[str, Any], choices: Any) -> List[Tuple[Dict[str, Any], str, Optional[str]]]:
+        """Check the admin's choices against the current files
+
+        Nothing is changed on disk here, so on an error the request stays open
+        and the admin can choose again.
+
+        Args:
+            choices: List of {"type", "name", "action", "new_name"}; files
+                without a choice get their default action
+
+        Returns:
+            List of (file entry, action, file name to save as or None for skip)
+        """
+        by_file = {}
+        for choice in choices if isinstance(choices, list) else []:
+            if isinstance(choice, dict):
+                by_file[(choice.get("type"), choice.get("name"))] = choice
+
+        directories = self.get_directories()
+        plan, errors, chosen = [], [], set()
+        for entry, file_plan in zip(request["files"], self._plan_files(request)):
+            choice = by_file.get((entry["type"], entry["name"]), {})
+            action = choice.get("action") or file_plan["default_action"]
+            if action not in file_plan["actions"]:
+                errors.append(f"{entry['name']}: '{action}' is not possible for this file now")
+                continue
+            if action == "skip":
+                plan.append((entry, action, None))
+                continue
+
+            name = file_plan["target"]
+            if action == "rename":
+                name = choice.get("new_name") or file_plan["suggested_name"]
+                if not is_allowed_file(entry["type"], name):
+                    errors.append(f"{entry['name']}: '{name}' is not a valid name for this file")
+                    continue
+                if os.path.exists(os.path.join(directories[entry["type"]], name)):
+                    errors.append(f"{entry['name']}: a file named '{name}' already exists")
+                    continue
+            if (entry["type"], name) in chosen:
+                errors.append(f"'{name}' is chosen for two files")
+                continue
+            chosen.add((entry["type"], name))
+            plan.append((entry, action, name))
+
+        if errors:
+            raise TransferError("; ".join(errors), 400)
+        return plan
 
     async def _download_file(
-        self, client: httpx.AsyncClient, sender_url: str, token: str, sender: str, entry: Dict[str, Any]
-    ) -> str:
-        """Download one file into its directory, return the saved file name"""
+        self,
+        client: httpx.AsyncClient,
+        sender_url: str,
+        token: str,
+        sender: str,
+        entry: Dict[str, Any],
+        save_as: str,
+        overwrite: bool,
+        renamed_media: Dict[Tuple[str, str], str],
+    ):
+        """Download one file and save it under the chosen name
+
+        Args:
+            save_as: File name in the directory of the file type
+            overwrite: Replace an existing file with this name
+            renamed_media: Images and attachments saved under a new name;
+                references in a downloaded quiz are updated to them
+        """
         url = f"{sender_url}/api/transfer/download/{token}/{entry['type']}/{quote(entry['name'])}"
         directory = self.get_directories()[entry["type"]]
         os.makedirs(directory, exist_ok=True)
@@ -385,9 +637,14 @@ class TransferManager:
                         if size > MAX_FILE_SIZE:
                             raise TransferError(f"File is larger than {MAX_FILE_SIZE // (1024 * 1024)} MB")
                         temp_file.write(chunk)
-            saved_name = self._target_file_name(entry["type"], entry["name"], sender)
-            os.replace(temp_path, os.path.join(directory, saved_name))
-            return saved_name
+            if entry["type"] == "quizzes" and renamed_media:
+                rewrite_quiz_media(temp_path, renamed_media)
+            final_path = os.path.join(directory, save_as)
+            if not overwrite and os.path.exists(final_path):
+                raise TransferError(f"A file named '{save_as}' appeared meanwhile")
+            if overwrite and self._is_in_use(final_path):
+                raise TransferError(f"'{save_as}' is used by the running server")
+            os.replace(temp_path, final_path)
         except httpx.HTTPError as e:
             raise TransferError(f"Download failed: {e}")
         finally:
@@ -406,34 +663,59 @@ class TransferManager:
             raise TransferError("Request not found or expired", 404)
         return request
 
-    async def accept(self, request_id: Any) -> Dict[str, Any]:
-        """Download all files of an incoming request
+    async def accept(self, request_id: Any, choices: Any = None) -> Dict[str, Any]:
+        """Download the files of an incoming request as the admin chose
+
+        Args:
+            choices: List of {"type", "name", "action": "save"|"replace"|"rename"|"skip",
+                "new_name"}; files without a choice get their default action
 
         Returns:
-            {"from": name, "saved": [...], "failed": [...]}
+            {"from": name, "saved": [...], "skipped": [...], "failed": [...]}
         """
         request = self._take_pending(request_id)
         base_url, _ = self._require_endpoint()
+        plan = self._build_plan(request, choices)
         request["status"] = "downloading"
         sender_url = f"{base_url}/{request['from']}"
-        saved, failed = [], []
+        saved, skipped, failed = [], [], []
+        renamed_media = {}
+        # Images and attachments first, so quizzes can point to their saved names
+        plan.sort(key=lambda item: item[0]["type"] not in MEDIA_TYPES)
         try:
             async with httpx.AsyncClient(timeout=HTTP_TIMEOUT) as client:
-                for entry in request["files"]:
+                for entry, action, save_as in plan:
+                    file_info = {"type": entry["type"], "name": entry["name"], "action": action}
+                    if action == "skip":
+                        skipped.append(file_info)
+                        continue
                     try:
-                        saved_name = await self._download_file(
-                            client, sender_url, request["token"], request["from"], entry
+                        await self._download_file(
+                            client,
+                            sender_url,
+                            request["token"],
+                            request["from"],
+                            entry,
+                            save_as,
+                            overwrite=action == "replace",
+                            renamed_media=renamed_media,
                         )
-                        saved.append({"type": entry["type"], "name": entry["name"], "saved_as": saved_name})
+                        if entry["type"] in MEDIA_TYPES and save_as != entry["name"]:
+                            renamed_media[(entry["type"], entry["name"])] = save_as
+                        saved.append({**file_info, "saved_as": save_as})
                     except TransferError as e:
-                        failed.append({"type": entry["type"], "name": entry["name"], "error": e.message})
-                await self._report_result(client, sender_url, request["token"], "accepted" if saved else "failed")
+                        failed.append({**file_info, "error": e.message})
+                status = "failed" if failed and not saved else "accepted"
+                await self._report_result(client, sender_url, request["token"], status)
         finally:
             self.incoming.pop(request["id"], None)
             await self._notify({"type": "transfer_request_removed", "id": request["id"]})
 
-        logger.info(f"File transfer from '{request['from']}': {len(saved)} saved, {len(failed)} failed")
-        return {"from": request["from"], "saved": saved, "failed": failed}
+        logger.info(
+            f"File transfer from '{request['from']}': "
+            f"{len(saved)} saved, {len(skipped)} skipped, {len(failed)} failed"
+        )
+        return {"from": request["from"], "saved": saved, "skipped": skipped, "failed": failed}
 
     async def reject(self, request_id: Any):
         """Forget an incoming request and tell the sender"""

@@ -6,6 +6,7 @@ with that socket name, and answers 502 for unknown names like nginx does when
 the socket file is missing.
 """
 
+import hashlib
 import os
 from datetime import datetime, timedelta
 
@@ -15,7 +16,14 @@ from aiohttp import web
 from aiohttp.test_utils import TestServer
 
 from webquiz import transfer as transfer_module
-from webquiz.transfer import TransferError, TransferManager, is_allowed_file, is_valid_server_name
+from webquiz.transfer import (
+    TransferError,
+    TransferManager,
+    is_allowed_file,
+    is_valid_server_name,
+    quiz_media_files,
+    rewrite_quiz_media,
+)
 
 
 class Machine:
@@ -25,21 +33,24 @@ class Machine:
         self.name = name
         self.tunnel = tunnel
         self.online = True
-        self.dirs = {kind: str(root / name / kind) for kind in ("quizzes", "logs", "csv")}
+        self.dirs = {kind: str(root / name / kind) for kind in ("quizzes", "logs", "csv", "images", "attachments")}
         for path in self.dirs.values():
             os.makedirs(path)
         self.messages = []
+        self.files_in_use = []
         self.manager = TransferManager(
             get_directories=lambda: self.dirs,
             get_endpoint=lambda: (self.tunnel.base_url, self.name) if self.online else None,
             notify=self._notify,
+            get_files_in_use=lambda: self.files_in_use,
         )
 
     async def _notify(self, message):
         self.messages.append(message)
 
     def write(self, kind, filename, content):
-        with open(os.path.join(self.dirs[kind], filename), "w") as f:
+        mode = "wb" if isinstance(content, bytes) else "w"
+        with open(os.path.join(self.dirs[kind], filename), mode) as f:
             f.write(content)
 
     def read(self, kind, filename):
@@ -132,6 +143,11 @@ def test_allowed_files():
     assert not is_allowed_file("quizzes", "a\nb.yaml")
     assert not is_allowed_file("quizzes", None)
     assert is_allowed_file("quizzes", "Математика 5 клас.yaml")
+    assert is_allowed_file("images", "map.PNG")
+    assert not is_allowed_file("images", "map.html")
+    assert is_allowed_file("attachments", "data.xlsx")
+    assert is_allowed_file("attachments", "README")
+    assert not is_allowed_file("attachments", "../data.xlsx")
 
 
 # ----- Full flow -----
@@ -154,6 +170,11 @@ async def test_accept_downloads_all_files(machines):
     )
     assert request["from"] == "room-a"
     assert [f["size"] for f in request["files"]] == [12, 9, 8]
+    stored = next(iter(b.manager.incoming.values()))
+    assert stored["files"][0]["sha256"] == hashlib.sha256(b"title: Math\n").hexdigest()
+    assert [f["case"] for f in request["files"]] == ["new", "new", "new"]
+    # Logs and CSV files are saved with the sender name
+    assert [f["target"] for f in request["files"]] == ["math.yaml", "room-a_0001.log", "room-a_results.csv"]
     assert "token" not in request
     assert b.messages[-1]["type"] == "transfer_request"
 
@@ -177,23 +198,330 @@ async def test_accept_downloads_all_files(machines):
     assert response.status_code == 404
 
 
-async def test_existing_files_are_never_overwritten(machines):
+def plan_of(request, name):
+    return next(f for f in request["files"] if f["name"] == name)
+
+
+async def test_cases_and_default_actions(machines):
+    """Every incoming file gets a case and a safe default action."""
     a, b = machines
-    a.write("quizzes", "math.yaml", "new\n")
-    a.write("logs", "0001.log", "new log\n")
-    b.write("quizzes", "math.yaml", "old\n")
-    b.write("logs", "room-a_0001.log", "old log\n")
+    for name, content in (("same.yaml", "x"), ("diff.yaml", "new"), ("active.yaml", "a"), ("fresh.yaml", "f")):
+        a.write("quizzes", name, content)
+    b.write("quizzes", "same.yaml", "x")
+    b.write("quizzes", "diff.yaml", "old")
+    b.write("quizzes", "active.yaml", "b")
+    b.files_in_use = [None, os.path.join(b.dirs["quizzes"], "active.yaml")]
+
+    files = [{"type": "quizzes", "name": n} for n in ("same.yaml", "diff.yaml", "active.yaml", "fresh.yaml")]
+    request = await send(a, b, files)
+
+    expected = {
+        "same.yaml": ("same", ["replace", "rename", "skip"], "skip"),
+        "diff.yaml": ("different", ["replace", "rename", "skip"], "rename"),
+        "active.yaml": ("in_use", ["rename", "skip"], "rename"),
+        "fresh.yaml": ("new", ["save", "rename", "skip"], "save"),
+    }
+    for name, (case, actions, default) in expected.items():
+        plan = plan_of(request, name)
+        assert (plan["case"], plan["actions"], plan["default_action"]) == (case, actions, default), name
+        assert plan["suggested_name"] == f"room-a_{name}"
+
+    result = await b.manager.accept(request["id"])
+
+    assert {f["name"]: f["saved_as"] for f in result["saved"]} == {
+        "diff.yaml": "room-a_diff.yaml",
+        "active.yaml": "room-a_active.yaml",
+        "fresh.yaml": "fresh.yaml",
+    }
+    assert [f["name"] for f in result["skipped"]] == ["same.yaml"]
+    assert b.read("quizzes", "diff.yaml") == "old"
+    assert b.read("quizzes", "active.yaml") == "b"
+    assert b.files("quizzes") == ["active.yaml", "diff.yaml", "fresh.yaml", "room-a_active.yaml", "room-a_diff.yaml", "same.yaml"]
+
+
+async def test_suggested_names_never_overwrite(machines):
+    a, b = machines
+    a.write("quizzes", "math.yaml", "new")
+    a.write("logs", "0001.log", "new log")
+    b.write("quizzes", "math.yaml", "old")
+    b.write("quizzes", "room-a_math.yaml", "older")
+    b.write("logs", "room-a_0001.log", "old log")
 
     files = [{"type": "quizzes", "name": "math.yaml"}, {"type": "logs", "name": "0001.log"}]
-    result = await b.manager.accept((await send(a, b, files))["id"])
-    assert [f["saved_as"] for f in result["saved"]] == ["room-a_math.yaml", "room-a_0001_2.log"]
+    request = await send(a, b, files)
+    assert plan_of(request, "math.yaml")["suggested_name"] == "room-a_math_2.yaml"
+    assert plan_of(request, "0001.log")["suggested_name"] == "room-a_0001_2.log"
 
-    result = await b.manager.accept((await send(a, b, files))["id"])
-    assert [f["saved_as"] for f in result["saved"]] == ["room-a_math_2.yaml", "room-a_0001_3.log"]
+    result = await b.manager.accept(request["id"])
+    assert [f["saved_as"] for f in result["saved"]] == ["room-a_math_2.yaml", "room-a_0001_2.log"]
+    assert b.read("quizzes", "math.yaml") == "old"
+    assert b.read("quizzes", "room-a_math.yaml") == "older"
+    assert b.read("logs", "room-a_0001.log") == "old log"
 
-    assert b.read("quizzes", "math.yaml") == "old\n"
-    assert b.read("logs", "room-a_0001.log") == "old log\n"
-    assert b.read("quizzes", "room-a_math_2.yaml") == "new\n"
+
+async def test_admin_chooses_replace_rename_skip(machines):
+    a, b = machines
+    a.write("quizzes", "math.yaml", "new math")
+    a.write("quizzes", "geo.yaml", "new geo")
+    a.write("logs", "0001.log", "log")
+    a.write("csv", "results.csv", "a,b")
+    b.write("quizzes", "math.yaml", "old math")
+
+    request = await send(
+        a,
+        b,
+        [
+            {"type": "quizzes", "name": "math.yaml"},
+            {"type": "quizzes", "name": "geo.yaml"},
+            {"type": "logs", "name": "0001.log"},
+            {"type": "csv", "name": "results.csv"},
+        ],
+    )
+    result = await b.manager.accept(
+        request["id"],
+        [
+            {"type": "quizzes", "name": "math.yaml", "action": "replace"},
+            {"type": "quizzes", "name": "geo.yaml", "action": "rename", "new_name": "Географія 7.yaml"},
+            {"type": "logs", "name": "0001.log", "action": "skip"},
+            # results.csv: no choice, default (save as room-a_results.csv)
+        ],
+    )
+
+    assert result["failed"] == []
+    assert [(f["name"], f["action"], f["saved_as"]) for f in result["saved"]] == [
+        ("math.yaml", "replace", "math.yaml"),
+        ("geo.yaml", "rename", "Географія 7.yaml"),
+        ("results.csv", "save", "room-a_results.csv"),
+    ]
+    assert [(f["name"], f["action"]) for f in result["skipped"]] == [("0001.log", "skip")]
+    assert b.read("quizzes", "math.yaml") == "new math"
+    assert b.read("quizzes", "Географія 7.yaml") == "new geo"
+    assert b.files("logs") == []
+    assert a.manager.get_state()["outgoing"][0]["status"] == "accepted"
+
+
+@pytest.mark.parametrize(
+    "choice, message",
+    [
+        ({"name": "active.yaml", "action": "replace"}, "not possible"),
+        ({"name": "fresh.yaml", "action": "replace"}, "not possible"),
+        ({"name": "diff.yaml", "action": "save"}, "not possible"),
+        ({"name": "diff.yaml", "action": "delete"}, "not possible"),
+        ({"name": "fresh.yaml", "action": "rename", "new_name": "diff.yaml"}, "already exists"),
+        ({"name": "fresh.yaml", "action": "rename", "new_name": "fresh.txt"}, "not a valid name"),
+        ({"name": "fresh.yaml", "action": "rename", "new_name": "../x.yaml"}, "not a valid name"),
+        ({"name": "diff.yaml", "action": "rename", "new_name": "fresh.yaml"}, "chosen for two files"),
+    ],
+)
+async def test_invalid_choices_keep_request_open(machines, choice, message):
+    a, b = machines
+    for name in ("diff.yaml", "active.yaml", "fresh.yaml"):
+        a.write("quizzes", name, "from a")
+    b.write("quizzes", "diff.yaml", "b")
+    b.write("quizzes", "active.yaml", "b")
+    b.files_in_use = [os.path.join(b.dirs["quizzes"], "active.yaml")]
+    files = [{"type": "quizzes", "name": n} for n in ("diff.yaml", "active.yaml", "fresh.yaml")]
+    request = await send(a, b, files)
+
+    with pytest.raises(TransferError) as error:
+        await b.manager.accept(request["id"], [{"type": "quizzes", **choice}])
+
+    assert error.value.status == 400
+    assert message in error.value.message
+    assert b.files("quizzes") == ["active.yaml", "diff.yaml"]  # nothing downloaded
+    assert [r["id"] for r in b.manager.list_incoming()] == [request["id"]]  # admin can choose again
+    assert a.manager.get_state()["outgoing"][0]["status"] == "waiting"
+
+
+async def test_file_used_by_server_cannot_be_replaced_during_download(machines):
+    """Choices are checked again right before a file is saved."""
+    a, b = machines
+    a.write("quizzes", "diff.yaml", "from a")
+    b.write("quizzes", "diff.yaml", "b")
+    request = await send(a, b, [{"type": "quizzes", "name": "diff.yaml"}])
+    original_build_plan = b.manager._build_plan
+
+    def build_plan_then_start_using(request, choices):
+        plan = original_build_plan(request, choices)
+        b.files_in_use = [os.path.join(b.dirs["quizzes"], "diff.yaml")]
+        return plan
+
+    b.manager._build_plan = build_plan_then_start_using
+    result = await b.manager.accept(request["id"], [{"type": "quizzes", "name": "diff.yaml", "action": "replace"}])
+
+    assert "used by the running server" in result["failed"][0]["error"]
+    assert b.read("quizzes", "diff.yaml") == "b"
+
+
+QUIZ_WITH_MEDIA = """# Geography quiz
+title: Geography
+questions:
+- question: Where is Kyiv?
+  image: "/imgs/map.png"  # main map
+  options: ["/imgs/a.png", "/imgs/b.png", "Lviv"]
+  correct_answer: 0
+- question: Open the table
+  file: data.xlsx
+  options: ["1", "2"]
+  correct_answer: 1
+- question: Read the notes
+  file: /attach/notes.pdf
+  image: /imgs/missing.png
+  options: ["yes", "no"]
+  correct_answer: 0
+"""
+
+
+def write_quiz_with_media(machine):
+    machine.write("quizzes", "geo.yaml", QUIZ_WITH_MEDIA)
+    for name in ("map.png", "a.png", "b.png"):
+        machine.write("images", name, f"image {name}".encode())
+    machine.write("attachments", "data.xlsx", b"table")
+    machine.write("attachments", "notes.pdf", b"notes")
+
+
+def test_quiz_media_files(tmp_path):
+    path = tmp_path / "geo.yaml"
+    path.write_text(QUIZ_WITH_MEDIA)
+    assert quiz_media_files(str(path)) == [
+        ("images", "map.png"),
+        ("images", "a.png"),
+        ("images", "b.png"),
+        ("attachments", "data.xlsx"),
+        ("images", "missing.png"),
+        ("attachments", "notes.pdf"),
+    ]
+
+    path.write_text("questions:\n- image: /imgs/sub/x.png\n  file: ../secret.txt\n  options: [/imgs/ok.png]\n")
+    assert quiz_media_files(str(path)) == [("images", "ok.png")]
+
+    path.write_text("questions: [unclosed")
+    assert quiz_media_files(str(path)) == []
+    assert quiz_media_files(str(tmp_path / "missing.yaml")) == []
+
+
+def test_rewrite_quiz_media_keeps_comments(tmp_path):
+    path = tmp_path / "geo.yaml"
+    path.write_text(QUIZ_WITH_MEDIA)
+
+    changed = rewrite_quiz_media(
+        str(path),
+        {("images", "map.png"): "room-a_map.png", ("attachments", "notes.pdf"): "room-a_notes.pdf"},
+    )
+
+    text = path.read_text()
+    assert changed
+    assert '"/imgs/room-a_map.png"' in text
+    assert "# main map" in text
+    assert "/attach/room-a_notes.pdf" in text
+    assert "# Geography quiz" in text
+    assert '"/imgs/a.png"' in text
+    assert "file: data.xlsx" in text
+    assert not rewrite_quiz_media(str(path), {("images", "other.png"): "x.png"})
+
+
+async def test_quiz_is_sent_with_its_images_and_attachments(machines):
+    a, b = machines
+    write_quiz_with_media(a)
+
+    request = await send(a, b, [{"type": "quizzes", "name": "geo.yaml"}])
+
+    # missing.png does not exist on the sender, so it is not offered
+    assert [(f["type"], f["name"]) for f in request["files"]] == [
+        ("quizzes", "geo.yaml"),
+        ("images", "map.png"),
+        ("images", "a.png"),
+        ("images", "b.png"),
+        ("attachments", "data.xlsx"),
+        ("attachments", "notes.pdf"),
+    ]
+
+    result = await b.manager.accept(request["id"])
+
+    assert result["failed"] == []
+    assert b.read("quizzes", "geo.yaml") == QUIZ_WITH_MEDIA  # no renames, quiz unchanged
+    assert b.files("images") == ["a.png", "b.png", "map.png"]
+    assert b.files("attachments") == ["data.xlsx", "notes.pdf"]
+    assert b.read("images", "map.png") == "image map.png"
+
+
+async def test_identical_images_are_skipped_by_default(machines):
+    a, b = machines
+    write_quiz_with_media(a)
+    b.write("images", "map.png", b"image map.png")
+
+    request = await send(a, b, [{"type": "quizzes", "name": "geo.yaml"}])
+    assert plan_of(request, "map.png")["case"] == "same"
+    result = await b.manager.accept(request["id"])
+
+    assert [f["name"] for f in result["skipped"]] == ["map.png"]
+    assert sorted(f["saved_as"] for f in result["saved"]) == ["a.png", "b.png", "data.xlsx", "geo.yaml", "notes.pdf"]
+    assert b.files("images") == ["a.png", "b.png", "map.png"]
+    assert b.read("quizzes", "geo.yaml") == QUIZ_WITH_MEDIA
+
+
+async def test_renamed_image_by_choice_updates_quiz(machines):
+    a, b = machines
+    write_quiz_with_media(a)
+    request = await send(a, b, [{"type": "quizzes", "name": "geo.yaml"}])
+
+    await b.manager.accept(request["id"], [{"type": "images", "name": "a.png", "action": "rename", "new_name": "circle.png"}])
+
+    quiz = b.read("quizzes", "geo.yaml")
+    assert '"/imgs/circle.png"' in quiz
+    assert '"/imgs/b.png"' in quiz
+    assert b.files("images") == ["b.png", "circle.png", "map.png"]
+
+
+async def test_skipped_image_keeps_quiz_reference(machines):
+    a, b = machines
+    write_quiz_with_media(a)
+    b.write("images", "map.png", b"receiver map")
+    request = await send(a, b, [{"type": "quizzes", "name": "geo.yaml"}])
+
+    await b.manager.accept(request["id"], [{"type": "images", "name": "map.png", "action": "skip"}])
+
+    assert '"/imgs/map.png"' in b.read("quizzes", "geo.yaml")
+    assert b.read("images", "map.png") == "receiver map"
+
+
+async def test_different_images_get_new_names_and_quiz_points_to_them(machines):
+    a, b = machines
+    write_quiz_with_media(a)
+    b.write("images", "map.png", b"another map")
+    b.write("attachments", "notes.pdf", b"other notes")
+    b.write("quizzes", "geo.yaml", "title: Old geography\n")
+
+    result = await b.manager.accept((await send(a, b, [{"type": "quizzes", "name": "geo.yaml"}]))["id"])
+
+    saved = {f["name"]: f["saved_as"] for f in result["saved"]}
+    assert saved == {
+        "geo.yaml": "room-a_geo.yaml",
+        "map.png": "room-a_map.png",
+        "a.png": "a.png",
+        "b.png": "b.png",
+        "data.xlsx": "data.xlsx",
+        "notes.pdf": "room-a_notes.pdf",
+    }
+    # Files of the receiver are untouched
+    assert b.read("images", "map.png") == "another map"
+    assert b.read("attachments", "notes.pdf") == "other notes"
+    assert b.read("quizzes", "geo.yaml") == "title: Old geography\n"
+    # The received quiz points to the received files
+    quiz = b.read("quizzes", "room-a_geo.yaml")
+    assert '"/imgs/room-a_map.png"' in quiz
+    assert "file: /attach/room-a_notes.pdf" in quiz
+    assert '"/imgs/a.png"' in quiz
+    assert b.read("images", "room-a_map.png") == "image map.png"
+
+
+async def test_media_limit_counts_images(machines, monkeypatch):
+    a, b = machines
+    write_quiz_with_media(a)
+    monkeypatch.setattr(transfer_module, "MAX_FILES_PER_OFFER", 3)
+    with pytest.raises(TransferError) as error:
+        await a.manager.send_offer("room-b", [{"type": "quizzes", "name": "geo.yaml"}])
+    assert "images and attachments" in error.value.message
 
 
 async def test_reject_tells_sender_and_saves_nothing(machines):
@@ -361,6 +689,13 @@ def test_incoming_validation(machines, data, message):
     with pytest.raises(TransferError) as error:
         b.manager.add_incoming(data)
     assert message in error.value.message
+
+
+def test_incoming_ignores_invalid_checksum(machines):
+    a, b = machines
+    files = [{"type": "logs", "name": "a.log", "size": 1, "sha256": "not-a-checksum"}]
+    request = b.manager.add_incoming({"from": "room-a", "token": "t" * 43, "files": files})
+    assert request["files"][0]["sha256"] is None
 
 
 def test_incoming_requires_tunnel(machines):

@@ -605,9 +605,22 @@ class TestingServer:
 
         # File transfer between servers connected to the same tunnel server
         self.transfer = TransferManager(
-            get_directories=lambda: {"quizzes": self.quizzes_dir, "logs": self.logs_dir, "csv": self.csv_dir},
+            get_directories=lambda: {
+                "quizzes": self.quizzes_dir,
+                "logs": self.logs_dir,
+                "csv": self.csv_dir,
+                "images": os.path.join(self.quizzes_dir, "imgs"),
+                "attachments": os.path.join(self.quizzes_dir, "attach"),
+            },
             get_endpoint=lambda: self.tunnel_manager.get_public_endpoint() if self.tunnel_manager else None,
             notify=self.broadcast_to_admin_websockets,
+            get_files_in_use=lambda: [
+                self.log_file,
+                self.csv_file,
+                self.user_csv_file,
+                self.answers_with_users_csv_file,
+                self.current_quiz_file,
+            ],
         )
 
         # Admin session storage for cookie-based authentication
@@ -3725,9 +3738,21 @@ class TestingServer:
 
     @admin_auth_required
     async def admin_transfer_accept(self, request):
-        """Accept an incoming transfer request and download its files."""
+        """Accept an incoming transfer request and download its files.
+
+        Optional body: {"files": [{"type", "name", "action": "save|replace|rename|skip", "new_name"}]}
+        Files without a choice get their default action. On invalid choices
+        nothing is downloaded and the request stays open (400).
+        """
+        choices = None
+        if request.can_read_body:
+            try:
+                data = await request.json()
+            except Exception:
+                return web.json_response({"error": "Invalid JSON"}, status=400)
+            choices = data.get("files") if isinstance(data, dict) else None
         try:
-            result = await self.transfer.accept(request.match_info["request_id"])
+            result = await self.transfer.accept(request.match_info["request_id"], choices)
         except TransferError as e:
             return web.json_response({"error": e.message}, status=e.status)
         return web.json_response({"success": True, **result})

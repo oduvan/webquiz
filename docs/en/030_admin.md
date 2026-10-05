@@ -73,8 +73,14 @@ The main administrative panel page contains essential tools for managing quizzes
 
 - **File Transfer Requests**
   This panel appears when another WebQuiz server on the same tunnel server wants to send files (see [Sending Files to Another Server](#sending-files-to-another-server)).
-  It shows the name of the sending server and the list of files.
-  - **Accept** — download the files. They appear in the File Manager. Existing files are never overwritten.
+  It shows the name of the sending server and every file with its case:
+  - **New file** — there is no file with this name. Choose **Save**, **Rename** or **Skip**.
+  - **The same file already exists** — choose **Skip** (default), **Replace** or **Rename**.
+  - **A different file with this name exists** — choose **Rename** (default), **Replace** or **Skip**.
+  - **The file is used by the server now** (current log, current CSV files, active quiz) — choose **Rename** or **Skip**. It cannot be replaced.
+
+  For **Rename**, a free name is suggested; you can change it. Then click:
+  - **Accept** — download the files as chosen. They appear in the File Manager. If a choice is not possible, an error is shown and nothing is downloaded, so you can choose again.
   - **Reject** — refuse the files. The sender sees that the request was rejected.
 
 - **Theme Switcher**
@@ -116,7 +122,7 @@ You can send quiz, log and CSV files to another WebQuiz server, for example from
 - have a fixed, different `socket_name` (see [Configuration](040_config.md));
 - have the SSH tunnel connected on the admin panel.
 
-When the tunnel is connected, the **Send files to another server** panel shows the name of this server and a checkbox next to every quiz, log and CSV file.
+The **Send files to another server** panel appears only while the tunnel is connected. It shows the name of this server, and a checkbox appears next to every quiz, log and CSV file.
 
 1. Tick the files on any tab.
 2. Type the name of the other server (its `socket_name`) and click **Send**.
@@ -125,8 +131,9 @@ When the tunnel is connected, the **Send files to another server** panel shows t
 
 Notes:
 - A request expires if it is not answered in 30 minutes. Keep both servers connected until then.
-- Received quizzes keep their name if it is free, otherwise the sender name is added (`room-12_math.yaml`). Logs and CSV files always get the sender name (`room-12_0001.log`).
-- Quiz attachments and images are not sent.
+- Images and attached files used by a sent quiz (from `quizzes/imgs/` and `quizzes/attach/`) are sent with it automatically. You do not need to select them.
+- On the other server, the admin chooses for every file: save, replace, rename or skip (see [File Transfer Requests](#main-panel-elements)). Logs and CSV files are saved with the sender name (`room-12_0001.log`).
+- If an image or attachment is saved under a new name, the received quiz is changed to use it, so the quiz shows the right image.
 
 #### Table View
 
