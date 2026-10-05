@@ -61,6 +61,9 @@ def test_accept_and_reject_unknown_request():
         cookies = get_admin_session(port)
         base = f"http://localhost:{port}/api/admin/transfer"
         assert requests.post(f"{base}/unknown/accept", cookies=cookies).status_code == 404
+        choices = {"files": [{"type": "quizzes", "name": "a.yaml", "action": "skip"}]}
+        assert requests.post(f"{base}/unknown/accept", cookies=cookies, json=choices).status_code == 404
+        assert requests.post(f"{base}/unknown/accept", cookies=cookies, data="not json").status_code == 400
         assert requests.post(f"{base}/unknown/reject", cookies=cookies).status_code == 404
 
 
@@ -87,3 +90,13 @@ def test_public_endpoints_work_from_public_ip():
 
         response = requests.post(f"{base}/offer", headers=headers, data="not json")
         assert response.status_code == 400
+
+
+def test_send_panel_hidden_until_tunnel_connected():
+    """The page shows the send panel only after GET /api/admin/transfer says it is available."""
+    with custom_webquiz_server() as (proc, port):
+        cookies = get_admin_session(port)
+        response = requests.get(f"http://localhost:{port}/files/", cookies=cookies)
+        assert response.status_code == 200
+        assert '<div id="transfer-panel" class="transfer-panel hidden">' in response.text
+        assert "classList.toggle('hidden', !state.available)" in response.text
