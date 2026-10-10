@@ -675,6 +675,38 @@
             border-color: #721c24;
         }
 
+        /* Shown while requests wait for the connection to come back */
+        .connection-banner {
+            position: fixed;
+            top: 0;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 100%;
+            max-width: 800px;
+            box-sizing: border-box;
+            padding: 10px 15px;
+            background-color: #fff3cd;
+            color: #856404;
+            border: 1px solid #ffeeba;
+            border-top: none;
+            border-radius: 0 0 5px 5px;
+            text-align: center;
+            font-size: 14px;
+            z-index: 1000;
+        }
+        [data-theme="dark"] .connection-banner {
+            background-color: #3d3410;
+            color: #ffe8a1;
+            border-color: #856404;
+        }
+        @media screen and (max-width: 768px) {
+            .connection-banner {
+                border-left: none;
+                border-right: none;
+                border-radius: 0;
+            }
+        }
+
         /* Text input question styles */
         .text-input-container {
             margin: 15px 0;
@@ -744,6 +776,7 @@
     </style>
 </head>
 <body>
+    <div id="connection-banner" class="connection-banner hidden" role="status"></div>
     <div class="container">
         <div class="top-right-controls">
             <div class="user-info" id="user-info">
@@ -816,6 +849,7 @@
         let selectedAnswers = []; // For multiple choice questions
         let textAnswer = ''; // For text input questions
         let testResults = [];
+        let answerLocked = false; // The answer is being sent and must not change
 
         // Prevent copying question text
         const questionContainer = document.getElementById('current-question-container');
@@ -868,22 +902,79 @@
             console.log(`Preloading ${imageUrls.size} quiz images`);
         }
 
-        // Notify server when question starts (for timing and live stats)
-        async function notifyQuestionStart(questionId) {
+        // Requests that fail because the connection dropped are repeated until they get
+        // through, with a banner while the page waits. A repeated answer or registration is
+        // safe: the server returns the stored result if the first attempt got through.
+        const RETRY_DELAYS_MS = [1000, 2000, 4000, 5000]; // The last delay repeats
+        const REQUEST_TIMEOUT_MS = 15000;
+        const RETRY_STATUSES = [502, 503, 504]; // A proxy or the tunnel cannot reach the server
+        let requestsWaitingForConnection = 0;
+
+        async function fetchWithRetry(url, options = {}) {
+            let attempt = 0;
+            let waiting = false;
             try {
-                await fetch('api/question-start', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({
-                        user_id: currentUserId,
-                        question_id: questionId
-                    })
-                });
-            } catch (error) {
-                console.log('Failed to notify question start:', error);
+                while (true) {
+                    const controller = new AbortController();
+                    const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+                    try {
+                        const response = await fetch(url, { ...options, signal: controller.signal });
+                        if (!RETRY_STATUSES.includes(response.status)) {
+                            return response;
+                        }
+                    } catch (error) {
+                        console.log(`Request to ${url} failed, retrying:`, error);
+                    } finally {
+                        clearTimeout(timer);
+                    }
+
+                    if (!waiting) {
+                        waiting = true;
+                        updateConnectionBanner(1);
+                    }
+                    const delay = RETRY_DELAYS_MS[Math.min(attempt, RETRY_DELAYS_MS.length - 1)];
+                    attempt++;
+                    await new Promise(resolve => setTimeout(resolve, delay));
+                }
+            } finally {
+                if (waiting) {
+                    updateConnectionBanner(-1);
+                }
             }
+        }
+
+        function updateConnectionBanner(change) {
+            requestsWaitingForConnection += change;
+            const banner = document.getElementById('connection-banner');
+            banner.textContent = T.connection_lost;
+            banner.classList.toggle('hidden', requestsWaitingForConnection === 0);
+        }
+
+        // Random token sent with a registration, so a retried request returns the same user
+        function generateRequestToken() {
+            const bytes = new Uint8Array(16);
+            crypto.getRandomValues(bytes);
+            return Array.from(bytes, byte => byte.toString(16).padStart(2, '0')).join('');
+        }
+
+        // Notify server when question starts (for timing and live stats).
+        // The answer waits for this request, so the server always gets them in order.
+        let questionStartRequest = Promise.resolve();
+
+        function notifyQuestionStart(questionId) {
+            questionStartRequest = fetchWithRetry('api/question-start', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    user_id: currentUserId,
+                    question_id: questionId
+                })
+            }).catch(error => {
+                console.log('Failed to notify question start:', error);
+            });
+            return questionStartRequest;
         }
 
         // Error message utilities
@@ -1040,7 +1131,7 @@
             if (storedUserId) {
                 // User ID stored, verify it with server
                 try {
-                    const response = await fetch(`api/verify-user/${storedUserId}`);
+                    const response = await fetchWithRetry(`api/verify-user/${storedUserId}`);
                     const data = await response.json();
 
                     if (response.ok && data.valid) {
@@ -1131,13 +1222,17 @@
             // Clear previous errors
             hideError('registration-error');
 
+            // Disable the button so a slow or retried request is not sent twice
+            const registerBtn = document.querySelector('.register-btn');
+            registerBtn.disabled = true;
+
             try {
-                const response = await fetch('api/register', {
+                const response = await fetchWithRetry('api/register', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json'
                     },
-                    body: JSON.stringify(registrationData)
+                    body: JSON.stringify({ ...registrationData, registration_token: generateRequestToken() })
                 });
 
                 const data = await response.json();
@@ -1174,6 +1269,8 @@
                 }
             } catch (error) {
                 showError('registration-error', T.error_prefix + error.message);
+            } finally {
+                registerBtn.disabled = false;
             }
         }
 
@@ -1224,7 +1321,7 @@
             hideError('waiting-error');
 
             try {
-                const response = await fetch('api/update-registration', {
+                const response = await fetchWithRetry('api/update-registration', {
                     method: 'PUT',
                     headers: {
                         'Content-Type': 'application/json'
@@ -1261,16 +1358,23 @@
             }
         }
 
+        // One check at a time: while the connection is down, more clicks would start the quiz several times
+        let checkingApproval = false;
+
         async function checkApprovalStatus() {
             if (!currentUserId) {
                 showError('waiting-error', 'User ID not found');
                 return;
             }
+            if (checkingApproval) {
+                return;
+            }
+            checkingApproval = true;
 
             hideError('waiting-error');
 
             try {
-                const response = await fetch(`api/verify-user/${currentUserId}`);
+                const response = await fetchWithRetry(`api/verify-user/${currentUserId}`);
                 const data = await response.json();
 
                 if (response.ok && data.valid) {
@@ -1295,6 +1399,8 @@
                 }
             } catch (error) {
                 showError('waiting-error', T.error_prefix + error.message);
+            } finally {
+                checkingApproval = false;
             }
         }
 
@@ -1406,8 +1512,8 @@
         }
 
         function selectCurrentAnswer(optionIndex) {
-            // Don't allow selection if already submitted
-            if (document.querySelector('.option.disabled')) {
+            // Don't allow selection if already submitted or being sent
+            if (answerLocked || document.querySelector('.option.disabled')) {
                 return;
             }
 
@@ -1478,6 +1584,13 @@
             const submitBtn = document.getElementById('submit-answer-btn');
             submitBtn.disabled = true;
 
+            // Lock the answer: a retried request sends the same answer, so it must not change
+            answerLocked = true;
+            const textInput = document.getElementById('text-answer-input');
+            if (textInput) {
+                textInput.disabled = true;
+            }
+
             // Determine the answer to submit
             let answerToSubmit;
             if (isTextQuestion) {
@@ -1489,7 +1602,10 @@
             }
 
             try {
-                const response = await fetch('api/submit-answer', {
+                // Timing for this question starts with the question-start request, send it first
+                await questionStartRequest;
+
+                const response = await fetchWithRetry('api/submit-answer', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json'
@@ -1555,6 +1671,11 @@
                 showError('test-error', T.submit_error + error.message);
                 // Re-enable submit button on error so user can retry
                 submitBtn.disabled = false;
+                if (textInput) {
+                    textInput.disabled = false;
+                }
+            } finally {
+                answerLocked = false;
             }
         }
 
@@ -1716,7 +1837,7 @@
         async function fetchAndShowFinalResults() {
             try {
                 // Fetch final results from server to ensure consistency with page reload
-                const response = await fetch(`api/verify-user/${currentUserId}`);
+                const response = await fetchWithRetry(`api/verify-user/${currentUserId}`);
                 const data = await response.json();
 
                 if (response.ok && data.valid && data.test_completed && data.final_results) {

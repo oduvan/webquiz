@@ -55,6 +55,7 @@ TRANSLATIONS = {
         "update_error": "Помилка оновлення даних",
         "status_check_error": "Помилка перевірки статусу",
         "submit_error": "Помилка відправки відповіді: ",
+        "connection_lost": "Немає з'єднання з сервером. Повторна спроба...",
 
         # Results
         "result_label": "Результат:",
@@ -78,6 +79,7 @@ TRANSLATIONS = {
         "server_field_empty": 'Поле "{field}" не може бути порожнім',
         "server_user_not_found": "Користувача не знайдено",
         "server_all_answered": "Ви вже відповіли на всі питання",
+        "server_already_answered": "Ви вже відповіли на це питання",
         "server_question_order_error": "Помилка валідації порядку питань",
         "server_only_current_question": "Ви можете відповідати лише на поточне питання",
         "server_question_not_found": "Питання не знайдено",
@@ -143,6 +145,7 @@ TRANSLATIONS = {
         "update_error": "Update error",
         "status_check_error": "Status check error",
         "submit_error": "Error submitting answer: ",
+        "connection_lost": "Connection to the server lost. Retrying...",
 
         # Results
         "result_label": "Result:",
@@ -166,6 +169,7 @@ TRANSLATIONS = {
         "server_field_empty": 'Field "{field}" cannot be empty',
         "server_user_not_found": "User not found",
         "server_all_answered": "You have already answered all questions",
+        "server_already_answered": "You have already answered this question",
         "server_question_order_error": "Question order validation error",
         "server_only_current_question": "You can only answer the current question",
         "server_question_not_found": "Question not found",

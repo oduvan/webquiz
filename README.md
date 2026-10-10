@@ -17,6 +17,7 @@ A modern web-based quiz and testing system built with Python and aiohttp that al
 - **Live Statistics**: Real-time WebSocket-powered dashboard showing user progress
 - **Real-time Validation**: Server-side answer checking with immediate feedback
 - **Session Persistence**: Cookie-based user sessions for seamless experience
+- **Connection Retry**: The quiz page repeats requests when the connection drops; answers and registrations are never counted twice
 - **Performance Tracking**: Server-side timing for accurate response measurement
 - **Data Export**: Automatic CSV export with quiz-prefixed filenames and unique suffixes
 - **AI Integration**: Use ChatGPT/Claude for analyzing quiz results and generating questions from existing materials
@@ -523,6 +524,22 @@ This is a quiz-level setting configured in the quiz YAML file:
 ```yaml
 show_final_list: false
 ```
+
+### Connection Drops
+
+The student quiz page keeps working through short network drops (unstable classroom Wi-Fi, a tunnel that reconnects):
+
+- A request that fails because of the connection (network error, no response within 15 seconds, or `502`/`503`/`504` from a proxy or the tunnel) is repeated after 1, 2 and 4 seconds, then every 5 seconds, until the server answers
+- While the page waits, a yellow banner at the top says the connection is lost; it disappears once the request gets through
+- The chosen answer is locked while it is being sent, so the repeated request always carries the same answer
+- A page opened or reloaded while the server is unreachable waits on the loading screen instead of showing the registration form
+- The answer waits for the question-start request of the same question, so question timing stays correct
+
+Repeated requests are safe on the server side, even when the first attempt got through and only the response was lost:
+
+- **`POST /api/submit-answer`**: the same answer to an already answered question returns the stored result (same `is_correct`, `time_taken`, and so on) without recording anything; a different answer to an answered question is rejected with `409` (or `403`/`400` in randomized quizzes, as before)
+- **`POST /api/register`**: the page sends a random `registration_token`; a repeated registration with the same token returns the user created by the first attempt instead of failing with "username already exists"
+- **`POST /api/question-start`**: a notice for a question the student already answered is ignored, so it cannot restart timing
 
 ### SSH Tunnel for Public Access
 
