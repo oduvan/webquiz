@@ -219,7 +219,8 @@ The `tunnel` section allows you to configure an SSH tunnel for public access to 
   If not specified, a random identifier of 6-8 characters is generated.
   Required for sending files between servers: it is the name other servers use to reach this one.
   Use letters, digits, `-`, `_` and `.`.
-  After a disconnect, the same name may be busy for up to 5 minutes, until the tunnel server removes the old socket file.
+  After a disconnect, a restart or a network change, the same name can stay taken on the tunnel server for several minutes, until the server drops the earlier connection and removes its socket file.
+  WebQuiz then shows that the name is still taken and tries again every 15 seconds until it connects (the **Cancel** button stops it).
   Example: `"my-quiz-socket"`
 
 - **config** (optional subsection) — local tunnel configuration.
@@ -240,7 +241,7 @@ The `tunnel` section allows you to configure an SSH tunnel for public access to 
 
 5. **Public URL**: Once connected, a public URL will be displayed (e.g., `https://tunnel.example.com/tests/a3f7b2/`).
 
-6. **Auto-reconnect**: If the connection drops, WebQuiz automatically attempts to restore it.
+6. **Auto-reconnect**: If the connection drops, WebQuiz automatically attempts to restore it. While it is trying, the button shows **Cancel**.
 
 **Server requirements:**
 - The tunnel server must support Unix domain socket forwarding

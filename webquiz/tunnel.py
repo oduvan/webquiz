@@ -42,12 +42,15 @@ class TunnelManager:
             "connected": False,
             "url": None,
             "error": None,
+            "retrying": False,  # Not connected, but trying again in the background
             "keys_status": "unchecked",
             "public_key_content": None,
         }
         self._reconnect_task: Optional[asyncio.Task] = None
         self._reconnect_delay = 5  # Initial reconnect delay in seconds
         self._max_reconnect_delay = 300  # Max 5 minutes
+        self._busy_retry_delay = 15  # Delay between attempts while the fixed socket name is taken
+        self._socket_busy = False  # Last attempt failed because the fixed socket name is taken
         self._should_be_connected = False  # Track if we should maintain connection
         self.status_callback: Optional[Callable[[Dict[str, Any]], None]] = None
 
@@ -223,11 +226,35 @@ class TunnelManager:
         return secrets.token_hex(num_bytes)
 
     async def connect(self) -> tuple[bool, str]:
-        """Establish SSH tunnel connection
+        """Establish SSH tunnel connection (admin action)
+
+        With a fixed socket_name the tunnel server can still hold the socket of an
+        earlier connection: sshd keeps it until it drops that connection, and the
+        socket file stays until the server's cleanup job removes it. Then the attempt
+        is repeated in the background until the name is free (status "retrying").
 
         Returns:
             Tuple of (success: bool, url_or_error: str)
         """
+        # A new attempt replaces any background reconnect attempts
+        self._should_be_connected = False
+        await self._cancel_reconnect()
+        self.status["retrying"] = False
+
+        success, result = await self._connect_once()
+        if not success and self._socket_busy:
+            self._should_be_connected = True
+            self._reconnect_task = asyncio.create_task(self._auto_reconnect())
+        return success, result
+
+    async def _connect_once(self) -> tuple[bool, str]:
+        """Make one attempt to establish the SSH tunnel
+
+        Returns:
+            Tuple of (success: bool, url_or_error: str)
+        """
+        self._socket_busy = False
+
         # Check if server is configured
         if not self.config.server:
             error_msg = "Tunnel server not configured"
@@ -276,6 +303,7 @@ class TunnelManager:
             self.status["connected"] = True
             self.status["url"] = public_url
             self.status["error"] = None
+            self.status["retrying"] = False
             self._should_be_connected = True
             self._reconnect_delay = 5  # Reset reconnect delay on successful connection
 
@@ -288,25 +316,47 @@ class TunnelManager:
             return True, public_url
 
         except Exception as e:
-            error_msg = f"Failed to establish SSH tunnel: {e}"
+            self._close_connection()
+            if isinstance(e, asyncssh.ChannelListenError) and self.config.socket_name:
+                self._socket_busy = True
+                error_msg = (
+                    f"Socket name '{self.socket_id}' is still taken on the tunnel server by an earlier "
+                    "connection. The tunnel server frees it when that connection times out."
+                )
+            else:
+                error_msg = f"Failed to establish SSH tunnel: {e}"
             logger.error(error_msg)
             self.status["error"] = error_msg
             self.status["connected"] = False
             self.status["url"] = None
+            self.status["retrying"] = self._socket_busy or self._should_be_connected
             await self._notify_status_change()
             return False, error_msg
+        except asyncio.CancelledError:
+            self._close_connection()
+            raise
 
-    async def disconnect(self):
-        """Close SSH tunnel connection"""
-        self._should_be_connected = False
+    def _close_connection(self):
+        """Close the SSH connection of a failed or cancelled attempt"""
+        if self.connection:
+            self.connection.close()
+            self.connection = None
+        self.listener = None
 
-        # Cancel reconnect task if running
+    async def _cancel_reconnect(self):
+        """Stop background reconnect attempts"""
         if self._reconnect_task and not self._reconnect_task.done():
             self._reconnect_task.cancel()
             try:
                 await self._reconnect_task
             except asyncio.CancelledError:
                 pass
+        self._reconnect_task = None
+
+    async def disconnect(self):
+        """Close SSH tunnel connection"""
+        self._should_be_connected = False
+        await self._cancel_reconnect()
 
         # Close listener
         if self.listener:
@@ -324,6 +374,7 @@ class TunnelManager:
         self.status["connected"] = False
         self.status["url"] = None
         self.status["error"] = None
+        self.status["retrying"] = False
         self.socket_id = None
         self.base_url = None
 
@@ -342,6 +393,7 @@ class TunnelManager:
                 self.status["connected"] = False
                 self.status["url"] = None
                 self.status["error"] = "Connection lost"
+                self.status["retrying"] = True
                 await self._notify_status_change()
 
                 # Start reconnect attempts
@@ -354,22 +406,25 @@ class TunnelManager:
         """Attempt to reconnect with exponential backoff"""
         while self._should_be_connected:
             try:
-                logger.info(f"Attempting to reconnect in {self._reconnect_delay} seconds...")
-                await asyncio.sleep(self._reconnect_delay)
+                # A taken socket name is checked often: it becomes free at an unknown moment
+                delay = self._busy_retry_delay if self._socket_busy else self._reconnect_delay
+                logger.info(f"Attempting to reconnect in {delay} seconds...")
+                await asyncio.sleep(delay)
 
                 if not self._should_be_connected:
                     break
 
                 logger.info("Reconnecting SSH tunnel...")
-                success, result = await self.connect()
+                success, result = await self._connect_once()
 
                 if success:
                     logger.info(f"Reconnected successfully: {result}")
                     break
                 else:
                     logger.warning(f"Reconnect attempt failed: {result}")
-                    # Exponential backoff
-                    self._reconnect_delay = min(self._reconnect_delay * 2, self._max_reconnect_delay)
+                    if not self._socket_busy:
+                        # Exponential backoff
+                        self._reconnect_delay = min(self._reconnect_delay * 2, self._max_reconnect_delay)
 
             except asyncio.CancelledError:
                 logger.info("Reconnect cancelled")

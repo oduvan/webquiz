@@ -48,7 +48,7 @@ WebQuiz - Python/aiohttp quiz system with multi-quiz management, real-time WebSo
 - Quiz file attachments: `GET /api/admin/list-files` (list files in quizzes/attach/)
 - Checker templates: `GET /api/admin/list-checker-templates` (list configured checker templates for text questions)
 - File management: `GET /api/files/list`, `GET /api/files/{type}/view/{filename}`, `GET /api/files/{type}/download/{filename}`, `PUT /api/files/quizzes/save/{filename}`
-- Tunnel management: `POST /api/admin/tunnel/connect`, `POST /api/admin/tunnel/disconnect`
+- Tunnel management: `POST /api/admin/tunnel/connect` (202 `{retrying, message}` while a taken fixed socket name is retried), `POST /api/admin/tunnel/disconnect` (also stops retrying)
 - File transfer: `GET /api/admin/transfer` (state: own name, sent offers, incoming requests), `POST /api/admin/transfer/send` (`{to, files: [{type, name}]}`), `POST /api/admin/transfer/{request_id}/accept` (optional `{files: [{type, name, action: save|replace|rename|skip, new_name}]}`; 400 keeps the request open), `POST /api/admin/transfer/{request_id}/reject`
 
 **Server-to-server (through the tunnel, protected by the offer token, not by IP):**
@@ -139,7 +139,8 @@ webquiz-stress-test -c 50
 - **Dynamic answer visibility** - `show_answers_on_completion: true` reveals correct answers only after all approved students complete, with automatic re-hiding when new students register
 - **SSH Tunnel for public access** - Optional feature to expose local server via SSH reverse tunnel with Unix domain sockets
 - **ED25519 SSH keys** - Auto-generated if missing, stored with binary-relative paths for PyInstaller compatibility
-- **Tunnel auto-reconnect** - Exponential backoff (5s → 300s max), connection monitoring via asyncssh
+- **Tunnel auto-reconnect** - Exponential backoff (5s → 300s max), connection monitoring via asyncssh. Status `retrying: true` while a background loop is trying; admin button shows **Cancel** (calls disconnect)
+- **Taken fixed socket name** - The tunnel server (`ForceCommand /bin/false`, no `StreamLocalBindUnlink`) keeps a socket while sshd still holds a dead earlier connection, and the file until its 5-min cleanup cron. `asyncssh.ChannelListenError` with a fixed `socket_name` → `_socket_busy`, `connect()` starts the background loop with a fixed 15s delay (`_busy_retry_delay`), `POST /api/admin/tunnel/connect` answers 202 `{retrying, message}`. Every failed attempt closes its SSH connection
 - **asyncssh forward_remote_path_to_port** - Used for forwarding remote Unix socket to local TCP port (not forward_remote_path)
 - **WebSocket tunnel status** - Real-time updates broadcast to admin clients, no polling needed
 - **Admin-triggered connection** - No auto-connect on startup, admin clicks button to establish tunnel
@@ -181,7 +182,7 @@ webquiz-stress-test -c 50
 **Randomization**: Load YAML → register → `random.shuffle()` → store `question_order` per-user → client receives array → JS reorders → persists across sessions
 **Admin**: Switch quiz → reset all state (users, progress, responses) → new CSV → session isolation
 **Live Stats Groups**: Users display in "In Progress" group → answer questions → complete final question → automatically move to "Completed" group with `completed: true` flag in WebSocket
-**Tunnel**: Initialize → check/generate keys → admin clicks connect → fetch server config → create SSH connection → forward remote Unix socket to local port (forward_remote_path_to_port) → broadcast public URL via WebSocket → auto-reconnect on disconnect
+**Tunnel**: Initialize → check/generate keys → admin clicks connect → fetch server config → create SSH connection → forward remote Unix socket to local port (forward_remote_path_to_port; fixed socket name taken → retry every 15s) → broadcast public URL via WebSocket → auto-reconnect on disconnect
 **File Transfer**: Sender admin ticks files in `/files/` → `POST /api/admin/transfer/send` → offer + token stored → `POST {base_url}/{target}/api/transfer/offer` → receiver broadcasts `transfer_request` to admin WebSocket → admin accepts → receiver GETs each file from `{base_url}/{sender}/api/transfer/download/{token}/...` into a temp file, renames to a free name → `POST .../api/transfer/result` → sender marks offer accepted/rejected/failed (files page polls `GET /api/admin/transfer`)
 **Startup**: Load config → create TestingServer → initialize log file → configure logging → **log environment info** (version, Python, OS, config, paths, network) → initialize tunnel → load questions → start periodic flush → register routes
 **Config Hot-Reload**: Admin saves config → validate YAML → backup original config → write to file → reload config from file → detect restart-required changes (server, paths, master_key) → apply safe changes (registration, trusted_ips, quizzes, tunnel) → reload templates → disconnect tunnel if connected (admin can reconnect) → restart current quiz (reset users/state) → return message (either "saved and applied" or "restart required for: ..."). On failure: rollback config file to backup → return error
@@ -209,7 +210,7 @@ webquiz-stress-test -c 50
   - `tunnel.server` - SSH tunnel server hostname (e.g., "tunnel.example.com")
   - `tunnel.public_key` - Path to SSH public key file (auto-generated if missing)
   - `tunnel.private_key` - Path to SSH private key file (auto-generated if missing)
-  - `tunnel.socket_name` - Optional fixed socket name instead of random generation (default: random 6-8 hex chars). Needed for file transfer (other servers address this one by it). After a disconnect the name can stay busy up to 5 min (stale socket file until the tunnel server's cleanup cron)
+  - `tunnel.socket_name` - Optional fixed socket name instead of random generation (default: random 6-8 hex chars). Needed for file transfer (other servers address this one by it). After a disconnect/restart the name can stay taken for minutes; WebQuiz retries every 15s until it is free
   - `tunnel.config` - Optional nested config subsection (username, socket_directory, base_url) - bypasses server fetch when provided
 - Questions use **0-indexed** `correct_answer` field and optional `points` field (default: 1)
 - Text questions are detected by `checker` field (no `type` field needed, no `options` or `correct_answer`)

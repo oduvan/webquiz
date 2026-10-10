@@ -68,6 +68,7 @@ The main administrative panel page contains essential tools for managing quizzes
   - **Server** — displays the tunnel server hostname
   - **Public Key** — your SSH public key that needs to be registered on the tunnel server. Use the **Copy** button to copy it to the clipboard.
   - **Connect/Disconnect** — click to establish or terminate the tunnel connection
+  - **Cancel** — shown while WebQuiz keeps trying to connect in the background (the connection was lost, or the fixed socket name is still taken on the tunnel server by an earlier connection). Click it to stop trying.
 
   When connected, a public URL appears in the "URL for Access from Other Devices" section with a green background, allowing participants outside your local network to join the quiz.
 

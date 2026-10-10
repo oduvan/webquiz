@@ -825,8 +825,8 @@ class TestingServer:
         if self.tunnel_manager:
             # Update tunnel manager's config reference
             self.tunnel_manager.config = new_config.tunnel
-            # Disconnect if connected (admin can reconnect with new config)
-            if self.tunnel_manager.status.get("connected"):
+            # Disconnect if connected or retrying (admin can reconnect with new config)
+            if self.tunnel_manager.status.get("connected") or self.tunnel_manager.status.get("retrying"):
                 logger.info("Disconnecting tunnel due to config change")
                 await self.tunnel_manager.disconnect()
 
@@ -3733,7 +3733,8 @@ class TestingServer:
             request: aiohttp request
 
         Returns:
-            JSON response with success status and URL or error
+            JSON response with success status and URL, 202 with message while the
+            tunnel manager keeps trying (fixed socket name still taken), or error
         """
         if not self.tunnel_manager:
             return web.json_response({"error": "Tunnel not configured"}, status=400)
@@ -3743,6 +3744,9 @@ class TestingServer:
         if success:
             logger.info(f"Tunnel connected: {result}")
             return web.json_response({"success": True, "url": result})
+        elif self.tunnel_manager.status.get("retrying"):
+            logger.warning(f"Tunnel not connected yet, retrying: {result}")
+            return web.json_response({"retrying": True, "message": result}, status=202)
         else:
             logger.error(f"Tunnel connection failed: {result}")
             return web.json_response({"error": result}, status=500)

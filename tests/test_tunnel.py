@@ -5,16 +5,21 @@ These tests ensure that tunnel configuration, key management, and connection
 logic work correctly.
 """
 
+import asyncio
+import json
 import os
 import tempfile
 import yaml
+import asyncssh
 import pytest
 from pathlib import Path
+from types import SimpleNamespace
 from unittest.mock import Mock, AsyncMock, patch, MagicMock
 
 from webquiz.config import (
     load_config_from_yaml,
     TunnelConfig,
+    TunnelServerConfig,
     WebQuizConfig,
 )
 from webquiz.tunnel import TunnelManager
@@ -755,3 +760,211 @@ async def test_cleanup():
     assert manager.connection is None
     assert manager.listener is None
     assert manager.status["connected"] is False
+
+
+class FakeSSHConnection:
+    """SSH connection whose remote Unix socket listener can be refused by the tunnel server"""
+
+    def __init__(self, listen_error=False):
+        self.listen_error = listen_error
+        self.closed = asyncio.Event()
+        self.forwarded = []
+
+    async def forward_remote_path_to_port(self, remote_path, *_args):
+        self.forwarded.append(remote_path)
+        if self.listen_error:
+            raise asyncssh.ChannelListenError("Failed to create remote UNIX listener")
+        listener = Mock()
+        listener.close = Mock()
+        listener.wait_closed = AsyncMock()
+        return listener
+
+    def close(self):
+        self.closed.set()
+
+    async def wait_closed(self):
+        await self.closed.wait()
+
+
+async def make_tunnel_manager(tmpdir, socket_name="racoon"):
+    """Tunnel manager with generated keys and local tunnel server config (no HTTP fetch)"""
+    config = TunnelConfig(
+        server="example.com",
+        public_key=os.path.join(tmpdir, "id_ed25519.pub"),
+        private_key=os.path.join(tmpdir, "id_ed25519"),
+        socket_name=socket_name,
+        config=TunnelServerConfig(
+            username="tunneluser", socket_directory="/var/run/tunnels", base_url="https://example.com/start"
+        ),
+    )
+    manager = TunnelManager(config, local_port=8080)
+    await manager.ensure_keys_exist()
+    manager._busy_retry_delay = 0
+    return manager
+
+
+async def wait_for_reconnect_task(manager):
+    for _ in range(200):
+        if manager._reconnect_task:
+            return manager._reconnect_task
+        await asyncio.sleep(0.01)
+    raise AssertionError("Reconnect task was not started")
+
+
+async def test_busy_socket_name_is_retried_until_free():
+    """A fixed socket name still held on the tunnel server is retried in the background."""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        manager = await make_tunnel_manager(tmpdir)
+        statuses = []
+
+        async def status_callback(status):
+            statuses.append(status)
+
+        manager.set_status_callback(status_callback)
+        busy = FakeSSHConnection(listen_error=True)
+        free = FakeSSHConnection()
+
+        with patch("webquiz.tunnel.asyncssh.connect", new_callable=AsyncMock, side_effect=[busy, free]):
+            success, message = await manager.connect()
+
+            assert success is False
+            assert "racoon" in message
+            assert "still taken" in message
+            assert manager.status["connected"] is False
+            assert manager.status["retrying"] is True
+            assert manager.status["error"] == message
+            assert statuses[-1]["retrying"] is True
+            # The refused attempt does not leave an SSH connection open
+            assert busy.closed.is_set()
+
+            await asyncio.wait_for(manager._reconnect_task, timeout=5)
+
+        assert manager.status["connected"] is True
+        assert manager.status["retrying"] is False
+        assert manager.status["error"] is None
+        assert manager.status["url"] == "https://example.com/start/racoon/"
+        assert free.forwarded == ["/var/run/tunnels/racoon"]
+        assert statuses[-1]["connected"] is True
+
+        await manager.disconnect()
+        await asyncio.sleep(0)
+
+
+async def test_listener_error_with_random_socket_name_is_not_retried():
+    """Without a fixed socket name a refused listener is a plain error."""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        manager = await make_tunnel_manager(tmpdir, socket_name=None)
+        connection = FakeSSHConnection(listen_error=True)
+
+        with patch("webquiz.tunnel.asyncssh.connect", new_callable=AsyncMock, return_value=connection):
+            success, message = await manager.connect()
+
+        assert success is False
+        assert "Failed to create remote UNIX listener" in message
+        assert manager.status["retrying"] is False
+        assert manager._reconnect_task is None
+        assert manager.connection is None
+        assert connection.closed.is_set()
+
+
+async def test_disconnect_stops_busy_socket_retry():
+    """Disconnect (the Cancel button) stops retrying a busy socket name."""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        manager = await make_tunnel_manager(tmpdir)
+        manager._busy_retry_delay = 60
+
+        with patch(
+            "webquiz.tunnel.asyncssh.connect",
+            new_callable=AsyncMock,
+            side_effect=lambda *_args, **_kwargs: FakeSSHConnection(listen_error=True),
+        ):
+            await manager.connect()
+            task = manager._reconnect_task
+            assert task is not None and not task.done()
+
+            await manager.disconnect()
+
+        assert task.cancelled()
+        assert manager.status["retrying"] is False
+        assert manager.status["connected"] is False
+        assert manager.status["error"] is None
+
+
+async def test_connect_replaces_pending_busy_retry():
+    """Connecting again while a busy socket name is retried does not start a second retry loop."""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        manager = await make_tunnel_manager(tmpdir)
+        manager._busy_retry_delay = 60
+        free = FakeSSHConnection()
+
+        with patch(
+            "webquiz.tunnel.asyncssh.connect",
+            new_callable=AsyncMock,
+            side_effect=[FakeSSHConnection(listen_error=True), free],
+        ):
+            await manager.connect()
+            pending = manager._reconnect_task
+
+            success, url = await manager.connect()
+
+        assert success is True
+        assert url == "https://example.com/start/racoon/"
+        assert pending.cancelled()
+        assert manager.status["retrying"] is False
+
+        await manager.disconnect()
+        await asyncio.sleep(0)
+
+
+async def test_lost_connection_is_shown_as_retrying():
+    """While reconnecting after a lost connection the status says so."""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        manager = await make_tunnel_manager(tmpdir)
+        statuses = []
+
+        async def status_callback(status):
+            statuses.append(status)
+
+        manager.set_status_callback(status_callback)
+        first = FakeSSHConnection()
+
+        with patch("webquiz.tunnel.asyncssh.connect", new_callable=AsyncMock, side_effect=[first, FakeSSHConnection()]):
+            success, _ = await manager.connect()
+            assert success is True
+            manager._reconnect_delay = 0
+
+            first.close()  # Connection drops
+            task = await wait_for_reconnect_task(manager)
+            await asyncio.wait_for(task, timeout=5)
+
+        lost = [s for s in statuses if s["error"] == "Connection lost"]
+        assert lost and lost[0]["retrying"] is True and lost[0]["connected"] is False
+        assert manager.status["connected"] is True
+        assert manager.status["retrying"] is False
+
+        await manager.disconnect()
+        await asyncio.sleep(0)
+
+
+async def test_connect_endpoint_reports_retrying():
+    """The admin endpoint answers 202 while a busy socket name is retried."""
+    from aiohttp.test_utils import make_mocked_request
+    from webquiz.server import TestingServer
+
+    manager = Mock()
+    manager.status = {"connected": False, "retrying": True}
+    manager.connect = AsyncMock(return_value=(False, "Socket name 'racoon' is still taken"))
+    server = SimpleNamespace(
+        tunnel_manager=manager, admin_config=SimpleNamespace(trusted_ips=["127.0.0.1"]), translations={}
+    )
+
+    response = await TestingServer.tunnel_connect(server, make_mocked_request("POST", "/api/admin/tunnel/connect"))
+
+    assert response.status == 202
+    data = json.loads(response.body)
+    assert data == {"retrying": True, "message": "Socket name 'racoon' is still taken"}
+
+    manager.status = {"connected": False, "retrying": False}
+    manager.connect = AsyncMock(return_value=(False, "Failed to establish SSH tunnel: refused"))
+    response = await TestingServer.tunnel_connect(server, make_mocked_request("POST", "/api/admin/tunnel/connect"))
+    assert response.status == 500

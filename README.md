@@ -579,7 +579,7 @@ tunnel:
 3. **Copy Public Key**: Copy the generated public key and add it to `~/.ssh/authorized_keys` on your tunnel server
 4. **Connect**: Click the "Connect" button in the admin panel to establish the tunnel
 5. **Public URL**: Once connected, a public URL will be displayed (e.g., `https://tunnel.example.com/tests/a3f7b2/`)
-6. **Auto-Reconnect**: If the connection drops, WebQuiz automatically attempts to reconnect
+6. **Auto-Reconnect**: If the connection drops, WebQuiz automatically attempts to reconnect. While it is trying, the button shows **Cancel**, which stops the attempts
 
 **Server Requirements:**
 - The tunnel server must be configured to support Unix domain socket forwarding
@@ -596,7 +596,7 @@ tunnel:
 - Connection is admin-initiated (no auto-connect on startup)
 - Connection status is shown in real-time via WebSocket
 - Tunnel traffic reaches WebQuiz from `127.0.0.1`. Proxy headers (`X-Forwarded-For`, `X-Real-IP`) are trusted only from loopback connections, and the **last** `X-Forwarded-For` entry is used, because the proxy appends the real address. Visitors through the tunnel therefore count as public IPs and cannot open admin pages.
-- With a fixed `socket_name`, a reconnect can fail for a few minutes: the tunnel server keeps the old socket file until its cleanup job removes it (every 5 minutes). Setting `StreamLocalBindUnlink yes` in the server's sshd config avoids this.
+- With a fixed `socket_name`, the name can still be taken on the tunnel server by an earlier connection: sshd keeps the socket until it notices that the old connection is dead (after a computer restart, sleep or network change this takes up to `ClientAliveInterval × ClientAliveCountMax`), and the socket file stays until the server's cleanup job removes it (every 5 minutes). WebQuiz then shows that the name is still taken and tries again every 15 seconds until it connects; **Cancel** stops it. Setting `StreamLocalBindUnlink yes` in the server's sshd config lets a new connection take the name at once.
 
 ### Sending Files Between Servers
 

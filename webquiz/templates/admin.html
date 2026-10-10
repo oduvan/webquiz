@@ -617,6 +617,10 @@
             margin: 10px 0;
         }
 
+        .tunnel-error.retrying {
+            color: var(--warning-color);
+        }
+
         .url-item .label {
             font-weight: bold;
             color: var(--button-bg);
@@ -3905,6 +3909,7 @@
 
             if (tunnelData.connected) {
                 connectBtn.textContent = 'Disconnect';
+                connectBtn.dataset.action = 'disconnect';
                 connectBtn.disabled = false;
                 errorSection.style.display = 'none';
 
@@ -3924,20 +3929,32 @@
                     urlList.insertBefore(tunnelUrlItem, urlList.firstChild);
                 }
             } else {
-                connectBtn.textContent = 'Connect';
-                connectBtn.disabled = tunnelData.keys_status !== 'ok';
-
                 // Remove tunnel URL from main URL list
                 const existingTunnelItem = document.getElementById('tunnel-url-item');
                 if (existingTunnelItem) {
                     existingTunnelItem.remove();
                 }
 
-                if (tunnelData.error) {
-                    errorSection.textContent = 'Error: ' + tunnelData.error;
+                if (tunnelData.retrying) {
+                    // The server keeps trying in the background; the button stops it
+                    connectBtn.textContent = 'Cancel';
+                    connectBtn.dataset.action = 'disconnect';
+                    connectBtn.disabled = false;
+                    errorSection.classList.add('retrying');
+                    errorSection.textContent = '⏳ ' + (tunnelData.error ? tunnelData.error + ' ' : '') + 'Trying again automatically...';
                     errorSection.style.display = 'block';
                 } else {
-                    errorSection.style.display = 'none';
+                    connectBtn.textContent = 'Connect';
+                    connectBtn.dataset.action = 'connect';
+                    connectBtn.disabled = tunnelData.keys_status !== 'ok';
+                    errorSection.classList.remove('retrying');
+
+                    if (tunnelData.error) {
+                        errorSection.textContent = 'Error: ' + tunnelData.error;
+                        errorSection.style.display = 'block';
+                    } else {
+                        errorSection.style.display = 'none';
+                    }
                 }
             }
         }
@@ -3997,7 +4014,8 @@
 
         async function toggleTunnel() {
             const connectBtn = document.getElementById('tunnel-connect-btn');
-            const isConnected = connectBtn.textContent === 'Disconnect';
+            // "Disconnect" while connected, "Cancel" while the server keeps trying
+            const isConnected = connectBtn.dataset.action === 'disconnect';
 
             try {
                 connectBtn.disabled = true;
@@ -4017,6 +4035,8 @@
 
                 if (isConnected) {
                     showMessage('Tunnel disconnected', 'success');
+                } else if (data.retrying) {
+                    showMessage(data.message + ' Trying again automatically...', 'warning');
                 } else {
                     showMessage('Tunnel connected! Public URL: ' + data.url, 'success');
                 }
