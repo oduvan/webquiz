@@ -593,6 +593,9 @@ class TestingServer:
         self.question_start_times: Dict[str, datetime] = {}  # user_id -> question_start_time
         self.user_stats: Dict[str, Dict[str, Any]] = {}  # user_id -> final stats for completed users
         self.user_answers: Dict[str, List[Dict[str, Any]]] = {}  # user_id -> list of answers for stats calculation
+        # user_id -> {question_id: {"selected_answer", "response"}}, answers a retried submit with the stored result
+        self.answer_results: Dict[str, Dict[int, Dict[str, Any]]] = {}
+        self.registration_tokens: Dict[str, str] = {}  # registration_token -> user_id, for retried registrations
         self.force_all_completed: bool = False  # Admin-triggered flag to force show answers
 
         # Live stats WebSocket infrastructure
@@ -731,6 +734,8 @@ class TestingServer:
         self.question_start_times.clear()
         self.user_stats.clear()
         self.user_answers.clear()
+        self.answer_results.clear()
+        self.registration_tokens.clear()
         self.live_stats.clear()
         self.force_all_completed = False
         logger.info("Server state reset for new quiz")
@@ -1735,6 +1740,16 @@ class TestingServer:
         data = await request.json()
         username = data["username"].strip()
 
+        # The quiz page sends a random token with each registration and repeats the request
+        # when the connection drops. If the first attempt got through, return that user.
+        registration_token = data.get("registration_token")
+        if not isinstance(registration_token, str) or not registration_token:
+            registration_token = None
+        if registration_token and self.registration_tokens.get(registration_token) in self.users:
+            user_id = self.registration_tokens[registration_token]
+            logger.info(f"Repeated registration for user {user_id}, returning the existing user")
+            return web.json_response(self._registration_response(user_id))
+
         if not username:
             return web.json_response({"error": self.translations["server_username_empty"]}, status=400)
 
@@ -1780,6 +1795,8 @@ class TestingServer:
             logger.info(f"Generated random question order for user {user_id}: {user_data['question_order']}")
 
         self.users[user_id] = user_data
+        if registration_token:
+            self.registration_tokens[registration_token] = user_id
 
         # If approval not required, start timing and live stats immediately
         if not requires_approval:
@@ -1819,9 +1836,21 @@ class TestingServer:
 
         logger.info(f"Registered user: {username} with ID: {user_id}, requires_approval: {requires_approval}")
 
-        # Build response
+        return web.json_response(self._registration_response(user_id))
+
+    def _registration_response(self, user_id):
+        """Build the register response for a registered user.
+
+        Args:
+            user_id: User identifier
+
+        Returns:
+            Dictionary with user_id, username, approval status and question order
+        """
+        user_data = self.users[user_id]
+        requires_approval = hasattr(self.config, "registration") and self.config.registration.approve
         response_data = {
-            "username": username,
+            "username": user_data["username"],
             "user_id": user_id,
             "message": "User registered successfully",
             "requires_approval": requires_approval,
@@ -1832,7 +1861,7 @@ class TestingServer:
         if self.randomize_questions and "question_order" in user_data:
             response_data["question_order"] = user_data["question_order"]
 
-        return web.json_response(response_data)
+        return response_data
 
     async def update_registration(self, request):
         """Update registration data for a user (only if not approved yet).
@@ -1920,6 +1949,13 @@ class TestingServer:
         username = self.users[user_id]["username"]
         user_data = self.users[user_id]
 
+        # The quiz page repeats the request when the connection drops. If the first attempt
+        # got through and only the response was lost, return the stored result.
+        previous_result = self.answer_results.get(user_id, {}).get(question_id)
+        if previous_result is not None and previous_result["selected_answer"] == selected_answer:
+            logger.info(f"Repeated answer from user {user_id} for question {question_id}, returning stored result")
+            return web.json_response(previous_result["response"])
+
         # Validate question order for randomized quizzes (security check)
         if getattr(self, "randomize_questions", False) and "question_order" in user_data:
             question_order = user_data["question_order"]
@@ -1958,6 +1994,10 @@ class TestingServer:
                     },
                     status=403,
                 )
+
+        # A different answer to an already answered question is not accepted
+        if previous_result is not None:
+            return web.json_response({"error": self.translations["server_already_answered"]}, status=409)
 
         # Find the question
         question = next((q for q in self.questions if q["id"] == question_id), None)
@@ -2060,6 +2100,30 @@ class TestingServer:
             completion_time = self.user_stats.get(user_id, {}).get("completed_at")
             logger.info(f"Test completed for user {user_id} - final stats calculated")
 
+        # Prepare response data
+        response_data = {"time_taken": time_taken, "message": "Answer submitted successfully"}
+
+        # Only include correctness feedback and correct answer if show_right_answer is enabled
+        if self.show_right_answer:
+            response_data["is_correct"] = is_correct
+
+            if is_text_question:
+                # Text input question response
+                response_data["is_text_question"] = True
+                response_data["correct_value"] = question.get("correct_value", "")
+                if checker_error:
+                    response_data["checker_error"] = checker_error
+            else:
+                # Choice question response
+                response_data["correct_answer"] = question["correct_answer"]
+                response_data["is_multiple_choice"] = isinstance(question["correct_answer"], list)
+
+        # Stored before the broadcast below awaits, so a retry arriving meanwhile gets this result
+        self.answer_results.setdefault(user_id, {})[question_id] = {
+            "selected_answer": selected_answer,
+            "response": response_data,
+        }
+
         # Broadcast current question result with completion status
         await self.broadcast_to_websockets(
             {
@@ -2083,24 +2147,6 @@ class TestingServer:
         )
         logger.info(f"Updated progress for user {user_id}: last answered question = {question_id}")
 
-        # Prepare response data
-        response_data = {"time_taken": time_taken, "message": "Answer submitted successfully"}
-
-        # Only include correctness feedback and correct answer if show_right_answer is enabled
-        if self.show_right_answer:
-            response_data["is_correct"] = is_correct
-
-            if is_text_question:
-                # Text input question response
-                response_data["is_text_question"] = True
-                response_data["correct_value"] = question.get("correct_value", "")
-                if checker_error:
-                    response_data["checker_error"] = checker_error
-            else:
-                # Choice question response
-                response_data["correct_answer"] = question["correct_answer"]
-                response_data["is_multiple_choice"] = isinstance(question["correct_answer"], list)
-
         return web.json_response(response_data)
 
     async def question_start(self, request):
@@ -2117,11 +2163,16 @@ class TestingServer:
         data = await request.json()
         user_id = data["user_id"]
         question_id = data["question_id"]
-        username = self.users[user_id]["username"]
 
         # Verify user exists
         if user_id not in self.users:
             return web.json_response({"error": self.translations["server_user_not_found"]}, status=404)
+
+        username = self.users[user_id]["username"]
+
+        # A repeated notice that arrives after the answer must not start timing again
+        if question_id in self.answer_results.get(user_id, {}):
+            return web.json_response({"status": "success"})
 
         if user_id not in self.question_start_times:
             self.question_start_times[user_id] = datetime.now()

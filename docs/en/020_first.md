@@ -103,6 +103,12 @@ To take the quiz:
 
 ![Quiz completion](../imgs/reg_default_test.png)
 
+#### If the Connection Drops
+
+Wi-Fi in a classroom is not always stable. When the student's device loses the connection to the server, the quiz page does not show an error. It shows a yellow banner at the top, **"Connection to the server lost. Retrying..."**, and keeps repeating the request every few seconds until the server answers. The chosen answer is locked while the page waits, and the quiz continues on its own once the connection is back.
+
+An answer or a registration is never counted twice, even if the server got the first attempt and only the reply was lost. A page opened or reloaded while the server is unreachable also waits for the connection instead of showing the registration form again.
+
 ---
 
 ### Alternative Launch and Configuration Methods
