@@ -149,9 +149,13 @@ class TestMultipleChoiceIntegration:
         assert data["is_correct"] == False
 
         # Test: Including incorrect answer (should fail)
+        # Another user, because a second, different answer to the same question is rejected
+        response = requests.post(f"{base_url}/api/register", json={"username": "testuser2"})
+        assert response.status_code == 200
+        second_user_id = response.json()["user_id"]
         response = requests.post(
             f"{base_url}/api/submit-answer",
-            json={"user_id": user_id, "question_id": 2, "selected_answer": [0, 1, 2]},  # Includes HTML
+            json={"user_id": second_user_id, "question_id": 2, "selected_answer": [0, 1, 2]},  # Includes HTML
         )
         assert response.status_code == 200
         data = response.json()
