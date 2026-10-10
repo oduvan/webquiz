@@ -236,9 +236,11 @@ class TunnelManager:
         Returns:
             Tuple of (success: bool, url_or_error: str)
         """
-        # A new attempt replaces any background reconnect attempts
+        # A new attempt replaces any background reconnect attempts and the current
+        # connection: two connections cannot hold the same fixed socket name
         self._should_be_connected = False
         await self._cancel_reconnect()
+        self._close_connection()
         self.status["retrying"] = False
 
         success, result = await self._connect_once()
@@ -311,7 +313,7 @@ class TunnelManager:
             await self._notify_status_change()
 
             # Start monitoring connection
-            asyncio.create_task(self._monitor_connection())
+            asyncio.create_task(self._monitor_connection(self.connection))
 
             return True, public_url
 
@@ -381,14 +383,13 @@ class TunnelManager:
         logger.info("SSH tunnel disconnected")
         await self._notify_status_change()
 
-    async def _monitor_connection(self):
+    async def _monitor_connection(self, connection: asyncssh.SSHClientConnection):
         """Monitor SSH connection and handle disconnections"""
         try:
-            if self.connection:
-                await self.connection.wait_closed()
+            await connection.wait_closed()
 
-            # Connection closed
-            if self._should_be_connected:
+            # Connection closed; a replaced or deliberately closed connection is not a loss
+            if connection is self.connection and self._should_be_connected:
                 logger.warning("SSH tunnel connection lost")
                 self.status["connected"] = False
                 self.status["url"] = None

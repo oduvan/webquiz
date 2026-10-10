@@ -763,23 +763,30 @@ async def test_cleanup():
 
 
 class FakeSSHConnection:
-    """SSH connection whose remote Unix socket listener can be refused by the tunnel server"""
+    """SSH connection whose remote Unix socket listener can be refused by the tunnel server
 
-    def __init__(self, listen_error=False):
+    held: optional set of socket paths taken on the tunnel server, shared by connections;
+    a path stays taken while the connection that created it is open.
+    """
+
+    def __init__(self, listen_error=False, held=None):
         self.listen_error = listen_error
+        self.held = held if held is not None else set()
         self.closed = asyncio.Event()
         self.forwarded = []
 
     async def forward_remote_path_to_port(self, remote_path, *_args):
-        self.forwarded.append(remote_path)
-        if self.listen_error:
+        if self.listen_error or remote_path in self.held:
             raise asyncssh.ChannelListenError("Failed to create remote UNIX listener")
+        self.forwarded.append(remote_path)
+        self.held.add(remote_path)
         listener = Mock()
         listener.close = Mock()
         listener.wait_closed = AsyncMock()
         return listener
 
     def close(self):
+        self.held.difference_update(self.forwarded)
         self.closed.set()
 
     async def wait_closed(self):
@@ -941,6 +948,63 @@ async def test_lost_connection_is_shown_as_retrying():
         assert lost and lost[0]["retrying"] is True and lost[0]["connected"] is False
         assert manager.status["connected"] is True
         assert manager.status["retrying"] is False
+
+        await manager.disconnect()
+        await asyncio.sleep(0)
+
+
+async def test_connect_stops_running_reconnect_loop():
+    """Connect while a reconnect loop runs: the loop must not try again and take over the status.
+
+    Before, the loop kept running next to the admin's connection. With a fixed socket name its
+    next attempt was refused (the admin's connection holds the name) and showed the error.
+    """
+    with tempfile.TemporaryDirectory() as tmpdir:
+        manager = await make_tunnel_manager(tmpdir)
+        held = set()
+        first = FakeSSHConnection(held=held)
+        ssh_connect = AsyncMock(side_effect=[first, FakeSSHConnection(held=held), FakeSSHConnection(held=held)])
+
+        with patch("webquiz.tunnel.asyncssh.connect", ssh_connect):
+            await manager.connect()
+            manager._reconnect_delay = 0.2
+            first.close()  # Connection drops, the reconnect loop waits before its next attempt
+            loop_task = await wait_for_reconnect_task(manager)
+
+            success, url = await manager.connect()  # Admin clicks Connect
+            await asyncio.sleep(0.4)
+
+        assert success is True
+        assert url == "https://example.com/start/racoon/"
+        assert loop_task.done()
+        assert ssh_connect.await_count == 2
+        assert manager.status["connected"] is True
+        assert manager.status["error"] is None
+        assert manager.status["retrying"] is False
+
+        await manager.disconnect()
+        await asyncio.sleep(0)
+
+
+async def test_connect_while_connected_replaces_connection():
+    """Connecting again closes the current connection first, so a fixed socket name is free."""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        manager = await make_tunnel_manager(tmpdir)
+        held = set()
+        first = FakeSSHConnection(held=held)
+        second = FakeSSHConnection(held=held)
+
+        with patch("webquiz.tunnel.asyncssh.connect", new_callable=AsyncMock, side_effect=[first, second]):
+            await manager.connect()
+            success, _ = await manager.connect()
+            await asyncio.sleep(0.05)  # Monitor of the first connection sees it closed
+
+        assert success is True
+        assert first.closed.is_set()
+        assert manager.connection is second
+        assert manager.status["connected"] is True
+        assert manager.status["retrying"] is False
+        assert manager._reconnect_task is None
 
         await manager.disconnect()
         await asyncio.sleep(0)
