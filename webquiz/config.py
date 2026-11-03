@@ -100,6 +100,7 @@ class DownloadableQuiz:
     name: str
     download_path: str
     folder: str
+    auth_header_token: Optional[str] = None
 
 
 @dataclass
@@ -204,7 +205,10 @@ def load_config_from_yaml(config_path: str) -> WebQuizConfig:
             for quiz_data in quizzes_data:
                 downloadable_quizzes.append(
                     DownloadableQuiz(
-                        name=quiz_data["name"], download_path=quiz_data["download_path"], folder=quiz_data["folder"]
+                        name=quiz_data["name"],
+                        download_path=quiz_data["download_path"],
+                        folder=quiz_data["folder"],
+                        auth_header_token=quiz_data.get("auth_header_token"),
                     )
                 )
         quizzes_config = QuizzesConfig(quizzes=downloadable_quizzes)

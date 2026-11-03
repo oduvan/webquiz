@@ -22,6 +22,7 @@ import aiofiles
 import logging
 from io import StringIO
 import ipaddress
+from urllib.parse import urlparse
 
 from .config import WebQuizConfig, load_config_from_yaml
 from .translations import get_translations
@@ -426,6 +427,24 @@ def normalize_url(url: str) -> str:
         URL with :80/ removed if present
     """
     return url.replace(":80/", "/")
+
+
+def can_send_token_to(url: str) -> bool:
+    """Check whether an access token may be sent to this URL.
+
+    Tokens go over https only, so they are not readable on the way. Plain http
+    is allowed for this machine, which is where test servers run.
+
+    Args:
+        url: The URL the archive would be downloaded from
+
+    Returns:
+        True if sending a token to this URL is safe
+    """
+    parsed = urlparse(url)
+    if parsed.scheme == "https":
+        return True
+    return parsed.scheme == "http" and parsed.hostname in ("localhost", "127.0.0.1", "::1")
 
 
 def get_network_interfaces(include_ipv6=False):
@@ -3361,6 +3380,10 @@ class TestingServer:
                         elif not isinstance(quiz[field], str):
                             errors.append(f"Quiz {i+1} field '{field}' must be a string")
 
+                    # Optional field for private archives
+                    if "auth_header_token" in quiz and not isinstance(quiz["auth_header_token"], str):
+                        errors.append(f"Quiz {i+1} field 'auth_header_token' must be a string")
+
         return len(errors) == 0
 
     @admin_auth_required
@@ -3467,6 +3490,24 @@ class TestingServer:
             headers={"Content-Disposition": f'attachment; filename="{filename}"'},
         )
 
+    def find_downloadable_quiz(self, name):
+        """Find a downloadable quiz from the config by its name.
+
+        Args:
+            name: Quiz name as shown in the admin panel
+
+        Returns:
+            DownloadableQuiz object, or None if the config has no quiz with that name
+        """
+        if not self.config.quizzes or not self.config.quizzes.quizzes:
+            return None
+
+        for quiz in self.config.quizzes.quizzes:
+            if quiz.name == name:
+                return quiz
+
+        return None
+
     @admin_auth_required
     async def admin_download_quiz(self, request):
         """Download and extract quiz from ZIP file.
@@ -3482,10 +3523,26 @@ class TestingServer:
         data = await request.json()
         name = data.get("name")
         download_path = data.get("download_path")
-        folder = data.get("folder")
+        folder = data.get("folder") or ""
 
         if not name or not download_path:
             return web.json_response({"error": "Name and download_path are required"}, status=400)
+
+        # Private archives need an access token. The token belongs to the config
+        # entry, so take the URL and folder from the config too — that way a token
+        # can never be sent to an address that arrived with the request.
+        token = None
+        configured_quiz = self.find_downloadable_quiz(name)
+        if configured_quiz and configured_quiz.auth_header_token:
+            token = configured_quiz.auth_header_token
+            download_path = configured_quiz.download_path
+            folder = configured_quiz.folder or ""
+
+            if not can_send_token_to(download_path):
+                return web.json_response(
+                    {"error": "A quiz token can only be sent over https"},
+                    status=400,
+                )
 
         # Check for absolute paths (Unix-style or Windows-style)
         if os.path.isabs(folder) or (len(folder) >= 2 and folder[1] == ":"):
@@ -3516,8 +3573,9 @@ class TestingServer:
         try:
             # Download the ZIP file
             logger.info(f"Downloading quiz from {download_path}")
+            headers = {"Authorization": f"Bearer {token}"} if token else None
             async with httpx.AsyncClient(follow_redirects=True, timeout=30.0) as client:
-                response = await client.get(download_path)
+                response = await client.get(download_path, headers=headers)
                 response.raise_for_status()
 
                 # Use temporary directory for extraction (auto-cleanup)
@@ -3535,6 +3593,20 @@ class TestingServer:
                         zip_ref.extractall(temp_dir)
 
                     source_path = os.path.join(temp_dir, folder)
+
+                    # Archives built by GitHub put everything inside one directory
+                    # named after the repository and the commit, so the name changes
+                    # with every push. Allow the folder to be given relative to that
+                    # directory as well.
+                    if folder and not os.path.exists(source_path):
+                        extracted_dirs = [
+                            entry for entry in os.listdir(temp_dir) if os.path.isdir(os.path.join(temp_dir, entry))
+                        ]
+                        if len(extracted_dirs) == 1:
+                            candidate = os.path.join(temp_dir, extracted_dirs[0], folder)
+                            if os.path.exists(candidate):
+                                logger.info(f"Resolved folder '{folder}' inside archive root '{extracted_dirs[0]}'")
+                                source_path = candidate
 
                     # Verify source path exists
                     if not os.path.exists(source_path):

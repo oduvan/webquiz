@@ -705,7 +705,9 @@ quizzes:
     folder: "geography/"
 ```
 
-After downloading, the archive is automatically unpacked into the specified folder inside `quizzes/`.
+After downloading, the contents of the folder you named inside the archive are copied into `quizzes/`.
+
+Quizzes can also be downloaded from a private repository with an access token — see the `quizzes` section in [Configuration](040_config.md).
 
 ---
 

@@ -385,3 +385,34 @@ def test_dataclass_defaults():
     assert config.paths is not None
     assert config.admin is not None
     assert config.registration is not None
+
+
+def test_load_config_from_yaml_with_private_quiz_tokens():
+    """Test loading downloadable quizzes with an auth header token."""
+    config_data = {
+        "quizzes": [
+            {
+                "name": "Private Quiz",
+                "download_path": "https://api.github.com/repos/me/quizzes/zipball/master",
+                "folder": "data",
+                "auth_header_token": "github_pat_example",
+            },
+            {
+                "name": "Public Quiz",
+                "download_path": "https://example.com/quiz.zip",
+                "folder": "data",
+            },
+        ]
+    }
+
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
+        yaml.dump(config_data, f)
+        config_path = f.name
+
+    try:
+        config = load_config_from_yaml(config_path)
+        quizzes = config.quizzes.quizzes
+        assert quizzes[0].auth_header_token == "github_pat_example"
+        assert quizzes[1].auth_header_token is None
+    finally:
+        os.unlink(config_path)

@@ -258,7 +258,7 @@ pytest tests/test_registration_approval.py
 
 ### Test Coverage
 
-The project has **222+ tests** across **15 test files** covering:
+The project has **769 tests** across **57 test files**. The main areas:
 
 - **CLI and Directory Creation** (7 tests): Directory and file creation
 - **Admin API** (14 tests): Admin interface and authentication
@@ -271,6 +271,7 @@ The project has **222+ tests** across **15 test files** covering:
 - **SSH Tunnel** (31 tests): Key generation, config fetch, connect/disconnect (`test_tunnel.py`)
 - **File Transfer** (59 tests): Sending files between servers through the tunnel (`test_transfer.py`, `test_transfer_api.py`)
 - **Network Access** (22 tests): Local network restriction and proxy header handling
+- **Private Quiz Archives** (6 tests): Downloading quizzes from token-protected archives (`test_download_quiz_token.py`)
 - **Index Generation** (18 tests): Template generation tests
 - **Registration Fields** (12 tests): Custom registration fields
 - **Show Right Answer** (5 tests): Answer display functionality
@@ -701,6 +702,47 @@ CSV files are created with proper escaping and include all user response data. F
    - Access `/admin` with your master key
    - Select your quiz from the dropdown
    - Click "Switch Quiz"
+
+### Downloading Quizzes from an Archive
+
+List archives in the `quizzes` section of `webquiz.yaml` and the admin panel shows a download button for each one:
+
+```yaml
+quizzes:
+  - name: "Geography Quizzes"
+    download_path: "https://example.com/quizzes/geography.zip"
+    folder: "geography"      # Folder inside the archive; its contents are copied into quizzes/
+```
+
+#### Private repositories
+
+Add `auth_header_token` to download from a place that needs an access token, such as a private GitHub repository. The value is sent to the server in the `Authorization` header. A complete `webquiz.yaml` then looks like this:
+
+```yaml
+server:
+  port: 8080
+
+admin:
+  master_key: "your-master-key"
+
+quizzes:
+  - name: "My Quizzes"
+    download_path: "https://api.github.com/repos/OWNER/REPO/zipball/BRANCH"
+    folder: "data"
+    auth_header_token: "github_pat_..."
+```
+
+Start the server as usual, open the admin panel, and the quiz appears in the download list:
+
+```bash
+webquiz --config webquiz.yaml
+```
+
+For GitHub, create a fine-grained personal access token with **Contents: Read-only** on that one repository, and use the `api.github.com/repos/OWNER/REPO/zipball/BRANCH` address. The browser address `github.com/OWNER/REPO/archive/refs/heads/master.zip` does not work with a token: GitHub redirects it to another host and the token is dropped on the way, so the download fails with HTTP 404.
+
+A GitHub archive wraps everything in a directory named after the repository and the commit. You do not need to write that name — give `folder` as the path inside the repository and the server finds it.
+
+A token is only ever sent over `https`, and it is never sent to the browser with the admin page. A token written in the config file is readable by anyone who can open the file manager's Config tab, which means anyone on your local network who has the master key.
 
 ### Admin Interface
 
