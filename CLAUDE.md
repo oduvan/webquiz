@@ -3,8 +3,8 @@
 ## ⚠️ CRITICAL: Every Code Change MUST Include
 
 1. **Update CLAUDE.md** - Reflect architectural changes, new features, API endpoints, technical decisions. Keep this file MINIMAL - detailed user-facing info belongs in README.md
-2. **Update README.md** - User-facing documentation with detailed usage instructions
-3. **Update docs/** - Both Ukrainian (`docs/uk/`) and English (`docs/en/`) in sync
+2. **Update README.md** - User-facing documentation with detailed usage instructions. Only for new or changed features: a bug fix does not need a README change, except for the test counts
+3. **Update docs/** - Both Ukrainian (`docs/uk/`) and English (`docs/en/`) in sync. Only for new or changed features: a bug fix does not need a docs change
 4. **Write tests FIRST** - All functionality requires automated tests (update test counts below)
 5. **Mobile support** - All UI must be responsive (≤768px viewport, `width: 100%; max-width: [size]`)
 
