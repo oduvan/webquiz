@@ -698,22 +698,21 @@ def test_network_interruption_resilience():
 
 
 def test_files_page_has_csv_table_container():
-    """Verify /files/ page includes the table container for CSV preview."""
+    """Verify /files/ page includes the container that holds the CSV table viewer."""
     with custom_webquiz_server() as (proc, port):
         headers = {"X-Master-Key": "test123"}
         response = requests.get(f"http://localhost:{port}/files/", headers=headers)
 
         assert response.status_code == 200
-        # Check for table container element
+        # Check for table container element (it holds the viewer page in an iframe)
         assert 'id="file-content-table"' in response.text
-        assert "csv-table-container" in response.text
+        assert "csv-frame-container" in response.text
 
 
-def test_files_page_has_csv_table_styles():
-    """Verify /files/ page includes CSS styles for CSV table."""
+def test_csv_table_page_has_table_styles():
+    """Verify the CSV table viewer page includes CSS styles for the table."""
     with custom_webquiz_server() as (proc, port):
-        headers = {"X-Master-Key": "test123"}
-        response = requests.get(f"http://localhost:{port}/files/", headers=headers)
+        response = requests.get(f"http://localhost:{port}/files/csv/any.csv")
 
         assert response.status_code == 200
         # Check for table CSS styles
@@ -723,11 +722,10 @@ def test_files_page_has_csv_table_styles():
         assert ".csv-table td" in response.text
 
 
-def test_files_page_has_csv_parsing_function():
-    """Verify /files/ page includes JavaScript CSV parsing function."""
+def test_csv_table_page_has_csv_parsing_function():
+    """Verify the CSV table viewer page includes the JavaScript CSV parsing functions."""
     with custom_webquiz_server() as (proc, port):
-        headers = {"X-Master-Key": "test123"}
-        response = requests.get(f"http://localhost:{port}/files/", headers=headers)
+        response = requests.get(f"http://localhost:{port}/files/csv/any.csv")
 
         assert response.status_code == 200
         # Check for parseCSV function

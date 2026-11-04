@@ -29,7 +29,7 @@ WebQuiz - Python/aiohttp quiz system with multi-quiz management, real-time WebSo
 - `webquiz/cli.py` - CLI with daemon support
 - `webquiz/build.py` - PyInstaller build script
 - `installer/webquiz.iss` - Inno Setup script for Windows installer
-- `webquiz/templates/` - index.html, admin.html, files.html, live_stats.html
+- `webquiz/templates/` - index.html, admin.html, files.html, csv_table.html, live_stats.html
 - `tests/` - Test suite
 - `docs/uk/`, `docs/en/` - Documentation (compiled to PDF with version)
 - `gh-pages/index.html` - GitHub Pages download page template (version placeholder: `{{VERSION}}`)
@@ -58,6 +58,7 @@ WebQuiz - Python/aiohttp quiz system with multi-quiz management, real-time WebSo
 - `GET /admin/` - Admin interface page
 - `GET /live-stats/` - Live stats page
 - `GET /files/` - File manager page
+- `GET /files/csv/{filename}` - CSV table viewer page (`?question=`, `?user=`, `?embedded=1`)
 
 **WebSockets:**
 - `WS /ws/live-stats` (local network only), `WS /ws/admin` (local network only, admin approval + tunnel status + file transfer notifications: `transfer_request`, `transfer_request_removed`, `transfer_result`)
@@ -135,6 +136,7 @@ webquiz-stress-test -c 50
 - **Windows installer** - Inno Setup script (`installer/webquiz.iss`) builds `webquiz-windows-setup.exe` with Start Menu shortcut and Add/Remove Programs uninstaller. Built in CI alongside portable ZIP. Version injected via `/DMyAppVersion` flag.
 - **Coverage excludes build tools**: build.py and binary_entry.py omitted from coverage (not runtime code)
 - **Wizard-only quiz editor** - Admin panel uses wizard mode only; YAML editing available in file manager with validation
+- **CSV table viewer** - `csv_table.html` at `/files/csv/{filename}` (`@local_network_only`; data comes from `/api/files/csv/view/`, so it needs the admin session like the rest). One page for both places: the file manager pop-up shows it in an iframe with `?embedded=1` (hides its own header, shows "Open in new window"), and the CSV list has a "↗ New window" link to it. Filters by `question` column and by user (`user_id`, labelled with `username`; for a plain answers CSV the names come from the matching `.users.csv`). Filters live in the address (`?question=&user=`, updated with `history.replaceState`). `parseCSV()` reads quoted fields with commas, `""` and line breaks. Table cells wrap (`white-space: pre-line`) instead of growing sideways. Theme follows localStorage and the `storage` event.
 - **File manager quiz editing** - Direct YAML editing with validation button, automatic backup, and active quiz reload
 - **Dynamic answer visibility** - `show_answers_on_completion: true` reveals correct answers only after all approved students complete, with automatic re-hiding when new students register
 - **SSH Tunnel for public access** - Optional feature to expose local server via SSH reverse tunnel with Unix domain sockets

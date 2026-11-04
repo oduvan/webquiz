@@ -658,6 +658,7 @@ class TestingServer:
             "index.html",
             "admin.html",
             "files.html",
+            "csv_table.html",
             "live_stats.html",
             "quiz_selection_required.html",
             "template_error.html",
@@ -4208,6 +4209,22 @@ class TestingServer:
         return web.Response(text=template_content, content_type="text/html")
 
     @local_network_only
+    async def serve_csv_table_page(self, request):
+        """Serve the CSV table viewer page.
+
+        The page shows one CSV file as a table with filters by question and by
+        user. It reads the file name from its own address and loads the data
+        through the protected /api/files/csv/view/ endpoint, so the page itself
+        holds no data. The file manager shows it in its pop-up (in an iframe)
+        and it can also be opened in its own window.
+
+        Returns:
+            HTML response with the CSV table viewer
+        """
+        template_content = self.templates.get("csv_table.html", "")
+        return web.Response(text=template_content, content_type="text/html")
+
+    @local_network_only
     async def serve_live_stats_page(self, request):
         """Serve the live stats page.
 
@@ -4438,6 +4455,7 @@ async def create_app(config: WebQuizConfig):
 
     # File management routes (admin access)
     app.router.add_get("/files/", server.serve_files_page)
+    app.router.add_get("/files/csv/{filename}", server.serve_csv_table_page)
     # Quiz file attachment download route
     app.router.add_get("/attach/{filename}", server.serve_quiz_file)
     app.router.add_get("/api/files/list", server.files_list)

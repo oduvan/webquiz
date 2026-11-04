@@ -437,42 +437,38 @@
             color: var(--text-muted);
         }
 
-        /* CSV Table Styles */
-        .csv-table-container {
+        /* CSV table view: the pop-up shows the /files/csv/ viewer page in an iframe.
+           The viewer page has its own table styles, filters and "open in new window" button. */
+        .modal-content.wide {
+            max-width: 1600px;
+        }
+
+        .csv-frame-container {
             flex: 1;
-            overflow: auto;
-            background: var(--container-bg);
-            border: 1px solid var(--border-color);
+            min-height: 0;
+            display: flex;
         }
 
-        .csv-table {
+        .csv-frame-container iframe {
+            flex: 1;
             width: 100%;
-            border-collapse: collapse;
-            font-size: 14px;
+            border: none;
         }
 
-        .csv-table th,
-        .csv-table td {
-            border: 1px solid var(--border-color);
-            padding: 8px 12px;
-            text-align: left;
-            white-space: nowrap;
-        }
-
-        .csv-table th {
-            background: var(--button-bg);
+        /* "New window" link looks like the other small buttons */
+        a.btn-new-window {
+            display: inline-block;
+            margin: 5px;
+            align-self: center;
+            background: var(--muted-gray);
             color: var(--white);
-            position: sticky;
-            top: 0;
-            font-weight: bold;
+            border-radius: 5px;
+            text-decoration: none;
+            line-height: normal;
         }
 
-        .csv-table tr:nth-child(even) {
-            background: var(--light-bg);
-        }
-
-        .csv-table tr:hover {
-            background: #e8f4ff;
+        a.btn-new-window:hover {
+            background: var(--text-muted);
         }
 
         @media (max-width: 768px) {
@@ -507,10 +503,9 @@
                 overflow-x: auto;
             }
 
-            .csv-table th,
-            .csv-table td {
-                padding: 6px 8px;
-                font-size: 12px;
+            .modal-content {
+                margin: 2% auto;
+                padding: 12px;
             }
         }
 
@@ -518,18 +513,6 @@
         [data-theme="dark"] .file-item:hover {
             background: #3a3a3a;
             border-color: var(--button-bg);
-        }
-
-        [data-theme="dark"] .csv-table tr:hover {
-            background: #3a3a3a;
-        }
-
-        [data-theme="dark"] .csv-table tr:nth-child(even) {
-            background: var(--light-bg);
-        }
-
-        [data-theme="dark"] .csv-table td {
-            color: var(--text-color);
         }
 
         [data-theme="dark"] input[type="password"],
@@ -907,7 +890,7 @@
                 <div id="file-content" class="file-content">
                     <div class="loading">Loading file content...</div>
                 </div>
-                <div id="file-content-table" class="csv-table-container hidden">
+                <div id="file-content-table" class="csv-frame-container hidden">
                 </div>
             </div>
         </div>
@@ -970,9 +953,6 @@
         let allFiles = { logs: [], csv: [], quizzes: [] };
         let currentTab = 'csv';
         let currentEditingQuiz = '';
-        let currentCsvContent = '';
-        let currentCsvView = 'text';
-        let currentViewingFileType = '';
 
         function switchTab(tabName) {
             currentTab = tabName;
@@ -1092,9 +1072,10 @@
                     actionButtons = `<button class="btn-small btn-view" onclick="editQuizFile(${name})">✏️ Edit</button>
                        <button class="btn-small btn-download" onclick="downloadFile('${type}', ${name})">💾 Download</button>`;
                 } else if (type === 'csv') {
-                    // CSV files get Text and Table view buttons
+                    // CSV files get Text and Table view buttons, plus a link that opens the table in a new window
                     actionButtons = `<button class="btn-small btn-view" onclick="viewFile('${type}', ${name}, 'text')">📄 Text</button>
                        <button class="btn-small btn-view" onclick="viewFile('${type}', ${name}, 'table')">📊 Table</button>
+                       <a class="btn-small btn-new-window" href="${escapeHtml(csvTableUrl(file.name))}" target="_blank" rel="noopener" title="Open the table in a new window">↗ New window</a>
                        <button class="btn-small btn-download" onclick="downloadFile('${type}', ${name})">💾 Download</button>`;
                 } else {
                     actionButtons = `<button class="btn-small btn-view" onclick="viewFile('${type}', ${name}, 'text')">👁️ View</button>
@@ -1124,139 +1105,50 @@
             container.innerHTML = html;
         }
 
+        // Address of the CSV table viewer page for a file
+        function csvTableUrl(filename) {
+            return `/files/csv/${encodeURIComponent(filename)}`;
+        }
+
         async function viewFile(type, filename, viewMode = 'text') {
+            const textContent = document.getElementById('file-content');
+            const tableContent = document.getElementById('file-content-table');
+            const modalContent = document.querySelector('#file-viewer-modal .modal-content');
+
+            document.getElementById('file-viewer-title').textContent = `${filename}`;
+            document.getElementById('file-viewer-modal').style.display = 'block';
+
+            if (viewMode === 'table' && type === 'csv') {
+                // The table, its filters and the "open in new window" button live on the
+                // viewer page; the pop-up shows that page in an iframe.
+                textContent.classList.add('hidden');
+                tableContent.classList.remove('hidden');
+                modalContent.classList.add('wide');
+                tableContent.innerHTML = `<iframe id="csv-table-frame" title="${escapeHtml(filename)}"
+                    src="${escapeHtml(csvTableUrl(filename))}?embedded=1"></iframe>`;
+                return;
+            }
+
+            textContent.classList.remove('hidden');
+            tableContent.classList.add('hidden');
+            tableContent.innerHTML = '';
+            modalContent.classList.remove('wide');
+            textContent.innerHTML = '<div class="loading">Loading file content...</div>';
+
             try {
-                currentViewingFileType = type;
-                currentCsvContent = '';
-                currentCsvView = viewMode;
-
-                const textContent = document.getElementById('file-content');
-                const tableContent = document.getElementById('file-content-table');
-
-                document.getElementById('file-viewer-title').textContent = `${filename}`;
-                textContent.innerHTML = '<div class="loading">Loading file content...</div>';
-                tableContent.innerHTML = '';
-                document.getElementById('file-viewer-modal').style.display = 'block';
-
-                // Show appropriate view based on viewMode
-                if (viewMode === 'table') {
-                    textContent.classList.add('hidden');
-                    tableContent.classList.remove('hidden');
-                    tableContent.innerHTML = '<div class="loading">Loading file content...</div>';
-                } else {
-                    textContent.classList.remove('hidden');
-                    tableContent.classList.add('hidden');
-                }
-
                 const response = await fetch(`/api/files/${type}/view/${encodeURIComponent(filename)}`, {
                     credentials: 'same-origin'
                 });
 
                 if (response.ok) {
-                    const content = await response.text();
-
-                    if (viewMode === 'table' && type === 'csv') {
-                        // Parse and render as table
-                        const parsedData = parseCSV(content);
-                        tableContent.innerHTML = renderCsvTable(parsedData);
-                    } else {
-                        // Show as text
-                        textContent.textContent = content;
-                    }
+                    textContent.textContent = await response.text();
                 } else {
                     const data = await response.json();
-                    const errorHtml = `<div class="error">Error: ${escapeHtml(data.error)}</div>`;
-                    if (viewMode === 'table') {
-                        tableContent.innerHTML = errorHtml;
-                    } else {
-                        textContent.innerHTML = errorHtml;
-                    }
+                    textContent.innerHTML = `<div class="error">Error: ${escapeHtml(data.error)}</div>`;
                 }
             } catch (error) {
-                const errorHtml = `<div class="error">Error loading file: ${escapeHtml(error.message)}</div>`;
-                if (currentCsvView === 'table') {
-                    document.getElementById('file-content-table').innerHTML = errorHtml;
-                } else {
-                    document.getElementById('file-content').innerHTML = errorHtml;
-                }
+                textContent.innerHTML = `<div class="error">Error loading file: ${escapeHtml(error.message)}</div>`;
             }
-        }
-
-        function parseCSV(text) {
-            const lines = text.split('\n');
-            const result = [];
-
-            for (let i = 0; i < lines.length; i++) {
-                const line = lines[i].trim();
-                if (!line) continue;
-
-                const row = [];
-                let inQuotes = false;
-                let currentField = '';
-
-                for (let j = 0; j < line.length; j++) {
-                    const char = line[j];
-                    const nextChar = line[j + 1];
-
-                    if (inQuotes) {
-                        if (char === '"' && nextChar === '"') {
-                            // Escaped quote
-                            currentField += '"';
-                            j++;
-                        } else if (char === '"') {
-                            // End of quoted field
-                            inQuotes = false;
-                        } else {
-                            currentField += char;
-                        }
-                    } else {
-                        if (char === '"') {
-                            // Start of quoted field
-                            inQuotes = true;
-                        } else if (char === ',') {
-                            // Field separator
-                            row.push(currentField);
-                            currentField = '';
-                        } else {
-                            currentField += char;
-                        }
-                    }
-                }
-
-                // Add the last field
-                row.push(currentField);
-                result.push(row);
-            }
-
-            return result;
-        }
-
-        function renderCsvTable(data) {
-            if (data.length === 0) {
-                return '<div class="empty-state"><div class="icon">📊</div><div>No data to display</div></div>';
-            }
-
-            let html = '<table class="csv-table">';
-
-            // Header row
-            html += '<thead><tr>';
-            data[0].forEach(cell => {
-                html += `<th>${escapeHtml(cell)}</th>`;
-            });
-            html += '</tr></thead>';
-
-            // Data rows
-            html += '<tbody>';
-            for (let i = 1; i < data.length; i++) {
-                html += '<tr>';
-                data[i].forEach(cell => {
-                    html += `<td title="${escapeHtml(cell)}">${escapeHtml(cell)}</td>`;
-                });
-                html += '</tr>';
-            }
-            html += '</tbody></table>';
-
-            return html;
         }
 
         function escapeHtml(text) {
@@ -1293,10 +1185,8 @@
 
         function closeFileViewer() {
             document.getElementById('file-viewer-modal').style.display = 'none';
+            // Removing the iframe stops the viewer page
             document.getElementById('file-content-table').innerHTML = '';
-            currentCsvContent = '';
-            currentCsvView = 'text';
-            currentViewingFileType = '';
         }
 
         function filterFiles() {
