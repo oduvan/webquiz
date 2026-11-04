@@ -211,3 +211,79 @@ async def test_live_stats_gets_timeout_state(temp_dir):
                 if "timeout" in states:
                     break
             assert "timeout" in states
+
+
+# ---- Requests sent by hand (not by the quiz page) must not avoid the limit ----
+
+
+def test_answer_without_question_start_counts_from_registration(temp_dir):
+    """Skipping question-start for the first question does not stop the clock."""
+    with custom_webquiz_server(quizzes=quiz({"per_question": 1}), env=SHORT_GRACE) as (proc, port):
+        user_id = register_student(port)
+        time.sleep(1.8)  # no question-start is ever sent
+        data = submit(port, user_id, 1, 0).json()
+        assert data["timed_out"] is True
+
+
+def test_answer_without_question_start_counts_from_previous_answer(temp_dir):
+    """Skipping question-start for a later question does not stop the clock."""
+    quizzes = quiz({"per_question": 1}, questions=[question("Q1?"), question("Q2?")])
+    with custom_webquiz_server(quizzes=quizzes, env=SHORT_GRACE) as (proc, port):
+        user_id = register_student(port)
+        question_start(port, user_id, 1)
+        assert submit(port, user_id, 1, 0).status_code == 200
+        time.sleep(1.8)  # no question-start for Q2
+        data = submit(port, user_id, 2, 0).json()
+        assert data["timed_out"] is True
+
+
+def test_continue_screen_time_still_not_counted(temp_dir):
+    """The quiz page sends question-start, so time on the Continue screen does not count."""
+    quizzes = quiz({"per_question": 1}, questions=[question("Q1?"), question("Q2?")])
+    with custom_webquiz_server(quizzes=quizzes, env=SHORT_GRACE) as (proc, port):
+        user_id = register_student(port)
+        question_start(port, user_id, 1)
+        assert submit(port, user_id, 1, 0).status_code == 200
+        time.sleep(1.8)  # the student stays on the Continue screen
+        question_start(port, user_id, 2)
+        data = submit(port, user_id, 2, 0).json()
+        assert "timed_out" not in data
+
+
+def test_whole_quiz_without_question_start_counts_from_registration(temp_dir):
+    quizzes = quiz({"whole_quiz": 1}, questions=[question("Q1?"), question("Q2?")])
+    with custom_webquiz_server(quizzes=quizzes, env=SHORT_GRACE) as (proc, port):
+        user_id = register_student(port)
+        time.sleep(1.8)  # no question-start is ever sent
+        data = submit(port, user_id, 1, 0).json()
+        assert data["timed_out"] is True
+        assert data["test_completed"] is True
+
+
+def test_question_start_with_unknown_question_is_rejected(temp_dir):
+    with custom_webquiz_server(quizzes=quiz({"per_question": 30})) as (proc, port):
+        user_id = register_student(port)
+        response = requests.post(
+            f"http://localhost:{port}/api/question-start", json={"user_id": user_id, "question_id": 999}
+        )
+        assert response.status_code == 404
+
+
+def test_question_start_for_a_later_question_does_not_block_the_open_clock(temp_dir):
+    quizzes = quiz({"per_question": 30}, questions=[question("Q1?"), question("Q2?")])
+    with custom_webquiz_server(quizzes=quizzes) as (proc, port):
+        user_id = register_student(port)
+        question_start(port, user_id, 2)  # not the student's question yet
+        question_start(port, user_id, 1)
+        time.sleep(1.1)
+        assert question_start(port, user_id, 1)["remaining_seconds"] <= 29  # Q1's clock is running
+
+
+def test_answer_to_another_question_does_not_stop_the_open_clock(temp_dir):
+    quizzes = quiz({"per_question": 30}, questions=[question("Q1?"), question("Q2?"), question("Q3?")])
+    with custom_webquiz_server(quizzes=quizzes) as (proc, port):
+        user_id = register_student(port)
+        question_start(port, user_id, 1)
+        time.sleep(1.1)
+        assert submit(port, user_id, 2, 0).status_code == 200  # no order check without randomization
+        assert question_start(port, user_id, 1)["remaining_seconds"] <= 29  # Q1's clock still runs

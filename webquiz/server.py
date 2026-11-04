@@ -596,6 +596,9 @@ class TestingServer:
         self.current_question_ids: Dict[str, int] = {}
         # user_id -> when the student first saw a question (whole-quiz time limit clock, never reset)
         self.quiz_start_times: Dict[str, datetime] = {}
+        # user_id -> when the student's next question became available (registration or approval, then each
+        # stored answer). Used for time limits when an answer arrives without question-start (sent by hand).
+        self.question_ready_times: Dict[str, datetime] = {}
         self.time_limit_settings = time_limits.TimeLimitSettings()  # Updated when quiz is loaded
         self.question_time_limits: Dict[int, int] = {}  # question_id -> effective seconds (0 = no limit)
         self.user_stats: Dict[str, Dict[str, Any]] = {}  # user_id -> final stats for completed users
@@ -741,6 +744,7 @@ class TestingServer:
         self.question_start_times.clear()
         self.current_question_ids.clear()
         self.quiz_start_times.clear()
+        self.question_ready_times.clear()
         self.user_stats.clear()
         self.user_answers.clear()
         self.answer_results.clear()
@@ -1859,6 +1863,7 @@ class TestingServer:
         # If approval not required, start live stats immediately.
         # The question clock starts later, when the page shows the question (question-start).
         if not requires_approval:
+            self.question_ready_times[user_id] = datetime.now()
             # Initialize live stats: set first question to "think"
             if len(self.questions) > 0:
                 # Determine first question ID (use question_order if randomization enabled)
@@ -2068,6 +2073,11 @@ class TestingServer:
         grace = time_limits.grace_seconds()
         answer_is_empty = time_limits.is_empty_answer(selected_answer)
 
+        # The quiz page always sends question-start before an answer. An answer without it was sent
+        # by hand: the whole-quiz clock then counts from when the first question became available.
+        if user_id not in self.quiz_start_times and user_id in self.question_ready_times:
+            self.quiz_start_times[user_id] = self.question_ready_times[user_id]
+
         # Whole-quiz time limit: the page sends an empty answer when the quiz countdown reaches zero.
         # That, or any answer after the quiz time and the grace, ends the whole quiz.
         quiz_seconds = self._whole_quiz_seconds()
@@ -2091,7 +2101,7 @@ class TestingServer:
 
         # Per-question time limit: an answer after the limit and the grace is stored as timed out
         question_limit = self.question_time_limits.get(question_id, 0)
-        elapsed = self._question_elapsed(user_id, question_id, now)
+        elapsed = self._answer_elapsed(user_id, question_id, now)
         if question_limit > 0 and elapsed > question_limit + grace:
             logger.info(f"Answer from user {user_id} for question {question_id} arrived after the time limit")
             return web.json_response(
@@ -2099,9 +2109,7 @@ class TestingServer:
             )
 
         # Calculate time taken server-side from when question was displayed
-        time_taken = 0
-        if user_id in self.question_start_times:
-            time_taken = (now - self.question_start_times[user_id]).total_seconds()
+        time_taken = self._question_elapsed(user_id, question_id, now)
 
         return web.json_response(await self._record_answer(user_id, question, selected_answer, time_taken))
 
@@ -2124,9 +2132,11 @@ class TestingServer:
         username = self.users[user_id]["username"]
         question_id = question["id"]
 
-        # The clock for this question is finished
-        self.question_start_times.pop(user_id, None)
-        self.current_question_ids.pop(user_id, None)
+        # The clock for this question is finished (an answer to another question leaves a running clock alone)
+        if self.current_question_ids.get(user_id) == question_id:
+            self.question_start_times.pop(user_id, None)
+            self.current_question_ids.pop(user_id, None)
+        self.question_ready_times[user_id] = datetime.now()
 
         # Check if this is a text input question (has checker)
         is_text_question = "checker" in question
@@ -2293,6 +2303,20 @@ class TestingServer:
             return 0
         return (now - self.question_start_times[user_id]).total_seconds()
 
+    def _answer_elapsed(self, user_id: str, question_id: int, now: datetime) -> float:
+        """Seconds to check against the question's time limit when an answer arrives.
+
+        Normally the question's own clock. If the page never sent question-start for it
+        (a request sent by hand), count from when the question became available: registration
+        or approval for the first question, the previous answer for later ones.
+        """
+        if self.current_question_ids.get(user_id) == question_id and user_id in self.question_start_times:
+            return (now - self.question_start_times[user_id]).total_seconds()
+        ready = self.question_ready_times.get(user_id)
+        if ready is None:
+            return 0
+        return (now - ready).total_seconds()
+
     def _unanswered_question_ids(self, user_id: str) -> List[int]:
         """Ids of the questions the student has not answered yet, in the student's order."""
         user_data = self.users[user_id]
@@ -2364,8 +2388,17 @@ class TestingServer:
 
         username = self.users[user_id]["username"]
 
+        if not any(q["id"] == question_id for q in self.questions):
+            return web.json_response({"error": self.translations["server_question_not_found"]}, status=404)
+
         # A repeated notice that arrives after the answer must not start timing again
         if question_id in self.answer_results.get(user_id, {}):
+            return web.json_response({"status": "success"})
+
+        # Only the student's next question can start the clocks: a notice for another question
+        # (sent by hand) must not take the place of the real question's clock
+        unanswered = self._unanswered_question_ids(user_id)
+        if not unanswered or unanswered[0] != question_id:
             return web.json_response({"status": "success"})
 
         now = datetime.now()
@@ -2843,6 +2876,7 @@ class TestingServer:
 
         # The question clock starts when the student's page shows the question (question-start),
         # not here: the student sees the question only after pressing "Check status".
+        self.question_ready_times[user_id] = datetime.now()
 
         # Initialize live stats: set first question to "think"
         if len(self.questions) > 0:

@@ -114,7 +114,7 @@ webquiz-stress-test -c 50
 - **Middleware-based error handling** for aiohttp
 - **Configuration module separation** - config.py contains dataclasses for configuration (using standard dataclasses module with field(default_factory=...))
 - **6 digits user ID** stored by user_id as key
-- **Server-side timing** for accuracy. A question's clock starts at `POST /api/question-start` (when the page shows it), also for the first question; registration and approval do not start it. A repeated question-start does not restart it. `current_question_ids[user_id]` names the question whose clock runs; `quiz_start_times[user_id]` (first question-start) is the whole-quiz clock
+- **Server-side timing** for accuracy. A question's clock starts at `POST /api/question-start` (when the page shows it), also for the first question; registration and approval do not start it. A repeated question-start does not restart it. `current_question_ids[user_id]` names the question whose clock runs; `quiz_start_times[user_id]` (first question-start) is the whole-quiz clock. question-start returns 404 for an unknown question and starts clocks only for the student's next unanswered question; an answer stops only its own question's clock. `question_ready_times[user_id]` (registration/approval, then each stored answer) is the fallback start for the time limit check when an answer arrives without question-start (a request sent by hand)
 - **Multi-file quiz system** in `quizzes/` dir, auto-created if missing
 - **Session-based admin auth** - Master key sent in request body to `/api/admin/auth`, returns session cookie for subsequent requests (no header-based auth)
 - **Config validation** with comprehensive structure/type checks before save

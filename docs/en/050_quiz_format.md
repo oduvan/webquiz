@@ -163,7 +163,7 @@ How the limit for a question is chosen:
 
 **How time is counted:**
 
-- The clock for a question starts when the student's page shows it. Reloading the page does not restart it.
+- The clock for a question starts when the student's page shows it. Reloading the page does not restart it. The server keeps the time, so blocking the page's requests does not help: an answer without that "question shown" notice is timed from the moment the question became available.
 - An answer that reaches the server up to 5 seconds after the limit still counts, so a slow Wi-Fi connection does not cost the student an answer sent in time.
 - When time runs out, the question is stored with **no answer** and counts as failed. In the answers CSV this is a row with an empty `selected_answer`.
 - In whole-test mode, if the student closes the page, the server still finishes their test 5 seconds after the time is up: all unanswered questions are stored as timed out.
