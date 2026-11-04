@@ -27,8 +27,17 @@ A teacher wants to limit how long students have, either for each question or for
 - The clock runs before the student can see the question. For example, today the first question's clock starts at registration or approval, which can be minutes before the student sees it.
 - Reloading the page restarts the clock.
 - An answer sent in time is lost because the Wi-Fi was slow for a few seconds.
-- A student who closes the tab shows "thinking" in live stats forever, or blocks `show_answers_on_completion` forever, on a question that has a limit.
+- A student who closes the tab on a question that has a limit shows "thinking" on that question forever.
 - Quizzes **without** `time_limit` behave differently. The one exception is the first-question timing fix below, which makes their CSV times more accurate.
+
+## Known limitation (agreed with Oleksandr)
+
+A student who leaves in the middle of the quiz stays unfinished, the same as today:
+
+- In per-question mode, the open question times out, but the next question never opens, because its clock starts only when the page shows it.
+- With approval on, a student who is approved but never presses "Check status" never starts.
+
+The teacher uses the existing "Show answers" button for such stragglers. The server does **not** move a student through the remaining questions on its own. That would break the main rule: the clock starts only when the student sees the question, with no exceptions.
 
 ## Quiz file format
 
