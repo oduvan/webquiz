@@ -80,6 +80,8 @@ The server works out the effective limit once, when the quiz is loaded. The page
 - An empty answer is **always failed**, earns 0 points, and **the checker is not run**. Otherwise a text question whose checker accepts anything, or whose `correct_value` is `""`, could mark it as correct.
 - An empty answer is accepted **only** on a question that has a limit: an effective per-question limit above 0, or any question in whole-quiz mode with `W > 0`. On any other question the server answers 400, as the page already blocks empty answers there. This keeps "empty in the CSV" a reliable sign of "time ran out".
 - The server accepts an empty answer on a limited question at any moment. The page's clock may run slightly ahead of the server's, and giving up early only hurts the student.
+- **Whole-quiz mode (my call, after review):** an empty answer means "my quiz time is up". The server ends the whole quiz at once, as described in "End of the whole-quiz time", without waiting for `W + 5`. In this mode no question has its own limit, so the page sends an empty answer only when the quiz countdown reaches zero. This avoids any wait caused by the page's clock and the server's clock being slightly apart.
+  - If the student is on a "Continue" screen at that moment, the question on screen already has an answer. So the page sends the empty answer for the **next unanswered question** in the student's order. The server accepts it because it is the expected next question, even though that question's clock never started.
 
 ### How a timed-out question is stored
 
@@ -103,6 +105,7 @@ Both values are without the grace and never below 0. On resume after a reload, t
 
 Before checking the answer:
 
+0. If the stored result for this question is a timeout, return it at once, before any other check, including the randomized-order check. Then a late retry gets 200 and not 403.
 1. If the answer is empty, apply the empty-answer rules above.
 2. Per-question mode: if the question has limit `L > 0`, its clock started, and `now > start + L + 5`, store a timeout.
 3. Whole-quiz mode: if `now > quiz_start + W + 5`, end the student's quiz (see below).
@@ -133,7 +136,7 @@ All new per-user state is cleared in `reset_server_state()`.
 - **At zero:** if an answer is not already being sent (`answerLocked`), the page sends the empty answer through the normal submit path, with the same retry, locking and waiting for `questionStartRequest`. Anything selected or typed is dropped.
   - With `show_right_answer: true`: show "Time is up", the correct answer as today, and the "Continue" button.
   - With `show_right_answer: false`: show "Time is up" briefly and move to the next question.
-  - In whole-quiz mode: after the response, show the final results. Load them from `verify-user` (`final_results`), because the server wrote the remaining answers.
+  - In whole-quiz mode: send the empty answer for the open question, or, on a "Continue" screen, for the next unanswered question. After the response, show the final results. Load them from `verify-user` (`final_results`), because the server wrote the remaining answers.
 - **Results screen:** a timed-out question shows "⏱ Time is up" in place of the student's answer.
 - New strings go in `translations.py` (uk and en).
 - Mobile: the countdowns fit at ≤768px with no horizontal scroll.
@@ -143,6 +146,10 @@ All new per-user state is cleared in `reset_server_state()`.
 - In the quiz settings section, add "Time limit" with a choice of "none / per question / whole quiz" and a seconds field.
 - Each question gets a "Time limit (seconds)" field. Empty means "use the default", and 0 means "no limit". The field is shown only in per-question mode. When hidden, the field and its value stay in the form, and saving keeps the value. This matches the rule that question values are allowed and ignored outside per-question mode.
 - Loading a quiz fills these fields. Saving writes `time_limit: {per_question: N}` or `{whole_quiz: N}`, or leaves `time_limit` out for "none".
+
+## Loading a hand-edited quiz
+
+Loading a quiz does not run the save checks. If `time_limit` in a loaded file is malformed, for example a string or both keys at once, the quiz runs with no time limits, and a warning is written to the log. This is my call. A malformed per-question value is treated the same way: that question has no own limit, and it uses the default.
 
 ## Checks on save (`_validate_quiz_data`)
 
@@ -188,7 +195,7 @@ Per `CLAUDE.md`, every change updates:
 - **Selenium (admin editor):** the time limit fields load, save and hide correctly.
 - **Live stats:** the ⏱ icon is shown.
 
-To keep tests fast, use short limits (1–2 s). Also make the grace and the check interval adjustable in tests, for example as class attributes the test fixture can set.
+To keep tests fast, use short limits (1–2 s). Also make the grace and the check interval adjustable in tests. The test fixtures run the server in a separate process, so read them from environment variables at startup (names left to the builder), with the real values (5 s and 1 s) as defaults. Do not document them for users.
 
 ## Approaches considered (for the once-a-second check)
 
