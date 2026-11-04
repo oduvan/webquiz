@@ -97,3 +97,24 @@ def test_timer_fits_mobile_width(temp_dir, browser):
         register_user(browser, port)
         wait_for_element(browser, By.ID, "quiz-timer")
         assert browser.execute_script("return document.documentElement.scrollWidth <= window.innerWidth")
+
+
+@skip_if_selenium_disabled
+def test_live_stats_shows_timeout_icon(temp_dir, browser):
+    import requests
+
+    quizzes = timed_quiz({"per_question": 30}, questions=[question("Q1?"), question("Q2?")])
+    with custom_webquiz_server(config=EN, quizzes=quizzes) as (proc, port):
+        base_url = f"http://localhost:{port}"
+        user_id = requests.post(f"{base_url}/api/register", json={"username": "slowstudent"}).json()["user_id"]
+        requests.post(f"{base_url}/api/question-start", json={"user_id": user_id, "question_id": 1})
+        response = requests.post(
+            f"{base_url}/api/submit-answer", json={"user_id": user_id, "question_id": 1, "selected_answer": None}
+        )
+        assert response.json()["timed_out"] is True
+
+        browser.get(f"{base_url}/live-stats/")
+        WebDriverWait(browser, 15).until(lambda d: "slowstudent" in d.page_source)
+        body = browser.find_element(By.TAG_NAME, "body").text
+        assert "⏱" in body, body
+        assert "0/1" in body, body  # the timed-out question counts as answered (and failed)

@@ -248,6 +248,7 @@ The main area displays a grid with:
 
 Each cell shows the participant's answer status:
 - **Red circle** — incorrect answer
+- **Stopwatch ⏱** — the time limit ran out, so there is no answer (counts as incorrect)
 - **Green background** — correct answer
 - **Yellow background** — currently answering this question
 - **Empty/white** — not yet answered
