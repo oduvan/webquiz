@@ -101,9 +101,10 @@ At the top of the page, there's a **search field** to filter files by name, and 
 
 - **CSV Files** — list of quiz result files.
   Each item shows the file name, size, and last modification date.
-  Three buttons are available for each file:
+  Four buttons are available for each file:
   - **Text** — view the raw CSV content in the browser
-  - **Table** — view the data in a formatted table (see below)
+  - **Table** — view the data in a formatted table in a pop-up window (see below)
+  - **New window** — open the same table in a new browser tab
   - **Download** — save the file locally
 
 - **Log Files** — server launch logs.
@@ -139,13 +140,25 @@ Notes:
 
 ![CSV Table View](../imgs/file_manager_table.png)
 
-When you click the **Table** button for a CSV file, a modal window opens displaying the data in a formatted table. The table shows columns such as:
+When you click the **Table** button for a CSV file, a pop-up window opens displaying the data in a formatted table. The table shows columns such as:
 - **user_id** — the participant's ID
 - **question** — the question text
 - **selected_answer** — the answer chosen by the participant
 - **correct_answer** — the correct answer
 - **is_correct** — whether the answer was correct (True/False)
 - **time_taken** — time spent on the question in seconds
+
+Long text, such as a long question, wraps onto several lines, so you see all columns without scrolling sideways.
+
+Above the table there are two filters:
+- **Question** — show only the answers to one question.
+- **User** — show only the answers of one participant. The list shows the name and the ID, for example `Racoon (809400)`. The answers CSV file itself has only IDs, so the names are taken from the users CSV file of the same quiz run.
+
+You can use both filters together. Next to them you see how many rows are shown, for example "Showing 5 of 20 rows". A filter is hidden when the file has no such column (the users CSV file has no question column).
+
+The **Reload** button reads the file again. Use it while a quiz is running, because the server adds new answers to the file every few seconds.
+
+The **Open in new window** button opens the table in a new browser tab, with the same filters. You can also open it there directly with the **New window** button in the file list. In its own tab the table uses the whole screen. The filters are kept in the page address, so you can refresh the page or bookmark it and the same filters stay on.
 
 This view makes it easy to analyze quiz results without downloading the file.
 

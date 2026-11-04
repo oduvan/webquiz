@@ -267,6 +267,7 @@ The project has **222+ tests** across **15 test files** covering:
 - **Config Management** (23 tests): Config editor, validation, and form-based JSON updates
 - **Registration Approval** (20 tests): Approval workflow and timing
 - **Files Management** (38 tests): File manager interface
+- **CSV Table Viewer** (17 tests): Table page with question/user filters, pop-up and new window (`test_csv_table_viewer.py`, `test_selenium_csv_table_viewer.py`)
 - **SSH Tunnel** (31 tests): Key generation, config fetch, connect/disconnect (`test_tunnel.py`)
 - **File Transfer** (59 tests): Sending files between servers through the tunnel (`test_transfer.py`, `test_transfer_api.py`)
 - **Network Access** (22 tests): Local network restriction and proxy header handling
@@ -712,6 +713,7 @@ webquiz --master-key secret123
 Access admin panels:
 - `/admin` - Quiz management and user approval
 - `/files` - View logs, CSV files, and edit configuration
+- `/files/csv/{filename}` - One CSV file as a table with filters by question and by user. The file manager shows it in its pop-up (**Table** button) and opens it in a new tab (**New window** button, or **Open in new window** inside the pop-up). Filters are kept in the address (`?question=...&user=...`), so a refresh or a bookmark keeps them. For a plain answers CSV the user list takes names from the matching `.users.csv`
 - `/live-stats` - Real-time user progress dashboard
 
 The admin panel automatically detects when the package has been updated while the server is running and displays a "Restart Required" notification, prompting you to restart the server to use the new version.
