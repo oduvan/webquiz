@@ -2990,12 +2990,12 @@ class TestingServer:
             "questions": [],
         }
 
-        # Copy optional config fields from first quiz
+        # Copy optional config fields from first quiz.
+        # min_correct is not listed: it is a per-question setting and stays on its question.
         optional_fields = [
             "description",
             "show_right_answer",
             "randomize_questions",
-            "min_correct",
             "show_answers_on_completion",
             "show_final_list",
         ]
@@ -3221,6 +3221,9 @@ class TestingServer:
 
         if "randomize_questions" in data and not isinstance(data["randomize_questions"], bool):
             errors.append("'randomize_questions' must be a boolean (true or false)")
+
+        if "show_answers_on_completion" in data and not isinstance(data["show_answers_on_completion"], bool):
+            errors.append("'show_answers_on_completion' must be a boolean (true or false)")
 
         if "show_final_list" in data and not isinstance(data["show_final_list"], bool):
             errors.append("'show_final_list' must be a boolean (true or false)")

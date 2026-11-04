@@ -25,6 +25,8 @@ questions:
     correct_answer: 0
 ```
 
+> **Note:** The on/off settings (`show_right_answer`, `show_answers_on_completion`, `show_final_list`, `randomize_questions`) take `true` or `false` **without quotes**. With quotes, `"false"` is text, not an on/off value, and the admin panel will not save the test.
+
 ---
 
 ### Main Test Parameters

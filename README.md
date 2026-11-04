@@ -511,6 +511,8 @@ WebQuiz offers flexible control over when students can see correct answers:
   - If new students register, answers are hidden again until everyone completes
   - In approval mode, only approved students count toward completion
 
+Both settings take `true` or `false` without quotes. The admin panel refuses to save a quiz where one of them is text, such as `"false"`.
+
 **Example Use Case**: Useful for collaborative learning environments where you want students to discuss answers together after everyone has completed the quiz independently.
 
 ### Final Results Display
