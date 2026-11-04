@@ -510,6 +510,16 @@
             return String(roundPoints(value));
         }
 
+        // Make text safe to put into HTML. Quiz text like `<vtx_band>` and
+        // student names must show as written, not be read as HTML tags.
+        function escapeHtml(text) {
+            if (text === null || text === undefined) {
+                return '';
+            }
+            const map = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' };
+            return String(text).replace(/[&<>"']/g, m => map[m]);
+        }
+
         class LiveStatsClient {
             constructor() {
                 this.ws = null;
@@ -956,7 +966,7 @@
                     const statsText = `${questionStats.correct_count}/${questionStats.total_attempts}`;
 
                     // Build file indicator if question has a file attachment
-                    const fileIndicator = question.file ? `<span class="file-indicator" title="${question.file.split('/').pop()}">📎</span>` : '';
+                    const fileIndicator = question.file ? `<span class="file-indicator" title="${escapeHtml(question.file.split('/').pop())}">📎</span>` : '';
 
                     // Build points indicator if question has more than 1 point
                     const pointsIndicator = questionPoints !== 1 ? `<span class="points-indicator" title="${formatPoints(questionPoints)} points">🏆 ${formatPoints(questionPoints)}</span>` : '';
@@ -965,19 +975,19 @@
                         // Image-only question: show filename and small image
                         const imagePath = question.image;
                         const filename = imagePath.split('/').pop().split('.').slice(0, -1).join('.');
-                        headerHtml += `<th title="${filename} - Correct: ${statsText}${questionPoints !== 1 ? ` - ${formatPoints(questionPoints)} points` : ''}">
+                        headerHtml += `<th title="${escapeHtml(filename)} - Correct: ${statsText}${questionPoints !== 1 ? ` - ${formatPoints(questionPoints)} points` : ''}">
                             <div class="image-header">
-                                <img src="${imagePath}" alt="${filename}" class="header-image">
-                                <div class="image-filename">${filename}${fileIndicator}${pointsIndicator}</div>
+                                <img src="${escapeHtml(imagePath)}" alt="${escapeHtml(filename)}" class="header-image">
+                                <div class="image-filename">${escapeHtml(filename)}${fileIndicator}${pointsIndicator}</div>
                                 <div class="question-stats">${statsText}</div>
                             </div>
                         </th>`;
                     } else {
                         // Regular question with text
                         const questionText = question.question || `Q${i + 1}`;
-                        headerHtml += `<th title="${questionText} - Correct: ${statsText}${questionPoints > 1 ? ` - ${questionPoints} points` : ''}">
+                        headerHtml += `<th title="${escapeHtml(questionText)} - Correct: ${statsText}${questionPoints > 1 ? ` - ${questionPoints} points` : ''}">
                             <div class="question-header">
-                                <div class="question-text">${questionText}${fileIndicator}${pointsIndicator}</div>
+                                <div class="question-text">${escapeHtml(questionText)}${fileIndicator}${pointsIndicator}</div>
                                 <div class="question-stats">${statsText}</div>
                             </div>
                         </th>`;
@@ -998,7 +1008,7 @@
                     bodyHtml += `<tr id="user-${userId}">`;
                     bodyHtml += `<td class="username-cell">
                         <div class="username-content">
-                            <div class="username-text">${username}</div>
+                            <div class="username-text">${escapeHtml(username)}</div>
                             <span class="user-stats">${userStatsText}</span>
                         </div>
                     </td>`;

@@ -2491,7 +2491,7 @@
                                 <div class="option-item">
                                     <input type="${inputType}" name="${inputName}" value="${index}" ${isCorrect ? 'checked' : ''}>
                                     <input type="text" class="option-text" value="${escapeHtml(option)}" placeholder="Варіант ${index + 1}" oninput="updateOptionImagePreview(this)">
-                                    ${isImageOption ? `<img class="option-image-preview" src="${option}" alt="Option preview" title="Click to enlarge" onclick="openFullscreenPreview(this.src)">` : ''}
+                                    ${isImageOption ? `<img class="option-image-preview" src="${escapeHtml(option)}" alt="Option preview" title="Click to enlarge" onclick="openFullscreenPreview(this.src)">` : ''}
                                     <button type="button" onclick="openImagePicker('option-text', ${questionCounter}, ${index})" style="padding: 2px 5px; font-size: 12px;" title="Select image">📷</button>
                                     <button type="button" onclick="removeOption(this)">×</button>
                                 </div>
@@ -2564,7 +2564,7 @@
                                     <button type="button" onclick="openImagePicker('question-image', ${questionCounter})" style="padding: 5px 8px; font-size: 16px;" title="Select image">📷</button>
                                 </div>
                                 <div class="image-preview-container${question.image ? ' has-image' : ''}">
-                                    <img class="image-preview" src="${question.image || ''}" alt="Preview" onclick="openFullscreenPreview(this.src)" title="Click to enlarge">
+                                    <img class="image-preview" src="${escapeHtml(question.image)}" alt="Preview" onclick="openFullscreenPreview(this.src)" title="Click to enlarge">
                                 </div>
                             </div>
                             <div class="form-group">
@@ -2955,7 +2955,7 @@
                 NETWORK_INFO.urls.forEach(url => {
                     urlHtml += `
                         <div class="url-item">
-                            <div class="label"><a href="${url.quiz_url}" target="_blank">${url.quiz_url}</a></div>
+                            <div class="label"><a href="${escapeHtml(url.quiz_url)}" target="_blank">${escapeHtml(url.quiz_url)}</a></div>
                         </div>
                     `;
                 });
@@ -3015,9 +3015,9 @@
             let gridHtml = '';
             images.forEach(image => {
                 gridHtml += `
-                    <div class="image-item" onclick="selectImage('${image.path}')" title="${image.filename}">
-                        <img src="${image.path}" alt="${image.filename}" loading="lazy">
-                        <div class="image-filename">${image.filename}</div>
+                    <div class="image-item" onclick="selectImage(${escapeHtml(JSON.stringify(image.path))})" title="${escapeHtml(image.filename)}">
+                        <img src="${escapeHtml(image.path)}" alt="${escapeHtml(image.filename)}" loading="lazy">
+                        <div class="image-filename">${escapeHtml(image.filename)}</div>
                     </div>
                 `;
             });
@@ -3120,10 +3120,10 @@
             let listHtml = '';
             files.forEach(file => {
                 listHtml += `
-                    <div class="file-item" onclick="selectFile('${file.path}')" title="${file.filename}">
+                    <div class="file-item" onclick="selectFile(${escapeHtml(JSON.stringify(file.path))})" title="${escapeHtml(file.filename)}">
                         <div class="file-item-info">
                             <span class="file-item-icon">📄</span>
-                            <span class="file-item-name">${file.filename}</span>
+                            <span class="file-item-name">${escapeHtml(file.filename)}</span>
                         </div>
                         <span class="file-item-size">${formatFileSize(file.size)}</span>
                     </div>
@@ -3245,9 +3245,9 @@
                     html += `
                         <div class="downloadable-quiz-item">
                             <div class="downloadable-quiz-info">
-                                <div class="downloadable-quiz-name">${quiz.name}</div>
-                                <div class="downloadable-quiz-url">${quiz.download_path}</div>
-                                <small style="color: var(--text-muted);">Папка: ${quiz.folder}</small>
+                                <div class="downloadable-quiz-name">${escapeHtml(quiz.name)}</div>
+                                <div class="downloadable-quiz-url">${escapeHtml(quiz.download_path)}</div>
+                                <small style="color: var(--text-muted);">Папка: ${escapeHtml(quiz.folder)}</small>
                             </div>
                             <button class="download-btn" onclick="downloadQuiz(${index})" id="download-btn-${index}">
                                 📥 Завантажити
@@ -3448,13 +3448,13 @@
                 html += `
                     <div class="pending-user-item" id="pending-user-${user_id}">
                         <div class="pending-user-info">
-                            <div class="pending-user-name">👤 ${user.username}</div>
+                            <div class="pending-user-name">👤 ${escapeHtml(user.username)}</div>
                 `;
 
                 // Add registration fields (only custom fields from server)
                 for (const [key, value] of Object.entries(user.registration_fields || {})) {
                     const label = fieldNameToLabel(key);
-                    html += `<div class="pending-user-data">${label}: ${value}</div>`;
+                    html += `<div class="pending-user-data">${escapeHtml(label)}: ${escapeHtml(value)}</div>`;
                 }
 
                 html += `
@@ -3817,7 +3817,7 @@
                 if (isNewer) {
                     const updateElement = document.getElementById('footer-update');
                     updateElement.classList.remove('hidden');
-                    updateElement.innerHTML = `⬆️ Update available: <a href="https://github.com/oduvan/webquiz/releases/tag/v${latestVersion}" target="_blank">v${latestVersion}</a>`;
+                    updateElement.innerHTML = `⬆️ Update available: <a href="https://github.com/oduvan/webquiz/releases/tag/v${escapeHtml(latestVersion)}" target="_blank">v${escapeHtml(latestVersion)}</a>`;
                 }
             } catch (error) {
                 // Silently fail - don't show any error messages
@@ -3918,7 +3918,7 @@
                     tunnelUrlItem.innerHTML = `
                         <div class="label">
                             <strong>🌐 Зовнішній URL:</strong>
-                            <a href="${tunnelData.url}" target="_blank">${tunnelData.url}</a>
+                            <a href="${escapeHtml(tunnelData.url)}" target="_blank">${escapeHtml(tunnelData.url)}</a>
                         </div>
                     `;
                     urlList.insertBefore(tunnelUrlItem, urlList.firstChild);

@@ -188,6 +188,8 @@ The simplest form of question with text, answer options, and the correct answer 
 
 In this example, the correct answer is `"4"` (index 1).
 
+Text is shown exactly as you write it. This applies to the question, the options, the quiz title, `default_value` and `correct_value`. HTML tags are not applied: `<b>` does not make text bold. In return, you can safely write things like `vtx <vtx_band> <vtx_channel>`, and students will see the angle brackets.
+
 ---
 
 #### Question Points

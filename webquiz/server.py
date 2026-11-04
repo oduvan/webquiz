@@ -2,6 +2,7 @@ import asyncio
 import httpx
 import json
 import csv
+import html
 import yaml
 from ruamel.yaml import YAML as RuamelYAML
 import os
@@ -110,6 +111,17 @@ def ensure_directory_exists(path: str) -> str:
     """
     os.makedirs(path, exist_ok=True)
     return path
+
+
+def json_for_script(data, indent=None) -> str:
+    """Turn data into JSON that is safe to put inside a <script> tag.
+
+    Quiz text may contain "</script>". If that text is put into the page as it
+    is, the browser ends the script there and the page breaks. Writing every
+    "<" as the JSON escape \\u003c keeps the same value but leaves no tag in the
+    page source.
+    """
+    return json.dumps(data, indent=indent).replace("<", "\\u003c")
 
 
 #: Question points may carry at most this many decimal places
@@ -936,9 +948,9 @@ class TestingServer:
         quiz_list_html = ""
         for quiz in available_quizzes:
             if quiz["title"]:
-                quiz_list_html += f"<li>{quiz['filename']} - {quiz['title']}</li>"
+                quiz_list_html += f"<li>{html.escape(str(quiz['filename']), quote=False)} - {html.escape(str(quiz['title']), quote=False)}</li>"
             else:
-                quiz_list_html += f"<li>{quiz['filename']}</li>"
+                quiz_list_html += f"<li>{html.escape(str(quiz['filename']), quote=False)}</li>"
 
         # Load template and replace placeholders
         template_content = self.templates.get("quiz_selection_required.html", "")
@@ -1151,8 +1163,8 @@ class TestingServer:
 
             questions_for_client.append(client_question)
 
-        # Convert questions to JSON string for embedding
-        questions_json = json.dumps(questions_for_client, indent=2)
+        # Convert questions to JSON string for embedding inside <script>
+        questions_json = json_for_script(questions_for_client, indent=2)
 
         template_content = self.templates.get("index.html", "")
 
@@ -1168,7 +1180,7 @@ class TestingServer:
         # Add username field as first row
         registration_fields_html += f"""
             <tr>
-                <td class="registration-label">{username_label}:</td>
+                <td class="registration-label">{html.escape(username_label, quote=False)}:</td>
                 <td class="registration-input">
                     <input type="text" id="username">
                 </td>
@@ -1180,9 +1192,9 @@ class TestingServer:
                 field_name = field_label.lower().replace(" ", "_")
                 registration_fields_html += f"""
             <tr>
-                <td class="registration-label">{field_label}:</td>
+                <td class="registration-label">{html.escape(field_label, quote=False)}:</td>
                 <td class="registration-input">
-                    <input type="text" class="registration-field" data-field-name="{field_name}">
+                    <input type="text" class="registration-field" data-field-name="{html.escape(field_name)}">
                 </td>
             </tr>"""
 
@@ -1190,9 +1202,9 @@ class TestingServer:
 
         # Inject questions data, title, version, registration fields, username label, and show_right_answer setting into template
         html_content = template_content.replace("{{QUESTIONS_DATA}}", questions_json)
-        html_content = html_content.replace("{{QUIZ_TITLE}}", self.quiz_title)
+        html_content = html_content.replace("{{QUIZ_TITLE}}", html.escape(self.quiz_title, quote=False))
         html_content = html_content.replace("{{REGISTRATION_FIELDS}}", registration_fields_html)
-        html_content = html_content.replace("{{USERNAME_LABEL}}", username_label)
+        html_content = html_content.replace("{{USERNAME_LABEL}}", html.escape(username_label, quote=False))
         html_content = html_content.replace("{{SHOW_RIGHT_ANSWER}}", "true" if self.show_right_answer else "false")
         html_content = html_content.replace("{{SHOW_FINAL_LIST}}", "true" if self.show_final_list else "false")
         html_content = html_content.replace("{{WEBQUIZ_VERSION}}", get_package_version())
@@ -3846,7 +3858,7 @@ class TestingServer:
                     registration = parsed.get("registration", {})
                     if not isinstance(registration, dict):
                         registration = {}
-                    config_data_json = json.dumps(
+                    config_data_json = json_for_script(
                         {
                             "language": parsed.get("language", "uk"),
                             "extra_answers_with_users_csv": bool(parsed.get("extra_answers_with_users_csv", False)),
@@ -3863,7 +3875,7 @@ class TestingServer:
         # Inject JavaScript variables for trusted IP auto-auth and config
         js_variables = f"""
             const IS_TRUSTED_IP = {str(is_trusted_ip).lower()};
-            const CONFIG_CONTENT = {json.dumps(config_content) if config_path else 'null'};
+            const CONFIG_CONTENT = {json_for_script(config_content) if config_path else 'null'};
             const CONFIG_PATH = {json.dumps(config_path) if config_path else 'null'};
             const CONFIG_DATA = {config_data_json if config_path else 'null'};
         """
@@ -4187,7 +4199,7 @@ class TestingServer:
         server_data_script = f"""
     const IS_TRUSTED_IP = {str(is_trusted_ip).lower()};
     const NETWORK_INFO = {json.dumps(network_info)};
-    const DOWNLOADABLE_QUIZZES = {json.dumps(downloadable_quizzes)};
+    const DOWNLOADABLE_QUIZZES = {json_for_script(downloadable_quizzes)};
     const WEBQUIZ_VERSION = {json.dumps(package_version)};
     const TUNNEL_PUBLIC_KEY = {json.dumps(tunnel_public_key)};"""
 
