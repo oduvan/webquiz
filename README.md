@@ -270,12 +270,12 @@ The project has **222+ tests** across **15 test files** covering:
 - **SSH Tunnel** (31 tests): Key generation, config fetch, connect/disconnect (`test_tunnel.py`)
 - **File Transfer** (59 tests): Sending files between servers through the tunnel (`test_transfer.py`, `test_transfer_api.py`)
 - **Network Access** (22 tests): Local network restriction and proxy header handling
-- **Index Generation** (18 tests): Template generation tests, including escaping of tags in titles, labels and question data
+- **Index Generation** (18 tests): Template generation tests
 - **Registration Fields** (12 tests): Custom registration fields
 - **Show Right Answer** (5 tests): Answer display functionality
 - **Show Answers on Completion** (10 tests): Dynamic answer visibility after all students complete
 - **Integration Tests** (6 tests): Multiple choice, multiple answers
-- **Selenium Tests** (87 tests): End-to-end browser testing, including `test_selenium_html_escaping.py` (quiz text and student names with tags show as plain text)
+- **Selenium Tests** (87 tests): End-to-end browser testing
 - **Auto-Advance** (6 tests): Automatic progression behavior
 
 The test suite uses GitHub Actions CI/CD for automated testing on every commit.
@@ -358,12 +358,6 @@ questions:
 **Copy Protection:**
 - Question text and answer options cannot be selected or copied by students
 - Prevents sharing quiz content via copy-paste
-
-**Text Is Shown As Written:**
-- Question text, options, the quiz title, `default_value` and `correct_value` are shown exactly as written, on every page (quiz, live stats, admin)
-- HTML tags are not applied: `<b>` shows as `<b>`, it does not make text bold
-- So you can write commands like `vtx <vtx_band> <vtx_channel>` and students see the angle brackets
-- Student names and registration fields are also shown as plain text, so a student cannot put HTML or scripts into the admin or live stats pages
 
 **Question Grouping (stick_to_the_previous):**
 - Use `stick_to_the_previous: true` on questions that should stay adjacent to their predecessor during randomization
