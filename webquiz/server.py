@@ -1969,8 +1969,12 @@ class TestingServer:
 
         # The quiz page repeats the request when the connection drops. If the first attempt
         # got through and only the response was lost, return the stored result.
+        # After a timeout, any later answer to that question gets the stored timeout result,
+        # so a late retry lets the page move on instead of getting an error.
         previous_result = self.answer_results.get(user_id, {}).get(question_id)
-        if previous_result is not None and previous_result["selected_answer"] == selected_answer:
+        if previous_result is not None and (
+            previous_result.get("timed_out") or previous_result["selected_answer"] == selected_answer
+        ):
             logger.info(f"Repeated answer from user {user_id} for question {question_id}, returning stored result")
             return web.json_response(previous_result["response"])
 
@@ -2022,33 +2026,96 @@ class TestingServer:
         if not question:
             return web.json_response({"error": self.translations["server_question_not_found"]}, status=404)
 
+        now = datetime.now()
+        grace = time_limits.grace_seconds()
+        answer_is_empty = time_limits.is_empty_answer(selected_answer)
+
+        # Whole-quiz time limit: the page sends an empty answer when the quiz countdown reaches zero.
+        # That, or any answer after the quiz time and the grace, ends the whole quiz.
+        quiz_seconds = self._whole_quiz_seconds()
+        if quiz_seconds > 0:
+            quiz_start = self.quiz_start_times.get(user_id)
+            quiz_time_over = quiz_start is not None and (now - quiz_start).total_seconds() > quiz_seconds + grace
+            if answer_is_empty or quiz_time_over:
+                response_data = await self._end_whole_quiz(user_id, now)
+                if response_data is None:
+                    return web.json_response({"error": self.translations["server_all_answered"]}, status=400)
+                return web.json_response(response_data)
+
+        # An empty answer means "time ran out", so it is accepted only on a question with a time limit
+        if answer_is_empty:
+            if not self._question_is_limited(question_id):
+                return web.json_response({"error": self.translations["server_empty_answer"]}, status=400)
+            elapsed = self._question_elapsed(user_id, question_id, now)
+            return web.json_response(
+                await self._record_answer(user_id, question, selected_answer, elapsed, timed_out=True)
+            )
+
+        # Per-question time limit: an answer after the limit and the grace is stored as timed out
+        question_limit = self.question_time_limits.get(question_id, 0)
+        elapsed = self._question_elapsed(user_id, question_id, now)
+        if question_limit > 0 and elapsed > question_limit + grace:
+            logger.info(f"Answer from user {user_id} for question {question_id} arrived after the time limit")
+            return web.json_response(
+                await self._record_answer(user_id, question, selected_answer, elapsed, timed_out=True)
+            )
+
         # Calculate time taken server-side from when question was displayed
         time_taken = 0
         if user_id in self.question_start_times:
-            time_taken = (datetime.now() - self.question_start_times[user_id]).total_seconds()
-            # Clean up the start time
-            del self.question_start_times[user_id]
-            self.current_question_ids.pop(user_id, None)
+            time_taken = (now - self.question_start_times[user_id]).total_seconds()
+
+        return web.json_response(await self._record_answer(user_id, question, selected_answer, time_taken))
+
+    async def _record_answer(self, user_id: str, question: dict, selected_answer, time_taken: float, timed_out=False):
+        """Store an answer (or a timeout), update progress and live stats, and build the response.
+
+        Used for normal answers and for timeouts. A timeout is stored as an empty, failed answer:
+        the checker is not run and no points are earned.
+
+        Args:
+            user_id: User identifier
+            question: The question dict
+            selected_answer: The answer as submitted (kept to recognise a repeated request)
+            time_taken: Seconds the student spent on the question
+            timed_out: True when time ran out for this question
+
+        Returns:
+            Response dict for the page
+        """
+        username = self.users[user_id]["username"]
+        question_id = question["id"]
+
+        # The clock for this question is finished
+        self.question_start_times.pop(user_id, None)
+        self.current_question_ids.pop(user_id, None)
 
         # Check if this is a text input question (has checker)
         is_text_question = "checker" in question
         checker_error = None
 
-        # Check if answer is correct (handle single, multiple, and text answers)
-        validation_result = self._validate_answer(selected_answer, question)
-
-        # Handle text question result (returns tuple)
-        if is_text_question:
-            is_correct, checker_error = validation_result
+        if timed_out:
+            is_correct = False
         else:
-            is_correct = validation_result
+            # Check if answer is correct (handle single, multiple, and text answers)
+            validation_result = self._validate_answer(selected_answer, question)
+
+            # Handle text question result (returns tuple)
+            if is_text_question:
+                is_correct, checker_error = validation_result
+            else:
+                is_correct = validation_result
 
         # Determine the correct answer text for storage
         if is_text_question:
             correct_answer_text = question.get("correct_value", "")
-            selected_answer_text = str(selected_answer)
         else:
             correct_answer_text = self._format_answer_text(question["correct_answer"], question.get("options"))
+        if timed_out:
+            selected_answer_text = ""  # An empty answer marks "time ran out"
+        elif is_text_question:
+            selected_answer_text = str(selected_answer)
+        else:
             selected_answer_text = self._format_answer_text(selected_answer, question.get("options"))
 
         # Store response in memory
@@ -2098,6 +2165,8 @@ class TestingServer:
         # Add checker error for text questions if present
         if is_text_question and checker_error:
             answer_data["checker_error"] = checker_error
+        if timed_out:
+            answer_data["timed_out"] = True  # Used by the results screen, not written to CSV
 
         self.user_answers[user_id].append(answer_data)
 
@@ -2105,7 +2174,10 @@ class TestingServer:
         self.user_progress[user_id] = question_id
 
         # Update live stats: set current question state based on correctness
-        state = "ok" if is_correct else "fail"
+        if timed_out:
+            state = "timeout"
+        else:
+            state = "ok" if is_correct else "fail"
         self.update_live_stats(user_id, question_id, state, time_taken)
 
         # Check if this was the last question and calculate final stats
@@ -2120,7 +2192,14 @@ class TestingServer:
             logger.info(f"Test completed for user {user_id} - final stats calculated")
 
         # Prepare response data
-        response_data = {"time_taken": time_taken, "message": "Answer submitted successfully"}
+        response_data = {
+            "time_taken": time_taken,
+            "message": "Answer submitted successfully",
+            "test_completed": test_completed,
+        }
+        if timed_out:
+            # Always sent, so the page can show "Time is up" even when correct answers are hidden
+            response_data["timed_out"] = True
 
         # Only include correctness feedback and correct answer if show_right_answer is enabled
         if self.show_right_answer:
@@ -2141,6 +2220,7 @@ class TestingServer:
         self.answer_results.setdefault(user_id, {})[question_id] = {
             "selected_answer": selected_answer,
             "response": response_data,
+            "timed_out": timed_out,
         }
 
         # Broadcast current question result with completion status
@@ -2162,11 +2242,53 @@ class TestingServer:
         )
 
         logger.info(
-            f"Answer submitted by {username} (ID: {user_id}) for question {question_id}: {'Correct' if is_correct else 'Incorrect'} (took {time_taken}s)"
+            f"Answer submitted by {username} (ID: {user_id}) for question {question_id}: "
+            f"{'Time ran out' if timed_out else ('Correct' if is_correct else 'Incorrect')} (took {time_taken}s)"
         )
         logger.info(f"Updated progress for user {user_id}: last answered question = {question_id}")
 
-        return web.json_response(response_data)
+        return response_data
+
+    def _question_elapsed(self, user_id: str, question_id: int, now: datetime) -> float:
+        """Seconds since this question's clock started, or 0 if its clock is not running."""
+        if self.current_question_ids.get(user_id) != question_id or user_id not in self.question_start_times:
+            return 0
+        return (now - self.question_start_times[user_id]).total_seconds()
+
+    def _unanswered_question_ids(self, user_id: str) -> List[int]:
+        """Ids of the questions the student has not answered yet, in the student's order."""
+        user_data = self.users[user_id]
+        if self.randomize_questions and "question_order" in user_data:
+            order = user_data["question_order"]
+        else:
+            order = [q["id"] for q in self.questions]
+        answered = self.answer_results.get(user_id, {})
+        return [question_id for question_id in order if question_id not in answered]
+
+    async def _end_whole_quiz(self, user_id: str, now: datetime) -> Optional[dict]:
+        """Whole-quiz time is up: store every unanswered question as timed out.
+
+        The open question keeps its real time, questions never opened get 0.
+        Returns the response for the first of them (the question the page is on),
+        or None when nothing was left to answer.
+        """
+        unanswered = self._unanswered_question_ids(user_id)
+        # Work out the times first: storing the first timeout stops the running clock
+        elapsed = {question_id: self._question_elapsed(user_id, question_id, now) for question_id in unanswered}
+        questions_by_id = {q["id"]: q for q in self.questions}
+        logger.info(f"Whole-quiz time is up for user {user_id}, {len(unanswered)} questions left without an answer")
+
+        first_response = None
+        for question_id in unanswered:
+            response = await self._record_answer(
+                user_id, questions_by_id[question_id], None, elapsed[question_id], timed_out=True
+            )
+            if first_response is None:
+                first_response = response
+        if first_response is not None:
+            # The same dict is stored in answer_results, so a retry also learns that the test is over
+            first_response["test_completed"] = True
+        return first_response
 
     async def question_start(self, request):
         """Handle notification that a user started viewing a question.

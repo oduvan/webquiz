@@ -142,7 +142,7 @@ Notes:
 When you click the **Table** button for a CSV file, a modal window opens displaying the data in a formatted table. The table shows columns such as:
 - **user_id** — the participant's ID
 - **question** — the question text
-- **selected_answer** — the answer chosen by the participant
+- **selected_answer** — the answer chosen by the participant. It is empty when the time limit ran out (see `time_limit` in the quiz file format)
 - **correct_answer** — the correct answer
 - **is_correct** — whether the answer was correct (True/False)
 - **time_taken** — time spent on the question in seconds

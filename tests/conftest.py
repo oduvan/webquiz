@@ -45,16 +45,18 @@ def temp_dir():
 
 
 @contextmanager
-def custom_webquiz_server(config=None, quizzes=None):
+def custom_webquiz_server(config=None, quizzes=None, env=None):
     """Context manager for creating webquiz servers with custom configurations.
 
     Args:
         config: Full configuration dictionary (uses default if None)
         quizzes: Dictionary of quiz_filename -> quiz_data (uses default if None)
+        env: Extra environment variables for the server process (for example shorter time limit grace)
 
     Yields:
         Tuple of (process, port)
     """
+    extra_env = env
     port = get_worker_port()
 
     # Create default config with port-specific directories to avoid conflicts
@@ -135,6 +137,8 @@ def custom_webquiz_server(config=None, quizzes=None):
     if os.path.exists(pyproject_path):
         env["COVERAGE_PROCESS_START"] = pyproject_path
 
+    if extra_env:
+        env.update(extra_env)
     cmd = [sys.executable, "-m", "webquiz.cli", "--config", config_filename]
     proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, env=env)
 

@@ -38,6 +38,7 @@ TRANSLATIONS = {
 
         # Answer validation
         "please_enter_answer": "Будь ласка, введіть відповідь",
+        "server_empty_answer": "Порожня відповідь не приймається",
         "please_select_at_least_one": "Будь ласка, оберіть хоча б одну відповідь",
         "please_select_answer": "Будь ласка, оберіть відповідь",
 
@@ -128,6 +129,7 @@ TRANSLATIONS = {
 
         # Answer validation
         "please_enter_answer": "Please enter an answer",
+        "server_empty_answer": "An empty answer is not accepted",
         "please_select_at_least_one": "Please select at least one answer",
         "please_select_answer": "Please select an answer",
 
