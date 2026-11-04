@@ -2075,7 +2075,7 @@ class TestingServer:
             quiz_start = self.quiz_start_times.get(user_id)
             quiz_time_over = quiz_start is not None and (now - quiz_start).total_seconds() > quiz_seconds + grace
             if answer_is_empty or quiz_time_over:
-                response_data = await self._end_whole_quiz(user_id, now)
+                response_data = await self._end_whole_quiz(user_id, now, question_id)
                 if response_data is None:
                     return web.json_response({"error": self.translations["server_all_answered"]}, status=400)
                 return web.json_response(response_data)
@@ -2303,30 +2303,45 @@ class TestingServer:
         answered = self.answer_results.get(user_id, {})
         return [question_id for question_id in order if question_id not in answered]
 
-    async def _end_whole_quiz(self, user_id: str, now: datetime) -> Optional[dict]:
+    async def _end_whole_quiz(self, user_id: str, now: datetime, question_id: Optional[int] = None) -> Optional[dict]:
         """Whole-quiz time is up: store every unanswered question as timed out.
 
         The open question keeps its real time, questions never opened get 0.
-        Returns the response for the first of them (the question the page is on),
-        or None when nothing was left to answer.
+
+        Args:
+            user_id: User identifier
+            now: The moment the time ran out
+            question_id: The question the page sent its answer for (None for the background check)
+
+        Returns:
+            The stored response for question_id (or for the first timed-out question when
+            question_id is None), or None when nothing was stored for it.
         """
         unanswered = self._unanswered_question_ids(user_id)
         # Work out the times first: storing the first timeout stops the running clock
-        elapsed = {question_id: self._question_elapsed(user_id, question_id, now) for question_id in unanswered}
+        elapsed = {qid: self._question_elapsed(user_id, qid, now) for qid in unanswered}
         questions_by_id = {q["id"]: q for q in self.questions}
         logger.info(f"Whole-quiz time is up for user {user_id}, {len(unanswered)} questions left without an answer")
 
-        first_response = None
-        for question_id in unanswered:
-            response = await self._record_answer(
-                user_id, questions_by_id[question_id], None, elapsed[question_id], timed_out=True
-            )
-            if first_response is None:
-                first_response = response
-        if first_response is not None:
-            # The same dict is stored in answer_results, so a retry also learns that the test is over
-            first_response["test_completed"] = True
-        return first_response
+        first_stored_id = None
+        for qid in unanswered:
+            # Each store awaits the live-stats send. Meanwhile the page's answer or the background
+            # check may have stored this question, or the quiz may have been switched: check again.
+            if user_id not in self.users:
+                return None
+            if qid in self.answer_results.get(user_id, {}):
+                continue
+            await self._record_answer(user_id, questions_by_id[qid], None, elapsed[qid], timed_out=True)
+            if first_stored_id is None:
+                first_stored_id = qid
+
+        wanted_id = question_id if question_id is not None else first_stored_id
+        stored = self.answer_results.get(user_id, {}).get(wanted_id)
+        if stored is None:
+            return None
+        # The same dict is stored in answer_results, so a retry also learns whether the test is over
+        stored["response"]["test_completed"] = user_id in self.user_stats
+        return stored["response"]
 
     async def question_start(self, request):
         """Handle notification that a user started viewing a question.

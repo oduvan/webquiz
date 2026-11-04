@@ -502,13 +502,13 @@
         // Initialize theme on page load
         initializeTheme();
 
-        // Points may be decimals with at most 2 places. Round to kill binary
-        // float noise from repeated adding/subtracting of values like 0.1.
         // A question is answered when it is right, wrong, or its time limit ran out ("timeout" counts as wrong)
         function isAnsweredState(state) {
             return state === 'ok' || state === 'fail' || state === 'timeout';
         }
 
+        // Points may be decimals with at most 2 places. Round to kill binary
+        // float noise from repeated adding/subtracting of values like 0.1.
         function roundPoints(value) {
             return Math.round((Number(value) || 0) * 100) / 100;
         }

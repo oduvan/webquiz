@@ -33,7 +33,7 @@ The main administrative panel page contains essential tools for managing quizzes
   This panel appears if manual user approval is enabled in the configuration (`registration.approve: true`, see [Configuration](040_config.md) for details).
   It displays a list of users who have registered but are waiting for approval to start the quiz.
   Each user shows their name and registration time. Click the **"Approve"** button to allow them to begin.
-  The quiz timer starts only after approval, ensuring fair timing for all participants.
+  Time is never counted while a participant waits for approval: the timer starts when their page shows the first question (after they press **"Check"**), ensuring fair timing for all participants.
 
 - **Answer Management**
   This section appears only for quizzes with `show_answers_on_completion: true` enabled (see "Quiz File Format" section for details about this option).

@@ -1142,6 +1142,14 @@
                 index++;
             }
             if (index < questions.length) {
+                // Lock the answer like a normal submit, so the student cannot send a second one
+                answerLocked = true;
+                document.getElementById('submit-answer-btn').disabled = true;
+                document.querySelectorAll('.option').forEach(option => option.classList.add('disabled'));
+                const textInput = document.getElementById('text-answer-input');
+                if (textInput) {
+                    textInput.disabled = true;
+                }
                 try {
                     await questionStartRequest;
                     await fetchWithRetry('api/submit-answer', {
@@ -1151,6 +1159,8 @@
                     });
                 } catch (error) {
                     console.log('Failed to send the quiz time-up answer:', error);
+                } finally {
+                    answerLocked = false;
                 }
             }
             await finishQuizAfterTimeUp();

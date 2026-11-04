@@ -9,8 +9,8 @@ from webquiz.time_limits import (
 )
 
 
-def make_question(**extra):
-    return {"question": "Q?", "options": ["A", "B"], "correct_answer": 0, **extra}
+def make_question(text="Q?", **extra):
+    return {"question": text, "options": ["A", "B"], "correct_answer": 0, **extra}
 
 
 def test_question_limits_follow_spec_table():
@@ -72,3 +72,56 @@ def test_validate_time_limits_rejects_bad_question_values():
 def test_is_empty_answer():
     assert all(is_empty_answer(value) for value in (None, "", "   ", []))
     assert not any(is_empty_answer(value) for value in (0, [0], "a"))
+
+
+async def test_whole_quiz_end_twice_at_once_stores_each_question_once(temp_dir):
+    """A slow live-stats send must not let two whole-quiz ends store the same questions twice."""
+    import asyncio
+    from datetime import datetime, timedelta
+
+    from webquiz.config import WebQuizConfig
+    from webquiz.server import TestingServer
+
+    server = TestingServer(WebQuizConfig())
+    server.questions = [dict(make_question(f"Q{n}?"), id=n) for n in (1, 2, 3)]
+    server.randomize_questions = False
+    server.time_limit_settings = TimeLimitSettings("whole_quiz", 10)
+    server.question_time_limits = {1: 0, 2: 0, 3: 0}
+    server.users["u1"] = {"username": "Student", "approved": True}
+    server.quiz_start_times["u1"] = datetime.now() - timedelta(seconds=30)
+
+    async def slow_broadcast(message):
+        await asyncio.sleep(0.05)  # a live-stats client that is slow to read
+
+    server.broadcast_to_websockets = slow_broadcast
+
+    now = datetime.now()
+    await asyncio.gather(server._end_whole_quiz("u1", now), server._end_whole_quiz("u1", now))
+
+    assert len(server.user_answers["u1"]) == 3
+    assert len(server.user_responses) == 3
+    assert server.user_stats["u1"]["total_count"] == 3
+
+
+async def test_whole_quiz_end_returns_response_for_the_submitted_question(temp_dir):
+    from datetime import datetime
+
+    from webquiz.config import WebQuizConfig
+    from webquiz.server import TestingServer
+
+    server = TestingServer(WebQuizConfig())
+    server.questions = [dict(make_question(f"Q{n}?"), id=n) for n in (1, 2)]
+    server.randomize_questions = False
+    server.time_limit_settings = TimeLimitSettings("whole_quiz", 10)
+    server.question_time_limits = {1: 0, 2: 0}
+    server.users["u1"] = {"username": "Student", "approved": True}
+
+    async def no_broadcast(message):
+        pass
+
+    server.broadcast_to_websockets = no_broadcast
+
+    response = await server._end_whole_quiz("u1", datetime.now(), question_id=2)
+    assert response is server.answer_results["u1"][2]["response"]
+    assert response["timed_out"] is True
+    assert response["test_completed"] is True

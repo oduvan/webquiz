@@ -120,3 +120,31 @@ def test_live_stats_shows_timeout_icon(temp_dir, browser):
         body = browser.find_element(By.TAG_NAME, "body").text
         assert "⏱" in body, body
         assert "0/1" in body, body  # the timed-out question counts as answered (and failed)
+
+
+@skip_if_selenium_disabled
+def test_whole_quiz_time_up_locks_the_answer_while_sending(temp_dir, browser):
+    """While the time-up answer is on its way (slow Wi-Fi), the student cannot send another answer."""
+    quizzes = timed_quiz({"whole_quiz": 3}, questions=[question("Q1?"), question("Q2?")])
+    with custom_webquiz_server(config=EN, quizzes=quizzes) as (proc, port):
+        register_user(browser, port)
+        wait_for_element(browser, By.ID, "quiz-timer")
+        browser.find_element(By.ID, "option_0").click()  # selected, but not submitted
+        # Slow network: every submit-answer request takes 3 seconds
+        browser.execute_script(
+            """
+            const originalFetch = window.fetch;
+            window.fetch = (url, options) => String(url).includes('submit-answer')
+                ? new Promise(resolve => setTimeout(resolve, 3000)).then(() => originalFetch(url, options))
+                : originalFetch(url, options);
+        """
+        )
+        WebDriverWait(browser, 6).until(lambda d: d.find_element(By.ID, "quiz-timer").text.strip() == "0:00")
+        time.sleep(0.5)  # the empty answer is now on its way
+
+        assert browser.find_element(By.ID, "submit-answer-btn").get_attribute("disabled") is not None
+        assert "disabled" in browser.find_element(By.ID, "option_1").get_attribute("class")
+
+        WebDriverWait(browser, 10).until(
+            lambda d: len(d.find_elements(By.CSS_SELECTOR, ".results-table .time-up-message")) == 2
+        )
