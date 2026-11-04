@@ -872,6 +872,16 @@
             return String(Math.round(number * 100) / 100);
         }
 
+        // Make text safe to put into HTML. Quiz text like `<vtx_band>` and
+        // student input must show as written, not be read as HTML tags.
+        function escapeHtml(text) {
+            if (text === null || text === undefined) {
+                return '';
+            }
+            const map = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' };
+            return String(text).replace(/[&<>"']/g, m => map[m]);
+        }
+
         // Preload all quiz images for instant display during questions
         function preloadQuizImages() {
             const imageUrls = new Set();
@@ -1280,7 +1290,7 @@
 
             // Create a table similar to registration form using CSS classes
             let fieldsHTML = '<table class="registration-table">';
-            fieldsHTML += `<tr><td class="registration-label">{{USERNAME_LABEL}}:</td><td class="registration-input"><input type="text" id="waiting-username" value="${registrationData.username || ''}" /></td></tr>`;
+            fieldsHTML += `<tr><td class="registration-label">{{USERNAME_LABEL}}:</td><td class="registration-input"><input type="text" id="waiting-username" value="${escapeHtml(registrationData.username)}" /></td></tr>`;
 
             // Add additional registration fields if they exist
             const additionalFields = document.querySelectorAll('.registration-field');
@@ -1290,7 +1300,7 @@
                 const fieldLabel = fieldRow ? fieldRow.querySelector('td:first-child')?.textContent.trim() : fieldName;
                 const fieldValue = registrationData[fieldName] || '';
 
-                fieldsHTML += `<tr><td class="registration-label">${fieldLabel}</td><td class="registration-input"><input type="text" class="waiting-field" data-field-name="${fieldName}" value="${fieldValue}" /></td></tr>`;
+                fieldsHTML += `<tr><td class="registration-label">${escapeHtml(fieldLabel)}</td><td class="registration-input"><input type="text" class="waiting-field" data-field-name="${escapeHtml(fieldName)}" value="${escapeHtml(fieldValue)}" /></td></tr>`;
             }
             fieldsHTML += '</table>';
 
@@ -1440,7 +1450,7 @@
                 questionContent = `
                     <div class="text-input-container">
                         <p style="font-size: 14px; color: var(--text-muted); margin-bottom: 10px;">${T.enter_answer_label}</p>
-                        <textarea id="text-answer-input" class="text-answer-input" placeholder="${T.enter_answer_placeholder}" oninput="onTextAnswerInput(this)">${question.default_value || ''}</textarea>
+                        <textarea id="text-answer-input" class="text-answer-input" placeholder="${T.enter_answer_placeholder}" oninput="onTextAnswerInput(this)">${escapeHtml(question.default_value)}</textarea>
                         <div id="checker-feedback"></div>
                     </div>
                 `;
@@ -1456,14 +1466,14 @@
                                 return `
                                     <div class="option quiz-option" data-option-index="${optionIndex}" onclick="selectCurrentAnswer(${optionIndex})" id="option_${optionIndex}">
                                         <div class="option-content">
-                                            <img src="${makeRelativePath(option)}" alt="Option ${optionIndex + 1}" class="option-image">
+                                            <img src="${escapeHtml(makeRelativePath(option))}" alt="Option ${optionIndex + 1}" class="option-image">
                                         </div>
                                     </div>
                                 `;
                             } else {
                                 return `
                                     <div class="option quiz-option" data-option-index="${optionIndex}" onclick="selectCurrentAnswer(${optionIndex})" id="option_${optionIndex}">
-                                        ${option}
+                                        ${escapeHtml(option)}
                                     </div>
                                 `;
                             }
@@ -1475,9 +1485,9 @@
             container.innerHTML = `
                 <div class="current-question active-question" style="position: relative;">
                     ${questionPoints !== 1 ? `<div class="question-points-badge">🏆 ${formatPoints(questionPoints)} ${Number.isInteger(questionPoints) && questionPoints >= 2 && questionPoints <= 4 ? T.points_2_4 : T.points_other}</div>` : ''}
-                    ${question.question ? `<h3 class="question-text">${question.question}</h3>` : ''}
-                    ${question.image ? `<a href="${makeRelativePath(question.image)}" target="_blank"><img src="${makeRelativePath(question.image)}" alt="Question image" class="question-image quiz-question-img"></a>` : ''}
-                    ${question.file ? `<a href="${makeRelativePath(question.file)}" download class="question-file"><span class="question-file-icon">📎</span><span class="question-file-name">${question.file.split('/').pop()}</span></a>` : ''}
+                    ${question.question ? `<h3 class="question-text">${escapeHtml(question.question)}</h3>` : ''}
+                    ${question.image ? `<a href="${escapeHtml(makeRelativePath(question.image))}" target="_blank"><img src="${escapeHtml(makeRelativePath(question.image))}" alt="Question image" class="question-image quiz-question-img"></a>` : ''}
+                    ${question.file ? `<a href="${escapeHtml(makeRelativePath(question.file))}" download class="question-file"><span class="question-file-icon">📎</span><span class="question-file-name">${escapeHtml(question.file.split('/').pop())}</span></a>` : ''}
                     ${questionContent}
                 </div>
             `;
@@ -1724,12 +1734,12 @@
 
                     // Show checker error if present and answer is incorrect
                     if (!isCorrect && checkerError) {
-                        feedbackHtml += `<div class="checker-error">⚠️ ${checkerError}</div>`;
+                        feedbackHtml += `<div class="checker-error">⚠️ ${escapeHtml(checkerError)}</div>`;
                     }
 
                     // Show correct value if answer is incorrect and correct value is available
                     if (!isCorrect && correctValue) {
-                        feedbackHtml += `<div class="correct-value-display">${T.correct_answer_value}<pre style="margin: 5px 0 0 0; white-space: pre-wrap;">${correctValue}</pre></div>`;
+                        feedbackHtml += `<div class="correct-value-display">${T.correct_answer_value}<pre style="margin: 5px 0 0 0; white-space: pre-wrap;">${escapeHtml(correctValue)}</pre></div>`;
                     }
 
                     feedbackContainer.innerHTML = feedbackHtml;
@@ -1859,25 +1869,25 @@
 
             // Add question text if present
             if (questionText) {
-                html += questionText;
+                html += escapeHtml(questionText);
             }
 
             // Add image if present
             if (questionImage && questionImage.startsWith('/')) {
                 if (html) html += '<br>';
-                html += `<img src="${makeRelativePath(questionImage)}" alt="Question image" style="max-width: 200px; max-height: 150px; border-radius: 5px;">`;
+                html += `<img src="${escapeHtml(makeRelativePath(questionImage))}" alt="Question image" style="max-width: 200px; max-height: 150px; border-radius: 5px;">`;
             }
 
             // Add file download link if present
             if (questionFile && questionFile.startsWith('/')) {
                 if (html) html += '<br>';
                 const fileName = questionFile.split('/').pop();
-                html += `<a href="${makeRelativePath(questionFile)}" download class="question-file" style="display: inline-flex; margin-top: 5px; padding: 5px 10px; font-size: 12px;"><span class="question-file-icon">📎</span><span class="question-file-name">${fileName}</span></a>`;
+                html += `<a href="${escapeHtml(makeRelativePath(questionFile))}" download class="question-file" style="display: inline-flex; margin-top: 5px; padding: 5px 10px; font-size: 12px;"><span class="question-file-icon">📎</span><span class="question-file-name">${escapeHtml(fileName)}</span></a>`;
             }
 
             // Fallback if nothing present
             if (!html) {
-                return questionImage || questionFile || T.no_question_content;
+                return escapeHtml(questionImage || questionFile || T.no_question_content);
             }
 
             return html;
@@ -1893,20 +1903,20 @@
                     const trimmedAnswer = answer.trim();
                     if (trimmedAnswer.startsWith('/')) {
                         // Image answer
-                        return `<div style="margin: 2px 0;"><img src="${makeRelativePath(trimmedAnswer)}" alt="Answer option" style="max-width: 100px; max-height: 75px; border-radius: 3px;"></div>`;
+                        return `<div style="margin: 2px 0;"><img src="${escapeHtml(makeRelativePath(trimmedAnswer))}" alt="Answer option" style="max-width: 100px; max-height: 75px; border-radius: 3px;"></div>`;
                     } else {
                         // Text answer
-                        return `<div style="margin: 2px 0;">${trimmedAnswer}</div>`;
+                        return `<div style="margin: 2px 0;">${escapeHtml(trimmedAnswer)}</div>`;
                     }
                 }).join('');
             } else {
                 // Single answer
                 if (answerText.startsWith('/')) {
                     // Display image for answer option
-                    return `<img src="${makeRelativePath(answerText)}" alt="Answer option" style="max-width: 100px; max-height: 75px; border-radius: 3px;">`;
+                    return `<img src="${escapeHtml(makeRelativePath(answerText))}" alt="Answer option" style="max-width: 100px; max-height: 75px; border-radius: 3px;">`;
                 } else {
                     // Text answer
-                    return answerText;
+                    return escapeHtml(answerText);
                 }
             }
         }

@@ -1165,7 +1165,7 @@
                     }
                 } else {
                     const data = await response.json();
-                    const errorHtml = `<div class="error">Error: ${data.error}</div>`;
+                    const errorHtml = `<div class="error">Error: ${escapeHtml(data.error)}</div>`;
                     if (viewMode === 'table') {
                         tableContent.innerHTML = errorHtml;
                     } else {
@@ -1173,7 +1173,7 @@
                     }
                 }
             } catch (error) {
-                const errorHtml = `<div class="error">Error loading file: ${error.message}</div>`;
+                const errorHtml = `<div class="error">Error loading file: ${escapeHtml(error.message)}</div>`;
                 if (currentCsvView === 'table') {
                     document.getElementById('file-content-table').innerHTML = errorHtml;
                 } else {
@@ -1548,18 +1548,18 @@
                 const data = await response.json();
 
                 if (response.ok) {
-                    messageArea.innerHTML = '<div class="message success">' + data.message + '</div>';
+                    messageArea.innerHTML = '<div class="message success">' + escapeHtml(data.message) + '</div>';
                     // Update both views from response
                     updateBothViews(data.config_content, data.config_data);
                 } else {
-                    let errorMessage = data.error || 'Failed to save configuration';
+                    let errorMessage = escapeHtml(data.error || 'Failed to save configuration');
                     if (data.errors && data.errors.length > 0) {
-                        errorMessage += ':<ul>' + data.errors.map(function(err) { return '<li>' + err + '</li>'; }).join('') + '</ul>';
+                        errorMessage += ':<ul>' + data.errors.map(function(err) { return '<li>' + escapeHtml(err) + '</li>'; }).join('') + '</ul>';
                     }
                     messageArea.innerHTML = '<div class="message error">' + errorMessage + '</div>';
                 }
             } catch (error) {
-                messageArea.innerHTML = '<div class="message error">Error: ' + error.message + '</div>';
+                messageArea.innerHTML = '<div class="message error">Error: ' + escapeHtml(error.message) + '</div>';
             }
         }
 
@@ -1752,10 +1752,10 @@
                     document.getElementById('quiz-editor-content').value = content;
                 } else {
                     const data = await response.json();
-                    document.getElementById('quiz-editor-message-area').innerHTML = `<div class="message error">Error: ${data.error}</div>`;
+                    document.getElementById('quiz-editor-message-area').innerHTML = `<div class="message error">Error: ${escapeHtml(data.error)}</div>`;
                 }
             } catch (error) {
-                document.getElementById('quiz-editor-message-area').innerHTML = `<div class="message error">Error loading file: ${error.message}</div>`;
+                document.getElementById('quiz-editor-message-area').innerHTML = `<div class="message error">Error loading file: ${escapeHtml(error.message)}</div>`;
             }
         }
 
@@ -1786,16 +1786,16 @@
                     } else {
                         let errorHTML = '<div class="message error">❌ Validation errors:<ul>';
                         data.errors.forEach(err => {
-                            errorHTML += `<li>${err}</li>`;
+                            errorHTML += `<li>${escapeHtml(err)}</li>`;
                         });
                         errorHTML += '</ul></div>';
                         messageArea.innerHTML = errorHTML;
                     }
                 } else {
-                    messageArea.innerHTML = `<div class="message error">Error: ${data.error}</div>`;
+                    messageArea.innerHTML = `<div class="message error">Error: ${escapeHtml(data.error)}</div>`;
                 }
             } catch (error) {
-                messageArea.innerHTML = `<div class="message error">Error: ${error.message}</div>`;
+                messageArea.innerHTML = `<div class="message error">Error: ${escapeHtml(error.message)}</div>`;
             }
         }
 
@@ -1821,21 +1821,21 @@
                 const data = await response.json();
 
                 if (response.ok) {
-                    messageArea.innerHTML = `<div class="message success">${data.message}</div>`;
+                    messageArea.innerHTML = `<div class="message success">${escapeHtml(data.message)}</div>`;
                     showMessage(`Saved ${currentEditingQuiz}`, 'success');
                     await loadFiles(); // Refresh file list
                     setTimeout(() => {
                         closeQuizEditor();
                     }, 2000);
                 } else {
-                    let errorMessage = data.error || 'Failed to save quiz';
+                    let errorMessage = escapeHtml(data.error || 'Failed to save quiz');
                     if (data.errors && data.errors.length > 0) {
-                        errorMessage += ':<ul>' + data.errors.map(err => `<li>${err}</li>`).join('') + '</ul>';
+                        errorMessage += ':<ul>' + data.errors.map(err => `<li>${escapeHtml(err)}</li>`).join('') + '</ul>';
                     }
                     messageArea.innerHTML = `<div class="message error">${errorMessage}</div>`;
                 }
             } catch (error) {
-                messageArea.innerHTML = `<div class="message error">Error: ${error.message}</div>`;
+                messageArea.innerHTML = `<div class="message error">Error: ${escapeHtml(error.message)}</div>`;
             }
         }
 

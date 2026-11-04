@@ -418,8 +418,9 @@ def test_special_characters_in_quiz_data(temp_dir):
         with open(index_path, "r", encoding="utf-8") as f:
             html_content = f.read()
 
-        # Verify title is properly escaped
-        assert 'Quiz "with" special & characters' in html_content
+        # Verify title is properly escaped for HTML
+        assert '<title>Quiz "with" special &amp; characters</title>' in html_content
+        assert '<h1>Quiz "with" special &amp; characters</h1>' in html_content
 
         # Extract and parse questions JSON to verify proper escaping
         questions_match = re.search(r"let questions = (\[.*?\]);", html_content, re.DOTALL)
@@ -477,3 +478,75 @@ def test_very_long_quiz_titles(temp_dir):
         # Verify HTML structure is still valid
         assert html_content.count("<title>") == 1
         assert html_content.count("</title>") == 1
+
+
+def test_tags_in_quiz_title_are_escaped(temp_dir):
+    """A title with tags is shown as text, not read as HTML."""
+    quiz_data = {
+        "tags_title.yaml": {
+            "title": "VTX <vtx_band> setup",
+            "questions": [{"question": "Q?", "options": ["A", "B"], "correct_answer": 0}],
+        }
+    }
+
+    with custom_webquiz_server(quizzes=quiz_data) as (proc, port):
+        index_path = Path(temp_dir) / f"static_{port}" / "index.html"
+        html_content = index_path.read_text(encoding="utf-8")
+
+        assert "<title>VTX &lt;vtx_band&gt; setup</title>" in html_content
+        assert "<h1>VTX &lt;vtx_band&gt; setup</h1>" in html_content
+        assert "VTX <vtx_band> setup" not in html_content
+
+
+def test_script_end_tag_in_question_does_not_break_page(temp_dir):
+    """A question with `</script>` in it must not end the page's script early."""
+    question_text = "What does </script><b>bold</b> do?"
+    quiz_data = {
+        "script_tag.yaml": {
+            "title": "Script tag quiz",
+            "questions": [{"question": question_text, "options": ["</script>", "B"], "correct_answer": 0}],
+        }
+    }
+
+    with custom_webquiz_server(quizzes=quiz_data) as (proc, port):
+        index_path = Path(temp_dir) / f"static_{port}" / "index.html"
+        html_content = index_path.read_text(encoding="utf-8")
+
+        # The raw text must not appear: inside a <script> it would close the script
+        assert "</script><b>" not in html_content
+
+        # The embedded data is still valid JSON with the original text
+        questions_match = re.search(r"let questions = (\[.*?\]);", html_content, re.DOTALL)
+        embedded_questions = json.loads(questions_match.group(1))
+        assert embedded_questions[0]["question"] == question_text
+        assert embedded_questions[0]["options"][0] == "</script>"
+
+
+def test_tags_in_registration_labels_are_escaped(temp_dir):
+    """Registration labels from the config are shown as text."""
+    config = {"registration": {"username_label": "Name <full>", "fields": ["Group <class>"]}}
+
+    with custom_webquiz_server(config=config) as (proc, port):
+        index_path = Path(temp_dir) / f"static_{port}" / "index.html"
+        html_content = index_path.read_text(encoding="utf-8")
+
+        assert '<td class="registration-label">Name &lt;full&gt;:</td>' in html_content
+        assert '<td class="registration-label">Group &lt;class&gt;:</td>' in html_content
+        assert 'data-field-name="group_&lt;class&gt;"' in html_content
+        assert "<full>" not in html_content
+        assert "<class>" not in html_content
+
+
+def test_tags_in_quiz_titles_are_escaped_on_selection_page(temp_dir):
+    """The 'select a quiz first' page shows quiz titles as text."""
+    quizzes = {
+        "first.yaml": {"title": "First <one>", "questions": [{"question": "Q?", "options": ["A", "B"], "correct_answer": 0}]},
+        "second.yaml": {"title": "Second", "questions": [{"question": "Q?", "options": ["A", "B"], "correct_answer": 0}]},
+    }
+
+    with custom_webquiz_server(quizzes=quizzes) as (proc, port):
+        index_path = Path(temp_dir) / f"static_{port}" / "index.html"
+        html_content = index_path.read_text(encoding="utf-8")
+
+        assert "first.yaml - First &lt;one&gt;" in html_content
+        assert "<one>" not in html_content
