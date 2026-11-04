@@ -159,6 +159,13 @@ How the limit for a question is chosen:
 
 > **Note:** A question's `time_limit` works only when the test has `time_limit: {per_question: ...}`. Without it, the question value is kept in the file but ignored.
 
+**How time is counted:**
+
+- The clock for a question starts when the student's page shows it. Reloading the page does not restart it.
+- An answer that reaches the server up to 5 seconds after the limit still counts, so a slow Wi-Fi connection does not cost the student an answer sent in time.
+- When time runs out, the question is stored with **no answer** and counts as failed. In the answers CSV this is a row with an empty `selected_answer`.
+- If the student closes the page, the server still marks the open question as timed out. In per-question mode, the next question never opens, so the student stays unfinished. Use the **"Show Answers for All"** button for such students when `show_answers_on_completion: true` is set.
+
 ---
 
 #### `stick_to_the_previous` (optional, per question)

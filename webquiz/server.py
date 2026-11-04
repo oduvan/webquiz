@@ -1444,6 +1444,44 @@ class TestingServer:
             except Exception as e:
                 logger.exception(f"Error during flush_users_to_csv: {e}")
 
+    async def check_time_limits(self, now: datetime) -> None:
+        """Store timeouts for students whose page did not send an answer in time.
+
+        The page sends an empty answer when a countdown reaches zero. This check covers
+        a closed tab or a locked phone. It never starts a clock: a question the page
+        never showed cannot time out.
+        """
+        grace = time_limits.grace_seconds()
+        questions_by_id = {q["id"]: q for q in self.questions}
+
+        # Per-question limits: the question whose clock is running
+        for user_id, question_id in list(self.current_question_ids.items()):
+            limit = self.question_time_limits.get(question_id, 0)
+            if limit <= 0 or user_id not in self.users or question_id in self.answer_results.get(user_id, {}):
+                continue
+            elapsed = self._question_elapsed(user_id, question_id, now)
+            if elapsed > limit + grace:
+                logger.info(f"Time ran out for user {user_id} on question {question_id} (no answer from the page)")
+                await self._record_answer(user_id, questions_by_id[question_id], None, elapsed, timed_out=True)
+
+        # Whole-quiz limit
+        quiz_seconds = self._whole_quiz_seconds()
+        if quiz_seconds > 0:
+            for user_id, quiz_start in list(self.quiz_start_times.items()):
+                if user_id not in self.users or user_id in self.user_stats:
+                    continue  # gone after a quiz switch, or already finished
+                if (now - quiz_start).total_seconds() > quiz_seconds + grace:
+                    await self._end_whole_quiz(user_id, now)
+
+    async def time_limit_watcher(self):
+        """Run check_time_limits() every second (tests can shorten the interval)."""
+        while True:
+            await asyncio.sleep(time_limits.check_interval_seconds())
+            try:
+                await self.check_time_limits(datetime.now())
+            except Exception as e:
+                logger.exception(f"Error during check_time_limits: {e}")
+
     async def _broadcast_to_websocket_list(
         self, clients_list: List[web.WebSocketResponse], message: dict, client_type: str = "WebSocket"
     ):
@@ -4555,6 +4593,7 @@ async def create_app(config: WebQuizConfig):
 
     # Start periodic flush task
     asyncio.create_task(server.periodic_flush())
+    asyncio.create_task(server.time_limit_watcher())
 
     # Create app with middleware
     app = web.Application(middlewares=[error_middleware])
