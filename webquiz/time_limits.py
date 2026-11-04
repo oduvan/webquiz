@@ -67,9 +67,7 @@ def validate_time_limits(data: dict) -> List[str]:
         for index, question in enumerate(questions):
             if isinstance(question, dict) and "time_limit" in question:
                 if not is_whole_seconds(question["time_limit"]):
-                    errors.append(
-                        f"Question {index + 1} 'time_limit' must be a whole number of seconds (0 or more)"
-                    )
+                    errors.append(f"Question {index + 1} 'time_limit' must be a whole number of seconds (0 or more)")
     return errors
 
 
@@ -84,9 +82,7 @@ def parse_time_limit(data: dict) -> Tuple[TimeLimitSettings, Optional[str]]:
 
     errors = _quiz_level_errors(data["time_limit"])
     if errors:
-        return TimeLimitSettings(), "Ignoring malformed time_limit, quiz runs without time limits: " + "; ".join(
-            errors
-        )
+        return TimeLimitSettings(), "Ignoring malformed time_limit, quiz runs without time limits: " + "; ".join(errors)
 
     mode, seconds = next(iter(data["time_limit"].items()))
     return TimeLimitSettings(mode, seconds), None

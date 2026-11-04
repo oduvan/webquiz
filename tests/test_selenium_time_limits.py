@@ -24,7 +24,9 @@ def question(text="Q?", **extra):
 
 
 def timed_quiz(time_limit, questions=None, **settings):
-    return {"timed.yaml": {"title": "Timed", "time_limit": time_limit, "questions": questions or [question()], **settings}}
+    return {
+        "timed.yaml": {"title": "Timed", "time_limit": time_limit, "questions": questions or [question()], **settings}
+    }
 
 
 def timer_seconds(element):

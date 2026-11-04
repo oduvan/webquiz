@@ -110,9 +110,7 @@ def test_empty_answer_skips_checker(temp_dir):
 
 
 def test_answer_after_timeout_returns_stored_timeout(temp_dir):
-    quizzes = quiz(
-        {"per_question": 30}, questions=[question("Q1?"), question("Q2?")], randomize_questions=True
-    )
+    quizzes = quiz({"per_question": 30}, questions=[question("Q1?"), question("Q2?")], randomize_questions=True)
     with custom_webquiz_server(quizzes=quizzes) as (proc, port):
         registration = requests.post(f"http://localhost:{port}/api/register", json={"username": "S"}).json()
         user_id = registration["user_id"]
@@ -184,7 +182,14 @@ def test_timeout_row_in_answers_csv(temp_dir):
         with open(os.path.join(csv_dir, answer_files[0]), encoding="utf-8") as f:
             rows = list(csv.reader(f))
 
-        assert rows[0] == ["user_id", "question", "selected_answer", "correct_answer", "is_correct", "time_taken_seconds"]
+        assert rows[0] == [
+            "user_id",
+            "question",
+            "selected_answer",
+            "correct_answer",
+            "is_correct",
+            "time_taken_seconds",
+        ]
         assert rows[1][2] == ""
         assert rows[1][4] == "False"
 

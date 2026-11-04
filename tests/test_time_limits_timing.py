@@ -77,9 +77,7 @@ def test_question_start_returns_quiz_remaining(temp_dir):
 
 
 def test_unlimited_question_has_no_remaining(temp_dir):
-    quizzes = {
-        "q.yaml": {"title": "T", "time_limit": {"per_question": 30}, "questions": [question(time_limit=0)]}
-    }
+    quizzes = {"q.yaml": {"title": "T", "time_limit": {"per_question": 30}, "questions": [question(time_limit=0)]}}
     with custom_webquiz_server(quizzes=quizzes) as (proc, port):
         user_id = register_student(port)
         assert question_start(port, user_id, 1) == {"status": "success"}
