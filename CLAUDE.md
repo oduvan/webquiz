@@ -93,7 +93,7 @@ source venv/bin/activate && poetry run build_binary
 ```
 
 ### Environment Requirements
-- **Python**: 3.9+ (tested with 3.9-3.14)
+- **Python**: 3.10+ (tested with 3.10-3.14)
 - **Poetry**: Installed inside venv (not globally) to avoid conflicts
 - **Test ports**: Tests use ports 8080-8087 for parallel execution (-n 4 uses 4 workers). CLI tests that launch a real server use 8090-8097 via `--port` so they never collide with fixture workers
 
