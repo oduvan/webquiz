@@ -274,7 +274,7 @@ The project has **222+ tests** across **15 test files** covering:
 - **Registration Fields** (12 tests): Custom registration fields
 - **Show Right Answer** (5 tests): Answer display functionality
 - **Show Answers on Completion** (10 tests): Dynamic answer visibility after all students complete
-- **Time Limits** (46 tests): Per-question and whole-quiz time limits, timeouts, background check, countdowns, editor fields (`test_time_limits_*.py`, `test_selenium_time_limits.py`, `test_selenium_admin_time_limits.py`)
+- **Time Limits** (56 tests): Per-question and whole-quiz time limits, timeouts, background check, countdowns, editor fields (`test_time_limits_*.py`, `test_selenium_time_limits.py`, `test_selenium_admin_time_limits.py`)
 - **Integration Tests** (6 tests): Multiple choice, multiple answers
 - **Selenium Tests** (56 tests): End-to-end browser testing
 - **Auto-Advance** (6 tests): Automatic progression behavior
