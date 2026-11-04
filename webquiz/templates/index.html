@@ -773,6 +773,42 @@
             border-color: #28a745;
             color: #a5d6a7;
         }
+        /* Time limit countdowns */
+        .timer-box {
+            display: inline-block;
+            max-width: 100%;
+            padding: 4px 12px;
+            margin-bottom: 10px;
+            border: 1px solid var(--border-color);
+            border-radius: 14px;
+            background: var(--container-bg);
+            font-weight: 600;
+            font-variant-numeric: tabular-nums;
+        }
+        .quiz-timer-box {
+            display: block;
+            width: fit-content;
+            margin: 0 auto 10px auto;
+            font-size: 18px;
+        }
+        .timer-pending {
+            visibility: hidden;
+        }
+        .timer-warning {
+            color: #dc3545;
+        }
+        .time-up-message {
+            color: #dc3545;
+            font-weight: 600;
+        }
+        .current-question .time-up-message {
+            margin-top: 12px;
+        }
+        @media screen and (max-width: 768px) {
+            .quiz-timer-box {
+                font-size: 16px;
+            }
+        }
     </style>
 </head>
 <body>
@@ -819,6 +855,7 @@
 
         <!-- Test Section -->
         <div id="test-section" class="section hidden">
+            <div id="quiz-timer-box" class="timer-box quiz-timer-box hidden">⏱ <span class="timer-label"></span> <span id="quiz-timer"></span></div>
             <div id="progress-bar" class="progress">
                 <div id="progress-fill"></div>
                 <span id="progress-text"></span>
@@ -851,6 +888,9 @@
         let textAnswer = ''; // For text input questions
         let testResults = [];
         let answerLocked = false; // The answer is being sent and must not change
+        let questionCountdown = null; // {questionId, deadline, intervalId} for a per-question time limit
+        let quizCountdown = null; // {deadline, intervalId} for a whole-quiz time limit
+        let quizTimeUpStarted = false; // The whole-quiz time ran out and the quiz is being closed
 
         // Prevent copying question text
         const questionContainer = document.getElementById('current-question-container');
@@ -972,10 +1012,162 @@
                     user_id: currentUserId,
                     question_id: questionId
                 })
+            }).then(async response => {
+                // The server sends the remaining time, so a page reload does not restart the countdown
+                if (response.ok) {
+                    applyRemainingTimes(questionId, await response.json());
+                }
             }).catch(error => {
                 console.log('Failed to notify question start:', error);
             });
             return questionStartRequest;
+        }
+
+        // ---- Time limit countdowns ----
+
+        function formatTimer(seconds) {
+            const whole = Math.max(0, Math.ceil(seconds));
+            return `${Math.floor(whole / 60)}:${String(whole % 60).padStart(2, '0')}`;
+        }
+
+        function applyRemainingTimes(questionId, data) {
+            if (data.remaining_seconds !== undefined) {
+                startQuestionCountdown(questionId, data.remaining_seconds);
+            }
+            if (data.quiz_remaining_seconds !== undefined) {
+                startQuizCountdown(data.quiz_remaining_seconds);
+            }
+        }
+
+        function startQuestionCountdown(questionId, remainingSeconds) {
+            stopQuestionCountdown();
+            questionCountdown = {questionId: questionId, deadline: Date.now() + remainingSeconds * 1000};
+            tickQuestionCountdown();
+            if (questionCountdown) {
+                questionCountdown.intervalId = setInterval(tickQuestionCountdown, 250);
+            }
+        }
+
+        function stopQuestionCountdown() {
+            if (questionCountdown && questionCountdown.intervalId) {
+                clearInterval(questionCountdown.intervalId);
+            }
+            questionCountdown = null;
+        }
+
+        function tickQuestionCountdown() {
+            if (!questionCountdown) {
+                return;
+            }
+            const remaining = (questionCountdown.deadline - Date.now()) / 1000;
+            // The element is looked up each time: the question may be drawn after the countdown starts
+            const timer = document.getElementById('question-timer');
+            if (timer) {
+                timer.textContent = formatTimer(remaining);
+                timer.classList.toggle('timer-warning', remaining <= 10);
+                timer.parentElement.classList.remove('timer-pending');
+            }
+            if (remaining <= 0) {
+                const questionId = questionCountdown.questionId;
+                stopQuestionCountdown();
+                onQuestionTimeUp(questionId);
+            }
+        }
+
+        function startQuizCountdown(remainingSeconds) {
+            if (quizCountdown && quizCountdown.intervalId) {
+                clearInterval(quizCountdown.intervalId);
+            }
+            quizCountdown = {deadline: Date.now() + remainingSeconds * 1000};
+            const box = document.getElementById('quiz-timer-box');
+            box.querySelector('.timer-label').textContent = T.time_left;
+            box.classList.remove('hidden');
+            tickQuizCountdown();
+            if (quizCountdown) {
+                quizCountdown.intervalId = setInterval(tickQuizCountdown, 250);
+            }
+        }
+
+        function stopAllCountdowns() {
+            stopQuestionCountdown();
+            if (quizCountdown && quizCountdown.intervalId) {
+                clearInterval(quizCountdown.intervalId);
+            }
+            quizCountdown = null;
+            document.getElementById('quiz-timer-box').classList.add('hidden');
+        }
+
+        function tickQuizCountdown() {
+            if (!quizCountdown) {
+                return;
+            }
+            const remaining = (quizCountdown.deadline - Date.now()) / 1000;
+            const timer = document.getElementById('quiz-timer');
+            timer.textContent = formatTimer(remaining);
+            timer.classList.toggle('timer-warning', remaining <= 10);
+            if (remaining <= 0) {
+                clearInterval(quizCountdown.intervalId);
+                quizCountdown = null;
+                onQuizTimeUp();
+            }
+        }
+
+        function isQuestionAnswered(questionId) {
+            return testResults.some(result => result.questionId === questionId);
+        }
+
+        // Per-question time is up: send an empty answer, unless an answer is already on its way
+        function onQuestionTimeUp(questionId) {
+            const question = questions[currentQuestionIndex];
+            if (!question || question.id !== questionId || answerLocked || isQuestionAnswered(questionId)) {
+                return;
+            }
+            submitCurrentAnswer({timedOut: true});
+        }
+
+        // Whole-quiz time is up: send an empty answer, and the server closes the whole quiz
+        async function onQuizTimeUp() {
+            if (quizTimeUpStarted) {
+                return;
+            }
+            quizTimeUpStarted = true;
+            stopQuestionCountdown();
+            // Never have two answers in flight: wait for an answer that is being sent
+            while (answerLocked) {
+                await new Promise(resolve => setTimeout(resolve, 100));
+            }
+            let index = currentQuestionIndex;
+            // On the "Continue" screen the open question already has an answer: use the next one
+            if (index < questions.length && isQuestionAnswered(questions[index].id)) {
+                index++;
+            }
+            if (index < questions.length) {
+                try {
+                    await questionStartRequest;
+                    await fetchWithRetry('api/submit-answer', {
+                        method: 'POST',
+                        headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify({user_id: currentUserId, question_id: questions[index].id, selected_answer: null})
+                    });
+                } catch (error) {
+                    console.log('Failed to send the quiz time-up answer:', error);
+                }
+            }
+            await finishQuizAfterTimeUp();
+        }
+
+        async function finishQuizAfterTimeUp() {
+            quizTimeUpStarted = true;
+            stopAllCountdowns();
+            currentQuestionIndex = questions.length;
+            await showCurrentQuestion(false); // Shows the final results from the server
+        }
+
+        function showTimeUpMessage() {
+            const currentQuestion = document.querySelector('#current-question-container .current-question');
+            if (currentQuestion && !currentQuestion.querySelector('.time-up-message')) {
+                currentQuestion.insertAdjacentHTML('beforeend', `<div class="time-up-message">⏱ ${T.time_is_up}</div>`);
+            }
         }
 
         // Error message utilities
@@ -1475,6 +1667,7 @@
 
             container.innerHTML = `
                 <div class="current-question active-question" style="position: relative;">
+                    ${question.time_limit > 0 ? `<div class="timer-box question-timer-box timer-pending">⏱ ${T.time_left} <span id="question-timer"></span></div>` : ''}
                     ${questionPoints !== 1 ? `<div class="question-points-badge">🏆 ${formatPoints(questionPoints)} ${Number.isInteger(questionPoints) && questionPoints >= 2 && questionPoints <= 4 ? T.points_2_4 : T.points_other}</div>` : ''}
                     ${question.question ? `<h3 class="question-text">${question.question}</h3>` : ''}
                     ${question.image ? `<a href="${makeRelativePath(question.image)}" target="_blank"><img src="${makeRelativePath(question.image)}" alt="Question image" class="question-image quiz-question-img"></a>` : ''}
@@ -1556,12 +1749,16 @@
             }
         }
 
-        async function submitCurrentAnswer() {
+        async function submitCurrentAnswer(options = {}) {
             const question = questions[currentQuestionIndex];
             const isTextQuestion = question.type === 'text';
+            // timedOut: the countdown reached zero, so an empty answer is sent ("time ran out")
+            const sendingTimeUp = options.timedOut === true;
 
             // Validate selection based on question type
-            if (isTextQuestion) {
+            if (sendingTimeUp) {
+                // Nothing to check: an empty answer is sent
+            } else if (isTextQuestion) {
                 if (!textAnswer.trim()) {
                     showError('test-error', T.please_enter_answer);
                     return;
@@ -1592,9 +1789,14 @@
                 textInput.disabled = true;
             }
 
+            // The answer is on its way, so the question countdown is over
+            stopQuestionCountdown();
+
             // Determine the answer to submit
             let answerToSubmit;
-            if (isTextQuestion) {
+            if (sendingTimeUp) {
+                answerToSubmit = null;
+            } else if (isTextQuestion) {
                 answerToSubmit = textAnswer;
             } else if (question.is_multiple_choice) {
                 answerToSubmit = selectedAnswers.slice().sort((a, b) => a - b);
@@ -1641,9 +1843,20 @@
                     throw new Error(`Invalid JSON response: ${responseText.substring(0, 100)}`);
                 }
 
+                // Time ran out (the page sent an empty answer, or the answer arrived too late):
+                // the server stored no answer, so drop what was selected
+                const timedOut = data.timed_out === true;
+                if (timedOut) {
+                    selectedAnswer = null;
+                    selectedAnswers = [];
+                    document.querySelectorAll('.option.selected').forEach(option => option.classList.remove('selected'));
+                }
+
                 // Format selected answer for display
                 let selectedAnswerDisplay;
-                if (isTextQuestion) {
+                if (timedOut) {
+                    selectedAnswerDisplay = '';
+                } else if (isTextQuestion) {
                     selectedAnswerDisplay = textAnswer;
                 } else if (question.is_multiple_choice) {
                     selectedAnswerDisplay = selectedAnswers.map(idx => question.options[idx]).join(' | ');
@@ -1662,11 +1875,19 @@
                     isMultipleChoice: question.is_multiple_choice,
                     isTextQuestion: isTextQuestion,
                     checkerError: data.checker_error,
-                    correctValue: data.correct_value
+                    correctValue: data.correct_value,
+                    timedOut: timedOut
                 });
 
+                // Whole-quiz time is over: the server closed the quiz, show the results
+                if (timedOut && quizTimeLimit > 0 && data.test_completed) {
+                    answerLocked = false;
+                    await finishQuizAfterTimeUp();
+                    return;
+                }
+
                 // Show feedback on selected answer
-                showAnswerFeedback(data.is_correct, data.correct_answer, data.is_text_question, data.checker_error, data.correct_value);
+                showAnswerFeedback(data.is_correct, data.correct_answer, data.is_text_question, data.checker_error, data.correct_value, timedOut);
 
             } catch (error) {
                 showError('test-error', T.submit_error + error.message);
@@ -1680,9 +1901,13 @@
             }
         }
 
-        function showAnswerFeedback(isCorrect, correctAnswer, isTextQuestion, checkerError, correctValue) {
+        function showAnswerFeedback(isCorrect, correctAnswer, isTextQuestion, checkerError, correctValue, timedOut = false) {
             const question = questions[currentQuestionIndex];
             const actualIsTextQuestion = question.type === 'text';
+
+            if (timedOut) {
+                showTimeUpMessage();
+            }
 
             // If isCorrect is undefined, don't show any feedback (show_right_answer is false)
             if (isCorrect === undefined) {
@@ -1703,10 +1928,10 @@
                 submitBtn.classList.add('hidden');
 
                 // Auto-advance to next question with animation after a brief pause
-                // Brief delay allows user to see their selection before transition
+                // Brief delay allows user to see their selection (or the "Time is up" message) before transition
                 setTimeout(() => {
                     continueToNextQuestion(true);
-                }, 100);
+                }, timedOut ? 1500 : 100);
                 return;
             }
 
@@ -1836,6 +2061,7 @@
         }
 
         async function fetchAndShowFinalResults() {
+            stopAllCountdowns();
             try {
                 // Fetch final results from server to ensure consistency with page reload
                 const response = await fetchWithRetry(`api/verify-user/${currentUserId}`);
@@ -1949,9 +2175,9 @@
                         <tr>
                             <td data-label="${T.question_header}">${formatQuestionForDisplay(result.question, result.image, result.file)}</td>
                             <td data-label="${T.your_answer_header}">
-                                <span class="${result.isCorrect === true ? 'answer-correct' : (result.isCorrect === false ? 'answer-incorrect' : '')}">
+                                ${result.timedOut ? `<span class="time-up-message">⏱ ${T.time_is_up}</span>` : `<span class="${result.isCorrect === true ? 'answer-correct' : (result.isCorrect === false ? 'answer-incorrect' : '')}">
                                     ${formatAnswerForDisplay(result.selectedAnswer)}
-                                </span>
+                                </span>`}
                                 ${result.isCorrect === false && correctAnswer && showRightAnswer ? `<div class="correct-answer-hint">${T.result_correct_header}${formatAnswerForDisplay(correctAnswer)}</div>` : ''}
                             </td>
                             <td data-label="${T.correct_header_alt}" style="text-align: center;">
@@ -1974,6 +2200,7 @@
         }
 
         function showCompletedTestResults(finalResults) {
+            stopAllCountdowns();
             document.getElementById('loading').classList.add('hidden');
             document.getElementById('test-section').classList.add('hidden');
 
@@ -2032,9 +2259,9 @@
                                 <tr>
                                     <td data-label="${T.question_header}">${formatQuestionForDisplay(result.question, result.image, result.file)}</td>
                                     <td data-label="${T.your_answer_header}">
-                                        <span class="${result.is_correct === true ? 'answer-correct' : (result.is_correct === false ? 'answer-incorrect' : '')}">
+                                        ${result.timed_out ? `<span class="time-up-message">⏱ ${T.time_is_up}</span>` : `<span class="${result.is_correct === true ? 'answer-correct' : (result.is_correct === false ? 'answer-incorrect' : '')}">
                                             ${formatAnswerForDisplay(result.selected_answer)}
-                                        </span>
+                                        </span>`}
                                         ${result.is_correct === false && result.correct_answer && (showRightAnswer || hasCorrectAnswers) ? `<div class="correct-answer-hint">${T.result_correct_header}${formatAnswerForDisplay(result.correct_answer)}</div>` : ''}
                                     </td>
                                     <td data-label="${T.correct_header_alt}" style="text-align: center;">

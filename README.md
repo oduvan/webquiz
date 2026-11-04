@@ -546,7 +546,7 @@ time_limit:
 
 A question's `time_limit` works only in `per_question` mode. Without a quiz-level `time_limit`, it is ignored.
 
-The clock for a question starts when the student's page shows it. An answer that reaches the server within the limit plus 5 seconds counts. A later answer, or no answer, is stored as an empty, failed answer, so in the answers CSV an empty `selected_answer` means "time ran out".
+Students see a countdown for the question (or one for the whole quiz) that turns red in the last 10 seconds, then "Time is up". The clock for a question starts when the student's page shows it. An answer that reaches the server within the limit plus 5 seconds counts. A later answer, or no answer, is stored as an empty, failed answer, so in the answers CSV an empty `selected_answer` means "time ran out".
 
 ### Connection Drops
 

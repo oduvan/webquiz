@@ -159,6 +159,8 @@ How the limit for a question is chosen:
 
 > **Note:** A question's `time_limit` works only when the test has `time_limit: {per_question: ...}`. Without it, the question value is kept in the file but ignored.
 
+**What the student sees:** a countdown (⏱ Time left 0:42) on each question with a limit, or one countdown for the whole test at the top of the page. It turns red in the last 10 seconds. When it reaches zero, the student sees "Time is up". The question counts as failed, and the test moves on (or, for the whole test, the results open). On the results screen, such questions show "⏱ Time is up".
+
 **How time is counted:**
 
 - The clock for a question starts when the student's page shows it. Reloading the page does not restart it.
