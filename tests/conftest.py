@@ -207,3 +207,12 @@ def get_admin_session(port, master_key="test123"):
     if response.status_code != 200:
         raise Exception(f"Failed to authenticate: {response.status_code} - {response.text}")
     return response.cookies
+
+
+def register_student(port, username="Student"):
+    """Register a student through the API and return the new user_id."""
+    import requests
+
+    response = requests.post(f"http://localhost:{port}/api/register", json={"username": username})
+    assert response.status_code == 200, response.text
+    return response.json()["user_id"]

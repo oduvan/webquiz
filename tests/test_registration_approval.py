@@ -373,14 +373,18 @@ def test_approve_user_broadcasts_websocket():
 # Test timing behavior (2 tests)
 
 
-def test_timing_starts_on_registration_when_approve_false():
-    """Test that timing starts immediately when approval disabled"""
+def test_timing_starts_on_question_start_when_approve_false():
+    """Test that timing starts when the page shows the question, not at registration"""
     config = {"registration": {"approve": False}}
 
     with custom_webquiz_server(config=config) as (proc, port):
         # Register user
         reg_response = requests.post(f"http://localhost:{port}/api/register", json={"username": "TestUser"})
         user_id = reg_response.json()["user_id"]
+
+        # Time before the page shows the question does not count
+        time.sleep(1.5)
+        requests.post(f"http://localhost:{port}/api/question-start", json={"user_id": user_id, "question_id": 1})
 
         # Wait a bit
         time.sleep(0.2)
@@ -394,6 +398,7 @@ def test_timing_starts_on_registration_when_approve_false():
         assert response.status_code == 200
         data = response.json()
         assert data["time_taken"] >= 0.2  # At least 0.2 seconds passed
+        assert data["time_taken"] < 1.2  # The 1.5 seconds before question-start are not counted
 
 
 def test_timing_starts_on_approval_when_approve_true():
@@ -425,5 +430,5 @@ def test_timing_starts_on_approval_when_approve_true():
 
         assert response.status_code == 200
         data = response.json()
-        # Time should be around 0.1 seconds (from approval), NOT 0.6 seconds (from registration)
+        # Time before approval is never counted (the clock starts when the page shows the question)
         assert data["time_taken"] < 0.3  # Should be much less than 0.5+0.1=0.6 seconds

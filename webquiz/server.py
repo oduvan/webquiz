@@ -592,6 +592,12 @@ class TestingServer:
         self.user_responses: List[Dict[str, Any]] = []
         self.user_progress: Dict[str, int] = {}  # user_id -> last_answered_question_id
         self.question_start_times: Dict[str, datetime] = {}  # user_id -> question_start_time
+        # user_id -> id of the question whose clock is running (set and removed with question_start_times)
+        self.current_question_ids: Dict[str, int] = {}
+        # user_id -> when the student first saw a question (whole-quiz time limit clock, never reset)
+        self.quiz_start_times: Dict[str, datetime] = {}
+        self.time_limit_settings = time_limits.TimeLimitSettings()  # Updated when quiz is loaded
+        self.question_time_limits: Dict[int, int] = {}  # question_id -> effective seconds (0 = no limit)
         self.user_stats: Dict[str, Dict[str, Any]] = {}  # user_id -> final stats for completed users
         self.user_answers: Dict[str, List[Dict[str, Any]]] = {}  # user_id -> list of answers for stats calculation
         # user_id -> {question_id: {"selected_answer", "response"}}, answers a retried submit with the stored result
@@ -733,6 +739,8 @@ class TestingServer:
         self.user_responses.clear()
         self.user_progress.clear()
         self.question_start_times.clear()
+        self.current_question_ids.clear()
+        self.quiz_start_times.clear()
         self.user_stats.clear()
         self.user_answers.clear()
         self.answer_results.clear()
@@ -1058,11 +1066,18 @@ class TestingServer:
             for i, question in enumerate(self.questions):
                 question["id"] = i + 1
 
+            # Time limits: a malformed value in a hand-edited file means no limits
+            self.time_limit_settings, time_limit_warning = time_limits.parse_time_limit(data)
+            if time_limit_warning:
+                logger.warning(f"{quiz_file_path}: {time_limit_warning}")
+            self.question_time_limits = time_limits.question_limits(self.time_limit_settings, self.questions)
+
             logger.info(
                 f"Loaded {len(self.questions)} questions from {quiz_file_path}, "
                 f"show_right_answer: {self.show_right_answer}, randomize_questions: {self.randomize_questions}, "
                 f"show_answers_on_completion: {self.show_answers_on_completion}, "
-                f"show_final_list: {self.show_final_list}"
+                f"show_final_list: {self.show_final_list}, "
+                f"time_limit: {self.time_limit_settings.mode} {self.time_limit_settings.seconds}s"
             )
 
     async def load_questions(self):
@@ -1150,6 +1165,9 @@ class TestingServer:
                     file_path = f"/attach/{file_path}"
                 client_question["file"] = file_path
 
+            # Effective time limit in seconds (0 = no limit), so the page does not need the rules
+            client_question["time_limit"] = self.question_time_limits.get(q["id"], 0)
+
             questions_for_client.append(client_question)
 
         # Convert questions to JSON string for embedding
@@ -1196,6 +1214,7 @@ class TestingServer:
         html_content = html_content.replace("{{USERNAME_LABEL}}", username_label)
         html_content = html_content.replace("{{SHOW_RIGHT_ANSWER}}", "true" if self.show_right_answer else "false")
         html_content = html_content.replace("{{SHOW_FINAL_LIST}}", "true" if self.show_final_list else "false")
+        html_content = html_content.replace("{{QUIZ_TIME_LIMIT}}", str(self._whole_quiz_seconds()))
         html_content = html_content.replace("{{WEBQUIZ_VERSION}}", get_package_version())
 
         # Inject translations as JSON for JS and as individual placeholders for HTML/CSS
@@ -1799,11 +1818,9 @@ class TestingServer:
         if registration_token:
             self.registration_tokens[registration_token] = user_id
 
-        # If approval not required, start timing and live stats immediately
+        # If approval not required, start live stats immediately.
+        # The question clock starts later, when the page shows the question (question-start).
         if not requires_approval:
-            # Start timing for first question
-            self.question_start_times[user_id] = datetime.now()
-
             # Initialize live stats: set first question to "think"
             if len(self.questions) > 0:
                 # Determine first question ID (use question_order if randomization enabled)
@@ -2011,6 +2028,7 @@ class TestingServer:
             time_taken = (datetime.now() - self.question_start_times[user_id]).total_seconds()
             # Clean up the start time
             del self.question_start_times[user_id]
+            self.current_question_ids.pop(user_id, None)
 
         # Check if this is a text input question (has checker)
         is_text_question = "checker" in question
@@ -2175,8 +2193,13 @@ class TestingServer:
         if question_id in self.answer_results.get(user_id, {}):
             return web.json_response({"status": "success"})
 
+        now = datetime.now()
+        # A repeated notice (for example after a page reload) does not restart the clocks
         if user_id not in self.question_start_times:
-            self.question_start_times[user_id] = datetime.now()
+            self.question_start_times[user_id] = now
+            self.current_question_ids[user_id] = question_id
+        if user_id not in self.quiz_start_times:
+            self.quiz_start_times[user_id] = now
         self.update_live_stats(user_id, question_id, "think")
 
         # Get points for current question
@@ -2197,7 +2220,37 @@ class TestingServer:
             }
         )
 
-        return web.json_response({"status": "success"})
+        return web.json_response({"status": "success", **self._remaining_times(user_id, question_id, now)})
+
+    def _whole_quiz_seconds(self) -> int:
+        """Seconds for the whole quiz, or 0 when the quiz has no whole-quiz limit."""
+        if self.time_limit_settings.mode == "whole_quiz":
+            return self.time_limit_settings.seconds
+        return 0
+
+    def _question_is_limited(self, question_id: int) -> bool:
+        """True when the question has its own limit, or the whole quiz has a limit."""
+        return self.question_time_limits.get(question_id, 0) > 0 or self._whole_quiz_seconds() > 0
+
+    def _remaining_times(self, user_id: str, question_id: int, now: datetime) -> dict:
+        """Remaining seconds for the question and for the whole quiz, without the grace.
+
+        Only the limits that apply are included, so a quiz without limits gets an empty dict.
+        """
+        remaining = {}
+        question_limit = self.question_time_limits.get(question_id, 0)
+        if question_limit > 0:
+            if self.current_question_ids.get(user_id) == question_id:
+                elapsed = (now - self.question_start_times[user_id]).total_seconds()
+            else:
+                elapsed = 0
+            remaining["remaining_seconds"] = max(0.0, question_limit - elapsed)
+
+        quiz_seconds = self._whole_quiz_seconds()
+        if quiz_seconds > 0 and user_id in self.quiz_start_times:
+            elapsed = (now - self.quiz_start_times[user_id]).total_seconds()
+            remaining["quiz_remaining_seconds"] = max(0.0, quiz_seconds - elapsed)
+        return remaining
 
     def calculate_and_store_user_stats(self, user_id):
         """Calculate and store final stats for a completed user.
@@ -2613,8 +2666,8 @@ class TestingServer:
 
         self.users[user_id] = user_data
 
-        # Start timing for first question
-        self.question_start_times[user_id] = datetime.now()
+        # The question clock starts when the student's page shows the question (question-start),
+        # not here: the student sees the question only after pressing "Check status".
 
         # Initialize live stats: set first question to "think"
         if len(self.questions) > 0:

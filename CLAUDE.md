@@ -38,7 +38,7 @@ WebQuiz - Python/aiohttp quiz system with multi-quiz management, real-time WebSo
 ## API Endpoints
 
 **Public:**
-- `POST /api/register` (optional `registration_token`: a repeat with the same token returns the existing user), `PUT /api/update-registration`, `POST /api/submit-answer` (repeat with the same answer returns the stored result; a different answer to an answered question → 409), `POST /api/question-start` (ignored for an answered question), `GET /api/verify-user/{user_id}`
+- `POST /api/register` (optional `registration_token`: a repeat with the same token returns the existing user), `PUT /api/update-registration`, `POST /api/submit-answer` (repeat with the same answer returns the stored result; a different answer to an answered question → 409), `POST /api/question-start` (ignored for an answered question; response adds `remaining_seconds` / `quiz_remaining_seconds` when a time limit applies), `GET /api/verify-user/{user_id}`
 - `GET /attach/{filename}` - Download quiz file attachment (Content-Disposition: attachment)
 
 **Admin (session cookie required, local network only):**
@@ -113,7 +113,7 @@ webquiz-stress-test -c 50
 - **Middleware-based error handling** for aiohttp
 - **Configuration module separation** - config.py contains dataclasses for configuration (using standard dataclasses module with field(default_factory=...))
 - **6 digits user ID** stored by user_id as key
-- **Server-side timing** for accuracy (starts on admin approval if required)
+- **Server-side timing** for accuracy. A question's clock starts at `POST /api/question-start` (when the page shows it), also for the first question; registration and approval do not start it. A repeated question-start does not restart it. `current_question_ids[user_id]` names the question whose clock runs; `quiz_start_times[user_id]` (first question-start) is the whole-quiz clock
 - **Multi-file quiz system** in `quizzes/` dir, auto-created if missing
 - **Session-based admin auth** - Master key sent in request body to `/api/admin/auth`, returns session cookie for subsequent requests (no header-based auth)
 - **Config validation** with comprehensive structure/type checks before save
@@ -178,7 +178,7 @@ webquiz-stress-test -c 50
 ## Key Flows
 
 **Quiz**: Load YAML → inject to HTML → register user → cookie session → submit answers → timing → validate → in-memory → CSV flush
-**Approval**: Register → `approved: false` → wait → admin WebSocket notified → approve button → **timing starts** → student checks → quiz begins
+**Approval**: Register → `approved: false` → wait → admin WebSocket notified → approve button → student checks → quiz begins → **timing starts** at question-start
 **Randomization**: Load YAML → register → `random.shuffle()` → store `question_order` per-user → client receives array → JS reorders → persists across sessions
 **Admin**: Switch quiz → reset all state (users, progress, responses) → new CSV → session isolation
 **Live Stats Groups**: Users display in "In Progress" group → answer questions → complete final question → automatically move to "Completed" group with `completed: true` flag in WebSocket
