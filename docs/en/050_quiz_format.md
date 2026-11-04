@@ -122,6 +122,45 @@ randomize_questions: true  # Each student gets a unique question order
 
 ---
 
+#### `time_limit` (optional)
+
+Limits how much time students have. Choose **one** of two modes. All values are whole seconds, and `0` always means "no limit".
+
+**Mode 1: per question.** `per_question` is the default limit for every question. A question can set its own `time_limit`:
+
+```
+time_limit:
+  per_question: 60      # every question: 60 seconds
+questions:
+  - question: "2+2?"
+    time_limit: 20      # this question: 20 seconds
+  - question: "Explain your answer"
+    time_limit: 0       # this question: no limit
+  - question: "3+3?"    # uses the default: 60 seconds
+```
+
+With `per_question: 0`, questions have no limit, except the ones that set their own `time_limit`.
+
+**Mode 2: whole quiz.** One limit for the whole quiz. Question `time_limit` values are ignored:
+
+```
+time_limit:
+  whole_quiz: 900       # 15 minutes for the whole test
+```
+
+How the limit for a question is chosen:
+
+| Test `time_limit` | Question `time_limit` | Result |
+|---|---|---|
+| not set | anything | no limit (the question value is ignored) |
+| `per_question: D` | not set | `D` seconds |
+| `per_question: D` | `T` | `T` seconds |
+| `whole_quiz: W` | anything | the question has no own limit; the whole test has `W` seconds |
+
+> **Note:** A question's `time_limit` works only when the test has `time_limit: {per_question: ...}`. Without it, the question value is kept in the file but ignored.
+
+---
+
 #### `stick_to_the_previous` (optional, per question)
 
 Determines whether a question should stay adjacent to the previous question during randomization. This is useful for related questions that must appear consecutively (e.g., a reading passage followed by questions about it).

@@ -26,6 +26,7 @@ from .config import WebQuizConfig, load_config_from_yaml
 from .translations import get_translations
 from .tunnel import TunnelManager
 from .transfer import TransferManager, TransferError
+from . import time_limits
 
 from webquiz import __version__ as package_version
 from webquiz import checker as checker_module
@@ -2998,6 +2999,7 @@ class TestingServer:
             "min_correct",
             "show_answers_on_completion",
             "show_final_list",
+            "time_limit",
         ]
         for field in optional_fields:
             if field in quizzes_data[0]:
@@ -3227,6 +3229,8 @@ class TestingServer:
 
         if "title" in data and not isinstance(data["title"], str):
             errors.append("'title' must be a string")
+
+        errors.extend(time_limits.validate_time_limits(data))
 
         return len(errors) == 0
 

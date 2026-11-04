@@ -525,6 +525,27 @@ This is a quiz-level setting configured in the quiz YAML file:
 show_final_list: false
 ```
 
+### Time Limits
+
+A quiz can limit how much time students have, in one of two modes. All values are whole seconds, and `0` means "no limit".
+
+```yaml
+time_limit:
+  per_question: 60      # default for every question
+questions:
+  - question: "2+2?"
+    time_limit: 20      # this question: 20 seconds
+  - question: "Explain"
+    time_limit: 0       # this question: no limit
+```
+
+```yaml
+time_limit:
+  whole_quiz: 900       # 15 minutes for the whole quiz (question values are ignored)
+```
+
+A question's `time_limit` works only in `per_question` mode. Without a quiz-level `time_limit`, it is ignored.
+
 ### Connection Drops
 
 The student quiz page keeps working through short network drops (unstable classroom Wi-Fi, a tunnel that reconnects):
