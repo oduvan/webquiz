@@ -11,7 +11,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        python-version: ["3.9", "3.10", "3.11", "3.12", "3.13"]
+        python-version: ["3.10", "3.11", "3.12", "3.13"]
 
     steps:
     - uses: actions/checkout@v4
@@ -39,16 +39,16 @@ jobs:
       run: |
         poetry install --no-interaction --no-ansi
 
-    - name: Run tests with coverage (Python 3.9 only)
-      if: matrix.python-version == '3.9'
+    - name: Run tests with coverage (Python 3.10 only)
+      if: matrix.python-version == '3.10'
       run: |
         poetry run pytest tests/ -v --tb=short --cov=webquiz --cov-report=term-missing --cov-report=xml
       env:
         SKIP_SELENIUM: "false"
         PYTEST_XDIST_WORKER: gw${{ strategy.job-index }}
 
-    - name: Run tests without coverage (Python 3.10+)
-      if: matrix.python-version != '3.9'
+    - name: Run tests without coverage (Python 3.11+)
+      if: matrix.python-version != '3.10'
       run: |
         poetry run python -m pytest tests/ -v --tb=short
       env:
