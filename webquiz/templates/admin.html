@@ -1323,6 +1323,21 @@
                         </label>
                     </div>
                     <div class="form-group">
+                        <label for="time-limit-mode">Обмеження часу:</label>
+                        <div style="display: flex; gap: 10px; flex-wrap: wrap; align-items: center;">
+                            <select id="time-limit-mode" onchange="toggleTimeLimitFields()" style="max-width: 100%;">
+                                <option value="none">Без обмеження часу</option>
+                                <option value="per_question">На кожне питання</option>
+                                <option value="whole_quiz">На весь тест</option>
+                            </select>
+                            <span id="time-limit-seconds-group" style="display: none; align-items: center; gap: 6px; flex-wrap: wrap;">
+                                <label for="time-limit-seconds">Обмеження часу (секунди):</label>
+                                <input type="number" id="time-limit-seconds" min="0" step="1" value="60" style="width: 100px;">
+                                <small>0 = без обмеження</small>
+                            </span>
+                        </div>
+                    </div>
+                    <div class="form-group">
                         <div id="questions-container">
                             <!-- Questions will be added dynamically -->
                         </div>
@@ -1913,6 +1928,10 @@
         function resetQuizEditor() {
             questionCounter = 1;
 
+            // A new quiz starts without a time limit
+            document.getElementById('time-limit-mode').value = 'none';
+            document.getElementById('time-limit-seconds').value = 60;
+
             // Clear content
             document.getElementById('questions-container').innerHTML = '';
 
@@ -2018,6 +2037,11 @@
                         <label for="points-${questionCounter}" style="display: inline-block;">Бали за питання:</label>
                         <input type="number" id="points-${questionCounter}" class="points-input" min="0.01" step="0.01" value="1" placeholder="1" style="width: 80px;" oninput="updateQuestionPreview(this)">
                     </div>
+                    <div class="form-group question-time-limit-group">
+                        <label style="display: inline-block;">Обмеження часу (секунди):</label>
+                        <input type="number" class="question-time-limit-input" min="0" step="1" value="" placeholder="за замовчуванням" style="width: 140px;">
+                        <small>0 = без обмеження</small>
+                    </div>
                     <div class="form-group">
                         <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
                             <input type="checkbox" class="stick-to-previous-checkbox" onchange="updateQuestionPreview(this)">
@@ -2030,6 +2054,7 @@
             container.appendChild(questionDiv);
             setupDragEvents(questionDiv);
             questionCounter++;
+            toggleTimeLimitFields();
             updateQuestionNumbers();
 
             // Scroll the new question into view and focus if not collapsed
@@ -2467,6 +2492,17 @@
             // Update visibility of show_answers_on_completion based on show_right_answer
             toggleShowAnswersOnCompletion();
 
+            // Populate time limit: one of per_question / whole_quiz, or none
+            const timeLimit = (quizData.time_limit && typeof quizData.time_limit === 'object') ? quizData.time_limit : {};
+            let timeLimitMode = 'none';
+            if (timeLimit.per_question !== undefined) {
+                timeLimitMode = 'per_question';
+            } else if (timeLimit.whole_quiz !== undefined) {
+                timeLimitMode = 'whole_quiz';
+            }
+            document.getElementById('time-limit-mode').value = timeLimitMode;
+            document.getElementById('time-limit-seconds').value = timeLimitMode === 'none' ? 60 : timeLimit[timeLimitMode];
+
             if (quizData.questions) {
                 quizData.questions.forEach(question => {
                     const questionDiv = document.createElement('div');
@@ -2618,6 +2654,11 @@
                                 <label for="points-${questionCounter}" style="display: inline-block;">Бали за питання:</label>
                                 <input type="number" id="points-${questionCounter}" class="points-input" min="0.01" step="0.01" value="${pointsValue}" placeholder="1" style="width: 80px;" oninput="updateQuestionPreview(this)">
                             </div>
+                            <div class="form-group question-time-limit-group">
+                                <label style="display: inline-block;">Обмеження часу (секунди):</label>
+                                <input type="number" class="question-time-limit-input" min="0" step="1" value="${question.time_limit !== undefined && question.time_limit !== null ? escapeHtml(String(question.time_limit)) : ''}" placeholder="за замовчуванням" style="width: 140px;">
+                                <small>0 = без обмеження</small>
+                            </div>
                             <div class="form-group">
                                 <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
                                     <input type="checkbox" class="stick-to-previous-checkbox" ${question.stick_to_the_previous ? 'checked' : ''} onchange="updateQuestionPreview(this)">
@@ -2633,6 +2674,17 @@
                 });
                 updateQuestionNumbers();
             }
+            toggleTimeLimitFields();
+        }
+
+        // Show the seconds field when a time limit is chosen, and the per-question
+        // fields only in per-question mode. Hidden fields keep their values and are saved.
+        function toggleTimeLimitFields() {
+            const mode = document.getElementById('time-limit-mode').value;
+            document.getElementById('time-limit-seconds-group').style.display = mode === 'none' ? 'none' : 'inline-flex';
+            document.querySelectorAll('.question-time-limit-group').forEach(group => {
+                group.style.display = mode === 'per_question' ? '' : 'none';
+            });
         }
 
         // Check every question's points field. Returns an error message for the
@@ -2771,6 +2823,12 @@
                     questionData.stick_to_the_previous = true;
                 }
 
+                // Include the question's own time limit when filled (kept in every mode, used in per-question mode)
+                const timeLimitInput = div.querySelector('.question-time-limit-input');
+                if (timeLimitInput && timeLimitInput.value.trim() !== '') {
+                    questionData.time_limit = Number(timeLimitInput.value);
+                }
+
                 questions.push(questionData);
             });
 
@@ -2793,6 +2851,13 @@
 
             // Include show_final_list setting
             quizData.show_final_list = document.getElementById('show-final-list').checked;
+
+            // Include time limit unless "none" is chosen
+            const timeLimitMode = document.getElementById('time-limit-mode').value;
+            if (timeLimitMode !== 'none') {
+                const seconds = document.getElementById('time-limit-seconds').value.trim();
+                quizData.time_limit = { [timeLimitMode]: seconds === '' ? 0 : Number(seconds) };
+            }
 
             return quizData;
         }

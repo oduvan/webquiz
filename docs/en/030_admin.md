@@ -192,6 +192,9 @@ The editor uses a visual wizard interface for easy question management.
 - **Randomize Question Order**
   If enabled, questions are shuffled for each participant. Each student sees questions in a different random order.
 
+- **Time limit**
+  Choose **No time limit**, **Per question** or **Whole test**, and enter the seconds (0 = no limit). For per question, the seconds are the default for every question. See `time_limit` in the quiz file format.
+
 #### Question Editor
 
 For each question, you can configure:
@@ -210,6 +213,8 @@ For each question, you can configure:
 - **Answer Options** — for single/multiple choice questions, add answer options. Each option can be text or an image path. Mark the correct answer(s) with the radio button or checkbox.
 
 - **Points per Question** — the number of points awarded for a correct answer (default: 1). Questions with more than 1 point show a trophy indicator.
+
+- **Time limit (seconds)** — shown only when the test time limit is **Per question**. Leave it empty to use the default, or enter 0 for no limit on this question. The value is kept in the file when you switch to another mode.
 
 - **Stick to Previous Question** — when randomization is enabled, this keeps the question adjacent to the previous one. Useful for grouping related questions together.
 
