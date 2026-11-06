@@ -791,6 +791,10 @@
             margin: 0 auto 10px auto;
             font-size: 18px;
         }
+        /* .quiz-timer-box sets display, so .hidden alone would not hide it */
+        .quiz-timer-box.hidden {
+            display: none;
+        }
         .timer-pending {
             visibility: hidden;
         }

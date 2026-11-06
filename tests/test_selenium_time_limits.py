@@ -41,7 +41,7 @@ def test_question_countdown_is_shown(temp_dir, browser):
         timer = wait_for_element(browser, By.ID, "question-timer")
         WebDriverWait(browser, 5).until(lambda d: re.match(r"^\d:\d\d$", timer.text.strip()))
         assert timer.is_displayed()
-        assert not browser.find_element(By.ID, "quiz-timer").is_displayed()
+        assert not browser.find_element(By.ID, "quiz-timer-box").is_displayed()  # no whole-quiz limit
 
 
 @skip_if_selenium_disabled
