@@ -30,6 +30,15 @@ from .tunnel import TunnelManager
 from .transfer import TransferManager, TransferError
 from . import time_limits
 
+# Quiz settings the admin can change in the start pop-up (the quiz file gives the defaults)
+START_SETTING_KEYS = (
+    "show_right_answer",
+    "randomize_questions",
+    "show_answers_on_completion",
+    "show_final_list",
+    "time_limit",
+)
+
 from webquiz import __version__ as package_version
 from webquiz import checker as checker_module
 
@@ -631,6 +640,9 @@ class TestingServer:
         # stored answer). Used for time limits when an answer arrives without question-start (sent by hand).
         self.question_ready_times: Dict[str, datetime] = {}
         self.time_limit_settings = time_limits.TimeLimitSettings()  # Updated when quiz is loaded
+        # Settings the admin chose when starting the quiz (they override the quiz file for this run only)
+        self.start_settings: Dict[str, Any] = {}
+        self.start_settings_quiz: Optional[str] = None  # The quiz file the start settings belong to
         self.question_time_limits: Dict[int, int] = {}  # question_id -> effective seconds (0 = no limit)
         self.user_stats: Dict[str, Dict[str, Any]] = {}  # user_id -> final stats for completed users
         self.user_answers: Dict[str, List[Dict[str, Any]]] = {}  # user_id -> list of answers for stats calculation
@@ -920,7 +932,50 @@ class TestingServer:
                     quiz_files.append(quiz_info)
         return sorted(quiz_files, key=lambda x: x["filename"])
 
-    async def switch_quiz(self, quiz_filename: str):
+    def _validate_start_settings(self, settings) -> List[str]:
+        """Check the settings the admin chose when starting a quiz. Returns error messages."""
+        if not isinstance(settings, dict):
+            return ["'settings' must be an object"]
+        errors = []
+        for key, value in settings.items():
+            if key not in START_SETTING_KEYS:
+                errors.append(f"'{key}' cannot be changed when starting a quiz")
+            elif key == "time_limit":
+                if value is not None:  # None turns the time limit off
+                    errors.extend(time_limits.validate_time_limits({"time_limit": value}))
+            elif not isinstance(value, bool):
+                errors.append(f"'{key}' must be a boolean (true or false)")
+        return errors
+
+    def _apply_start_settings(self):
+        """Use the admin's start settings instead of the quiz file values for the running quiz."""
+        settings = self.start_settings
+        for key in ("show_right_answer", "randomize_questions", "show_answers_on_completion", "show_final_list"):
+            if key in settings:
+                setattr(self, key, settings[key])
+        if "time_limit" in settings:
+            if settings["time_limit"] is None:
+                self.time_limit_settings = time_limits.TimeLimitSettings()
+            else:
+                self.time_limit_settings, _ = time_limits.parse_time_limit({"time_limit": settings["time_limit"]})
+            self.question_time_limits = time_limits.question_limits(self.time_limit_settings, self.questions)
+        if settings:
+            logger.info(f"Quiz runs with start settings (quiz file not changed): {settings}")
+
+    def current_quiz_settings(self) -> dict:
+        """The settings the running quiz uses (quiz file values with the start settings applied)."""
+        time_limit = None
+        if self.time_limit_settings.mode != "none":
+            time_limit = {self.time_limit_settings.mode: self.time_limit_settings.seconds}
+        return {
+            "show_right_answer": self.show_right_answer,
+            "randomize_questions": self.randomize_questions,
+            "show_answers_on_completion": self.show_answers_on_completion,
+            "show_final_list": self.show_final_list,
+            "time_limit": time_limit,
+        }
+
+    async def switch_quiz(self, quiz_filename: str, settings: Optional[dict] = None):
         """Switch to a different quiz file and reset server state.
 
         Resets all user data, loads new questions, regenerates index.html,
@@ -928,6 +983,10 @@ class TestingServer:
 
         Args:
             quiz_filename: Name of the quiz file to switch to
+            settings: Start settings chosen by the admin (already checked with
+                _validate_start_settings). They override the quiz file for this run and are
+                never written to it. Without them, a restart of the same quiz keeps the
+                earlier start settings, and another quiz uses its file values.
 
         Raises:
             ValueError: If quiz file doesn't exist
@@ -939,6 +998,13 @@ class TestingServer:
         # Reset server state
         self.reset_server_state()
 
+        if settings is not None:
+            self.start_settings = dict(settings)
+            self.start_settings_quiz = quiz_filename
+        elif quiz_filename != self.start_settings_quiz:
+            self.start_settings = {}
+            self.start_settings_quiz = None
+
         # Update current quiz and CSV filenames (answers, users, optional extra)
         self.current_quiz_file = quiz_path
         self.csv_file = self.generate_csv_path(quiz_filename, "answers")
@@ -948,8 +1014,9 @@ class TestingServer:
         else:
             self.answers_with_users_csv_file = None
 
-        # Load new questions
+        # Load new questions, then apply the admin's start settings on top of the file values
         await self.load_questions_from_file(quiz_path)
+        self._apply_start_settings()
 
         # Regenerate index.html with new questions
         await self.create_default_index_html()
@@ -2768,7 +2835,14 @@ class TestingServer:
         data = await request.json()
         quiz_filename = data["quiz_filename"]
 
-        await self.switch_quiz(quiz_filename)
+        # Optional settings from the start pop-up: they apply to this run only
+        settings = data.get("settings")
+        if settings is not None:
+            errors = self._validate_start_settings(settings)
+            if errors:
+                return web.json_response({"error": "; ".join(errors), "errors": errors}, status=400)
+
+        await self.switch_quiz(quiz_filename, settings)
 
         return web.json_response(
             {
@@ -2776,6 +2850,7 @@ class TestingServer:
                 "message": f"Switched to quiz: {quiz_filename}",
                 "current_quiz": quiz_filename,
                 "csv_file": os.path.basename(self.csv_file),
+                "settings": self.current_quiz_settings(),
             }
         )
 

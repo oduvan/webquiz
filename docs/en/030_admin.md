@@ -22,6 +22,9 @@ The main administrative panel page contains essential tools for managing quizzes
 
   You can switch between quizzes or create new ones.
 
+- **Starting a quiz: the settings pop-up**
+  When you press the button to switch to (or restart) a quiz, a pop-up shows the quiz settings: show correct answers, show answers after everyone finishes, randomize question order, show the question list at the end, and the time limit. The values come from the quiz file. You can change them before pressing **"Запустити"** (Start). The changes apply only to this run of the quiz and are **not** saved in the quiz file. If the running quiz restarts by itself (for example after you save the config or edit this quiz), the same settings stay. Starting another quiz uses that quiz's file values again. With **Per question**, questions that have their own time limit in the file keep it.
+
 - **"Create New Quiz" Button**
   Opens the interface for creating a new quiz in visual mode.
   The new file will be added to the `quizzes` directory.
