@@ -168,7 +168,36 @@ This section allows the administrator to download quizzes from external sources 
 
 - **name** — the name of the quiz that appears in the admin panel.
 - **download_path** — link to an archive with the quiz (for example, `.zip`).
-- **folder** — the folder where the archive contents will be extracted after download.
+- **folder** — the folder **inside the archive** whose contents are copied into your quizzes directory. Leave it empty to copy the whole archive.
+
+#### Private archives
+
+One more optional field lets you download from a place that needs an access token, such as a private GitHub repository:
+
+- **auth_header_token** — the access token. The server sends it in the `Authorization` header of the download request. Without this field the archive is downloaded without any token, which is what public archives need.
+
+```
+quizzes:
+  - name: "My Private Quizzes"
+    download_path: "https://api.github.com/repos/myname/my-quizzes/zipball/master"
+    folder: "data"
+    auth_header_token: "github_pat_..."
+```
+
+For a private GitHub repository:
+
+1. Create a **fine-grained personal access token**: GitHub → Settings → Developer settings → Personal access tokens → Fine-grained tokens → Generate new token.
+2. Under *Repository access* choose only the repository with your quizzes, and under *Permissions* give it **Contents: Read-only**. Nothing else is needed.
+3. Use the API address of the archive, as in the example above: `https://api.github.com/repos/OWNER/REPO/zipball/BRANCH`.
+
+The usual browser address `https://github.com/OWNER/REPO/archive/refs/heads/master.zip` does **not** work with a token. GitHub redirects it to another host, and the token is dropped on the way for safety, so the download fails with "HTTP 404". The `api.github.com` address above works because it signs the redirect itself.
+
+A GitHub archive keeps everything inside one directory named after the repository and the commit, and that name changes with every push. You do not have to write it: give `folder` as the path inside the repository (`data` in the example), and the server finds it inside the archive.
+
+Two things to keep in mind:
+
+- A token is only ever sent over `https`. If `download_path` starts with `http://`, the download is refused.
+- A token written in the config file is visible to anyone who can open the Config tab of the file manager, which means anyone on your local network who has the master key. The token is never sent to the browser as part of the admin page, but the config file itself shows it.
 
 ---
 

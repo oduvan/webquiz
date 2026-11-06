@@ -31,7 +31,7 @@ A modern web-based quiz and testing system built with Python and aiohttp that al
 
 ### Prerequisites
 
-- Python 3.9-3.14 (required by aiohttp)
+- Python 3.10-3.14 (required by aiohttp)
 - Poetry (recommended) or pip
 - Git
 
@@ -258,7 +258,7 @@ pytest tests/test_registration_approval.py
 
 ### Test Coverage
 
-The project has **222+ tests** across **15 test files** covering:
+The project has **769 tests** across **57 test files**. The main areas:
 
 - **CLI and Directory Creation** (7 tests): Directory and file creation
 - **Admin API** (14 tests): Admin interface and authentication
@@ -267,16 +267,18 @@ The project has **222+ tests** across **15 test files** covering:
 - **Config Management** (23 tests): Config editor, validation, and form-based JSON updates
 - **Registration Approval** (20 tests): Approval workflow and timing
 - **Files Management** (38 tests): File manager interface
+- **CSV Table Viewer** (17 tests): Table page with question/user filters, pop-up and new window (`test_csv_table_viewer.py`, `test_selenium_csv_table_viewer.py`)
 - **SSH Tunnel** (31 tests): Key generation, config fetch, connect/disconnect (`test_tunnel.py`)
 - **File Transfer** (59 tests): Sending files between servers through the tunnel (`test_transfer.py`, `test_transfer_api.py`)
 - **Network Access** (22 tests): Local network restriction and proxy header handling
-- **Index Generation** (13 tests): Template generation tests
+- **Private Quiz Archives** (6 tests): Downloading quizzes from token-protected archives (`test_download_quiz_token.py`)
+- **Index Generation** (18 tests): Template generation tests
 - **Registration Fields** (12 tests): Custom registration fields
 - **Show Right Answer** (5 tests): Answer display functionality
 - **Show Answers on Completion** (10 tests): Dynamic answer visibility after all students complete
 - **Time Limits** (56 tests): Per-question and whole-quiz time limits, timeouts, background check, countdowns, editor fields (`test_time_limits_*.py`, `test_selenium_time_limits.py`, `test_selenium_admin_time_limits.py`)
 - **Integration Tests** (6 tests): Multiple choice, multiple answers
-- **Selenium Tests** (56 tests): End-to-end browser testing
+- **Selenium Tests** (87 tests): End-to-end browser testing
 - **Auto-Advance** (6 tests): Automatic progression behavior
 
 The test suite uses GitHub Actions CI/CD for automated testing on every commit.
@@ -725,6 +727,47 @@ CSV files are created with proper escaping and include all user response data. F
    - Select your quiz from the dropdown
    - Click "Switch Quiz"
 
+### Downloading Quizzes from an Archive
+
+List archives in the `quizzes` section of `webquiz.yaml` and the admin panel shows a download button for each one:
+
+```yaml
+quizzes:
+  - name: "Geography Quizzes"
+    download_path: "https://example.com/quizzes/geography.zip"
+    folder: "geography"      # Folder inside the archive; its contents are copied into quizzes/
+```
+
+#### Private repositories
+
+Add `auth_header_token` to download from a place that needs an access token, such as a private GitHub repository. The value is sent to the server in the `Authorization` header. A complete `webquiz.yaml` then looks like this:
+
+```yaml
+server:
+  port: 8080
+
+admin:
+  master_key: "your-master-key"
+
+quizzes:
+  - name: "My Quizzes"
+    download_path: "https://api.github.com/repos/OWNER/REPO/zipball/BRANCH"
+    folder: "data"
+    auth_header_token: "github_pat_..."
+```
+
+Start the server as usual, open the admin panel, and the quiz appears in the download list:
+
+```bash
+webquiz --config webquiz.yaml
+```
+
+For GitHub, create a fine-grained personal access token with **Contents: Read-only** on that one repository, and use the `api.github.com/repos/OWNER/REPO/zipball/BRANCH` address. The browser address `github.com/OWNER/REPO/archive/refs/heads/master.zip` does not work with a token: GitHub redirects it to another host and the token is dropped on the way, so the download fails with HTTP 404.
+
+A GitHub archive wraps everything in a directory named after the repository and the commit. You do not need to write that name — give `folder` as the path inside the repository and the server finds it.
+
+A token is only ever sent over `https`, and it is never sent to the browser with the admin page. A token written in the config file is readable by anyone who can open the file manager's Config tab, which means anyone on your local network who has the master key.
+
 ### Admin Interface
 
 Enable admin features with a master key:
@@ -736,6 +779,7 @@ webquiz --master-key secret123
 Access admin panels:
 - `/admin` - Quiz management and user approval
 - `/files` - View logs, CSV files, and edit configuration
+- `/files/csv/{filename}` - One CSV file as a table with filters by question and by user. The file manager shows it in its pop-up (**Table** button) and opens it in a new tab (**New window** button, or **Open in new window** inside the pop-up). Filters are kept in the address (`?question=...&user=...`), so a refresh or a bookmark keeps them. For a plain answers CSV the user list takes names from the matching `.users.csv`
 - `/live-stats` - Real-time user progress dashboard
 
 The admin panel automatically detects when the package has been updated while the server is running and displays a "Restart Required" notification, prompting you to restart the server to use the new version.
@@ -785,7 +829,7 @@ The binary includes all templates and configuration examples, with automatic dir
 
 ### Architecture
 
-- **Backend**: Python 3.9-3.14 with aiohttp async web framework
+- **Backend**: Python 3.10-3.14 with aiohttp async web framework
 - **Frontend**: Vanilla HTML/CSS/JavaScript (no frameworks)
 - **Storage**: In-memory with periodic CSV backups (30-second intervals)
 - **Session Management**: Cookie-based with server-side validation
