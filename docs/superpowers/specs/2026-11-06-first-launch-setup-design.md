@@ -169,8 +169,8 @@ Needed only to open the admin panel from other computers in your network.
 - **Finish** saves the password as `admin.master_key` and makes it active right away (set
   `self.master_key` directly; the normal config save does not change the master key without a restart).
 - **Skip** leaves the install without a master key: the admin panel opens only from trusted IPs.
-- If a master key is already active (from `--master-key` or `WEBQUIZ_MASTER_KEY`), this step is not
-  shown, because the command-line value would override the file anyway.
+- If a master key is already active, from any source (`--master-key`, `WEBQUIZ_MASTER_KEY`, or the config
+  file when the setup runs again), this step is not shown and the existing key is kept. (Claude's call.)
 - Both buttons remove the marker.
 
 **Final screen**
@@ -201,6 +201,25 @@ Everything else is ignored: `server`, `paths`, `admin` (password and trusted IPs
 `tunnel.private_key` (these are file paths on the teacher's computer), `tunnel.socket_name` (one shared
 name would make every install of a school clash), and any unknown key. The preview lists the ignored keys
 as "not applied", so the person who prepared the file can see it.
+
+**How the file's settings replace what is already there (Claude's call).** Usually the config is fresh
+from the example, so there is nothing to replace. But the setup can run on a config that already has
+settings: when the marker is added back by hand, or when a teacher applies one name, closes the browser
+before step 2, and types a different name next time. In that case:
+
+- Each top-level key the file sets (`language`, `extra_answers_with_users_csv`, `registration`, `quizzes`,
+  `checker_templates`) replaces that key in the config **whole**. Nothing from an earlier setup or from
+  hand edits is mixed in. This keeps the result predictable: after Apply, those parts of the config are
+  exactly what the file says.
+- Keys the file does not set are left alone.
+- `tunnel` is the exception, because it also holds local settings (key paths, `socket_name`) that the file
+  may not touch. Only `tunnel.server` and `tunnel.config` are replaced, and they are replaced together.
+  If the file sets `tunnel.server` but no `tunnel.config`, an old `tunnel.config` is removed. Otherwise
+  the tunnel would connect to the new server with the old username and `base_url`.
+- The preview says "replaces" for every key that already has a value in the config.
+
+This differs from the config form's merge, which sets values key by key inside a section. The shared
+helper therefore needs a "replace" mode next to the form's "merge" mode.
 
 The allowed part is checked with the existing config validator (`_validate_config_data`) before the
 preview is shown. Applying goes through the same merge-and-reload path as the config form
