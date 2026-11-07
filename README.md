@@ -278,11 +278,21 @@ The project has **769 tests** across **57 test files**. The main areas:
 - **Show Answers on Completion** (10 tests): Dynamic answer visibility after all students complete
 - **Time Limits** (56 tests): Per-question and whole-quiz time limits, timeouts, background check, countdowns, editor fields (`test_time_limits_*.py`, `test_selenium_time_limits.py`, `test_selenium_admin_time_limits.py`)
 - **Start Settings** (11 tests): Settings pop-up when starting a quiz; values apply to the running quiz only (`test_quiz_start_settings.py`, `test_selenium_admin_start_settings.py`)
+- **Harness Checks** (10 tests): The classroom harness's data and agent-report checks, on small fake records (`test_harness_checks.py`)
 - **Integration Tests** (6 tests): Multiple choice, multiple answers
 - **Selenium Tests** (87 tests): End-to-end browser testing
 - **Auto-Advance** (6 tests): Automatic progression behavior
 
 The test suite uses GitHub Actions CI/CD for automated testing on every commit.
+
+### Classroom Test Harness
+
+`harness/` runs a real WebQuiz server and lets a whole class take a quiz in real browsers: a scripted teacher starts the quiz, scripted students act at exact times (answers at the time limit, Wi-Fi drops, reloads), and AI agent students take the quiz and report what they did and saw. The harness then checks that the agents' reports, the browser record and the stored CSV data all agree. It is not part of the normal test run. See [harness/README.md](harness/README.md).
+
+```bash
+pip install -r harness/requirements.txt
+python -m harness.run time-edges --no-agents   # scripted students only
+```
 
 ## 🔥 Stress Testing
 
