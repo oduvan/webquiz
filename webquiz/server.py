@@ -29,6 +29,7 @@ from .translations import get_translations
 from .tunnel import TunnelManager
 from .transfer import TransferManager, TransferError
 from . import time_limits
+from . import explanations
 
 # Quiz settings the admin can change in the start pop-up (the quiz file gives the defaults)
 START_SETTING_KEYS = (
@@ -36,6 +37,7 @@ START_SETTING_KEYS = (
     "randomize_questions",
     "show_answers_on_completion",
     "show_final_list",
+    "show_explanation",
     "time_limit",
 )
 
@@ -627,6 +629,8 @@ class TestingServer:
         self.show_right_answer = True  # Default setting, updated when quiz is loaded
         self.show_answers_on_completion = False  # Default setting, updated when quiz is loaded
         self.show_final_list = True  # Default setting, updated when quiz is loaded
+        self.show_explanation = False  # Default setting, updated when quiz is loaded
+        self.explanations_html: Dict[int, str] = {}  # question id -> rendered explanation
         self.users: Dict[str, Dict[str, Any]] = {}  # user_id -> user data
         self.questions: List[Dict[str, Any]] = []
         self.user_responses: List[Dict[str, Any]] = []
@@ -950,7 +954,13 @@ class TestingServer:
     def _apply_start_settings(self):
         """Use the admin's start settings instead of the quiz file values for the running quiz."""
         settings = self.start_settings
-        for key in ("show_right_answer", "randomize_questions", "show_answers_on_completion", "show_final_list"):
+        for key in (
+            "show_right_answer",
+            "randomize_questions",
+            "show_answers_on_completion",
+            "show_final_list",
+            "show_explanation",
+        ):
             if key in settings:
                 setattr(self, key, settings[key])
         if "time_limit" in settings:
@@ -972,6 +982,7 @@ class TestingServer:
             "randomize_questions": self.randomize_questions,
             "show_answers_on_completion": self.show_answers_on_completion,
             "show_final_list": self.show_final_list,
+            "show_explanation": self.show_explanation,
             "time_limit": time_limit,
         }
 
@@ -1165,9 +1176,19 @@ class TestingServer:
             # Store show_final_list setting (default: True)
             self.show_final_list = data.get("show_final_list", True)
 
+            # Store show_explanation setting (default: False)
+            self.show_explanation = data.get("show_explanation", False)
+
             # Add automatic IDs based on array index (for quiz execution only)
             for i, question in enumerate(self.questions):
                 question["id"] = i + 1
+
+            # Explanations are rendered once; they reach the page only with the answer reply
+            self.explanations_html = {
+                q["id"]: explanations.render_explanation(q["explanation"])
+                for q in self.questions
+                if explanations.has_explanation(q)
+            }
 
             # Time limits: a malformed value in a hand-edited file means no limits
             self.time_limit_settings, time_limit_warning = time_limits.parse_time_limit(data)
@@ -1180,6 +1201,7 @@ class TestingServer:
                 f"show_right_answer: {self.show_right_answer}, randomize_questions: {self.randomize_questions}, "
                 f"show_answers_on_completion: {self.show_answers_on_completion}, "
                 f"show_final_list: {self.show_final_list}, "
+                f"show_explanation: {self.show_explanation}, explanations: {len(self.explanations_html)}, "
                 f"time_limit: {self.time_limit_settings.mode} {self.time_limit_settings.seconds}s"
             )
 
@@ -2212,7 +2234,9 @@ class TestingServer:
 
         return web.json_response(await self._record_answer(user_id, question, selected_answer, time_taken))
 
-    async def _record_answer(self, user_id: str, question: dict, selected_answer, time_taken: float, timed_out=False):
+    async def _record_answer(
+        self, user_id: str, question: dict, selected_answer, time_taken: float, timed_out=False, with_explanation=True
+    ):
         """Store an answer (or a timeout), update progress and live stats, and build the response.
 
         Used for normal answers and for timeouts. A timeout is stored as an empty, failed answer:
@@ -2224,6 +2248,7 @@ class TestingServer:
             selected_answer: The answer as submitted (kept to recognise a repeated request)
             time_taken: Seconds the student spent on the question
             timed_out: True when time ran out for this question
+            with_explanation: False when the reply must not carry the explanation (whole quiz ended)
 
         Returns:
             Response dict for the page
@@ -2363,6 +2388,10 @@ class TestingServer:
                 response_data["correct_answer"] = question["correct_answer"]
                 response_data["is_multiple_choice"] = isinstance(question["correct_answer"], list)
 
+            # The explanation follows the answer, only where correct answers are shown
+            if with_explanation and self.show_explanation and question_id in self.explanations_html:
+                response_data["explanation_html"] = self.explanations_html[question_id]
+
         # Stored before the broadcast below awaits, so a retry arriving meanwhile gets this result
         self.answer_results.setdefault(user_id, {})[question_id] = {
             "selected_answer": selected_answer,
@@ -2454,7 +2483,9 @@ class TestingServer:
                 return None
             if qid in self.answer_results.get(user_id, {}):
                 continue
-            await self._record_answer(user_id, questions_by_id[qid], None, elapsed[qid], timed_out=True)
+            await self._record_answer(
+                user_id, questions_by_id[qid], None, elapsed[qid], timed_out=True, with_explanation=False
+            )
             if first_stored_id is None:
                 first_stored_id = qid
 
@@ -2805,6 +2836,18 @@ class TestingServer:
         return web.json_response(response_data)
 
     # Admin API endpoints
+    @admin_auth_required
+    async def admin_preview_explanation(self, request):
+        """Render explanation Markdown for the quiz editor's preview, the same way students get it."""
+        try:
+            data = await request.json()
+        except Exception:
+            return web.json_response({"error": "Invalid JSON"}, status=400)
+        markdown = data.get("markdown") if isinstance(data, dict) else None
+        if not isinstance(markdown, str):
+            return web.json_response({"error": "'markdown' must be text"}, status=400)
+        return web.json_response({"html": explanations.render_explanation(markdown, explanations.ADMIN_IMAGES_URL)})
+
     @admin_auth_required
     async def admin_list_quizzes(self, request):
         """List available quiz files.
@@ -3368,6 +3411,7 @@ class TestingServer:
             "randomize_questions",
             "show_answers_on_completion",
             "show_final_list",
+            "show_explanation",
             "time_limit",
         ]
         for field in optional_fields:
@@ -3598,6 +3642,8 @@ class TestingServer:
 
         if "show_final_list" in data and not isinstance(data["show_final_list"], bool):
             errors.append("'show_final_list' must be a boolean (true or false)")
+
+        errors.extend(explanations.validate_explanations(data))
 
         if "title" in data and not isinstance(data["title"], str):
             errors.append("'title' must be a string")
@@ -4843,6 +4889,7 @@ async def create_app(config: WebQuizConfig):
     app.router.add_get("/api/admin/list-quizzes", server.admin_list_quizzes)
     app.router.add_post("/api/admin/switch-quiz", server.admin_switch_quiz)
     app.router.add_get("/api/admin/quiz/{filename}", server.admin_get_quiz)
+    app.router.add_post("/api/admin/preview-explanation", server.admin_preview_explanation)
     app.router.add_post("/api/admin/create-quiz", server.admin_create_quiz)
     app.router.add_put("/api/admin/quiz/{filename}", server.admin_update_quiz)
     app.router.add_delete("/api/admin/quiz/{filename}", server.admin_delete_quiz)
