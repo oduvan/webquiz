@@ -134,3 +134,12 @@ def test_live_stats_final_states_match_rows():
     assert check_live_stats(states, rows) == []
     assert check_live_stats({**states, ("u1", "Q3?"): "fail"}, rows)
     assert check_live_stats({**states, ("u1", "Q2?"): "think"}, rows)
+
+
+def test_parse_agent_report_ignores_punctuation_left_by_nested_quotes():
+    line = (
+        'STEP 13 | DID: type "6" | SAW: "TYPE INTO: [textarea] Введіть відповідь... = "6""; "✍️ Введіть вашу відповідь:"'
+    )
+    quotes = parse_agent_report(line)[0]["quotes"]
+    assert ";" not in [q.strip() for q in quotes]
+    assert "✍️ Введіть вашу відповідь:" in quotes

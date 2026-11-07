@@ -19,8 +19,11 @@ import sys
 from collections import defaultdict
 from pathlib import Path
 
+from harness.classroom import format_step
+
 STEP_LINE = re.compile(r"^\s*step\s+(\d+)\s*\|\s*did:\s*(.*?)\s*\|\s*saw:\s*(.*)$", re.IGNORECASE)
-QUOTE = re.compile(r"[\"“”«»]([^\"“”«»]+)[\"“”«»]")
+QUOTE_SEPARATOR = re.compile(r"[\"“”»]\s*;\s*[\"“«]")
+QUOTE_MARKS = '"“”«» '
 SCORE = re.compile(r"(?:Результат|Result):\s*(\d+)\s*/\s*(\d+)")
 
 
@@ -30,6 +33,26 @@ def _plain(text):
 
 
 # ---- 1 vs 2: the agent's report against the driver's record ----
+
+
+def split_quotes(saw):
+    """Split 'SAW: "a"; "b"' into ["a", "b"].
+
+    Splitting on the '"; "' separator (instead of matching quote pairs) keeps a quote that
+    itself contains quotes, like '"TYPE INTO: ... = "6""', in one piece.
+    """
+    pieces = QUOTE_SEPARATOR.split(saw.strip())
+    quotes = []
+    for piece in pieces:
+        piece = piece.strip()
+        if piece[:1] in QUOTE_MARKS:
+            piece = piece[1:]
+        if piece[-1:] in QUOTE_MARKS:
+            piece = piece[:-1]
+        piece = piece.strip()
+        if re.search(r"\w", piece):
+            quotes.append(piece)
+    return quotes
 
 
 def parse_agent_report(text):
@@ -42,7 +65,7 @@ def parse_agent_report(text):
                 {
                     "step": int(match.group(1)),
                     "did": match.group(2).strip(),
-                    "quotes": [q.strip() for q in QUOTE.findall(match.group(3)) if q.strip()],
+                    "quotes": split_quotes(match.group(3)),
                 }
             )
     return steps
@@ -273,7 +296,8 @@ def analyze(run_dir):
     driver_steps = defaultdict(dict)
     for event in events:
         if event["kind"] == "step":
-            driver_steps[event["student"]][event["step"]] = event
+            # The agent may quote anything the tool printed for the step, not only the page text
+            driver_steps[event["student"]][event["step"]] = {**event, "screen": format_step(event)}
             last_screen[event["student"]] = event.get("screen", "")
     final_scores = {}
     for student, screen in last_screen.items():
