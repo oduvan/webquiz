@@ -68,6 +68,17 @@ questions:
   with a short note that explanations need correct answers to be shown. Like
   the other start settings, the value applies to this run only and is never
   written to the file.
+- **Live preview in the quiz editor**: under each explanation text area, a
+  preview box shows the rendered explanation, styled like the student's
+  explanation step (same CSS, light and dark), with images. It updates
+  about 300 ms after the teacher stops typing, and is hidden while the text
+  is empty. The preview comes from the server, so it is exactly what students
+  will get: `POST /api/admin/preview-explanation` (`{"markdown": "..."}` →
+  `{"html": "..."}`, admin session and local network required like the other
+  admin endpoints) uses the same renderer. The renderer takes the image path
+  prefix as a parameter: `imgs/...` for the student page (served at `/`) and
+  `../imgs/...` for the admin page (served at `/admin/`), so both work also
+  behind a reverse proxy with a path prefix.
 - **File manager (YAML)**: nothing new; the fields are plain YAML.
 
 ## Decisions on how it is built
@@ -152,7 +163,7 @@ questions:
 
 - No explanation per answer option ("why option B is wrong"); one
   explanation per question.
-- No Markdown preview in the editor.
+- No preview in the file manager's YAML editor (only in the quiz editor).
 - No explanations on the results screen or in live stats.
 - No change to CSV files.
 
@@ -176,17 +187,21 @@ questions:
   file; invalid value gives 400.
 - Unite copies `show_explanation`. Transfer finds and rewrites images inside
   explanations.
+- Preview endpoint: renders Markdown with the admin image prefix, needs the
+  admin session, refuses a non-string `markdown`, shows raw HTML as text.
 - Browser: step between questions, "Далі" opens the next question, last
   question → explanation → results, no step without an explanation, no step
   with `show_right_answer: false`, whole-quiz time-up during the step shows
   the results; editor saves the explanation and shows/hides the checkbox; the
-  start pop-up shows, fills and greys out the checkbox; phone width.
+  start pop-up shows, fills and greys out the checkbox; the editor preview
+  shows the rendered Markdown and an image, and updates after typing; phone
+  width.
 
 ## Docs
 
 `docs/en` and `docs/uk` (`050_quiz_format.md`, `030_admin.md`), README
 (feature, `show_explanation` option, test counts), CLAUDE.md (technical
-decision, config option, the new dependency).
+decision, config option, the new dependency, the preview endpoint).
 
 ## Left to the builder
 
