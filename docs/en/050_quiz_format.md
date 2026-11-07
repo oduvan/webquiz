@@ -16,6 +16,7 @@ description: "Test description (optional)"
 show_right_answer: false
 show_final_list: true        # false to hide question list on results screen
 randomize_questions: false  # true for randomized question order for each student
+show_explanation: false     # true to show question explanations after the answer
 questions:
   - question: "Question text"
     options:
@@ -25,7 +26,7 @@ questions:
     correct_answer: 0
 ```
 
-> **Note:** The on/off settings (`show_right_answer`, `show_answers_on_completion`, `show_final_list`, `randomize_questions`) take `true` or `false` **without quotes**. With quotes, `"false"` is text, not an on/off value, and the admin panel will not save the test.
+> **Note:** The on/off settings (`show_right_answer`, `show_answers_on_completion`, `show_final_list`, `randomize_questions`, `show_explanation`) take `true` or `false` **without quotes**. With quotes, `"false"` is text, not an on/off value, and the admin panel will not save the test.
 
 ---
 
@@ -106,6 +107,22 @@ show_final_list: false  # Only show score, hide question list
 ```
 
 > **Tip:** Use `show_final_list: false` when you want students to see only their overall score without reviewing individual questions.
+
+---
+
+#### `show_explanation` (optional)
+
+Shows the explanation of a question right after the student answers it (default: `false`). Each question can have an `explanation` (see "Question Explanation" below).
+
+```yaml
+show_right_answer: true
+show_explanation: true
+```
+
+- The explanation is its own step: after the answer feedback, the student presses **"Continue"**, reads the explanation, and presses **"Next"** to open the next question (after the last question, the results).
+- Only questions with an explanation get this step; the others go straight on.
+- Explanations work only together with `show_right_answer: true`. When correct answers are hidden, no explanations are shown, also not on the results screen.
+- When the whole-test time runs out, the results open at once, without an explanation.
 
 ---
 
@@ -423,6 +440,28 @@ Students will see a download button next to the question text.
 Clicking it will automatically download the file to the student's device.
 
 ---
+
+#### Question Explanation
+
+A question can have an `explanation`: a short text the student reads after answering, to remember the right answer. It is written in **Markdown**: bold, lists, tables, links, code and images. Images come from the `quizzes/imgs/` folder, written the same way as question images.
+
+```yaml
+show_right_answer: true
+show_explanation: true
+questions:
+  - question: "Which planet is the largest?"
+    options: ["Mars", "Jupiter", "Earth"]
+    correct_answer: 1
+    explanation: |
+      **Jupiter** is the largest planet of the Solar System.
+
+      ![Jupiter](/imgs/jupiter.png)
+```
+
+- Write the text after `explanation: |` on new lines, indented, so Markdown line breaks are kept.
+- For an image name with spaces, use angle brackets: `![](</imgs/my picture.png>)`.
+- HTML in the text is shown as text, not run. Links open in a new tab.
+- The explanation is shown only when the test has `show_explanation: true` and `show_right_answer: true`.
 
 #### Combined Question: Image + File
 

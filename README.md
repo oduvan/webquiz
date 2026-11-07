@@ -10,6 +10,7 @@ A modern web-based quiz and testing system built with Python and aiohttp that al
 - **Registration Approval**: Optional admin approval workflow for new registrations with real-time notifications
 - **Question Randomization**: Configurable per-student question order randomization for fair testing
 - **Question Grouping**: Keep related questions together during randomization with `stick_to_the_previous` attribute
+- **Question Explanations**: Optional Markdown explanation (with images) shown as its own step after each answer, written in the quiz editor with a live preview
 - **Dynamic Answer Visibility**: Optional delayed answer reveal - show correct answers only after all students complete
 - **Manual Answer Control**: Admin button to reveal answers immediately without waiting for all students
 - **Dynamic Quiz Switching**: Real-time quiz switching with automatic server state reset
@@ -258,7 +259,7 @@ pytest tests/test_registration_approval.py
 
 ### Test Coverage
 
-The project has **856 tests** across **68 test files**. The main areas:
+The project has **904 tests** across **72 test files**. The main areas:
 
 - **CLI and Directory Creation** (7 tests): Directory and file creation
 - **Admin API** (14 tests): Admin interface and authentication
@@ -269,7 +270,7 @@ The project has **856 tests** across **68 test files**. The main areas:
 - **Files Management** (38 tests): File manager interface
 - **CSV Table Viewer** (17 tests): Table page with question/user filters, pop-up and new window (`test_csv_table_viewer.py`, `test_selenium_csv_table_viewer.py`)
 - **SSH Tunnel** (31 tests): Key generation, config fetch, connect/disconnect (`test_tunnel.py`)
-- **File Transfer** (59 tests): Sending files between servers through the tunnel (`test_transfer.py`, `test_transfer_api.py`)
+- **File Transfer** (61 tests): Sending files between servers through the tunnel (`test_transfer.py`, `test_transfer_api.py`)
 - **Network Access** (22 tests): Local network restriction and proxy header handling
 - **Private Quiz Archives** (6 tests): Downloading quizzes from token-protected archives (`test_download_quiz_token.py`)
 - **Index Generation** (18 tests): Template generation tests
@@ -278,6 +279,7 @@ The project has **856 tests** across **68 test files**. The main areas:
 - **Show Answers on Completion** (10 tests): Dynamic answer visibility after all students complete
 - **Time Limits** (57 tests): Per-question and whole-quiz time limits, timeouts, background check, countdowns, editor fields (`test_time_limits_*.py`, `test_selenium_time_limits.py`, `test_selenium_admin_time_limits.py`)
 - **Start Settings** (11 tests): Settings pop-up when starting a quiz; values apply to the running quiz only (`test_quiz_start_settings.py`, `test_selenium_admin_start_settings.py`)
+- **Question Explanations** (46 tests): Markdown rendering, the answer reply, the explanation step, editor field and preview, start pop-up (`test_explanations*.py`, `test_selenium_explanations.py`, `test_selenium_admin_explanations.py`)
 - **Hidden Correctness** (2 tests): The results table leaves out the "correct" column while correct answers are hidden (`test_selenium_hidden_correctness.py`)
 - **Harness Checks** (14 tests): The classroom harness's data and agent-report checks, on small fake records (`test_harness_checks.py`)
 - **Integration Tests** (6 tests): Multiple choice, multiple answers
@@ -565,9 +567,32 @@ A question's `time_limit` works only in `per_question` mode. Without a quiz-leve
 
 Students see a countdown for the question (or one for the whole quiz) that turns red in the last 10 seconds, then "Time is up". The clock for a question starts when the student's page shows it. An answer that reaches the server within the limit plus 5 seconds counts. A later answer, or no answer, is stored as an empty, failed answer, so in the answers CSV an empty `selected_answer` means "time ran out".
 
+### Question Explanations
+
+A question can have an `explanation`: a short Markdown text the student reads right after answering, to remember the right answer. It is turned on for the quiz with `show_explanation: true` (default: `false`).
+
+```yaml
+show_right_answer: true
+show_explanation: true
+questions:
+  - question: "Which planet is the largest?"
+    options: ["Mars", "Jupiter", "Earth"]
+    correct_answer: 1
+    explanation: |
+      **Jupiter** is the largest planet of the Solar System.
+
+      ![Jupiter](/imgs/jupiter.png)
+```
+
+- After the answer feedback, **Continue** opens the explanation as its own step; **Next** opens the next question (or the results). Questions without an explanation go straight on.
+- Explanations follow the correct answers: with `show_right_answer: false` they are never shown. When the whole-quiz time runs out, the results open without an explanation.
+- Markdown is rendered on the server with [mistune](https://github.com/lepture/mistune): bold, lists, tables, links, code and images from `quizzes/imgs/` (`![](</imgs/name with spaces.png>)` for names with spaces). HTML in the text is shown as text, and links open in a new tab.
+- The explanation reaches the student's page only with the reply to their answer, never before.
+- In the quiz editor, every question has an **Explanation (Markdown)** field with an image button and a live preview. **Show explanation after the answer** appears in the quiz settings and in the start pop-up while the quiz has explanations.
+
 ### Start Settings
 
-When the admin starts (or restarts) a quiz from the admin panel, a pop-up shows the quiz settings: `show_right_answer`, `show_answers_on_completion`, `randomize_questions`, `show_final_list` and `time_limit`. The quiz file gives the default values. The admin can change them right before starting. The changes apply only to the running quiz and are never written to the quiz file. They stay when the same quiz restarts by itself (for example after a config save), and they are dropped when another quiz is started.
+When the admin starts (or restarts) a quiz from the admin panel, a pop-up shows the quiz settings: `show_right_answer`, `show_answers_on_completion`, `randomize_questions`, `show_final_list`, `show_explanation` and `time_limit`. The quiz file gives the default values. The admin can change them right before starting. The changes apply only to the running quiz and are never written to the quiz file. They stay when the same quiz restarts by itself (for example after a config save), and they are dropped when another quiz is started.
 
 The API takes the same values: `POST /api/admin/switch-quiz` with `{"quiz_filename": "...", "settings": {"show_right_answer": false, "time_limit": {"per_question": 30}}}`. A missing key keeps the file value, and `"time_limit": null` turns the time limit off.
 
