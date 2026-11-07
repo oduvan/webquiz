@@ -18,7 +18,7 @@ The main administrative panel page contains essential tools for managing quizzes
   Each quiz shows its filename and title (if set), for example: `default.yaml - My Quiz Title`.
   The current active quiz is highlighted with a yellow background and marked as **(current)**.
 
-  You can select multiple quizzes using **Ctrl+click** (or **Cmd+click** on macOS) for individual selection, or **Shift+click** to select a range. When multiple quizzes are selected, you can unite them into a single quiz or delete them together.
+  You can select multiple quizzes using **Ctrl+click** (or **Cmd+click** on macOS) for individual selection, or **Shift+click** to select a range. When multiple quizzes are selected, you can unite them into a single quiz or delete them together. The united quiz takes its title, description and settings (`show_right_answer`, `randomize_questions`, `show_answers_on_completion`, `show_final_list`) from the first selected quiz, and the questions of all selected quizzes in order.
 
   You can switch between quizzes or create new ones.
 

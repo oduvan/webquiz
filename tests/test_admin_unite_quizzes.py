@@ -397,13 +397,15 @@ def test_unite_with_yaml_extension_in_name(temp_dir):
 
 
 def test_unite_preserves_optional_config_fields(temp_dir):
-    """Test description, min_correct, show_answers_on_completion preserved."""
+    """Test that all quiz-wide settings of the first quiz are copied."""
     quizzes = {
         "quiz1.yaml": {
             "title": "Quiz 1",
             "description": "Test description",
-            "min_correct": 2,
+            "show_right_answer": False,
+            "randomize_questions": True,
             "show_answers_on_completion": True,
+            "show_final_list": False,
             "questions": [{"question": "Q1?", "options": ["A", "B"], "correct_answer": 0}],
         },
         "quiz2.yaml": {
@@ -430,8 +432,55 @@ def test_unite_preserves_optional_config_fields(temp_dir):
             united_quiz = yaml.safe_load(f)
 
         assert united_quiz["description"] == "Test description"
-        assert united_quiz["min_correct"] == 2
+        assert united_quiz["show_right_answer"] is False
+        assert united_quiz["randomize_questions"] is True
         assert united_quiz["show_answers_on_completion"] is True
+        assert united_quiz["show_final_list"] is False
+
+
+def test_unite_does_not_copy_quiz_level_min_correct(temp_dir):
+    """Test that min_correct is not copied to the top level of the united quiz.
+
+    min_correct is a per-question setting. At the top level of a quiz file
+    nothing reads it, so unite must not create it there. The per-question
+    min_correct must still be kept on its question.
+    """
+    quizzes = {
+        "quiz1.yaml": {
+            "title": "Quiz 1",
+            "min_correct": 2,
+            "questions": [
+                {
+                    "question": "Pick the even numbers",
+                    "options": ["2", "3", "4", "6"],
+                    "correct_answer": [0, 2, 3],
+                    "min_correct": 2,
+                }
+            ],
+        },
+        "quiz2.yaml": {
+            "title": "Quiz 2",
+            "questions": [{"question": "Q2?", "options": ["C", "D"], "correct_answer": 1}],
+        },
+    }
+
+    with custom_webquiz_server(quizzes=quizzes) as (proc, port):
+        cookies = get_admin_session(port)
+
+        response = requests.post(
+            f"http://localhost:{port}/api/admin/unite-quizzes",
+            cookies=cookies,
+            json={"quiz_filenames": ["quiz1.yaml", "quiz2.yaml"], "new_name": "no_top_min_correct"},
+        )
+
+        assert response.status_code == 200
+
+        quizzes_dir = os.path.join(temp_dir, f"quizzes_{port}")
+        with open(os.path.join(quizzes_dir, "no_top_min_correct.yaml"), "r", encoding="utf-8") as f:
+            united_quiz = yaml.safe_load(f)
+
+        assert "min_correct" not in united_quiz
+        assert united_quiz["questions"][0]["min_correct"] == 2
 
 
 def test_unite_invalid_quiz_structure_error(temp_dir):
