@@ -670,6 +670,76 @@
             overflow-y: auto;
         }
 
+        /* Explanation preview in the quiz editor: looks like the student's explanation step */
+        .explanation-preview {
+            margin-top: 8px;
+            padding: 12px;
+            border: 1px dashed var(--border-color);
+            border-radius: 6px;
+        }
+        .explanation-preview.hidden {
+            display: none;
+        }
+        .explanation-content {
+            line-height: 1.5;
+            overflow-wrap: anywhere;
+        }
+        .explanation-content img {
+            max-width: 100%;
+            height: auto;
+        }
+        .explanation-content table {
+            display: block;
+            max-width: 100%;
+            overflow-x: auto;
+            border-collapse: collapse;
+        }
+        .explanation-content th,
+        .explanation-content td {
+            padding: 4px 8px;
+            border: 1px solid var(--border-color);
+        }
+        .explanation-content pre {
+            max-width: 100%;
+            overflow-x: auto;
+            padding: 8px;
+        }
+        .explanation-content blockquote {
+            margin: 8px 0;
+            padding-left: 12px;
+            border-left: 3px solid var(--border-color);
+        }
+        .question-explanation {
+            width: 100%;
+            min-height: 120px;
+            box-sizing: border-box;
+            font-family: monospace;
+        }
+        .question-explanation.hidden,
+        .explanation-image-btn.hidden {
+            display: none;
+        }
+        .explanation-group.folded .explanation-body {
+            display: none;
+        }
+        .explanation-toggle-btn {
+            margin-bottom: 8px;
+        }
+        .explanation-tools {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin: 6px 0;
+        }
+        .explanation-preview {
+            min-height: 120px;
+            box-sizing: border-box;
+        }
+        .explanation-preview-empty {
+            opacity: 0.7;
+            font-style: italic;
+        }
+
         .image-item {
             border: 2px solid transparent;
             border-radius: 8px;
@@ -1344,6 +1414,12 @@
                             Показувати список питань у кінці
                         </label>
                     </div>
+                    <div class="form-group" id="show-explanation-group" style="display: none;">
+                        <label style="display: flex; align-items: center;">
+                            <input type="checkbox" id="show-explanation" style="margin-right: 10px;">
+                            Показувати пояснення після відповіді
+                        </label>
+                    </div>
                     <div class="form-group">
                         <label for="time-limit-mode">Обмеження часу:</label>
                         <div style="display: flex; gap: 10px; flex-wrap: wrap; align-items: center;">
@@ -1446,6 +1522,13 @@
                     <input type="checkbox" id="start-show-final-list" style="margin-right: 10px;">
                     Показувати список питань у кінці
                 </label>
+            </div>
+            <div class="form-group" id="start-show-explanation-group" style="display: none;">
+                <label style="display: flex; align-items: center;">
+                    <input type="checkbox" id="start-show-explanation" style="margin-right: 10px;">
+                    Показувати пояснення після відповіді
+                </label>
+                <small id="start-show-explanation-note" style="display: none;">Пояснення показуються лише разом із правильними відповідями.</small>
             </div>
             <div class="form-group">
                 <label for="start-time-limit-mode">Обмеження часу:</label>
@@ -1742,6 +1825,14 @@
             document.getElementById('start-randomize-questions').checked = quizData.randomize_questions === true;
             document.getElementById('start-show-final-list').checked = quizData.show_final_list !== false;
 
+            // Explanations: offered only when the quiz file has at least one
+            const quizQuestions = Array.isArray(quizData.questions) ? quizData.questions : [];
+            const quizHasExplanations = quizQuestions.some(
+                q => q && typeof q.explanation === 'string' && q.explanation.trim() !== ''
+            );
+            document.getElementById('start-show-explanation-group').style.display = quizHasExplanations ? 'block' : 'none';
+            document.getElementById('start-show-explanation').checked = quizData.show_explanation === true;
+
             const timeLimit = (quizData.time_limit && typeof quizData.time_limit === 'object') ? quizData.time_limit : {};
             let mode = 'none';
             if (timeLimit.per_question !== undefined) {
@@ -1766,6 +1857,9 @@
         function toggleStartShowAnswersOnCompletion() {
             const showRightAnswer = document.getElementById('start-show-right-answer').checked;
             document.getElementById('start-show-answers-on-completion-group').style.display = showRightAnswer ? 'none' : 'block';
+            // Explanations follow the correct answers, so they need them shown
+            document.getElementById('start-show-explanation').disabled = !showRightAnswer;
+            document.getElementById('start-show-explanation-note').style.display = showRightAnswer ? 'none' : 'block';
         }
 
         function toggleStartTimeLimitFields() {
@@ -1777,7 +1871,7 @@
         function getStartSettings() {
             const mode = document.getElementById('start-time-limit-mode').value;
             const seconds = document.getElementById('start-time-limit-seconds').value.trim();
-            return {
+            const settings = {
                 show_right_answer: document.getElementById('start-show-right-answer').checked,
                 show_answers_on_completion: document.getElementById('start-show-answers-on-completion').checked,
                 randomize_questions: document.getElementById('start-randomize-questions').checked,
@@ -1785,6 +1879,10 @@
                 // null turns the time limit off for this run
                 time_limit: mode === 'none' ? null : { [mode]: seconds === '' ? 0 : Number(seconds) }
             };
+            if (document.getElementById('start-show-explanation-group').style.display !== 'none') {
+                settings.show_explanation = document.getElementById('start-show-explanation').checked;
+            }
+            return settings;
         }
 
         async function confirmStartQuiz() {
@@ -2101,6 +2199,10 @@
             document.getElementById('time-limit-mode').value = 'none';
             document.getElementById('time-limit-seconds').value = 60;
 
+            // ...and without explanations
+            document.getElementById('show-explanation').checked = false;
+            document.getElementById('show-explanation-group').style.display = 'none';
+
             // Clear content
             document.getElementById('questions-container').innerHTML = '';
 
@@ -2211,6 +2313,7 @@
                         <input type="number" class="question-time-limit-input" min="0" step="1" value="" placeholder="за замовчуванням" style="width: 140px;">
                         <small>0 = без обмеження</small>
                     </div>
+                    ${explanationFieldHtml(questionCounter, '')}
                     <div class="form-group">
                         <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
                             <input type="checkbox" class="stick-to-previous-checkbox" onchange="updateQuestionPreview(this)">
@@ -2380,6 +2483,7 @@
             if (questionDiv) {
                 questionDiv.remove();
                 updateQuestionNumbers();
+                updateShowExplanationVisibility();
             }
         }
 
@@ -2828,6 +2932,7 @@
                                 <input type="number" class="question-time-limit-input" min="0" step="1" value="${question.time_limit !== undefined && question.time_limit !== null ? escapeHtml(String(question.time_limit)) : ''}" placeholder="за замовчуванням" style="width: 140px;">
                                 <small>0 = без обмеження</small>
                             </div>
+                            ${explanationFieldHtml(questionCounter, question.explanation)}
                             <div class="form-group">
                                 <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
                                     <input type="checkbox" class="stick-to-previous-checkbox" ${question.stick_to_the_previous ? 'checked' : ''} onchange="updateQuestionPreview(this)">
@@ -2844,6 +2949,116 @@
                 updateQuestionNumbers();
             }
             toggleTimeLimitFields();
+
+            // Explanations: the option shows only when some question has one
+            document.getElementById('show-explanation').checked = quizData.show_explanation === true;
+            updateShowExplanationVisibility();
+        }
+
+        // ---- Question explanations (Markdown, shown to students after an answer) ----
+
+        function explanationFieldHtml(questionId, value) {
+            const text = typeof value === 'string' ? value : '';
+            // Folded while empty; a written explanation opens unfolded
+            const folded = text.trim() === '';
+            return `
+                <div class="form-group explanation-group${folded ? ' folded' : ''}">
+                    <button type="button" class="explanation-toggle-btn" onclick="toggleExplanationGroup(this)">${folded ? '➕ Додати пояснення' : '📖 Пояснення ▾'}</button>
+                    <div class="explanation-body">
+                        <label>Пояснення (Markdown) — показується студенту після відповіді:</label>
+                        <div class="explanation-tools">
+                            <button type="button" class="explanation-image-btn" onclick="openImagePicker('explanation', ${questionId})">🖼️ Вставити зображення</button>
+                            <button type="button" class="explanation-preview-btn" onclick="toggleExplanationPreview(this)">👁️ Перегляд</button>
+                        </div>
+                        <textarea class="question-explanation" placeholder="**Чому** ця відповідь правильна..." oninput="onExplanationInput(this)">${escapeHtml(text)}</textarea>
+                        <div class="explanation-preview explanation-content hidden"></div>
+                    </div>
+                </div>
+            `;
+        }
+
+        function toggleExplanationGroup(button) {
+            const group = button.closest('.explanation-group');
+            const folded = group.classList.toggle('folded');
+            if (folded) {
+                const hasText = group.querySelector('.question-explanation').value.trim() !== '';
+                button.textContent = hasText ? '📖 Пояснення ▸' : '➕ Додати пояснення';
+            } else {
+                button.textContent = '📖 Пояснення ▾';
+                const textarea = group.querySelector('.question-explanation');
+                if (!textarea.classList.contains('hidden')) {
+                    textarea.focus();
+                }
+            }
+        }
+
+        function onExplanationInput(textarea) {
+            updateShowExplanationVisibility();
+        }
+
+        // The preview takes the place of the text field; the same button goes back to editing
+        async function toggleExplanationPreview(button) {
+            const group = button.closest('.explanation-group');
+            const textarea = group.querySelector('.question-explanation');
+            const preview = group.querySelector('.explanation-preview');
+            const imageButton = group.querySelector('.explanation-image-btn');
+
+            if (!preview.classList.contains('hidden')) {
+                preview.classList.add('hidden');
+                textarea.classList.remove('hidden');
+                imageButton.classList.remove('hidden');
+                button.textContent = '👁️ Перегляд';
+                textarea.focus();
+                return;
+            }
+
+            const markdown = textarea.value;
+            let html = '<p class="explanation-preview-empty">Пояснення порожнє.</p>';
+            if (markdown.trim() !== '') {
+                try {
+                    const response = await fetch('/api/admin/preview-explanation', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        credentials: 'same-origin',
+                        body: JSON.stringify({ markdown })
+                    });
+                    const data = await response.json();
+                    if (!response.ok) {
+                        showMessage(data.error || 'Не вдалося показати перегляд', 'error');
+                        return;
+                    }
+                    // Rendered on the server: raw HTML is escaped and unsafe links removed there
+                    html = data.html;
+                } catch (error) {
+                    showMessage('Не вдалося показати перегляд: ' + error.message, 'error');
+                    return;
+                }
+            }
+            preview.innerHTML = html;
+            textarea.classList.add('hidden');
+            imageButton.classList.add('hidden');
+            preview.classList.remove('hidden');
+            button.textContent = '✏️ Редагувати';
+        }
+
+        function hasAnyExplanation() {
+            return Array.from(document.querySelectorAll('.question-explanation')).some(t => t.value.trim() !== '');
+        }
+
+        function updateShowExplanationVisibility() {
+            document.getElementById('show-explanation-group').style.display = hasAnyExplanation() ? 'block' : 'none';
+        }
+
+        function insertExplanationImage(textarea, imagePath) {
+            const name = imagePath.startsWith('/imgs/') ? imagePath.substring('/imgs/'.length) : imagePath;
+            // Names with spaces or brackets need angle brackets in Markdown (the server reads both forms)
+            const markdown = /[\s()<>]/.test(name) ? `![](</imgs/${name}>)` : `![](/imgs/${name})`;
+            const start = textarea.selectionStart ?? textarea.value.length;
+            const end = textarea.selectionEnd ?? textarea.value.length;
+            textarea.value = textarea.value.slice(0, start) + markdown + textarea.value.slice(end);
+            textarea.selectionStart = textarea.selectionEnd = start + markdown.length;
+            textarea.focus();
+            onExplanationInput(textarea);
         }
 
         // Show the seconds field when a time limit is chosen, and the per-question
@@ -2992,6 +3207,12 @@
                     questionData.stick_to_the_previous = true;
                 }
 
+                // Include the explanation when written
+                const explanationInput = div.querySelector('.question-explanation');
+                if (explanationInput && explanationInput.value.trim() !== '') {
+                    questionData.explanation = explanationInput.value;
+                }
+
                 // Include the question's own time limit when filled (kept in every mode, used in per-question mode)
                 const timeLimitInput = div.querySelector('.question-time-limit-input');
                 if (timeLimitInput && timeLimitInput.value.trim() !== '') {
@@ -3020,6 +3241,11 @@
 
             // Include show_final_list setting
             quizData.show_final_list = document.getElementById('show-final-list').checked;
+
+            // Include show_explanation only while some question has an explanation
+            if (hasAnyExplanation()) {
+                quizData.show_explanation = document.getElementById('show-explanation').checked;
+            }
 
             // Include time limit unless "none" is chosen
             const timeLimitMode = document.getElementById('time-limit-mode').value;
@@ -3283,6 +3509,19 @@
                         targetInput = optionInputs[currentImageTarget.optionIndex];
                     }
                 }
+            }
+
+            if (currentImageTarget.fieldType === 'explanation') {
+                const questionDiv = document.querySelector(`[data-question-id="${currentImageTarget.questionId}"]`);
+                const textarea = questionDiv ? questionDiv.querySelector('.question-explanation') : null;
+                if (textarea) {
+                    insertExplanationImage(textarea, imagePath);
+                    closeImagePicker();
+                    showMessage(`Зображення вставлено: ${imagePath}`, 'success');
+                } else {
+                    showMessage('Поле вводу не знайдено', 'error');
+                }
+                return;
             }
 
             if (targetInput) {

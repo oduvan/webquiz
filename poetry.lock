@@ -1055,6 +1055,21 @@ files = [
 ]
 
 [[package]]
+name = "mistune"
+version = "3.4.0"
+description = "A sane and fast Markdown parser with useful plugins and renderers"
+optional = false
+python-versions = ">=3.10"
+groups = ["main"]
+files = [
+    {file = "mistune-3.4.0-py3-none-any.whl", hash = "sha256:d03cec4c8620f21517a996d82d14f3b59c30d79bda2cc6c56bd32b839f18ce6b"},
+    {file = "mistune-3.4.0.tar.gz", hash = "sha256:2eaf7952af928ca8d33b779762effc1da517b62c6ad85ec8ca957e3b07b9782a"},
+]
+
+[package.dependencies]
+typing-extensions = {version = "*", markers = "python_version < \"3.11\""}
+
+[[package]]
 name = "multidict"
 version = "6.6.4"
 description = "multidict implementation"
@@ -2284,4 +2299,4 @@ propcache = ">=0.2.1"
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.10,<3.15"
-content-hash = "9ddfa1cf75f32d72685c9aeeafb6dbbfbb134e655192e6f46824f94d55160397"
+content-hash = "2bdf603a7083896e6fc082633c6eaf7bde552fc59d77b13913606a87fc8ad326"

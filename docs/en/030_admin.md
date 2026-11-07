@@ -23,7 +23,7 @@ The main administrative panel page contains essential tools for managing quizzes
   You can switch between quizzes or create new ones.
 
 - **Starting a quiz: the settings pop-up**
-  When you press the button to switch to (or restart) a quiz, a pop-up shows the quiz settings: show correct answers, show answers after everyone finishes, randomize question order, show the question list at the end, and the time limit. The values come from the quiz file. You can change them before pressing **"Запустити"** (Start). The changes apply only to this run of the quiz and are **not** saved in the quiz file. If the running quiz restarts by itself (for example after you save the config or edit this quiz), the same settings stay. Starting another quiz uses that quiz's file values again. With **Per question**, questions that have their own time limit in the file keep it.
+  When you press the button to switch to (or restart) a quiz, a pop-up shows the quiz settings: show correct answers, show answers after everyone finishes, randomize question order, show the question list at the end, show explanations (only when the quiz has explanations; greyed out while correct answers are not shown), and the time limit. The values come from the quiz file. You can change them before pressing **"Запустити"** (Start). The changes apply only to this run of the quiz and are **not** saved in the quiz file. If the running quiz restarts by itself (for example after you save the config or edit this quiz), the same settings stay. Starting another quiz uses that quiz's file values again. With **Per question**, questions that have their own time limit in the file keep it.
 
 - **"Create New Quiz" Button**
   Opens the interface for creating a new quiz in visual mode.
@@ -211,6 +211,9 @@ The editor uses a visual wizard interface for easy question management.
 - **Time limit**
   Choose **No time limit**, **Per question** or **Whole test**, and enter the seconds (0 = no limit). For per question, the seconds are the default for every question. See `time_limit` in the quiz file format.
 
+- **Show explanation after the answer**
+  Appears only while some question has an explanation. When on, students read a question's explanation after answering it (needs **Show Correct Answers**). This is the default for the start pop-up. See `show_explanation` in the quiz file format.
+
 #### Question Editor
 
 For each question, you can configure:
@@ -231,6 +234,8 @@ For each question, you can configure:
 - **Points per Question** — the number of points awarded for a correct answer (default: 1). Questions with more than 1 point show a trophy indicator.
 
 - **Time limit (seconds)** — shown only when the test time limit is **Per question**. Leave it empty to use the default, or enter 0 for no limit on this question. The value is kept in the file when you switch to another mode.
+
+- **Explanation (Markdown)** — optional text the student reads after answering this question. While it is empty, it is folded: press **"➕ Add explanation"** to open it (a written explanation opens unfolded). Press **"🖼️ Insert image"** to add an image from `quizzes/imgs/` at the cursor. Press **"👁️ Preview"** to see the explanation the way students will see it, in place of the text field; **"✏️ Edit"** brings the text field back.
 
 - **Stick to Previous Question** — when randomization is enabled, this keeps the question adjacent to the previous one. Useful for grouping related questions together.
 

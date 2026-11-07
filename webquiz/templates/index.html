@@ -798,6 +798,71 @@
         .timer-pending {
             visibility: hidden;
         }
+        /* Explanation step after an answer (Markdown rendered by the server) */
+        .explanation-step {
+            width: 100%;
+            box-sizing: border-box;
+            padding: 20px;
+            margin-bottom: 15px;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            background: var(--current-question-bg);
+        }
+        .explanation-title {
+            margin: 0 0 8px 0;
+            font-size: 20px;
+        }
+        .explanation-question {
+            margin-bottom: 12px;
+            opacity: 0.8;
+            font-style: italic;
+            /* Question text stays protected from copying, as on the question itself */
+            user-select: none;
+            -webkit-user-select: none;
+        }
+        .explanation-content {
+            line-height: 1.5;
+            overflow-wrap: anywhere;
+        }
+        .explanation-content img {
+            max-width: 100%;
+            height: auto;
+        }
+        .explanation-content table {
+            display: block;
+            max-width: 100%;
+            overflow-x: auto;
+            border-collapse: collapse;
+        }
+        .explanation-content th,
+        .explanation-content td {
+            padding: 4px 8px;
+            border: 1px solid var(--border-color);
+        }
+        .explanation-content pre {
+            max-width: 100%;
+            overflow-x: auto;
+            padding: 8px;
+            background: var(--question-bg);
+        }
+        .explanation-content code {
+            font-family: monospace;
+        }
+        .explanation-content blockquote {
+            margin: 8px 0;
+            padding-left: 12px;
+            border-left: 3px solid var(--border-color);
+        }
+        /* "Next" sits on the right, where "Continue" is */
+        #explanation-next-btn {
+            position: absolute;
+            right: 0;
+        }
+        @media (max-width: 768px) {
+            .explanation-step {
+                padding: 12px;
+            }
+        }
         .timer-warning {
             color: #dc3545;
         }
@@ -866,6 +931,15 @@
             </div>
             <div id="test-error" class="error-message hidden"></div>
             <div id="current-question-container"></div>
+            <!-- Outside #current-question-container, so the copy blocker does not apply to it -->
+            <div id="explanation-step" class="explanation-step hidden">
+                <h3 class="explanation-title"></h3>
+                <div class="explanation-question"></div>
+                <div class="explanation-content"></div>
+                <div class="button-container">
+                    <button id="explanation-next-btn" onclick="nextAfterExplanation()"></button>
+                </div>
+            </div>
             <div class="button-container">
                 <button id="submit-answer-btn" onclick="submitCurrentAnswer()" disabled>{{T_SUBMIT_ANSWER}}</button>
                 <button id="continue-btn" onclick="continueToNextQuestion()" class="hidden">{{T_CONTINUE_BUTTON}}</button>
@@ -895,10 +969,15 @@
         let questionCountdown = null; // {questionId, deadline, intervalId} for a per-question time limit
         let quizCountdown = null; // {deadline, intervalId} for a whole-quiz time limit
         let quizTimeUpStarted = false; // The whole-quiz time ran out and the quiz is being closed
+        let pendingExplanation = null; // {question, html} to show after "Continue", from the answer reply
 
         // Prevent copying question text
         const questionContainer = document.getElementById('current-question-container');
         questionContainer.addEventListener('copy', function(e) {
+            e.preventDefault();
+        });
+        // ...also where the explanation step repeats the question (the explanation itself may be copied)
+        document.querySelector('#explanation-step .explanation-question').addEventListener('copy', function(e) {
             e.preventDefault();
         });
 
@@ -1629,9 +1708,50 @@
             await showCurrentQuestion(false); // Don't animate first question
         }
 
+        function showExplanationStep() {
+            const step = document.getElementById('explanation-step');
+            step.querySelector('.explanation-title').textContent = T.explanation_title;
+            step.querySelector('.explanation-question').textContent = pendingExplanation.question;
+            // Rendered on the server from Markdown: raw HTML is escaped and unsafe links removed there
+            step.querySelector('.explanation-content').innerHTML = pendingExplanation.html;
+            const nextBtn = document.getElementById('explanation-next-btn');
+            nextBtn.textContent = T.next_button;
+            nextBtn.disabled = false;
+            document.getElementById('current-question-container').classList.add('hidden');
+            document.getElementById('submit-answer-btn').classList.add('hidden');
+            document.getElementById('continue-btn').classList.add('hidden');
+            step.classList.remove('hidden');
+            window.scrollTo(0, 0);
+        }
+
+        function hideExplanationStep() {
+            document.getElementById('explanation-step').classList.add('hidden');
+            document.getElementById('current-question-container').classList.remove('hidden');
+        }
+
+        async function nextAfterExplanation() {
+            const nextBtn = document.getElementById('explanation-next-btn');
+            if (nextBtn.disabled) {
+                return;
+            }
+            nextBtn.disabled = true; // A double click must not skip a question
+            pendingExplanation = null;
+            // Keep the step (with the disabled button) under the mouse for a moment, so the second click
+            // of a double click cannot land on the next question's controls (like the "Continue" fade-out)
+            await new Promise(resolve => setTimeout(resolve, 400));
+            if (currentQuestionIndex >= questions.length || quizTimeUpStarted) {
+                return; // The whole-quiz time ran out meanwhile and the results are shown
+            }
+            // The next question is drawn while the step still covers the answered one
+            await continueToNextQuestion(false);
+            hideExplanationStep();
+        }
+
         async function showCurrentQuestion(withAnimation = true) {
             if (currentQuestionIndex >= questions.length) {
                 // Test completed - fetch final results from server to ensure consistency
+                pendingExplanation = null;
+                hideExplanationStep();
                 await fetchAndShowFinalResults();
                 return;
             }
@@ -1894,6 +2014,11 @@
                     selectedAnswerDisplay = question.options[selectedAnswer];
                 }
 
+                // The explanation step comes after "Continue" (the server sends it only with correct answers shown)
+                pendingExplanation = (typeof data.explanation_html === 'string' && data.explanation_html)
+                    ? {question: question.question || '', html: data.explanation_html}
+                    : null;
+
                 testResults.push({
                     questionId: question.id,
                     question: question.question,
@@ -2049,6 +2174,12 @@
         }
 
         async function continueToNextQuestion(withAnimation = true) {
+            // The answered question has an explanation: show it before the next question
+            if (pendingExplanation) {
+                showExplanationStep();
+                return;
+            }
+
             // Disable continue button to prevent double-clicks during animation
             const continueBtn = document.getElementById('continue-btn');
             if (continueBtn) {

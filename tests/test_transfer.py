@@ -420,6 +420,42 @@ def test_rewrite_quiz_media_keeps_comments(tmp_path):
     assert not rewrite_quiz_media(str(path), {("images", "other.png"): "x.png"})
 
 
+QUIZ_WITH_EXPLANATION_IMAGES = """\
+# Explanations quiz
+questions:
+- question: "Q1?"
+  options: ["a", "b"]
+  correct_answer: 0
+  image: /imgs/q.png
+  explanation: |
+    See ![map](/imgs/map.png) and ![room](</imgs/my room.png>).
+    Outside: ![x](https://example.com/x.png)  # not a quiz image
+"""
+
+
+def test_quiz_media_files_finds_explanation_images(tmp_path):
+    path = tmp_path / "e.yaml"
+    path.write_text(QUIZ_WITH_EXPLANATION_IMAGES)
+    assert quiz_media_files(str(path)) == [("images", "q.png"), ("images", "map.png"), ("images", "my room.png")]
+
+
+def test_rewrite_quiz_media_rewrites_explanation_images(tmp_path):
+    path = tmp_path / "e.yaml"
+    path.write_text(QUIZ_WITH_EXPLANATION_IMAGES)
+
+    changed = rewrite_quiz_media(
+        str(path), {("images", "map.png"): "room-a_map.png", ("images", "my room.png"): "room-a_my room.png"}
+    )
+
+    text = path.read_text()
+    assert changed
+    assert "See ![map](/imgs/room-a_map.png) and ![room](</imgs/room-a_my room.png>)." in text
+    assert "![x](https://example.com/x.png)" in text
+    assert "explanation: |" in text
+    assert "# Explanations quiz" in text
+    assert "image: /imgs/q.png" in text
+
+
 async def test_quiz_is_sent_with_its_images_and_attachments(machines):
     a, b = machines
     write_quiz_with_media(a)

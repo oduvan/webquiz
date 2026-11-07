@@ -41,6 +41,9 @@ import httpx
 import yaml
 from aiohttp import web
 from ruamel.yaml import YAML as RuamelYAML
+from ruamel.yaml.scalarstring import ScalarString
+
+from .explanations import explanation_image_names, rewrite_explanation_images
 
 logger = logging.getLogger(__name__)
 
@@ -147,6 +150,14 @@ def _media_fields(quiz: Any):
                 yield options, index, "images"
 
 
+def _explained_questions(quiz: Any):
+    """Yield every question whose explanation is text (it may show quiz images)"""
+    questions = quiz.get("questions") if isinstance(quiz, dict) else None
+    for question in questions if isinstance(questions, list) else []:
+        if isinstance(question, dict) and isinstance(question.get("explanation"), str):
+            yield question
+
+
 def quiz_media_files(quiz_path: str) -> List[Tuple[str, str]]:
     """Images and attachments used by a quiz file
 
@@ -163,6 +174,10 @@ def quiz_media_files(quiz_path: str) -> List[Tuple[str, str]]:
         name = _media_file_name(file_type, container[key])
         if name and (file_type, name) not in found:
             found.append((file_type, name))
+    for question in _explained_questions(quiz):
+        for name in explanation_image_names(question["explanation"]):
+            if is_allowed_file("images", name) and ("images", name) not in found:
+                found.append(("images", name))
     return found
 
 
@@ -194,6 +209,14 @@ def rewrite_quiz_media(quiz_path: str, renamed: Dict[Tuple[str, str], str]) -> b
         new_name = renamed.get((file_type, name)) if name else None
         if new_name:
             container[key] = value[: len(value) - len(name)] + new_name
+            changed = True
+    renamed_images = {name: new_name for (file_type, name), new_name in renamed.items() if file_type == "images"}
+    for question in _explained_questions(quiz):
+        text = question["explanation"]
+        new_text = rewrite_explanation_images(text, renamed_images)
+        if new_text != text:
+            # Keep the YAML style of the text (for example a "|" block)
+            question["explanation"] = type(text)(new_text) if isinstance(text, ScalarString) else new_text
             changed = True
     if changed:
         with open(quiz_path, "w", encoding="utf-8") as f:

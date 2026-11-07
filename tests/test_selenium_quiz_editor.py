@@ -380,6 +380,12 @@ def test_save_and_continue_keeps_editor_open(temp_dir, browser):
         title_input.clear()
         title_input.send_keys("Save and Continue Test")
 
+        # The editor focuses the first question 300 ms after opening, which can scroll the editor;
+        # wait for it, so it cannot move the "Add Question" button under the sticky bar mid-click
+        WebDriverWait(browser, 5).until(
+            lambda d: d.execute_script("return document.activeElement.classList.contains('question-text')")
+        )
+
         # Find and click "Add Question" button (scroll into view to avoid sticky bar)
         add_button = browser.find_element(By.XPATH, "//button[contains(text(), 'Додати Питання')]")
         browser.execute_script("arguments[0].scrollIntoView({block: 'center'});", add_button)
