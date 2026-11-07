@@ -2,6 +2,7 @@ import asyncio
 import httpx
 import json
 import csv
+import html
 import yaml
 from ruamel.yaml import YAML as RuamelYAML
 import os
@@ -21,6 +22,7 @@ import aiofiles
 import logging
 from io import StringIO
 import ipaddress
+from urllib.parse import urlparse
 
 from .config import WebQuizConfig, load_config_from_yaml
 from .translations import get_translations
@@ -110,6 +112,17 @@ def ensure_directory_exists(path: str) -> str:
     """
     os.makedirs(path, exist_ok=True)
     return path
+
+
+def json_for_script(data, indent=None) -> str:
+    """Turn data into JSON that is safe to put inside a <script> tag.
+
+    Quiz text may contain "</script>". If that text is put into the page as it
+    is, the browser ends the script there and the page breaks. Writing every
+    "<" as the JSON escape \\u003c keeps the same value but leaves no tag in the
+    page source.
+    """
+    return json.dumps(data, indent=indent).replace("<", "\\u003c")
 
 
 #: Question points may carry at most this many decimal places
@@ -416,6 +429,24 @@ def normalize_url(url: str) -> str:
     return url.replace(":80/", "/")
 
 
+def can_send_token_to(url: str) -> bool:
+    """Check whether an access token may be sent to this URL.
+
+    Tokens go over https only, so they are not readable on the way. Plain http
+    is allowed for this machine, which is where test servers run.
+
+    Args:
+        url: The URL the archive would be downloaded from
+
+    Returns:
+        True if sending a token to this URL is safe
+    """
+    parsed = urlparse(url)
+    if parsed.scheme == "https":
+        return True
+    return parsed.scheme == "http" and parsed.hostname in ("localhost", "127.0.0.1", "::1")
+
+
 def get_network_interfaces(include_ipv6=False):
     """Get all network interfaces and their IP addresses.
 
@@ -646,6 +677,7 @@ class TestingServer:
             "index.html",
             "admin.html",
             "files.html",
+            "csv_table.html",
             "live_stats.html",
             "quiz_selection_required.html",
             "template_error.html",
@@ -936,9 +968,9 @@ class TestingServer:
         quiz_list_html = ""
         for quiz in available_quizzes:
             if quiz["title"]:
-                quiz_list_html += f"<li>{quiz['filename']} - {quiz['title']}</li>"
+                quiz_list_html += f"<li>{html.escape(str(quiz['filename']), quote=False)} - {html.escape(str(quiz['title']), quote=False)}</li>"
             else:
-                quiz_list_html += f"<li>{quiz['filename']}</li>"
+                quiz_list_html += f"<li>{html.escape(str(quiz['filename']), quote=False)}</li>"
 
         # Load template and replace placeholders
         template_content = self.templates.get("quiz_selection_required.html", "")
@@ -1151,8 +1183,8 @@ class TestingServer:
 
             questions_for_client.append(client_question)
 
-        # Convert questions to JSON string for embedding
-        questions_json = json.dumps(questions_for_client, indent=2)
+        # Convert questions to JSON string for embedding inside <script>
+        questions_json = json_for_script(questions_for_client, indent=2)
 
         template_content = self.templates.get("index.html", "")
 
@@ -1168,7 +1200,7 @@ class TestingServer:
         # Add username field as first row
         registration_fields_html += f"""
             <tr>
-                <td class="registration-label">{username_label}:</td>
+                <td class="registration-label">{html.escape(username_label, quote=False)}:</td>
                 <td class="registration-input">
                     <input type="text" id="username">
                 </td>
@@ -1180,9 +1212,9 @@ class TestingServer:
                 field_name = field_label.lower().replace(" ", "_")
                 registration_fields_html += f"""
             <tr>
-                <td class="registration-label">{field_label}:</td>
+                <td class="registration-label">{html.escape(field_label, quote=False)}:</td>
                 <td class="registration-input">
-                    <input type="text" class="registration-field" data-field-name="{field_name}">
+                    <input type="text" class="registration-field" data-field-name="{html.escape(field_name)}">
                 </td>
             </tr>"""
 
@@ -1190,9 +1222,9 @@ class TestingServer:
 
         # Inject questions data, title, version, registration fields, username label, and show_right_answer setting into template
         html_content = template_content.replace("{{QUESTIONS_DATA}}", questions_json)
-        html_content = html_content.replace("{{QUIZ_TITLE}}", self.quiz_title)
+        html_content = html_content.replace("{{QUIZ_TITLE}}", html.escape(self.quiz_title, quote=False))
         html_content = html_content.replace("{{REGISTRATION_FIELDS}}", registration_fields_html)
-        html_content = html_content.replace("{{USERNAME_LABEL}}", username_label)
+        html_content = html_content.replace("{{USERNAME_LABEL}}", html.escape(username_label, quote=False))
         html_content = html_content.replace("{{SHOW_RIGHT_ANSWER}}", "true" if self.show_right_answer else "false")
         html_content = html_content.replace("{{SHOW_FINAL_LIST}}", "true" if self.show_final_list else "false")
         html_content = html_content.replace("{{WEBQUIZ_VERSION}}", get_package_version())
@@ -3351,6 +3383,10 @@ class TestingServer:
                         elif not isinstance(quiz[field], str):
                             errors.append(f"Quiz {i+1} field '{field}' must be a string")
 
+                    # Optional field for private archives
+                    if "auth_header_token" in quiz and not isinstance(quiz["auth_header_token"], str):
+                        errors.append(f"Quiz {i+1} field 'auth_header_token' must be a string")
+
         return len(errors) == 0
 
     @admin_auth_required
@@ -3457,6 +3493,24 @@ class TestingServer:
             headers={"Content-Disposition": f'attachment; filename="{filename}"'},
         )
 
+    def find_downloadable_quiz(self, name):
+        """Find a downloadable quiz from the config by its name.
+
+        Args:
+            name: Quiz name as shown in the admin panel
+
+        Returns:
+            DownloadableQuiz object, or None if the config has no quiz with that name
+        """
+        if not self.config.quizzes or not self.config.quizzes.quizzes:
+            return None
+
+        for quiz in self.config.quizzes.quizzes:
+            if quiz.name == name:
+                return quiz
+
+        return None
+
     @admin_auth_required
     async def admin_download_quiz(self, request):
         """Download and extract quiz from ZIP file.
@@ -3472,10 +3526,26 @@ class TestingServer:
         data = await request.json()
         name = data.get("name")
         download_path = data.get("download_path")
-        folder = data.get("folder")
+        folder = data.get("folder") or ""
 
         if not name or not download_path:
             return web.json_response({"error": "Name and download_path are required"}, status=400)
+
+        # Private archives need an access token. The token belongs to the config
+        # entry, so take the URL and folder from the config too — that way a token
+        # can never be sent to an address that arrived with the request.
+        token = None
+        configured_quiz = self.find_downloadable_quiz(name)
+        if configured_quiz and configured_quiz.auth_header_token:
+            token = configured_quiz.auth_header_token
+            download_path = configured_quiz.download_path
+            folder = configured_quiz.folder or ""
+
+            if not can_send_token_to(download_path):
+                return web.json_response(
+                    {"error": "A quiz token can only be sent over https"},
+                    status=400,
+                )
 
         # Check for absolute paths (Unix-style or Windows-style)
         if os.path.isabs(folder) or (len(folder) >= 2 and folder[1] == ":"):
@@ -3506,8 +3576,9 @@ class TestingServer:
         try:
             # Download the ZIP file
             logger.info(f"Downloading quiz from {download_path}")
+            headers = {"Authorization": f"Bearer {token}"} if token else None
             async with httpx.AsyncClient(follow_redirects=True, timeout=30.0) as client:
-                response = await client.get(download_path)
+                response = await client.get(download_path, headers=headers)
                 response.raise_for_status()
 
                 # Use temporary directory for extraction (auto-cleanup)
@@ -3525,6 +3596,20 @@ class TestingServer:
                         zip_ref.extractall(temp_dir)
 
                     source_path = os.path.join(temp_dir, folder)
+
+                    # Archives built by GitHub put everything inside one directory
+                    # named after the repository and the commit, so the name changes
+                    # with every push. Allow the folder to be given relative to that
+                    # directory as well.
+                    if folder and not os.path.exists(source_path):
+                        extracted_dirs = [
+                            entry for entry in os.listdir(temp_dir) if os.path.isdir(os.path.join(temp_dir, entry))
+                        ]
+                        if len(extracted_dirs) == 1:
+                            candidate = os.path.join(temp_dir, extracted_dirs[0], folder)
+                            if os.path.exists(candidate):
+                                logger.info(f"Resolved folder '{folder}' inside archive root '{extracted_dirs[0]}'")
+                                source_path = candidate
 
                     # Verify source path exists
                     if not os.path.exists(source_path):
@@ -3849,7 +3934,7 @@ class TestingServer:
                     registration = parsed.get("registration", {})
                     if not isinstance(registration, dict):
                         registration = {}
-                    config_data_json = json.dumps(
+                    config_data_json = json_for_script(
                         {
                             "language": parsed.get("language", "uk"),
                             "extra_answers_with_users_csv": bool(parsed.get("extra_answers_with_users_csv", False)),
@@ -3866,7 +3951,7 @@ class TestingServer:
         # Inject JavaScript variables for trusted IP auto-auth and config
         js_variables = f"""
             const IS_TRUSTED_IP = {str(is_trusted_ip).lower()};
-            const CONFIG_CONTENT = {json.dumps(config_content) if config_path else 'null'};
+            const CONFIG_CONTENT = {json_for_script(config_content) if config_path else 'null'};
             const CONFIG_PATH = {json.dumps(config_path) if config_path else 'null'};
             const CONFIG_DATA = {config_data_json if config_path else 'null'};
         """
@@ -4190,12 +4275,28 @@ class TestingServer:
         server_data_script = f"""
     const IS_TRUSTED_IP = {str(is_trusted_ip).lower()};
     const NETWORK_INFO = {json.dumps(network_info)};
-    const DOWNLOADABLE_QUIZZES = {json.dumps(downloadable_quizzes)};
+    const DOWNLOADABLE_QUIZZES = {json_for_script(downloadable_quizzes)};
     const WEBQUIZ_VERSION = {json.dumps(package_version)};
     const TUNNEL_PUBLIC_KEY = {json.dumps(tunnel_public_key)};"""
 
         template_content = template_content.replace("<script>", f"<script>{server_data_script}\n")
 
+        return web.Response(text=template_content, content_type="text/html")
+
+    @local_network_only
+    async def serve_csv_table_page(self, request):
+        """Serve the CSV table viewer page.
+
+        The page shows one CSV file as a table with filters by question and by
+        user. It reads the file name from its own address and loads the data
+        through the protected /api/files/csv/view/ endpoint, so the page itself
+        holds no data. The file manager shows it in its pop-up (in an iframe)
+        and it can also be opened in its own window.
+
+        Returns:
+            HTML response with the CSV table viewer
+        """
+        template_content = self.templates.get("csv_table.html", "")
         return web.Response(text=template_content, content_type="text/html")
 
     @local_network_only
@@ -4429,6 +4530,7 @@ async def create_app(config: WebQuizConfig):
 
     # File management routes (admin access)
     app.router.add_get("/files/", server.serve_files_page)
+    app.router.add_get("/files/csv/{filename}", server.serve_csv_table_page)
     # Quiz file attachment download route
     app.router.add_get("/attach/{filename}", server.serve_quiz_file)
     app.router.add_get("/api/files/list", server.files_list)

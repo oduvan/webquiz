@@ -3,8 +3,8 @@
 ## ⚠️ CRITICAL: Every Code Change MUST Include
 
 1. **Update CLAUDE.md** - Reflect architectural changes, new features, API endpoints, technical decisions. Keep this file MINIMAL - detailed user-facing info belongs in README.md
-2. **Update README.md** - User-facing documentation with detailed usage instructions
-3. **Update docs/** - Both Ukrainian (`docs/uk/`) and English (`docs/en/`) in sync
+2. **Update README.md** - User-facing documentation with detailed usage instructions. Only for new or changed features: a bug fix does not need a README change, except for the test counts
+3. **Update docs/** - Both Ukrainian (`docs/uk/`) and English (`docs/en/`) in sync. Only for new or changed features: a bug fix does not need a docs change
 4. **Write tests FIRST** - All functionality requires automated tests (update test counts below)
 5. **Mobile support** - All UI must be responsive (≤768px viewport, `width: 100%; max-width: [size]`)
 
@@ -29,7 +29,7 @@ WebQuiz - Python/aiohttp quiz system with multi-quiz management, real-time WebSo
 - `webquiz/cli.py` - CLI with daemon support
 - `webquiz/build.py` - PyInstaller build script
 - `installer/webquiz.iss` - Inno Setup script for Windows installer
-- `webquiz/templates/` - index.html, admin.html, files.html, live_stats.html
+- `webquiz/templates/` - index.html, admin.html, files.html, csv_table.html, live_stats.html
 - `tests/` - Test suite
 - `docs/uk/`, `docs/en/` - Documentation (compiled to PDF with version)
 - `gh-pages/index.html` - GitHub Pages download page template (version placeholder: `{{VERSION}}`)
@@ -58,6 +58,7 @@ WebQuiz - Python/aiohttp quiz system with multi-quiz management, real-time WebSo
 - `GET /admin/` - Admin interface page
 - `GET /live-stats/` - Live stats page
 - `GET /files/` - File manager page
+- `GET /files/csv/{filename}` - CSV table viewer page (`?question=`, `?user=`, `?embedded=1`)
 
 **WebSockets:**
 - `WS /ws/live-stats` (local network only), `WS /ws/admin` (local network only, admin approval + tunnel status + file transfer notifications: `transfer_request`, `transfer_request_removed`, `transfer_result`)
@@ -93,7 +94,7 @@ source venv/bin/activate && poetry run build_binary
 ```
 
 ### Environment Requirements
-- **Python**: 3.9+ (tested with 3.9-3.14)
+- **Python**: 3.10+ (tested with 3.10-3.14)
 - **Poetry**: Installed inside venv (not globally) to avoid conflicts
 - **Test ports**: Tests use ports 8080-8087 for parallel execution (-n 4 uses 4 workers). CLI tests that launch a real server use 8090-8097 via `--port` so they never collide with fixture workers
 
@@ -135,6 +136,7 @@ webquiz-stress-test -c 50
 - **Windows installer** - Inno Setup script (`installer/webquiz.iss`) builds `webquiz-windows-setup.exe` with Start Menu shortcut and Add/Remove Programs uninstaller. Built in CI alongside portable ZIP. Version injected via `/DMyAppVersion` flag.
 - **Coverage excludes build tools**: build.py and binary_entry.py omitted from coverage (not runtime code)
 - **Wizard-only quiz editor** - Admin panel uses wizard mode only; YAML editing available in file manager with validation
+- **CSV table viewer** - `csv_table.html` at `/files/csv/{filename}` (`@local_network_only`; data comes from `/api/files/csv/view/`, so it needs the admin session like the rest). One page for both places: the file manager pop-up shows it in an iframe with `?embedded=1` (hides its own header, shows "Open in new window"), and the CSV list has a "↗ New window" link to it. Filters by `question` column and by user (`user_id`, labelled with `username`; for a plain answers CSV the names come from the matching `.users.csv`). Filters live in the address (`?question=&user=`, updated with `history.replaceState`). `parseCSV()` reads quoted fields with commas, `""` and line breaks. Table cells wrap (`white-space: pre-line`) instead of growing sideways. Theme follows localStorage and the `storage` event.
 - **File manager quiz editing** - Direct YAML editing with validation button, automatic backup, and active quiz reload
 - **Dynamic answer visibility** - `show_answers_on_completion: true` reveals correct answers only after all approved students complete, with automatic re-hiding when new students register
 - **SSH Tunnel for public access** - Optional feature to expose local server via SSH reverse tunnel with Unix domain sockets
@@ -149,6 +151,8 @@ webquiz-stress-test -c 50
 - **File transfer between servers** - "Ask first, then send" over the public tunnel URLs (`{base_url}/{socket_name}/...`); direct SSH stream-local connections are blocked by the tunnel server (`AllowTcpForwarding remote`). Sender keeps an offer with a random token (30 min lifetime) and POSTs the file list; receiver admin accepts; receiver downloads from `{its own base_url}/{sender}/` with the token and reports the result. Only `.yaml/.yml` quizzes, `.log` logs, `.csv` files, plus images (`quizzes/imgs/`) and attachments (`quizzes/attach/`) referenced by offered quizzes (`image`, image `options`, `file`), added automatically by the sender; names without path or Windows-invalid characters; offer entries carry a SHA-256. Receiver shows per file a case (`new`, `same`, `different`, `in_use` = current log/CSV/active quiz from `get_files_in_use`) with allowed actions (save/replace/rename/skip) and a default (save/skip/rename/rename); target name is the original name, `{sender}_` prefix for logs/CSV; rename suggests the first free `{sender}_name`, `_2`, `_3`. `_build_plan()` validates all choices before any download (400 keeps the request). Receiver downloads media first and rewrites references in received quizzes with ruamel round-trip when media got a new name. Files page send panel is hidden until `GET /api/admin/transfer` reports `available`. State is in memory (`TransferManager`). `TunnelManager.get_public_endpoint()` returns `(base_url, socket_id)` while connected.
 - **Local network restriction** - All admin functionality (API endpoints via @admin_auth_required, HTML pages, WebSockets) automatically restricted to private networks (RFC 1918: 127.0.0.0/8, 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16) with no configuration needed
 - **Quiz download folder validation** - Path traversal protection: blocks "..", absolute paths (Unix/Windows), normalizes paths, ensures extraction stays within quizzes directory; allows subfolder paths like "folder/subfolder/"
+- **Private quiz archives** - A `quizzes` entry may carry `auth_header_token`, the only way to supply a token (no environment variable support by design). When an entry has it, `admin_download_quiz` looks the entry up with `find_downloadable_quiz(name)` and uses the **config's** `download_path` and `folder`, ignoring the request's, so a token can never be sent to an address supplied by the client. The token goes out as `Authorization: Bearer`, and only to an https URL (or http on localhost) — `can_send_token_to()` otherwise returns 400. Without the field the download is unauthenticated, as before. The token is not part of the `DOWNLOADABLE_QUIZZES` injected into admin.html. For GitHub use `https://api.github.com/repos/OWNER/REPO/zipball/REF`: the plain `github.com/.../archive/....zip` URL redirects cross-host to codeload and httpx strips `Authorization` there, giving a 404.
+- **Archive root folder resolution** - GitHub archives wrap everything in `owner-repo-<sha>/`, whose name changes per commit. If `folder` is not found at the archive top level and exactly one directory was extracted, the folder is retried inside it, so `folder: data` works. Existing configs that spell out the root folder keep working.
 - **Clipboard API fallback** - Copy public key button uses modern navigator.clipboard API for HTTPS/localhost, falls back to document.execCommand() for non-secure contexts (HTTP over IP)
 - **Package version check** - Admin panel periodically checks if package was updated while server is running by comparing in-memory version with file version; shows "Restart Required" banner when mismatch detected
 - **Quiz file attachments** - Questions can have downloadable files via `file` field (e.g., `file: "data.xlsx"`). Files stored in `quizzes/attach/`, served at `/attach/{filename}` with `Content-Disposition: attachment` header for forced download. Server auto-prepends `/attach/` when serving to client. Admin panel has file picker modal for selecting files.
@@ -166,6 +170,7 @@ webquiz-stress-test -c 50
 - **Manual answer revelation** - Admin can click "Show Answers" button to force `all_students_completed()` to return true, triggering existing answer visibility logic. Button only visible when quiz has `show_answers_on_completion: true`. Affects all students who complete after button click (including new registrations). One-way action (cannot be undone until quiz switch). Endpoint: `POST /api/admin/force-show-answers` (admin-auth required). Flag `force_all_completed` resets on quiz switch.
 - **Quiz renaming** - Admin can rename quizzes via editor modal. Backend renames physical file with validation. **Active quiz cannot be renamed** (must switch to different quiz first, returns 409 error). CSV files retain old quiz name prefix (historical data preservation). Prevents filename conflicts with 409 status code.
 - **Student request retry** - Quiz page sends requests through `fetchWithRetry()` (index.html): network error, 15s timeout (AbortController) or 502/503/504 → retry after 1s, 2s, 4s, then every 5s, forever, with a `#connection-banner` (`T.connection_lost`). Other HTTP errors are returned to the caller as before. The answer is locked (`answerLocked`, textarea disabled) while it is sent, and submit awaits the pending `questionStartRequest` so the server gets question-start before the answer. Page-load verification retries instead of falling back to the registration form. Server makes repeats safe: `answer_results[user_id][question_id]` stores `{selected_answer, response}` **before** the live-stats broadcast `await`, so a concurrent retry also gets the stored result; `registration_tokens[token] -> user_id` (client sends a random `registration_token`, built with `crypto.getRandomValues` because `randomUUID` needs a secure context). Both dicts are cleared in `reset_server_state()`.
+- **Plain text, never HTML** - Quiz text (question, options, title, `default_value`, `correct_value`, checker errors) and student input (username, registration fields) are shown as plain text on every page, so `<vtx_band>` stays visible and student names cannot inject HTML/JS. JS templates wrap every such value in `escapeHtml()` before `innerHTML` (index.html, live_stats.html, admin.html, files.html each define it). Server-side: `html.escape()` for `{{QUIZ_TITLE}}`, `{{USERNAME_LABEL}}`, registration labels and the quiz-selection list; `json_for_script()` (writes `<` as `\u003c`) for JSON put inside `<script>` (`{{QUESTIONS_DATA}}`, `CONFIG_CONTENT`, `CONFIG_DATA`, `DOWNLOADABLE_QUIZZES`) so a `</script>` in quiz text cannot end the script. Values inside `onclick="fn(...)"` use `escapeHtml(JSON.stringify(value))`.
 - **Question text copy prevention** - Quiz questions have `user-select: none` CSS and a `copy` event handler on the question container to prevent students from copying question text. Text input fields for text questions remain selectable.
 - **Show final list** - `show_final_list` quiz option (default: true) controls whether the question-by-question results table is displayed on the final screen. When false, only the score summary (e.g., "3/5 (60%)") is shown. Setting is loaded from YAML, injected as `showFinalList` JS variable, validated as boolean, and editable in admin quiz editor.
 - **Image preloading** - All quiz images (question images and image options) are preloaded immediately on page load. Uses `new Image()` to cache images in browser while user fills registration form. Images from options starting with `/` are detected as image paths. Ensures instant image display during quiz.
@@ -206,6 +211,7 @@ webquiz-stress-test -c 50
   - `show_right_answer: false` - Auto-advance without continue button (seamless flow)
   - `show_answers_on_completion: true` - Reveal correct answers dynamically after all approved students complete, with waiting message and reload prompt (default: false)
   - `show_final_list: false` - Hide the list of questions with answers on the results screen, showing only the score summary (default: true)
+  - `quizzes[].auth_header_token` - Access token for a private archive, sent in the `Authorization` header (default: none = unauthenticated download)
   - `tunnel.server` - SSH tunnel server hostname (e.g., "tunnel.example.com")
   - `tunnel.public_key` - Path to SSH public key file (auto-generated if missing)
   - `tunnel.private_key` - Path to SSH private key file (auto-generated if missing)

@@ -32,7 +32,7 @@ This directory contains comprehensive end-to-end tests using Selenium WebDriver 
 
 ### System Dependencies
 - **Chrome Browser**: Required for running tests
-- **Python 3.9+**: For async support and modern features
+- **Python 3.10+**: For async support and modern features
 
 ### Python Dependencies
 **Via Poetry (recommended):**
@@ -146,10 +146,10 @@ jobs:
     steps:
     - uses: actions/checkout@v3
 
-    - name: Set up Python 3.9
+    - name: Set up Python 3.10
       uses: actions/setup-python@v4
       with:
-        python-version: '3.9'
+        python-version: '3.10'
 
     - name: Install dependencies
       run: |
