@@ -25,6 +25,8 @@ questions:
     correct_answer: 0
 ```
 
+> **Примітка:** Налаштування «увімкнено/вимкнено» (`show_right_answer`, `show_answers_on_completion`, `show_final_list`, `randomize_questions`) приймають `true` або `false` **без лапок**. У лапках `"false"` — це текст, а не значення «увімкнено/вимкнено», і адміністративна панель не збереже такий тест.
+
 ---
 
 ### 1. Основні параметри тесту

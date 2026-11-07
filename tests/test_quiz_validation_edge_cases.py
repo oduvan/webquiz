@@ -498,6 +498,59 @@ questions:
         assert any("randomize_questions" in error and "boolean" in error.lower() for error in data["errors"])
 
 
+def test_validate_quiz_show_answers_on_completion_not_boolean(temp_dir):
+    """Test validation rejects non-boolean show_answers_on_completion.
+
+    The string "false" is the dangerous case: Python treats any non-empty
+    string as true, so without this check the quiz would reveal answers.
+    """
+    with custom_webquiz_server() as (proc, port):
+        cookies = get_admin_session(port)
+
+        quiz_yaml = """title: Invalid Show Answers On Completion Type
+show_right_answer: false
+show_answers_on_completion: "false"  # Should be boolean
+questions:
+  - question: Test?
+    options: ['A', 'B']
+    correct_answer: 0"""
+
+        response = requests.post(
+            f"http://localhost:{port}/api/admin/validate-quiz", cookies=cookies, json={"content": quiz_yaml}
+        )
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["valid"] is False
+        assert any("show_answers_on_completion" in error and "boolean" in error.lower() for error in data["errors"])
+
+
+def test_create_quiz_rejects_non_boolean_show_answers_on_completion(temp_dir):
+    """Test that creating a quiz with a non-boolean show_answers_on_completion fails and writes no file"""
+    with custom_webquiz_server() as (proc, port):
+        cookies = get_admin_session(port)
+
+        quiz_yaml = """title: Bad Setting
+show_right_answer: false
+show_answers_on_completion: "yes"
+questions:
+  - question: Test?
+    options: ['A', 'B']
+    correct_answer: 0"""
+
+        response = requests.post(
+            f"http://localhost:{port}/api/admin/create-quiz",
+            cookies=cookies,
+            json={"filename": "bad_setting", "mode": "text", "content": quiz_yaml},
+        )
+
+        assert response.status_code == 400
+
+        list_response = requests.get(f"http://localhost:{port}/api/admin/list-quizzes", cookies=cookies)
+        filenames = [quiz["filename"] for quiz in list_response.json()["quizzes"]]
+        assert "bad_setting.yaml" not in filenames
+
+
 def test_validate_quiz_title_not_string(temp_dir):
     """Test validation rejects non-string title"""
     with custom_webquiz_server() as (proc, port):
