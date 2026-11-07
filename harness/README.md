@@ -37,6 +37,9 @@ python -m playwright install chromium        # skip if a shared browser is set i
 
 # Scripted students only (no AI):
 python -m harness.run time-edges --no-agents
+
+# A class of 100 students (scripted only):
+python -m harness.run big-class --class-size 100 --no-agents
 ```
 
 With AI agent students:
@@ -57,6 +60,8 @@ Runs are saved in `harness/runs/` (not committed). The server uses port 8199 and
 | `normal-lesson` | A normal lesson: limit changed in the start pop-up, mixed question types, different speeds, a reload, a student who leaves |
 | `time-edges` | Answers just before the limit, inside and after the grace, a picked but unsent option, no answer, a reload, a closed tab, a question with no limit |
 | `whole-quiz-wifi` | Whole-quiz limit chosen in the pop-up: students finish early, run out of time, lose Wi-Fi when time runs out, close the tab, reload a lot |
+| `approval-whole-quiz` | Approval mode with a whole-quiz limit: a scripted teacher approves students in the admin panel at planned times; students press "Check" early, 40 s after approval, or are never approved. Waiting must never use up quiz time |
+| `big-class` | A big class at once (40 scripted students, `--class-size N` for more) plus agents, random question order, 30 s per question; some reload, leave, or lose Wi-Fi. The report adds the server's reply times and checks the server's time per answer against the browser's |
 
 ## Files
 
