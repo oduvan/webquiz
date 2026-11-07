@@ -276,6 +276,7 @@ The project has **769 tests** across **57 test files**. The main areas:
 - **Registration Fields** (12 tests): Custom registration fields
 - **Show Right Answer** (5 tests): Answer display functionality
 - **Show Answers on Completion** (10 tests): Dynamic answer visibility after all students complete
+- **Hidden Correctness** (2 tests): The results table leaves out the "correct" column while correct answers are hidden (`test_selenium_hidden_correctness.py`)
 - **Integration Tests** (6 tests): Multiple choice, multiple answers
 - **Selenium Tests** (87 tests): End-to-end browser testing
 - **Auto-Advance** (6 tests): Automatic progression behavior
