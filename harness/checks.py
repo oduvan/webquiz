@@ -19,7 +19,7 @@ import sys
 from collections import defaultdict
 from pathlib import Path
 
-from harness.classroom import format_step
+from harness.steps import format_step
 
 STEP_LINE = re.compile(r"^\s*step\s+(\d+)\s*\|\s*did:\s*(.*?)\s*\|\s*saw:\s*(.*)$", re.IGNORECASE)
 QUOTE_SEPARATOR = re.compile(r"[\"“”»]\s*;\s*[\"“«]")

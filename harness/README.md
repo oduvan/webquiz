@@ -73,6 +73,7 @@ Runs are saved in `harness/runs/` (not committed). The server uses port 8199 and
 | `scenarios.py` | Scenario quizzes, start settings, student plans, agent personas |
 | `run.py` | Runs a scenario end to end |
 | `checks.py` | The checks, the report and the timelines |
+| `steps.py` | How a recorded step is shown as text (to the agents and in the checks); needs no Playwright, so the checks' tests run without it |
 | `AGENT_PROMPT.md` | The instructions for an AI agent student |
 
 A suspected bug is only a bug once a scripted student or a normal test reproduces it. That test then stays in the test suite.

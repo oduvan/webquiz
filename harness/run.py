@@ -26,7 +26,8 @@ import yaml
 from aiohttp import web
 
 from harness import checks
-from harness.classroom import Classroom, format_step
+from harness.classroom import Classroom
+from harness.steps import format_step
 from harness.scenarios import SCENARIOS, big_class_scenario
 from harness.scripted import scripted_student, teacher_approves, teacher_start
 from webquiz import time_limits
