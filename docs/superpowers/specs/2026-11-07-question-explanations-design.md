@@ -121,6 +121,12 @@ questions:
   `onQuizTimeUp()` sends the empty answer for the next question (as it
   already does on the "Продовжити" screen) and shows the results.
 
+- When the whole-quiz time runs out (including while a question with an
+  explanation is on screen), the page goes straight to the results, as it
+  does today; there is no explanation step. Whole-quiz timeout replies do
+  not carry `explanation_html` (otherwise a time-up during the step would
+  bring the explanation of a question the student never saw).
+
 ## Page details
 
 - After "Продовжити", if the last answer reply had `explanation_html`, the
@@ -135,7 +141,12 @@ questions:
   wider than the screen (`max-width: 100%`, tables scroll inside their own
   box on phones).
 - Copy prevention applies to question text only; explanation text may be
-  selected.
+  selected. The copy blocker covers `#current-question-container`, so the
+  explanation step is shown outside it (or the blocker skips it).
+- `explanation:` with no value (null), or only spaces, means no explanation.
+- The image picker writes `![](/imgs/name.png)`; for a file name with a
+  space it writes `![](</imgs/my picture.png>)` (CommonMark angle brackets),
+  and the transfer pattern reads both forms.
 
 ## Non-goals
 
