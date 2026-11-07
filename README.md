@@ -278,7 +278,7 @@ The project has **769 tests** across **57 test files**. The main areas:
 - **Show Answers on Completion** (10 tests): Dynamic answer visibility after all students complete
 - **Time Limits** (56 tests): Per-question and whole-quiz time limits, timeouts, background check, countdowns, editor fields (`test_time_limits_*.py`, `test_selenium_time_limits.py`, `test_selenium_admin_time_limits.py`)
 - **Start Settings** (11 tests): Settings pop-up when starting a quiz; values apply to the running quiz only (`test_quiz_start_settings.py`, `test_selenium_admin_start_settings.py`)
-- **Harness Checks** (10 tests): The classroom harness's data and agent-report checks, on small fake records (`test_harness_checks.py`)
+- **Harness Checks** (14 tests): The classroom harness's data and agent-report checks, on small fake records (`test_harness_checks.py`)
 - **Integration Tests** (6 tests): Multiple choice, multiple answers
 - **Selenium Tests** (87 tests): End-to-end browser testing
 - **Auto-Advance** (6 tests): Automatic progression behavior

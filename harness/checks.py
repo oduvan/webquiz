@@ -41,7 +41,8 @@ def split_quotes(saw):
     Splitting on the '"; "' separator (instead of matching quote pairs) keeps a quote that
     itself contains quotes, like '"TYPE INTO: ... = "6""', in one piece.
     """
-    pieces = QUOTE_SEPARATOR.split(saw.strip())
+    # Some agents write quotes inside a quote with a backslash (\") as in JSON
+    pieces = QUOTE_SEPARATOR.split(saw.strip().replace('\\"', '"'))
     quotes = []
     for piece in pieces:
         piece = piece.strip()

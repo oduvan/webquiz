@@ -175,3 +175,10 @@ def test_time_accuracy_compares_server_time_with_browser_time():
     assert len(problems) == 1
     assert "Q2?" in problems[0] and "9.0" in problems[0] and "6.0" in problems[0]
     assert check_time_accuracy(rows[:1], measured, tolerance=1.5) == []
+
+
+def test_parse_agent_report_reads_backslash_escaped_quotes():
+    line = 'STEP 20 | DID: type "100" | SAW: "✍️ Введіть вашу відповідь:"; "Введіть відповідь... = \\"100\\""'
+    quotes = parse_agent_report(line)[0]["quotes"]
+    assert 'Введіть відповідь... = "100' in quotes[1]
+    assert "\\" not in quotes[1]
