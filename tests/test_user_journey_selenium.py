@@ -230,9 +230,9 @@ def test_progress_bar_functionality(temp_dir, browser):
         username_input.send_keys("ProgressTester")
         find_register_button(browser).click()
 
-        wait_for_element(browser, By.ID, "current-question-container")
-
-        # Check initial progress
+        # #current-question-container is in the page before registration ends,
+        # so wait for the progress text itself to be filled in
+        WebDriverWait(browser, 10).until(EC.text_to_be_present_in_element((By.ID, "progress-text"), "Питання 1 з 3"))
         progress_text = browser.find_element(By.ID, "progress-text")
         assert "Питання 1 з 3" in progress_text.text
 
