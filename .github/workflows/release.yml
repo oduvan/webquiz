@@ -327,6 +327,14 @@ jobs:
         *This release was automatically created by the release workflow.*
         EOF
 
+        # Put the hand-written notes for this version (if there are any) right after the title
+        NOTES_FILE=".github/release-notes/v${{ github.event.inputs.version }}.md"
+        if [ -f "$NOTES_FILE" ]; then
+          { head -n 2 release_notes.md; cat "$NOTES_FILE"; echo; tail -n +3 release_notes.md; } > release_notes_full.md
+          mv release_notes_full.md release_notes.md
+          echo "Added $NOTES_FILE to the release notes"
+        fi
+
         # Create release with built artifacts (includes wheel, tar.gz, PDFs, and zipped binaries)
         gh release create "v${{ github.event.inputs.version }}" \
           --title "Release v${{ github.event.inputs.version }}" \
