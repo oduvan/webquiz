@@ -207,6 +207,25 @@ def check_expectations(expectations, rows, user_of, question_text):
     return problems
 
 
+def check_time_accuracy(rows, measured, tolerance=1.5):
+    """The time the server stored for an answer matches the time the browser measured.
+
+    measured: {(user_id, question): seconds from sending question-start to sending the
+    accepted answer}. A bigger gap means the server was slow to handle requests (load).
+    """
+    problems = []
+    for item in rows:
+        key = (item["user_id"], item["question"])
+        if item["selected_answer"] == "" or key not in measured:
+            continue
+        if abs(item["time_taken"] - measured[key]) > tolerance:
+            problems.append(
+                f"user {key[0]}: '{key[1]}' took {item['time_taken']:.1f} s on the server, "
+                f"but {measured[key]:.1f} s in the browser"
+            )
+    return problems
+
+
 def parse_screen_score(text):
     """Read 'Результат: 2/3 (67%)' (or 'Result: ...') from a screen. None when there is no result."""
     match = SCORE.search(text or "")
@@ -316,6 +335,23 @@ def analyze(run_dir):
                 }
             )
 
+    # Browser-side time per answer: first question-start sent -> the accepted answer sent
+    first_start = {}
+    accepted_send = {}
+    latencies = []
+    for event in events:
+        if event["kind"] != "response" or event.get("status") != 200:
+            continue
+        request = requests.get(event["req_id"], {})
+        body = request.get("body") if isinstance(request.get("body"), dict) else {}
+        key = (body.get("user_id"), question_text.get(body.get("question_id")))
+        if request.get("path") == "/api/question-start":
+            first_start.setdefault(key, request["t"])
+        elif request.get("path") == "/api/submit-answer":
+            accepted_send.setdefault(key, request["t"])
+            latencies.append(event["t"] - request["t"])
+    measured = {key: accepted_send[key] - first_start[key] for key in accepted_send if key in first_start}
+
     # Rows the server stored by itself: the background check, and whole-quiz ends
     allowed = set()
     for match in re.finditer(r"Time ran out for user (\d+) on question (\d+)", server_log):
@@ -355,6 +391,7 @@ def analyze(run_dir):
         "Requests and stored answers agree": check_submits_match_rows(submits, rows, allowed),
         "Results screen matches stored answers": check_screen_scores(final_scores, rows, len(question_text)),
         "Live stats match stored answers": check_live_stats(final_states, rows),
+        "Server time per answer matches the browser (±1.5 s)": check_time_accuracy(rows, measured),
         "Planned outcomes of the scripted edge cases": check_expectations(
             meta.get("expectations", {}), rows, user_of, question_text
         ),
@@ -374,6 +411,12 @@ def analyze(run_dir):
         f"- Live stats messages recorded: {sum(1 for e in events if e['kind'] == 'live')}",
         f"- Answer requests with a reply: {len(submits)}",
     ]
+    if latencies:
+        ordered = sorted(latencies)
+        coverage.append(
+            f"- Answer reply time: median {ordered[len(ordered) // 2]:.2f} s, slowest {ordered[-1]:.2f} s"
+            " (from sending the accepted answer to its reply)"
+        )
     write_report(run_dir, meta, sections, agent_sections, rows, user_of, coverage)
     write_timelines(run_dir, events, rows, user_of, question_text)
     return sum(len(p) for p in sections.values())

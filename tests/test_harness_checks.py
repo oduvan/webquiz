@@ -6,6 +6,7 @@ They use small fake records only: no server, browser or AI agents.
 from harness.checks import (
     check_agent_alignment,
     check_expectations,
+    check_time_accuracy,
     check_answer_times,
     check_live_stats,
     check_screen_scores,
@@ -161,3 +162,16 @@ def test_expectations_compare_the_planned_outcome_with_the_stored_answer():
     assert any("Q1?" in p and "timeout" in p and "correct" in p for p in problems)
 
     assert check_expectations({"nobody": {1: "correct"}}, rows, user_of, question_text)
+
+
+def test_time_accuracy_compares_server_time_with_browser_time():
+    rows = [
+        row(question="Q1?", time_taken=5.2),
+        row(question="Q2?", time_taken=9.0),
+        row(question="Q3?", selected="", correct=False, time_taken=30.0),  # timeouts are skipped
+    ]
+    measured = {("u1", "Q1?"): 5.0, ("u1", "Q2?"): 6.0, ("u1", "Q3?"): 3.0}
+    problems = check_time_accuracy(rows, measured, tolerance=1.5)
+    assert len(problems) == 1
+    assert "Q2?" in problems[0] and "9.0" in problems[0] and "6.0" in problems[0]
+    assert check_time_accuracy(rows[:1], measured, tolerance=1.5) == []

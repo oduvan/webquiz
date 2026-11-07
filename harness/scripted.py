@@ -11,10 +11,14 @@ import time
 POLL = 0.3
 
 
-def resolve_answer(spec, question_number, answers):
-    """Turn an answer spec into ("options", [labels]) or ("text", value)."""
+def resolve_answer(spec, question_id, answers):
+    """Turn an answer spec into ("options", [labels]) or ("text", value).
+
+    None means the scenario's correct answer for this question id (so it also
+    works when every student gets the questions in a different order).
+    """
     if spec is None:
-        spec = answers[question_number]
+        spec = answers[question_id]
     if isinstance(spec, tuple) and spec and spec[0] == "text":
         return "text", spec[1]
     if isinstance(spec, str):
@@ -76,11 +80,38 @@ async def handle_question(classroom, name, action, number, answers, shown_at, qu
     return True
 
 
-async def scripted_student(classroom, name, plan, answers, deadline):
-    """Register, then follow the plan question by question until the results or the deadline."""
+async def wait_for_approval(classroom, name, checks):
+    """Press "Check" at the planned times (seconds since registration) until the quiz starts.
+
+    After the planned checks the student keeps checking every 5 s for 20 s more, then gives up.
+    Returns True when the quiz started.
+    """
+    registered_at = time.monotonic()
+    check_button = "button[onclick='checkApprovalStatus()']"
+    times = list(checks) + [checks[-1] + 5 * n for n in range(1, 5)]
+    for at in times:
+        await until(registered_at, at)
+        await classroom.click_selector(name, check_button, screenshot=True)
+        await asyncio.sleep(0.5)
+        if (await classroom.state(name)).get("question"):
+            return True
+    return False
+
+
+async def scripted_student(classroom, name, plan, answers, question_ids, deadline):
+    """Register, then follow the plan question by question until the results or the deadline.
+
+    plan: {position: action}; position 1 is the first question this student sees.
+    plan["check"]: when approval is on, the times (seconds after registering) to press "Check".
+    question_ids: {question text: question id}, to find the correct answer in a random order.
+    """
     await classroom.command(name, "open", screenshot=False)
     await classroom.command(name, "type", name, screenshot=False, settle=0.2)
     await classroom.click_selector(name, ".register-btn", screenshot=True)
+
+    if "check" in plan and not await wait_for_approval(classroom, name, plan["check"]):
+        await classroom.command(name, "look", screenshot=True)
+        return
 
     seen = set()
     number = 0
@@ -98,7 +129,8 @@ async def scripted_student(classroom, name, plan, answers, deadline):
             shown_at = time.monotonic()
             quiz_start = quiz_start or shown_at
             action = plan.get(number, ("answer", None, 3))
-            if not await handle_question(classroom, name, action, number, answers, shown_at, quiz_start):
+            question_id = question_ids.get(question, number)
+            if not await handle_question(classroom, name, action, question_id, answers, shown_at, quiz_start):
                 return
             continue
         if state.get("can_continue"):
@@ -157,5 +189,34 @@ async def teacher_start(classroom, quiz_file, settings, master_key):
         await page.click("#start-quiz-confirm")
     reply = await (await response_info.value).json()
     classroom.log("note", student="teacher", detail=f"started the quiz: {reply}")
-    await page.close()
+    teacher.page = page  # stays open: the teacher may approve students later
     return reply.get("settings")
+
+
+async def teacher_approves(classroom, approvals, agent_names, agent_delay, started, deadline):
+    """Click "approve" in the admin panel for each student at the planned time.
+
+    approvals: {student: seconds after the start, or None = never}.
+    Agents are approved `agent_delay` seconds after they first show up in the waiting list.
+    """
+    page = classroom.students["teacher"].page
+    planned = {name: at for name, at in approvals.items() if at is not None}
+    agents_seen = {}
+    agents_left = set(agent_names)
+    while (planned or agents_left) and time.monotonic() < deadline:
+        now = time.monotonic() - started
+        due = [name for name, at in planned.items() if now >= at]
+        for name in agents_left:
+            if await page.locator(".pending-user-item", has_text=f"👤 {name}").count():
+                agents_seen.setdefault(name, now)
+                if now - agents_seen[name] >= agent_delay:
+                    due.append(name)
+        for name in due:
+            item = page.locator(".pending-user-item", has_text=f"👤 {name}")
+            if await item.count() == 0:
+                continue  # not registered yet: try again on the next round
+            await item.first.locator(".approve-btn").click()
+            classroom.log("note", student="teacher", detail=f"approved {name} at {now:.1f} s")
+            planned.pop(name, None)
+            agents_left.discard(name)
+        await asyncio.sleep(0.5)

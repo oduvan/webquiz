@@ -26,6 +26,8 @@ Times are seconds since the question appeared on that student's screen
 data: "correct", "wrong", "timeout" or "missing" (no row), by question id.
 """
 
+import random
+
 FRACTIONS = {
     "name": "normal-lesson",
     "description": (
@@ -211,4 +213,160 @@ WHOLE_QUIZ = {
     "max_seconds": 420,
 }
 
-SCENARIOS = {s["name"]: s for s in (FRACTIONS, TIME_EDGES, WHOLE_QUIZ)}
+WAITING_NOTE = (
+    "The teacher has to let you in: after you register you see a waiting screen. Press the button "
+    '"🔄 Перевірити" about every 10 seconds (use `wait 10` in between) until the quiz starts.'
+)
+
+APPROVAL = {
+    "name": "approval-whole-quiz",
+    "description": (
+        "Approval mode with a whole-quiz limit: the file says 20 s per question; the teacher starts it with "
+        "50 s for the whole quiz. The teacher approves students at different times. One student presses "
+        "'Check' 40 s after being approved, one checks too early, one is approved late, one runs out of time, "
+        "one is never approved. Waiting must never use up quiz time."
+    ),
+    "quiz_file": "approval.yaml",
+    "config": {"registration": {"approve": True}},
+    "quiz": {
+        "title": "Географія",
+        "show_right_answer": True,
+        "time_limit": {"per_question": 20},
+        "questions": [
+            {"question": "Столиця Польщі?", "options": ["Варшава", "Краків", "Гданськ"], "correct_answer": 0},
+            {
+                "question": "Найдовша річка України?",
+                "options": ["Дністер", "Дніпро", "Південний Буг"],
+                "correct_answer": 1,
+            },
+            {
+                "question": "Яке море на півдні України?",
+                "options": ["Балтійське", "Чорне", "Біле"],
+                "correct_answer": 1,
+            },
+            {"question": "Найвища гора України?", "options": ["Говерла", "Петрос", "Піп Іван"], "correct_answer": 0},
+            {"question": "Скільки областей в Україні?", "options": ["20", "24", "27"], "correct_answer": 1},
+        ],
+    },
+    "start_settings": {"time_limit": {"whole_quiz": 50}},
+    "answers": {1: "Варшава", 2: "Дніпро", 3: "Чорне", 4: "Говерла", 5: "24"},
+    # When the teacher clicks "approve" (seconds after the start); None = never
+    "approvals": {
+        "a01-prompt": 3,
+        "a02-late-check": 3,
+        "a03-checks-early": 15,
+        "a04-never-approved": None,
+        "a05-slow": 3,
+        "a06-approved-late": 40,
+    },
+    "agent_approval_delay": 15,
+    "scripted": {
+        "a01-prompt": {"check": [5]},
+        "a02-late-check": {"check": [45]},
+        "a03-checks-early": {"check": [2, 20]},
+        "a04-never-approved": {"check": [10, 30]},
+        "a05-slow": {"check": [5]} | {q: ("answer", None, 10) for q in range(1, 6)},
+        "a06-approved-late": {"check": [45]},
+    },
+    "expectations": {
+        "a01-prompt": {q: "correct" for q in range(1, 6)},
+        "a02-late-check": {q: "correct" for q in range(1, 6)},
+        "a03-checks-early": {q: "correct" for q in range(1, 6)},
+        "a04-never-approved": {q: "missing" for q in range(1, 6)},
+        "a05-slow": {1: "correct", 2: "correct", 3: "correct", 4: "correct", 5: "timeout"},
+        "a06-approved-late": {q: "correct" for q in range(1, 6)},
+    },
+    "agents": {
+        "agent-waiting": {"device": "desktop", "persona": "You are an ordinary student. " + WAITING_NOTE},
+        "agent-impatient": {
+            "device": "phone",
+            "persona": "You are an impatient student on a phone who also reloads the page while waiting. "
+            + WAITING_NOTE,
+        },
+    },
+    "finish_after": 120,
+    "max_seconds": 480,
+}
+
+
+def _big_class(size):
+    """`size` scripted students (at least 20): 10 special ones reload, leave, lose Wi-Fi or skip a
+    question; all others answer correctly at random speeds. The same size always gives the same class."""
+    rng = random.Random(7)
+    plans, expectations = {}, {}
+    regular = size - 10
+    for n in range(1, regular + 1):
+        name = f"c{n:02d}"
+        plans[name] = {q: ("answer", None, round(rng.uniform(2, 18), 1)) for q in range(1, 7)}
+        expectations[name] = {q: "correct" for q in range(1, 7)}
+    number = regular
+    for kind in ("reload", "reload", "reload", "leaves", "leaves", "leaves", "wifi", "wifi", "wifi", "idle"):
+        number += 1
+        name = f"c{number:02d}-{kind}"
+        if kind == "reload":
+            plans[name] = {rng.randint(1, 6): ("reload", 3, None, 8)}
+            expectations[name] = {q: "correct" for q in range(1, 7)}
+        elif kind == "leaves":
+            plans[name] = {rng.randint(2, 5): ("leave", 4)}
+        elif kind == "wifi":
+            plans[name] = {q: ("offline_answer", None, 3, 4, 5) for q in (2, 4)}
+            expectations[name] = {q: "correct" for q in range(1, 7)}
+        else:
+            plans[name] = {3: ("idle",)}
+    return plans, expectations
+
+
+def big_class_scenario(size=40):
+    plans, expectations = _big_class(size)
+    return {
+        "name": "big-class",
+        "description": (
+            f"A big class at once: {size} scripted students plus AI agents, random question order, 30 s per question. "
+            "Most answer correctly at random speeds; some reload, leave, lose Wi-Fi for a moment, or skip a question. "
+            "Checks that the clocks stay accurate under load."
+        ),
+        "quiz_file": "big-class.yaml",
+        "quiz": {
+            "title": "Природознавство",
+            "show_right_answer": True,
+            "randomize_questions": True,
+            "time_limit": {"per_question": 30},
+            "questions": [
+                {"question": "Скільки планет у Сонячній системі?", "options": ["7", "8", "9"], "correct_answer": 1},
+                {"question": "Яка планета найбільша?", "options": ["Марс", "Юпітер", "Земля"], "correct_answer": 1},
+                {
+                    "question": "Що з цього — ссавці? (усі правильні)",
+                    "options": ["Кит", "Акула", "Кажан", "Пінгвін"],
+                    "correct_answer": [0, 2],
+                },
+                {
+                    "question": "За якої температури кипить вода (°C)? Введіть число.",
+                    "checker": "assert to_int(user_answer) == 100, 'Ні'",
+                    "correct_value": "100",
+                },
+                {
+                    "question": "Що потрібно рослинам для фотосинтезу?",
+                    "options": ["Світло", "Темрява", "Сіль"],
+                    "correct_answer": 0,
+                },
+                {
+                    "question": "Який газ ми видихаємо?",
+                    "options": ["Кисень", "Вуглекислий газ", "Азот"],
+                    "correct_answer": 1,
+                },
+            ],
+        },
+        "start_settings": {},
+        "answers": {1: "8", 2: "Юпітер", 3: ["Кит", "Кажан"], 4: ("text", "100"), 5: "Світло", 6: "Вуглекислий газ"},
+        "scripted": plans,
+        "expectations": expectations,
+        "agents": {
+            "agent-big-1": {"device": "desktop", "persona": "You are an ordinary student. Answer at a normal pace."},
+            "agent-big-2": {"device": "phone", "persona": "You are a quick student on a phone."},
+        },
+        "finish_after": 60,
+        "max_seconds": 600,
+    }
+
+
+SCENARIOS = {s["name"]: s for s in (FRACTIONS, TIME_EDGES, WHOLE_QUIZ, APPROVAL, big_class_scenario())}

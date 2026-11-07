@@ -27,8 +27,8 @@ from aiohttp import web
 
 from harness import checks
 from harness.classroom import Classroom, format_step
-from harness.scenarios import SCENARIOS
-from harness.scripted import scripted_student, teacher_start
+from harness.scenarios import SCENARIOS, big_class_scenario
+from harness.scripted import scripted_student, teacher_approves, teacher_start
 from webquiz import time_limits
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -61,6 +61,8 @@ def start_server(run_dir, scenario):
         },
         "admin": {"master_key": MASTER_KEY},
     }
+    for section, values in scenario.get("config", {}).items():
+        config.setdefault(section, {}).update(values)
     with open(run_dir / "config.yaml", "w", encoding="utf-8") as f:
         yaml.safe_dump(config, f, allow_unicode=True)
     log = open(run_dir / "server.log", "w", encoding="utf-8")
@@ -166,10 +168,22 @@ async def run(scenario, with_agents):
         deadline = started + scenario["max_seconds"]
         for name in scenario["scripted"]:
             await classroom.add_student(name)
+        question_ids = {q["question"]: i + 1 for i, q in enumerate(scenario["quiz"]["questions"])}
         students = [
-            scripted_student(classroom, name, plan, scenario["answers"], deadline)
+            scripted_student(classroom, name, plan, scenario["answers"], question_ids, deadline)
             for name, plan in scenario["scripted"].items()
         ]
+        if "approvals" in scenario:
+            students.append(
+                teacher_approves(
+                    classroom,
+                    scenario["approvals"],
+                    list(agents),
+                    scenario.get("agent_approval_delay", 15),
+                    started,
+                    deadline,
+                )
+            )
         await asyncio.gather(*students)
         print("Scripted students finished.", flush=True)
 
@@ -194,10 +208,16 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("scenario", choices=sorted(SCENARIOS))
     parser.add_argument("--no-agents", action="store_true", help="run only the scripted students")
+    parser.add_argument("--class-size", type=int, help="big-class only: number of scripted students (20 or more)")
     args = parser.parse_args()
     if "PLAYWRIGHT_BROWSERS_PATH" not in os.environ and Path("/opt/pw-browsers").exists():
         os.environ["PLAYWRIGHT_BROWSERS_PATH"] = "/opt/pw-browsers"  # a shared browser install, if there is one
-    asyncio.run(run(SCENARIOS[args.scenario], with_agents=not args.no_agents))
+    scenario = SCENARIOS[args.scenario]
+    if args.class_size:
+        if args.scenario != "big-class" or args.class_size < 20:
+            parser.error("--class-size works only with big-class, and needs 20 or more")
+        scenario = big_class_scenario(args.class_size)
+    asyncio.run(run(scenario, with_agents=not args.no_agents))
 
 
 if __name__ == "__main__":
