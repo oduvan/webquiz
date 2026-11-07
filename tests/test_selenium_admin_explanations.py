@@ -2,6 +2,7 @@
 
 import base64
 import os
+import time
 
 import requests
 import yaml
@@ -47,6 +48,21 @@ def preview_box(item):
     return item.find_element(By.CSS_SELECTOR, ".explanation-preview")
 
 
+def js_click(browser, element):
+    browser.execute_script("arguments[0].scrollIntoView({block: 'center'});", element)
+    # Click via JS: the editor's sticky action bar can sit over the button
+    browser.execute_script("arguments[0].click();", element)
+
+
+def unfold_explanation(browser, item):
+    js_click(browser, item.find_element(By.CSS_SELECTOR, ".explanation-toggle-btn"))
+    WebDriverWait(browser, 3).until(lambda d: explanation_field(item).is_displayed())
+
+
+def toggle_preview(browser, item):
+    js_click(browser, item.find_element(By.CSS_SELECTOR, ".explanation-preview-btn"))
+
+
 def open_first_question(browser, port):
     admin_login(browser, port)
     select_and_edit_quiz(browser)
@@ -54,19 +70,50 @@ def open_first_question(browser, port):
 
 
 @skip_if_selenium_disabled
-def test_editor_preview_renders_markdown(temp_dir, browser):
+def test_empty_explanation_is_folded(temp_dir, browser):
     with custom_webquiz_server(quizzes=quiz()) as (proc, port):
         item = open_first_question(browser, port)
+        toggle = item.find_element(By.CSS_SELECTOR, ".explanation-toggle-btn")
+        assert toggle.is_displayed()
+        assert "Додати пояснення" in toggle.text
+        assert not explanation_field(item).is_displayed()
+        unfold_explanation(browser, item)
+        assert item.find_element(By.CSS_SELECTOR, ".explanation-preview-btn").is_displayed()
+
+
+@skip_if_selenium_disabled
+def test_existing_explanation_is_unfolded(temp_dir, browser):
+    with custom_webquiz_server(quizzes=quiz("Loaded *text*", show_explanation=True)) as (proc, port):
+        item = open_first_question(browser, port)
+        assert explanation_field(item).is_displayed()
+        assert explanation_field(item).get_attribute("value") == "Loaded *text*"
         assert not preview_box(item).is_displayed()
+        assert browser.find_element(By.ID, "show-explanation-group").is_displayed()
+        assert browser.find_element(By.ID, "show-explanation").is_selected()
+        second = expand_question(browser, 1)
+        assert not explanation_field(second).is_displayed()
+
+
+@skip_if_selenium_disabled
+def test_preview_button_replaces_the_field(temp_dir, browser):
+    with custom_webquiz_server(quizzes=quiz()) as (proc, port):
+        item = open_first_question(browser, port)
+        unfold_explanation(browser, item)
         explanation_field(item).send_keys("**Bold** text")
-        WebDriverWait(browser, 3).until(
-            lambda d: preview_box(item).find_elements(By.TAG_NAME, "strong")
-            and preview_box(item).find_element(By.TAG_NAME, "strong").text == "Bold"
-        )
+        time.sleep(0.6)
+        assert not preview_box(item).is_displayed()  # no preview until the button is pressed
+
+        toggle_preview(browser, item)
+        WebDriverWait(browser, 3).until(lambda d: preview_box(item).find_elements(By.TAG_NAME, "strong"))
+        assert preview_box(item).find_element(By.TAG_NAME, "strong").text == "Bold"
         assert preview_box(item).is_displayed()
-        explanation_field(item).clear()
-        explanation_field(item).send_keys(" ")
-        WebDriverWait(browser, 3).until(lambda d: not preview_box(item).is_displayed())
+        assert not explanation_field(item).is_displayed()
+        assert not item.find_element(By.CSS_SELECTOR, ".explanation-image-btn").is_displayed()
+
+        toggle_preview(browser, item)
+        WebDriverWait(browser, 3).until(lambda d: explanation_field(item).is_displayed())
+        assert not preview_box(item).is_displayed()
+        assert explanation_field(item).get_attribute("value") == "**Bold** text"
 
 
 @skip_if_selenium_disabled
@@ -75,6 +122,7 @@ def test_editor_show_explanation_appears_with_text(temp_dir, browser):
         item = open_first_question(browser, port)
         group = browser.find_element(By.ID, "show-explanation-group")
         assert not group.is_displayed()
+        unfold_explanation(browser, item)
         explanation_field(item).send_keys("Because")
         WebDriverWait(browser, 3).until(lambda d: group.is_displayed())
         explanation_field(item).clear()
@@ -86,6 +134,7 @@ def test_editor_show_explanation_appears_with_text(temp_dir, browser):
 def test_editor_saves_explanation_and_option(temp_dir, browser):
     with custom_webquiz_server(quizzes=quiz()) as (proc, port):
         item = open_first_question(browser, port)
+        unfold_explanation(browser, item)
         explanation_field(item).send_keys("Because **A**")
         checkbox = WebDriverWait(browser, 3).until(EC.visibility_of_element_located((By.ID, "show-explanation")))
         if not checkbox.is_selected():
@@ -98,25 +147,13 @@ def test_editor_saves_explanation_and_option(temp_dir, browser):
 
 
 @skip_if_selenium_disabled
-def test_editor_loads_existing_explanation(temp_dir, browser):
-    with custom_webquiz_server(quizzes=quiz("Loaded *text*", show_explanation=True)) as (proc, port):
-        item = open_first_question(browser, port)
-        assert explanation_field(item).get_attribute("value") == "Loaded *text*"
-        WebDriverWait(browser, 3).until(lambda d: preview_box(item).find_elements(By.TAG_NAME, "em"))
-        assert browser.find_element(By.ID, "show-explanation-group").is_displayed()
-        assert browser.find_element(By.ID, "show-explanation").is_selected()
-
-
-@skip_if_selenium_disabled
 def test_editor_inserts_image_markdown(temp_dir, browser):
     with custom_webquiz_server(quizzes=quiz()) as (proc, port):
         with open(os.path.join(temp_dir, f"quizzes_{port}", "imgs", "pic.png"), "wb") as f:
             f.write(PNG)
         item = open_first_question(browser, port)
-        button = item.find_element(By.CSS_SELECTOR, ".explanation-image-btn")
-        browser.execute_script("arguments[0].scrollIntoView({block: 'center'});", button)
-        # Click via JS: the editor's sticky action bar can sit over the button
-        browser.execute_script("arguments[0].click();", button)
+        unfold_explanation(browser, item)
+        js_click(browser, item.find_element(By.CSS_SELECTOR, ".explanation-image-btn"))
         image = WebDriverWait(browser, 5).until(
             EC.element_to_be_clickable((By.CSS_SELECTOR, "#image-grid .image-item"))
         )
@@ -124,6 +161,7 @@ def test_editor_inserts_image_markdown(temp_dir, browser):
         WebDriverWait(browser, 3).until(
             lambda d: "![](/imgs/pic.png)" in explanation_field(item).get_attribute("value")
         )
+        toggle_preview(browser, item)
         preview_image = WebDriverWait(browser, 3).until(lambda d: preview_box(item).find_element(By.TAG_NAME, "img"))
         WebDriverWait(browser, 5).until(
             lambda d: d.execute_script("return arguments[0].naturalWidth", preview_image) > 0

@@ -711,9 +711,33 @@
         }
         .question-explanation {
             width: 100%;
-            min-height: 80px;
+            min-height: 120px;
             box-sizing: border-box;
             font-family: monospace;
+        }
+        .question-explanation.hidden,
+        .explanation-image-btn.hidden {
+            display: none;
+        }
+        .explanation-group.folded .explanation-body {
+            display: none;
+        }
+        .explanation-toggle-btn {
+            margin-bottom: 8px;
+        }
+        .explanation-tools {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin: 6px 0;
+        }
+        .explanation-preview {
+            min-height: 120px;
+            box-sizing: border-box;
+        }
+        .explanation-preview-empty {
+            opacity: 0.7;
+            font-style: italic;
         }
 
         .image-item {
@@ -2928,7 +2952,6 @@
 
             // Explanations: the option shows only when some question has one
             document.getElementById('show-explanation').checked = quizData.show_explanation === true;
-            document.querySelectorAll('.question-explanation').forEach(textarea => refreshExplanationPreview(textarea));
             updateShowExplanationVisibility();
         }
 
@@ -2936,49 +2959,86 @@
 
         function explanationFieldHtml(questionId, value) {
             const text = typeof value === 'string' ? value : '';
+            // Folded while empty; a written explanation opens unfolded
+            const folded = text.trim() === '';
             return `
-                <div class="form-group explanation-group">
-                    <label>Пояснення (Markdown, необов'язково) — показується студенту після відповіді:</label>
-                    <textarea class="question-explanation" placeholder="**Чому** ця відповідь правильна..." oninput="onExplanationInput(this)">${escapeHtml(text)}</textarea>
-                    <button type="button" class="explanation-image-btn" onclick="openImagePicker('explanation', ${questionId})">🖼️ Вставити зображення</button>
-                    <div class="explanation-preview explanation-content hidden"></div>
+                <div class="form-group explanation-group${folded ? ' folded' : ''}">
+                    <button type="button" class="explanation-toggle-btn" onclick="toggleExplanationGroup(this)">${folded ? '➕ Додати пояснення' : '📖 Пояснення ▾'}</button>
+                    <div class="explanation-body">
+                        <label>Пояснення (Markdown) — показується студенту після відповіді:</label>
+                        <div class="explanation-tools">
+                            <button type="button" class="explanation-image-btn" onclick="openImagePicker('explanation', ${questionId})">🖼️ Вставити зображення</button>
+                            <button type="button" class="explanation-preview-btn" onclick="toggleExplanationPreview(this)">👁️ Перегляд</button>
+                        </div>
+                        <textarea class="question-explanation" placeholder="**Чому** ця відповідь правильна..." oninput="onExplanationInput(this)">${escapeHtml(text)}</textarea>
+                        <div class="explanation-preview explanation-content hidden"></div>
+                    </div>
                 </div>
             `;
         }
 
-        const explanationPreviewTimers = new WeakMap();
+        function toggleExplanationGroup(button) {
+            const group = button.closest('.explanation-group');
+            const folded = group.classList.toggle('folded');
+            if (folded) {
+                const hasText = group.querySelector('.question-explanation').value.trim() !== '';
+                button.textContent = hasText ? '📖 Пояснення ▸' : '➕ Додати пояснення';
+            } else {
+                button.textContent = '📖 Пояснення ▾';
+                const textarea = group.querySelector('.question-explanation');
+                if (!textarea.classList.contains('hidden')) {
+                    textarea.focus();
+                }
+            }
+        }
 
         function onExplanationInput(textarea) {
             updateShowExplanationVisibility();
-            clearTimeout(explanationPreviewTimers.get(textarea));
-            explanationPreviewTimers.set(textarea, setTimeout(() => refreshExplanationPreview(textarea), 300));
         }
 
-        async function refreshExplanationPreview(textarea) {
-            const preview = textarea.closest('.explanation-group').querySelector('.explanation-preview');
-            const markdown = textarea.value;
-            if (markdown.trim() === '') {
-                preview.innerHTML = '';
+        // The preview takes the place of the text field; the same button goes back to editing
+        async function toggleExplanationPreview(button) {
+            const group = button.closest('.explanation-group');
+            const textarea = group.querySelector('.question-explanation');
+            const preview = group.querySelector('.explanation-preview');
+            const imageButton = group.querySelector('.explanation-image-btn');
+
+            if (!preview.classList.contains('hidden')) {
                 preview.classList.add('hidden');
+                textarea.classList.remove('hidden');
+                imageButton.classList.remove('hidden');
+                button.textContent = '👁️ Перегляд';
+                textarea.focus();
                 return;
             }
-            try {
-                const response = await fetch('/api/admin/preview-explanation', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    credentials: 'same-origin',
-                    body: JSON.stringify({ markdown })
-                });
-                const data = await response.json();
-                // Only show the answer for the text that is still in the field
-                if (response.ok && textarea.value === markdown) {
+
+            const markdown = textarea.value;
+            let html = '<p class="explanation-preview-empty">Пояснення порожнє.</p>';
+            if (markdown.trim() !== '') {
+                try {
+                    const response = await fetch('/api/admin/preview-explanation', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        credentials: 'same-origin',
+                        body: JSON.stringify({ markdown })
+                    });
+                    const data = await response.json();
+                    if (!response.ok) {
+                        showMessage(data.error || 'Не вдалося показати перегляд', 'error');
+                        return;
+                    }
                     // Rendered on the server: raw HTML is escaped and unsafe links removed there
-                    preview.innerHTML = data.html;
-                    preview.classList.remove('hidden');
+                    html = data.html;
+                } catch (error) {
+                    showMessage('Не вдалося показати перегляд: ' + error.message, 'error');
+                    return;
                 }
-            } catch (error) {
-                console.log('Explanation preview failed:', error);
             }
+            preview.innerHTML = html;
+            textarea.classList.add('hidden');
+            imageButton.classList.add('hidden');
+            preview.classList.remove('hidden');
+            button.textContent = '✏️ Редагувати';
         }
 
         function hasAnyExplanation() {

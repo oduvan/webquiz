@@ -205,3 +205,16 @@ def test_question_text_on_the_step_cannot_be_copied(temp_dir, browser):
         assert browser.execute_script("return getComputedStyle(arguments[0]).userSelect", heading) == "none"
         assert browser.execute_script(copy_blocked, heading) is True
         assert browser.execute_script(copy_blocked, content) is False
+
+
+@skip_if_selenium_disabled
+def test_next_button_is_on_the_right(temp_dir, browser):
+    with custom_webquiz_server(config=EN, quizzes=quiz([question("Q1?", "Text"), question("Q2?")])) as (proc, port):
+        register_user(browser, port)
+        answer_and_continue(browser)
+        step = wait_for_step(browser)
+        button = browser.find_element(By.ID, "explanation-next-btn")
+        step_box = browser.execute_script("return arguments[0].getBoundingClientRect()", step)
+        button_box = browser.execute_script("return arguments[0].getBoundingClientRect()", button)
+        assert button_box["right"] > step_box["right"] - 60
+        assert button_box["left"] > step_box["left"] + step_box["width"] / 2

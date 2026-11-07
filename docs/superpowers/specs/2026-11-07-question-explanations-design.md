@@ -18,7 +18,7 @@ Question 3  →  answer  →  ✓/✗ feedback  →  [Продовжити]
 ```
 
 - The explanation step shows the question text as a small heading and the
-  explanation below it, then a "Далі" (Next) button.
+  explanation below it, then a "Далі" (Next) button on the right.
 - Only questions that have an explanation get this step. Other questions go
   straight to the next question, as today.
 - After the last question, the explanation comes first, then the results.
@@ -68,11 +68,11 @@ questions:
   with a short note that explanations need correct answers to be shown. Like
   the other start settings, the value applies to this run only and is never
   written to the file.
-- **Live preview in the quiz editor**: under each explanation text area, a
-  preview box shows the rendered explanation, styled like the student's
-  explanation step (same CSS, light and dark), with images. It updates
-  about 300 ms after the teacher stops typing, and is hidden while the text
-  is empty. The preview comes from the server, so it is exactly what students
+- **Preview in the quiz editor** (changed after the first review with the
+  user): the explanation is folded while empty, with a "➕ Додати пояснення"
+  button to open it. A "👁️ Перегляд" button replaces the text area with the
+  rendered explanation, styled like the student's explanation step, with
+  images; "✏️ Редагувати" brings the text area back. The preview comes from the server, so it is exactly what students
   will get: `POST /api/admin/preview-explanation` (`{"markdown": "..."}` →
   `{"html": "..."}`, admin session and local network required like the other
   admin endpoints) uses the same renderer. The renderer takes the image path

@@ -235,7 +235,7 @@ For each question, you can configure:
 
 - **Time limit (seconds)** — shown only when the test time limit is **Per question**. Leave it empty to use the default, or enter 0 for no limit on this question. The value is kept in the file when you switch to another mode.
 
-- **Explanation (Markdown)** — optional text the student reads after answering this question. Press **"🖼️ Insert image"** to add an image from `quizzes/imgs/` at the cursor. A preview under the field shows the explanation the way students will see it, and updates as you type.
+- **Explanation (Markdown)** — optional text the student reads after answering this question. While it is empty, it is folded: press **"➕ Add explanation"** to open it (a written explanation opens unfolded). Press **"🖼️ Insert image"** to add an image from `quizzes/imgs/` at the cursor. Press **"👁️ Preview"** to see the explanation the way students will see it, in place of the text field; **"✏️ Edit"** brings the text field back.
 
 - **Stick to Previous Question** — when randomization is enabled, this keeps the question adjacent to the previous one. Useful for grouping related questions together.
 
