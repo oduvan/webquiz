@@ -258,7 +258,7 @@ pytest tests/test_registration_approval.py
 
 ### Test Coverage
 
-The project has **769 tests** across **57 test files**. The main areas:
+The project has **842 tests** across **67 test files**. The main areas:
 
 - **CLI and Directory Creation** (7 tests): Directory and file creation
 - **Admin API** (14 tests): Admin interface and authentication
@@ -278,6 +278,7 @@ The project has **769 tests** across **57 test files**. The main areas:
 - **Show Answers on Completion** (10 tests): Dynamic answer visibility after all students complete
 - **Time Limits** (57 tests): Per-question and whole-quiz time limits, timeouts, background check, countdowns, editor fields (`test_time_limits_*.py`, `test_selenium_time_limits.py`, `test_selenium_admin_time_limits.py`)
 - **Start Settings** (11 tests): Settings pop-up when starting a quiz; values apply to the running quiz only (`test_quiz_start_settings.py`, `test_selenium_admin_start_settings.py`)
+- **Hidden Correctness** (2 tests): The results table leaves out the "correct" column while correct answers are hidden (`test_selenium_hidden_correctness.py`)
 - **Integration Tests** (6 tests): Multiple choice, multiple answers
 - **Selenium Tests** (87 tests): End-to-end browser testing
 - **Auto-Advance** (6 tests): Automatic progression behavior
@@ -514,6 +515,8 @@ WebQuiz offers flexible control over when students can see correct answers:
   - Once all students finish, correct answers become visible
   - If new students register, answers are hidden again until everyone completes
   - In approval mode, only approved students count toward completion
+
+Both settings take `true` or `false` without quotes. The admin panel refuses to save a quiz where one of them is text, such as `"false"`.
 
 **Example Use Case**: Useful for collaborative learning environments where you want students to discuss answers together after everyone has completed the quiz independently.
 
