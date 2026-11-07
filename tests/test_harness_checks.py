@@ -5,6 +5,7 @@ They use small fake records only: no server, browser or AI agents.
 
 from harness.checks import (
     check_agent_alignment,
+    check_expectations,
     check_answer_times,
     check_live_stats,
     check_screen_scores,
@@ -143,3 +144,20 @@ def test_parse_agent_report_ignores_punctuation_left_by_nested_quotes():
     quotes = parse_agent_report(line)[0]["quotes"]
     assert ";" not in [q.strip() for q in quotes]
     assert "✍️ Введіть вашу відповідь:" in quotes
+
+
+def test_expectations_compare_the_planned_outcome_with_the_stored_answer():
+    question_text = {1: "Q1?", 2: "Q2?", 3: "Q3?"}
+    user_of = {"e02": "u2"}
+    rows = [
+        row(user="u2", question="Q1?", correct=True),
+        row(user="u2", question="Q2?", selected="", correct=False),
+    ]
+    good = {"e02": {1: "correct", 2: "timeout", 3: "missing"}}
+    assert check_expectations(good, rows, user_of, question_text) == []
+
+    problems = check_expectations({"e02": {1: "timeout", 2: "wrong", 3: "correct"}}, rows, user_of, question_text)
+    assert len(problems) == 3
+    assert any("Q1?" in p and "timeout" in p and "correct" in p for p in problems)
+
+    assert check_expectations({"nobody": {1: "correct"}}, rows, user_of, question_text)

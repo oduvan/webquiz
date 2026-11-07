@@ -21,6 +21,9 @@ answer after 3 seconds. Actions:
 
 Times are seconds since the question appeared on that student's screen
 (for offline_at_quiz_time: since the first question appeared).
+
+"expectations" give the outcome each scripted edge case must have in the stored
+data: "correct", "wrong", "timeout" or "missing" (no row), by question id.
 """
 
 FRACTIONS = {
@@ -62,6 +65,15 @@ FRACTIONS = {
         "s06-leaves": {3: ("leave", 4)},
         "s07-partial": {2: ("answer", ["2/4"], 6)},
         "s08-near-limit": {1: ("answer", "3/4", 42), 4: ("answer", "1/2", 43)},
+    },
+    "expectations": {
+        "s01-fast": {1: "correct", 2: "correct", 3: "correct", 4: "correct", 5: "correct"},
+        "s03-wrong": {1: "wrong", 4: "wrong"},
+        "s04-text-wrong": {3: "wrong"},
+        "s05-reload": {3: "correct"},
+        "s06-leaves": {3: "timeout", 4: "missing"},
+        "s07-partial": {2: "wrong"},
+        "s08-near-limit": {1: "correct", 4: "correct"},
     },
     "agents": {
         "agent-careful": {
@@ -118,6 +130,16 @@ TIME_EDGES = {
         "e07-no-limit": {4: ("answer", "8", 45)},
         "e08-leaves": {2: ("leave", 5)},
     },
+    "expectations": {
+        "e01-before-limit": {1: "correct", 4: "correct"},
+        "e02-late-in-grace": {1: "correct"},
+        "e03-late-after-grace": {1: "timeout"},
+        "e04-picked-not-sent": {1: "timeout"},
+        "e05-idle": {1: "timeout", 2: "timeout", 3: "timeout", 4: "correct"},
+        "e06-reload": {2: "correct"},
+        "e07-no-limit": {4: "correct"},
+        "e08-leaves": {2: "timeout", 3: "missing"},
+    },
     "agents": {
         "agent-slow": {
             "device": "desktop",
@@ -164,6 +186,13 @@ WHOLE_QUIZ = {
         "w03-wifi-at-end": {4: ("offline_at_quiz_time", 70, 25)},
         "w04-leaves": {3: ("leave", 3)},
         "w05-reloader": {q: ("reload", 3, None, 6) for q in range(1, 7)},
+    },
+    "expectations": {
+        "w01-early": {q: "correct" for q in range(1, 7)},
+        "w02-slow": {1: "correct", 6: "timeout"},
+        "w03-wifi-at-end": {1: "correct", 4: "timeout", 5: "timeout", 6: "timeout"},
+        "w04-leaves": {2: "correct", 3: "timeout", 4: "timeout", 5: "timeout", 6: "timeout"},
+        "w05-reloader": {q: "correct" for q in range(1, 7)},
     },
     "agents": {
         "agent-wifi": {

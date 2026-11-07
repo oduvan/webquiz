@@ -177,6 +177,36 @@ def check_submits_match_rows(submits, rows, allowed_without_submit):
     return problems
 
 
+def check_expectations(expectations, rows, user_of, question_text):
+    """The planned outcome of each scripted edge case matches the stored answer.
+
+    The other checks only test that the records agree with each other. This one tests that
+    they agree with what the scenario says must happen, for example that an answer arriving
+    inside the grace counts.
+
+    expectations: {student: {question id: "correct" | "wrong" | "timeout" | "missing"}}
+    """
+    problems = []
+    stored = {(item["user_id"], item["question"]): item for item in rows}
+    for student, outcomes in expectations.items():
+        user = user_of.get(student)
+        if user is None:
+            problems.append(f"{student}: never registered, so the planned outcomes cannot be checked")
+            continue
+        for question_id, expected in outcomes.items():
+            question = question_text[int(question_id)]
+            item = stored.get((user, question))
+            if item is None:
+                actual = "missing"
+            elif item["selected_answer"] == "":
+                actual = "timeout"
+            else:
+                actual = "correct" if item["is_correct"] else "wrong"
+            if actual != expected:
+                problems.append(f"{student}: '{question}' should be {expected}, the stored answer is {actual}")
+    return problems
+
+
 def parse_screen_score(text):
     """Read 'Результат: 2/3 (67%)' (or 'Result: ...') from a screen. None when there is no result."""
     match = SCORE.search(text or "")
@@ -250,6 +280,10 @@ def analyze(run_dir):
     """Run every check on a finished run and write report.md. Returns the number of problems found."""
     run_dir = Path(run_dir)
     meta = json.loads((run_dir / "meta.json").read_text(encoding="utf-8"))
+    if "expectations" not in meta:  # runs recorded before scenarios had expectations
+        from harness.scenarios import SCENARIOS
+
+        meta["expectations"] = SCENARIOS.get(meta["scenario"], {}).get("expectations", {})
     events = load_events(run_dir)
     rows = load_answer_rows(run_dir)
     server_log = (run_dir / "server.log").read_text(encoding="utf-8", errors="replace")
@@ -321,6 +355,9 @@ def analyze(run_dir):
         "Requests and stored answers agree": check_submits_match_rows(submits, rows, allowed),
         "Results screen matches stored answers": check_screen_scores(final_scores, rows, len(question_text)),
         "Live stats match stored answers": check_live_stats(final_states, rows),
+        "Planned outcomes of the scripted edge cases": check_expectations(
+            meta.get("expectations", {}), rows, user_of, question_text
+        ),
     }
 
     agent_sections = {}

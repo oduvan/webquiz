@@ -154,6 +154,7 @@ async def run(scenario, with_agents):
                 name: {str(k): list(v) for k, v in plan.items()} for name, plan in scenario["scripted"].items()
             },
             "agents": agents,
+            "expectations": scenario.get("expectations", {}),
         }
         (run_dir / "meta.json").write_text(
             json.dumps(meta, ensure_ascii=False, indent=2, default=str), encoding="utf-8"
