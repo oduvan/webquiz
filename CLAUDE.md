@@ -239,6 +239,8 @@ webquiz-stress-test -c 50
 
 **Process**: Build binaries (Linux, macOS Intel/ARM64, Windows) → Build Windows installer (Inno Setup) → Update versions → Generate PDFs (uk/en) → Publish to PyPI → Create GitHub release with 9 assets (2 Python packages + 4 zipped binaries + 1 Windows installer + 2 PDFs) → Deploy GitHub Pages
 
+**Release notes**: if `.github/release-notes/vX.Y.md` exists at the release tag, the workflow puts it at the top of the GitHub release notes (screenshots go in `.github/release-notes/images/vX.Y/`, linked by `raw.githubusercontent.com/oduvan/webquiz/vX.Y/...` URLs)
+
 **Note**: macOS builds on separate runners (macos-15-intel Intel, macos-15 ARM64)
 
 **GitHub Pages**: https://oduvan.github.io/webquiz/ - Static site with download page and online documentation
