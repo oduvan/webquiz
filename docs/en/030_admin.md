@@ -22,6 +22,9 @@ The main administrative panel page contains essential tools for managing quizzes
 
   You can switch between quizzes or create new ones.
 
+- **Starting a quiz: the settings pop-up**
+  When you press the button to switch to (or restart) a quiz, a pop-up shows the quiz settings: show correct answers, show answers after everyone finishes, randomize question order, show the question list at the end, and the time limit. The values come from the quiz file. You can change them before pressing **"Запустити"** (Start). The changes apply only to this run of the quiz and are **not** saved in the quiz file. If the running quiz restarts by itself (for example after you save the config or edit this quiz), the same settings stay. Starting another quiz uses that quiz's file values again. With **Per question**, questions that have their own time limit in the file keep it.
+
 - **"Create New Quiz" Button**
   Opens the interface for creating a new quiz in visual mode.
   The new file will be added to the `quizzes` directory.
@@ -33,7 +36,7 @@ The main administrative panel page contains essential tools for managing quizzes
   This panel appears if manual user approval is enabled in the configuration (`registration.approve: true`, see [Configuration](040_config.md) for details).
   It displays a list of users who have registered but are waiting for approval to start the quiz.
   Each user shows their name and registration time. Click the **"Approve"** button to allow them to begin.
-  The quiz timer starts only after approval, ensuring fair timing for all participants.
+  Time is never counted while a participant waits for approval: the timer starts when their page shows the first question (after they press **"Check"**), ensuring fair timing for all participants.
 
 - **Answer Management**
   This section appears only for quizzes with `show_answers_on_completion: true` enabled (see "Quiz File Format" section for details about this option).
@@ -143,7 +146,7 @@ Notes:
 When you click the **Table** button for a CSV file, a pop-up window opens displaying the data in a formatted table. The table shows columns such as:
 - **user_id** — the participant's ID
 - **question** — the question text
-- **selected_answer** — the answer chosen by the participant
+- **selected_answer** — the answer chosen by the participant. It is empty when the time limit ran out (see `time_limit` in the quiz file format)
 - **correct_answer** — the correct answer
 - **is_correct** — whether the answer was correct (True/False)
 - **time_taken** — time spent on the question in seconds
@@ -205,6 +208,9 @@ The editor uses a visual wizard interface for easy question management.
 - **Randomize Question Order**
   If enabled, questions are shuffled for each participant. Each student sees questions in a different random order.
 
+- **Time limit**
+  Choose **No time limit**, **Per question** or **Whole test**, and enter the seconds (0 = no limit). For per question, the seconds are the default for every question. See `time_limit` in the quiz file format.
+
 #### Question Editor
 
 For each question, you can configure:
@@ -223,6 +229,8 @@ For each question, you can configure:
 - **Answer Options** — for single/multiple choice questions, add answer options. Each option can be text or an image path. Mark the correct answer(s) with the radio button or checkbox.
 
 - **Points per Question** — the number of points awarded for a correct answer (default: 1). Questions with more than 1 point show a trophy indicator.
+
+- **Time limit (seconds)** — shown only when the test time limit is **Per question**. Leave it empty to use the default, or enter 0 for no limit on this question. The value is kept in the file when you switch to another mode.
 
 - **Stick to Previous Question** — when randomization is enabled, this keeps the question adjacent to the previous one. Useful for grouping related questions together.
 
@@ -261,6 +269,7 @@ The main area displays a grid with:
 
 Each cell shows the participant's answer status:
 - **Red circle** — incorrect answer
+- **Stopwatch ⏱** — the time limit ran out, so there is no answer (counts as incorrect)
 - **Green background** — correct answer
 - **Yellow background** — currently answering this question
 - **Empty/white** — not yet answered

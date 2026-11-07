@@ -124,6 +124,55 @@ randomize_questions: true  # Each student gets a unique question order
 
 ---
 
+#### `time_limit` (optional)
+
+Limits how much time students have. Choose **one** of two modes. All values are whole seconds, and `0` always means "no limit".
+
+**Mode 1: per question.** `per_question` is the default limit for every question. A question can set its own `time_limit`:
+
+```
+time_limit:
+  per_question: 60      # every question: 60 seconds
+questions:
+  - question: "2+2?"
+    time_limit: 20      # this question: 20 seconds
+  - question: "Explain your answer"
+    time_limit: 0       # this question: no limit
+  - question: "3+3?"    # uses the default: 60 seconds
+```
+
+With `per_question: 0`, questions have no limit, except the ones that set their own `time_limit`.
+
+**Mode 2: whole quiz.** One limit for the whole quiz. Question `time_limit` values are ignored:
+
+```
+time_limit:
+  whole_quiz: 900       # 15 minutes for the whole test
+```
+
+How the limit for a question is chosen:
+
+| Test `time_limit` | Question `time_limit` | Result |
+|---|---|---|
+| not set | anything | no limit (the question value is ignored) |
+| `per_question: D` | not set | `D` seconds |
+| `per_question: D` | `T` | `T` seconds |
+| `whole_quiz: W` | anything | the question has no own limit; the whole test has `W` seconds |
+
+> **Note:** A question's `time_limit` works only when the test has `time_limit: {per_question: ...}`. Without it, the question value is kept in the file but ignored.
+
+**What the student sees:** a countdown (⏱ Time left 0:42) on each question with a limit, or one countdown for the whole test at the top of the page. It turns red in the last 10 seconds. When it reaches zero, the student sees "Time is up". The question counts as failed, and the test moves on (or, for the whole test, the results open). On the results screen, such questions show "⏱ Time is up".
+
+**How time is counted:**
+
+- The clock for a question starts when the student's page shows it. Reloading the page does not restart it. The server keeps the time, so blocking the page's requests does not help: an answer without that "question shown" notice is timed from the moment the question became available.
+- An answer that reaches the server up to 5 seconds after the limit still counts, so a slow Wi-Fi connection does not cost the student an answer sent in time.
+- When time runs out, the question is stored with **no answer** and counts as failed. In the answers CSV this is a row with an empty `selected_answer`.
+- In whole-test mode, if the student closes the page, the server still finishes their test 5 seconds after the time is up: all unanswered questions are stored as timed out.
+- In per-question mode, if the student closes the page, the server still marks the open question as timed out. In per-question mode, the next question never opens, so the student stays unfinished. Use the **"Show Answers for All"** button for such students when `show_answers_on_completion: true` is set.
+
+---
+
 #### `stick_to_the_previous` (optional, per question)
 
 Determines whether a question should stay adjacent to the previous question during randomization. This is useful for related questions that must appear consecutively (e.g., a reading passage followed by questions about it).

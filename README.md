@@ -258,7 +258,7 @@ pytest tests/test_registration_approval.py
 
 ### Test Coverage
 
-The project has **769 tests** across **57 test files**. The main areas:
+The project has **842 tests** across **67 test files**. The main areas:
 
 - **CLI and Directory Creation** (7 tests): Directory and file creation
 - **Admin API** (14 tests): Admin interface and authentication
@@ -276,6 +276,8 @@ The project has **769 tests** across **57 test files**. The main areas:
 - **Registration Fields** (12 tests): Custom registration fields
 - **Show Right Answer** (5 tests): Answer display functionality
 - **Show Answers on Completion** (10 tests): Dynamic answer visibility after all students complete
+- **Time Limits** (57 tests): Per-question and whole-quiz time limits, timeouts, background check, countdowns, editor fields (`test_time_limits_*.py`, `test_selenium_time_limits.py`, `test_selenium_admin_time_limits.py`)
+- **Start Settings** (11 tests): Settings pop-up when starting a quiz; values apply to the running quiz only (`test_quiz_start_settings.py`, `test_selenium_admin_start_settings.py`)
 - **Hidden Correctness** (2 tests): The results table leaves out the "correct" column while correct answers are hidden (`test_selenium_hidden_correctness.py`)
 - **Integration Tests** (6 tests): Multiple choice, multiple answers
 - **Selenium Tests** (87 tests): End-to-end browser testing
@@ -529,6 +531,35 @@ This is a quiz-level setting configured in the quiz YAML file:
 ```yaml
 show_final_list: false
 ```
+
+### Time Limits
+
+A quiz can limit how much time students have, in one of two modes. All values are whole seconds, and `0` means "no limit".
+
+```yaml
+time_limit:
+  per_question: 60      # default for every question
+questions:
+  - question: "2+2?"
+    time_limit: 20      # this question: 20 seconds
+  - question: "Explain"
+    time_limit: 0       # this question: no limit
+```
+
+```yaml
+time_limit:
+  whole_quiz: 900       # 15 minutes for the whole quiz (question values are ignored)
+```
+
+A question's `time_limit` works only in `per_question` mode. Without a quiz-level `time_limit`, it is ignored.
+
+Students see a countdown for the question (or one for the whole quiz) that turns red in the last 10 seconds, then "Time is up". The clock for a question starts when the student's page shows it. An answer that reaches the server within the limit plus 5 seconds counts. A later answer, or no answer, is stored as an empty, failed answer, so in the answers CSV an empty `selected_answer` means "time ran out".
+
+### Start Settings
+
+When the admin starts (or restarts) a quiz from the admin panel, a pop-up shows the quiz settings: `show_right_answer`, `show_answers_on_completion`, `randomize_questions`, `show_final_list` and `time_limit`. The quiz file gives the default values. The admin can change them right before starting. The changes apply only to the running quiz and are never written to the quiz file. They stay when the same quiz restarts by itself (for example after a config save), and they are dropped when another quiz is started.
+
+The API takes the same values: `POST /api/admin/switch-quiz` with `{"quiz_filename": "...", "settings": {"show_right_answer": false, "time_limit": {"per_question": 30}}}`. A missing key keeps the file value, and `"time_limit": null` turns the time limit off.
 
 ### Connection Drops
 

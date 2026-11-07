@@ -290,6 +290,28 @@
             background-color: var(--modal-overlay);
         }
 
+        .start-quiz-content {
+            max-width: 520px;
+        }
+
+        .start-quiz-hint {
+            font-size: 14px;
+            opacity: 0.8;
+            margin-top: 0;
+        }
+
+        .start-quiz-error {
+            color: #dc3545;
+            margin: 10px 0;
+        }
+
+        .start-quiz-buttons {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-top: 15px;
+        }
+
         .modal-content {
             background-color: var(--container-bg);
             margin: 5% auto;
@@ -1323,6 +1345,21 @@
                         </label>
                     </div>
                     <div class="form-group">
+                        <label for="time-limit-mode">Обмеження часу:</label>
+                        <div style="display: flex; gap: 10px; flex-wrap: wrap; align-items: center;">
+                            <select id="time-limit-mode" onchange="toggleTimeLimitFields()" style="max-width: 100%;">
+                                <option value="none">Без обмеження часу</option>
+                                <option value="per_question">На кожне питання</option>
+                                <option value="whole_quiz">На весь тест</option>
+                            </select>
+                            <span id="time-limit-seconds-group" style="display: none; align-items: center; gap: 6px; flex-wrap: wrap;">
+                                <label for="time-limit-seconds">Обмеження часу (секунди):</label>
+                                <input type="number" id="time-limit-seconds" min="0" step="1" value="60" style="width: 100px;">
+                                <small>0 = без обмеження</small>
+                            </span>
+                        </div>
+                    </div>
+                    <div class="form-group">
                         <div id="questions-container">
                             <!-- Questions will be added dynamically -->
                         </div>
@@ -1373,6 +1410,63 @@
                 <div id="file-list" class="file-list">
                     Завантаження файлів...
                 </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Start quiz pop-up: the quiz file gives the defaults, changes apply to this run only -->
+    <div id="start-quiz-modal" class="modal">
+        <div class="modal-content start-quiz-content">
+            <div class="modal-header">
+                <h2>▶️ Запуск тесту</h2>
+                <span class="close" onclick="closeStartQuizModal()">&times;</span>
+            </div>
+            <p id="start-quiz-name" style="font-weight: 600; margin-top: 0;"></p>
+            <p class="start-quiz-hint">Значення взято з файлу тесту. Зміни діють лише для цього запуску і не зберігаються у файлі.</p>
+            <div class="form-group">
+                <label style="display: flex; align-items: center;">
+                    <input type="checkbox" id="start-show-right-answer" style="margin-right: 10px;" onchange="toggleStartShowAnswersOnCompletion()">
+                    Показувати правильні відповіді
+                </label>
+            </div>
+            <div class="form-group" id="start-show-answers-on-completion-group" style="display: none;">
+                <label style="display: flex; align-items: center;">
+                    <input type="checkbox" id="start-show-answers-on-completion" style="margin-right: 10px;">
+                    Показувати відповіді після завершення всіма
+                </label>
+            </div>
+            <div class="form-group">
+                <label style="display: flex; align-items: center;">
+                    <input type="checkbox" id="start-randomize-questions" style="margin-right: 10px;">
+                    Рандомізувати порядок питань
+                </label>
+            </div>
+            <div class="form-group">
+                <label style="display: flex; align-items: center;">
+                    <input type="checkbox" id="start-show-final-list" style="margin-right: 10px;">
+                    Показувати список питань у кінці
+                </label>
+            </div>
+            <div class="form-group">
+                <label for="start-time-limit-mode">Обмеження часу:</label>
+                <div style="display: flex; gap: 10px; flex-wrap: wrap; align-items: center;">
+                    <select id="start-time-limit-mode" onchange="toggleStartTimeLimitFields()" style="max-width: 100%;">
+                        <option value="none">Без обмеження часу</option>
+                        <option value="per_question">На кожне питання</option>
+                        <option value="whole_quiz">На весь тест</option>
+                    </select>
+                    <span id="start-time-limit-seconds-group" style="display: none; align-items: center; gap: 6px; flex-wrap: wrap;">
+                        <label for="start-time-limit-seconds">Секунди:</label>
+                        <input type="number" id="start-time-limit-seconds" min="0" step="1" value="60" style="width: 100px;">
+                        <small>0 = без обмеження</small>
+                    </span>
+                </div>
+                <small id="start-time-limit-hint" style="display: none;">Питання з власним обмеженням часу у файлі тесту залишають його.</small>
+            </div>
+            <div id="start-quiz-error" class="start-quiz-error" style="display: none;"></div>
+            <div class="start-quiz-buttons">
+                <button id="start-quiz-confirm" onclick="confirmStartQuiz()">▶️ Запустити</button>
+                <button id="start-quiz-cancel" onclick="closeStartQuizModal()">❌ Скасувати</button>
             </div>
         </div>
     </div>
@@ -1611,14 +1705,97 @@
             }
         }
 
+        // The quiz the start pop-up is open for
+        let startQuizFilename = null;
+
+        // Starting a quiz first opens a pop-up with its settings. The quiz file gives the
+        // defaults; changes apply to this run only and are not saved in the file.
         async function switchQuiz() {
             if (selectedQuizzes.length !== 1) {
                 showMessage('Будь ласка, виберіть один quiz', 'warning');
                 return;
             }
+            await openStartQuizModal(selectedQuizzes[0]);
+        }
 
-            const selectedQuiz = selectedQuizzes[0];
+        async function openStartQuizModal(filename) {
+            startQuizFilename = filename;
+            document.getElementById('start-quiz-name').textContent = filename + (filename === currentQuiz ? ' (перезапуск)' : '');
+            const errorBox = document.getElementById('start-quiz-error');
+            errorBox.style.display = 'none';
+            errorBox.textContent = '';
+
+            // Defaults come from the quiz file
+            let quizData = {};
+            try {
+                const response = await fetch(`/api/admin/quiz/${filename}`, { credentials: 'same-origin' });
+                const data = await response.json();
+                if (response.ok && data.parsed && typeof data.parsed === 'object') {
+                    quizData = data.parsed;
+                }
+            } catch (error) {
+                console.log('Could not load quiz settings:', error);
+            }
+
+            document.getElementById('start-show-right-answer').checked = quizData.show_right_answer !== false;
+            document.getElementById('start-show-answers-on-completion').checked = quizData.show_answers_on_completion === true;
+            document.getElementById('start-randomize-questions').checked = quizData.randomize_questions === true;
+            document.getElementById('start-show-final-list').checked = quizData.show_final_list !== false;
+
+            const timeLimit = (quizData.time_limit && typeof quizData.time_limit === 'object') ? quizData.time_limit : {};
+            let mode = 'none';
+            if (timeLimit.per_question !== undefined) {
+                mode = 'per_question';
+            } else if (timeLimit.whole_quiz !== undefined) {
+                mode = 'whole_quiz';
+            }
+            document.getElementById('start-time-limit-mode').value = mode;
+            document.getElementById('start-time-limit-seconds').value = mode === 'none' ? 60 : timeLimit[mode];
+
+            toggleStartShowAnswersOnCompletion();
+            toggleStartTimeLimitFields();
+            document.getElementById('start-quiz-modal').style.display = 'block';
+        }
+
+        function closeStartQuizModal() {
+            document.getElementById('start-quiz-modal').style.display = 'none';
+            startQuizFilename = null;
+        }
+
+        // "Show answers after everyone finishes" only matters when correct answers are hidden
+        function toggleStartShowAnswersOnCompletion() {
+            const showRightAnswer = document.getElementById('start-show-right-answer').checked;
+            document.getElementById('start-show-answers-on-completion-group').style.display = showRightAnswer ? 'none' : 'block';
+        }
+
+        function toggleStartTimeLimitFields() {
+            const mode = document.getElementById('start-time-limit-mode').value;
+            document.getElementById('start-time-limit-seconds-group').style.display = mode === 'none' ? 'none' : 'inline-flex';
+            document.getElementById('start-time-limit-hint').style.display = mode === 'per_question' ? 'block' : 'none';
+        }
+
+        function getStartSettings() {
+            const mode = document.getElementById('start-time-limit-mode').value;
+            const seconds = document.getElementById('start-time-limit-seconds').value.trim();
+            return {
+                show_right_answer: document.getElementById('start-show-right-answer').checked,
+                show_answers_on_completion: document.getElementById('start-show-answers-on-completion').checked,
+                randomize_questions: document.getElementById('start-randomize-questions').checked,
+                show_final_list: document.getElementById('start-show-final-list').checked,
+                // null turns the time limit off for this run
+                time_limit: mode === 'none' ? null : { [mode]: seconds === '' ? 0 : Number(seconds) }
+            };
+        }
+
+        async function confirmStartQuiz() {
+            if (!startQuizFilename) {
+                return;
+            }
+            const selectedQuiz = startQuizFilename;
             const isRestart = selectedQuiz === currentQuiz;
+            const confirmBtn = document.getElementById('start-quiz-confirm');
+            const errorBox = document.getElementById('start-quiz-error');
+            confirmBtn.disabled = true;
 
             const switchBtn = document.getElementById('switch-btn');
             switchBtn.disabled = true;
@@ -1631,14 +1808,17 @@
                         'Content-Type': 'application/json'
                     },
                     body: JSON.stringify({
-                        quiz_filename: selectedQuiz
+                        quiz_filename: selectedQuiz,
+                        settings: getStartSettings()
                     }),
                     credentials: 'same-origin'
                 });
 
                 const data = await response.json();
+                confirmBtn.disabled = false;
 
                 if (response.ok) {
+                    closeStartQuizModal();
                     const action = isRestart ? 'restarted' : 'switched to';
                     showMessage(`Successfully ${action} "${selectedQuiz}". CSV file: ${data.csv_file}`, 'success');
                     currentQuiz = selectedQuiz;
@@ -1650,12 +1830,16 @@
                     selectedQuizzes = [];
                     switchBtn.textContent = 'Переключитися на Вибраний Quiz';
                 } else {
-                    showMessage(data.error || `Failed to ${isRestart ? 'restart' : 'switch'} quiz`, 'error');
+                    // Keep the pop-up open so the admin can fix the value
+                    errorBox.textContent = data.error || `Failed to ${isRestart ? 'restart' : 'switch'} quiz`;
+                    errorBox.style.display = 'block';
                     switchBtn.disabled = false;
                     switchBtn.textContent = isRestart ? 'Restart Current Quiz' : 'Switch to Selected Quiz';
                 }
             } catch (error) {
-                showMessage(`Error ${isRestart ? 'restarting' : 'switching'} quiz: ` + error.message, 'error');
+                confirmBtn.disabled = false;
+                errorBox.textContent = `Error ${isRestart ? 'restarting' : 'switching'} quiz: ` + error.message;
+                errorBox.style.display = 'block';
                 switchBtn.disabled = false;
                 switchBtn.textContent = isRestart ? 'Restart Current Quiz' : 'Switch to Selected Quiz';
             }
@@ -1913,6 +2097,10 @@
         function resetQuizEditor() {
             questionCounter = 1;
 
+            // A new quiz starts without a time limit
+            document.getElementById('time-limit-mode').value = 'none';
+            document.getElementById('time-limit-seconds').value = 60;
+
             // Clear content
             document.getElementById('questions-container').innerHTML = '';
 
@@ -2018,6 +2206,11 @@
                         <label for="points-${questionCounter}" style="display: inline-block;">Бали за питання:</label>
                         <input type="number" id="points-${questionCounter}" class="points-input" min="0.01" step="0.01" value="1" placeholder="1" style="width: 80px;" oninput="updateQuestionPreview(this)">
                     </div>
+                    <div class="form-group question-time-limit-group">
+                        <label style="display: inline-block;">Обмеження часу (секунди):</label>
+                        <input type="number" class="question-time-limit-input" min="0" step="1" value="" placeholder="за замовчуванням" style="width: 140px;">
+                        <small>0 = без обмеження</small>
+                    </div>
                     <div class="form-group">
                         <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
                             <input type="checkbox" class="stick-to-previous-checkbox" onchange="updateQuestionPreview(this)">
@@ -2030,6 +2223,7 @@
             container.appendChild(questionDiv);
             setupDragEvents(questionDiv);
             questionCounter++;
+            toggleTimeLimitFields();
             updateQuestionNumbers();
 
             // Scroll the new question into view and focus if not collapsed
@@ -2467,6 +2661,17 @@
             // Update visibility of show_answers_on_completion based on show_right_answer
             toggleShowAnswersOnCompletion();
 
+            // Populate time limit: one of per_question / whole_quiz, or none
+            const timeLimit = (quizData.time_limit && typeof quizData.time_limit === 'object') ? quizData.time_limit : {};
+            let timeLimitMode = 'none';
+            if (timeLimit.per_question !== undefined) {
+                timeLimitMode = 'per_question';
+            } else if (timeLimit.whole_quiz !== undefined) {
+                timeLimitMode = 'whole_quiz';
+            }
+            document.getElementById('time-limit-mode').value = timeLimitMode;
+            document.getElementById('time-limit-seconds').value = timeLimitMode === 'none' ? 60 : timeLimit[timeLimitMode];
+
             if (quizData.questions) {
                 quizData.questions.forEach(question => {
                     const questionDiv = document.createElement('div');
@@ -2618,6 +2823,11 @@
                                 <label for="points-${questionCounter}" style="display: inline-block;">Бали за питання:</label>
                                 <input type="number" id="points-${questionCounter}" class="points-input" min="0.01" step="0.01" value="${pointsValue}" placeholder="1" style="width: 80px;" oninput="updateQuestionPreview(this)">
                             </div>
+                            <div class="form-group question-time-limit-group">
+                                <label style="display: inline-block;">Обмеження часу (секунди):</label>
+                                <input type="number" class="question-time-limit-input" min="0" step="1" value="${question.time_limit !== undefined && question.time_limit !== null ? escapeHtml(String(question.time_limit)) : ''}" placeholder="за замовчуванням" style="width: 140px;">
+                                <small>0 = без обмеження</small>
+                            </div>
                             <div class="form-group">
                                 <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
                                     <input type="checkbox" class="stick-to-previous-checkbox" ${question.stick_to_the_previous ? 'checked' : ''} onchange="updateQuestionPreview(this)">
@@ -2633,6 +2843,17 @@
                 });
                 updateQuestionNumbers();
             }
+            toggleTimeLimitFields();
+        }
+
+        // Show the seconds field when a time limit is chosen, and the per-question
+        // fields only in per-question mode. Hidden fields keep their values and are saved.
+        function toggleTimeLimitFields() {
+            const mode = document.getElementById('time-limit-mode').value;
+            document.getElementById('time-limit-seconds-group').style.display = mode === 'none' ? 'none' : 'inline-flex';
+            document.querySelectorAll('.question-time-limit-group').forEach(group => {
+                group.style.display = mode === 'per_question' ? '' : 'none';
+            });
         }
 
         // Check every question's points field. Returns an error message for the
@@ -2771,6 +2992,12 @@
                     questionData.stick_to_the_previous = true;
                 }
 
+                // Include the question's own time limit when filled (kept in every mode, used in per-question mode)
+                const timeLimitInput = div.querySelector('.question-time-limit-input');
+                if (timeLimitInput && timeLimitInput.value.trim() !== '') {
+                    questionData.time_limit = Number(timeLimitInput.value);
+                }
+
                 questions.push(questionData);
             });
 
@@ -2793,6 +3020,13 @@
 
             // Include show_final_list setting
             quizData.show_final_list = document.getElementById('show-final-list').checked;
+
+            // Include time limit unless "none" is chosen
+            const timeLimitMode = document.getElementById('time-limit-mode').value;
+            if (timeLimitMode !== 'none') {
+                const seconds = document.getElementById('time-limit-seconds').value.trim();
+                quizData.time_limit = { [timeLimitMode]: seconds === '' ? 0 : Number(seconds) };
+            }
 
             return quizData;
         }

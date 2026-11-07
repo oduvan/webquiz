@@ -54,7 +54,7 @@ This separation ensures **anonymity during analysis** — you can share the answ
 **Fields:**
 - `user_id` — 6-digit unique identifier (not linked to name)
 - `question` — question text
-- `selected_answer` — student's answer
+- `selected_answer` — student's answer (empty when the question's time limit ran out)
 - `correct_answer` — correct answer
 - `is_correct` — `True` or `False` (answer correctness)
 - `time_taken_seconds` — time taken to answer (seconds)
