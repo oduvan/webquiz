@@ -2,6 +2,7 @@
 
 import base64
 import os
+import time
 
 from selenium.webdriver.common.action_chains import ActionChains
 from selenium.webdriver.common.by import By
@@ -132,10 +133,19 @@ def test_whole_quiz_time_up_during_step_shows_results(temp_dir, browser):
 def test_explanation_fits_phone_width(temp_dir, browser):
     browser.set_window_size(375, 800)
     table = "| a | b | c | d | e | f |\n|---|---|---|---|---|---|\n" + "| long cell text | " * 6 + "\n"
-    with custom_webquiz_server(config=EN, quizzes=quiz([question("Q1?", table), question("Q2?")])) as (proc, port):
+    explanation = table + "\n![wide](/imgs/wide.svg)\n"
+    with custom_webquiz_server(config=EN, quizzes=quiz([question("Q1?", explanation), question("Q2?")])) as (
+        proc,
+        port,
+    ):
+        with open(os.path.join(temp_dir, f"quizzes_{port}", "imgs", "wide.svg"), "w") as f:
+            f.write(
+                '<svg xmlns="http://www.w3.org/2000/svg" width="1500" height="300"><rect width="1500" height="300"/></svg>'
+            )
         register_user(browser, port)
         answer_and_continue(browser)
-        wait_for_step(browser)
+        image = wait_for_step(browser).find_element(By.CSS_SELECTOR, ".explanation-content img")
+        WebDriverWait(browser, 5).until(lambda d: d.execute_script("return arguments[0].naturalWidth", image) == 1500)
         assert browser.execute_script("return document.documentElement.scrollWidth <= window.innerWidth")
 
 
@@ -152,3 +162,46 @@ def test_explanation_image_is_loaded(temp_dir, browser):
         answer_and_continue(browser)
         image = wait_for_step(browser).find_element(By.CSS_SELECTOR, ".explanation-content img")
         WebDriverWait(browser, 5).until(lambda d: d.execute_script("return arguments[0].naturalWidth", image) > 0)
+
+
+@skip_if_selenium_disabled
+def test_double_click_next_does_not_answer_the_next_question(temp_dir, browser):
+    """The second click of a double click must not land on the next question's submit button."""
+    long_explanation = "\n\n".join(f"Paragraph {n} of the explanation." for n in range(1, 6))
+    text_question = {
+        "question": "Q2: type a number",
+        "checker": "assert to_int(user_answer) == 42",
+        "default_value": "41",
+    }
+    questions = [question("Q1?", long_explanation), text_question]
+    with custom_webquiz_server(config=EN, quizzes=quiz(questions)) as (proc, port):
+        register_user(browser, port)
+        answer_and_continue(browser)
+        wait_for_step(browser)
+        ActionChains(browser).double_click(browser.find_element(By.ID, "explanation-next-btn")).perform()
+        wait_for_progress(browser, "Question 2 of 2")
+        WebDriverWait(browser, 5).until(EC.visibility_of_element_located((By.ID, "text-answer-input")))
+        time.sleep(1.0)  # give a wrongly sent answer time to come back
+        assert browser.find_element(By.ID, "text-answer-input").is_enabled()
+        assert browser.find_element(By.ID, "submit-answer-btn").is_displayed()
+        assert not browser.find_element(By.ID, "continue-btn").is_displayed()
+
+
+@skip_if_selenium_disabled
+def test_question_text_on_the_step_cannot_be_copied(temp_dir, browser):
+    with custom_webquiz_server(config=EN, quizzes=quiz([question("Q1?", "Free to copy"), question("Q2?")])) as (
+        proc,
+        port,
+    ):
+        register_user(browser, port)
+        answer_and_continue(browser)
+        step = wait_for_step(browser)
+        heading = step.find_element(By.CSS_SELECTOR, ".explanation-question")
+        content = step.find_element(By.CSS_SELECTOR, ".explanation-content")
+        copy_blocked = (
+            "const e = new ClipboardEvent('copy', {bubbles: true, cancelable: true});"
+            "arguments[0].dispatchEvent(e); return e.defaultPrevented;"
+        )
+        assert browser.execute_script("return getComputedStyle(arguments[0]).userSelect", heading) == "none"
+        assert browser.execute_script(copy_blocked, heading) is True
+        assert browser.execute_script(copy_blocked, content) is False

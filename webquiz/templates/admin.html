@@ -2991,7 +2991,8 @@
 
         function insertExplanationImage(textarea, imagePath) {
             const name = imagePath.startsWith('/imgs/') ? imagePath.substring('/imgs/'.length) : imagePath;
-            const markdown = /\s/.test(name) ? `![](</imgs/${name}>)` : `![](/imgs/${name})`;
+            // Names with spaces or brackets need angle brackets in Markdown (the server reads both forms)
+            const markdown = /[\s()<>]/.test(name) ? `![](</imgs/${name}>)` : `![](/imgs/${name})`;
             const start = textarea.selectionStart ?? textarea.value.length;
             const end = textarea.selectionEnd ?? textarea.value.length;
             textarea.value = textarea.value.slice(0, start) + markdown + textarea.value.slice(end);

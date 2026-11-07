@@ -93,3 +93,16 @@ def test_validate_explanations():
         validate_explanations({"show_explanation": True, "questions": [{"explanation": "t"}, {"explanation": None}]})
         == []
     )
+
+
+def test_image_name_with_parentheses_is_found():
+    text = "![a](/imgs/pic(1).png) and ![b](/imgs/plain.png)"
+    assert explanation_image_names(text) == ["pic(1).png", "plain.png"]
+
+
+def test_rewrite_to_a_name_that_needs_angle_brackets():
+    text = "![a](/imgs/map.png) ![b](/imgs/pic(1).png)"
+    result = rewrite_explanation_images(text, {"map.png": "my map.png", "pic(1).png": "s_pic(1).png"})
+    assert result == "![a](</imgs/my map.png>) ![b](</imgs/s_pic(1).png>)"
+    assert explanation_image_names(result) == ["my map.png", "s_pic(1).png"]
+    assert 'src="imgs/my%20map.png"' in render_explanation(result)

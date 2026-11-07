@@ -816,6 +816,9 @@
             margin-bottom: 12px;
             opacity: 0.8;
             font-style: italic;
+            /* Question text stays protected from copying, as on the question itself */
+            user-select: none;
+            -webkit-user-select: none;
         }
         .explanation-content {
             line-height: 1.5;
@@ -966,6 +969,10 @@
         // Prevent copying question text
         const questionContainer = document.getElementById('current-question-container');
         questionContainer.addEventListener('copy', function(e) {
+            e.preventDefault();
+        });
+        // ...also where the explanation step repeats the question (the explanation itself may be copied)
+        document.querySelector('#explanation-step .explanation-question').addEventListener('copy', function(e) {
             e.preventDefault();
         });
 
@@ -1724,6 +1731,12 @@
             }
             nextBtn.disabled = true; // A double click must not skip a question
             pendingExplanation = null;
+            // Keep the step (with the disabled button) under the mouse for a moment, so the second click
+            // of a double click cannot land on the next question's controls (like the "Continue" fade-out)
+            await new Promise(resolve => setTimeout(resolve, 400));
+            if (currentQuestionIndex >= questions.length || quizTimeUpStarted) {
+                return; // The whole-quiz time ran out meanwhile and the results are shown
+            }
             // The next question is drawn while the step still covers the answered one
             await continueToNextQuestion(false);
             hideExplanationStep();

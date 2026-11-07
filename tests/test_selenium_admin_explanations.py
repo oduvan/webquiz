@@ -166,3 +166,12 @@ def test_start_popup_sends_show_explanation(temp_dir, browser):
         ).json()
         assert "explanation_html" not in reply
 
+
+@skip_if_selenium_disabled
+def test_editor_uses_angle_brackets_for_unusual_image_names(temp_dir, browser):
+    with custom_webquiz_server(quizzes=quiz()) as (proc, port):
+        item = open_first_question(browser, port)
+        field = explanation_field(item)
+        for path in ("/imgs/pic(1).png", "/imgs/my pic.png", "/imgs/plain.png"):
+            browser.execute_script("insertExplanationImage(arguments[0], arguments[1])", field, path)
+        assert field.get_attribute("value") == "![](</imgs/pic(1).png>)![](</imgs/my pic.png>)![](/imgs/plain.png)"

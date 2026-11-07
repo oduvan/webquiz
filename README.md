@@ -259,7 +259,7 @@ pytest tests/test_registration_approval.py
 
 ### Test Coverage
 
-The project has **904 tests** across **72 test files**. The main areas:
+The project has **909 tests** across **72 test files**. The main areas:
 
 - **CLI and Directory Creation** (7 tests): Directory and file creation
 - **Admin API** (14 tests): Admin interface and authentication
@@ -279,7 +279,7 @@ The project has **904 tests** across **72 test files**. The main areas:
 - **Show Answers on Completion** (10 tests): Dynamic answer visibility after all students complete
 - **Time Limits** (57 tests): Per-question and whole-quiz time limits, timeouts, background check, countdowns, editor fields (`test_time_limits_*.py`, `test_selenium_time_limits.py`, `test_selenium_admin_time_limits.py`)
 - **Start Settings** (11 tests): Settings pop-up when starting a quiz; values apply to the running quiz only (`test_quiz_start_settings.py`, `test_selenium_admin_start_settings.py`)
-- **Question Explanations** (46 tests): Markdown rendering, the answer reply, the explanation step, editor field and preview, start pop-up (`test_explanations*.py`, `test_selenium_explanations.py`, `test_selenium_admin_explanations.py`)
+- **Question Explanations** (51 tests): Markdown rendering, the answer reply, the explanation step, editor field and preview, start pop-up (`test_explanations*.py`, `test_selenium_explanations.py`, `test_selenium_admin_explanations.py`)
 - **Hidden Correctness** (2 tests): The results table leaves out the "correct" column while correct answers are hidden (`test_selenium_hidden_correctness.py`)
 - **Harness Checks** (14 tests): The classroom harness's data and agent-report checks, on small fake records (`test_harness_checks.py`)
 - **Integration Tests** (6 tests): Multiple choice, multiple answers

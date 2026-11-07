@@ -25,7 +25,10 @@ ADMIN_IMAGES_URL = "../imgs/"  # The admin page is served at "/admin/"
 
 # "](/imgs/name)" with an optional title, and "](</imgs/name with spaces>)"
 _ANGLE_IMAGE = re.compile(r"(\]\(\s*<" + re.escape(IMAGES_PATH) + r")([^>\n]+)(>)")
-_PLAIN_IMAGE = re.compile(r"(\]\(\s*" + re.escape(IMAGES_PATH) + r")([^)\s>]+)()")
+# A plain name may hold balanced brackets, as in "pic(1).png"
+_PLAIN_IMAGE = re.compile(r"(\]\(\s*" + re.escape(IMAGES_PATH) + r")((?:[^()\s>]|\([^()\s>]*\))+)()")
+# Names with these characters must be written in angle brackets: "](</imgs/my map.png>)"
+_NEEDS_ANGLE_BRACKETS = re.compile(r"[\s()<>]")
 
 
 class _ExplanationRenderer(mistune.HTMLRenderer):
@@ -91,7 +94,12 @@ def rewrite_explanation_images(markdown: str, renamed: Dict[str, str]) -> str:
         name = match.group(2).strip()
         if name not in renamed:
             return match.group(0)
-        return match.group(1) + renamed[name] + match.group(3)
+        new_name = renamed[name]
+        is_plain = match.group(3) == ""
+        if is_plain and _NEEDS_ANGLE_BRACKETS.search(new_name):
+            start = match.group(1)[: -len(IMAGES_PATH)]
+            return f"{start}<{IMAGES_PATH}{new_name}>"
+        return match.group(1) + new_name + match.group(3)
 
     for pattern in (_ANGLE_IMAGE, _PLAIN_IMAGE):
         markdown = pattern.sub(replace, markdown)
