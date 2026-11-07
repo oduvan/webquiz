@@ -1874,6 +1874,12 @@
                     selectedAnswer = null;
                     selectedAnswers = [];
                     document.querySelectorAll('.option.selected').forEach(option => option.classList.remove('selected'));
+                    // The countdown stopped when the answer was sent; time is up, so show 0:00
+                    const timer = document.getElementById('question-timer');
+                    if (timer) {
+                        timer.textContent = formatTimer(0);
+                        timer.classList.add('timer-warning');
+                    }
                 }
 
                 // Format selected answer for display
