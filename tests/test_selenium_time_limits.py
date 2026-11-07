@@ -148,3 +148,34 @@ def test_whole_quiz_time_up_locks_the_answer_while_sending(temp_dir, browser):
         WebDriverWait(browser, 10).until(
             lambda d: len(d.find_elements(By.CSS_SELECTOR, ".results-table .time-up-message")) == 2
         )
+
+
+@skip_if_selenium_disabled
+def test_timer_shows_zero_when_a_late_answer_comes_back_timed_out(temp_dir, browser):
+    """An answer sent with seconds left but delivered late (slow Wi-Fi) comes back as timed out.
+
+    The countdown stopped when the answer was sent; it must then show 0:00, not the
+    seconds that were left at sending, next to "Time is up".
+    """
+    quizzes = timed_quiz({"per_question": 4}, questions=[question("Q1?"), question("Q2?")], show_right_answer=True)
+    fast_checks = {"WEBQUIZ_TIME_LIMIT_GRACE_SECONDS": "0.5", "WEBQUIZ_TIME_LIMIT_CHECK_INTERVAL": "0.2"}
+    with custom_webquiz_server(config=EN, quizzes=quizzes, env=fast_checks) as (proc, port):
+        register_user(browser, port)
+        wait_for_element(browser, By.ID, "question-timer")
+        # Slow network: every answer reaches the server 4 seconds after it is sent
+        browser.execute_script(
+            """
+            const originalFetch = window.fetch;
+            window.fetch = (url, options) => String(url).includes('submit-answer')
+                ? new Promise(resolve => setTimeout(resolve, 4000)).then(() => originalFetch(url, options))
+                : originalFetch(url, options);
+        """
+        )
+        time.sleep(1.5)
+        browser.find_element(By.ID, "option_0").click()
+        browser.find_element(By.ID, "submit-answer-btn").click()  # about 2 seconds left
+
+        WebDriverWait(browser, 12).until(
+            EC.visibility_of_element_located((By.CSS_SELECTOR, "#current-question-container .time-up-message"))
+        )
+        assert browser.find_element(By.ID, "question-timer").text.strip() == "0:00"

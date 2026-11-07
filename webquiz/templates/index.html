@@ -1874,6 +1874,12 @@
                     selectedAnswer = null;
                     selectedAnswers = [];
                     document.querySelectorAll('.option.selected').forEach(option => option.classList.remove('selected'));
+                    // The countdown stopped when the answer was sent; time is up, so show 0:00
+                    const timer = document.getElementById('question-timer');
+                    if (timer) {
+                        timer.textContent = formatTimer(0);
+                        timer.classList.add('timer-warning');
+                    }
                 }
 
                 // Format selected answer for display
@@ -2174,6 +2180,10 @@
             const totalTime = testResults.reduce((sum, r) => sum + r.timeTaken, 0);
             const avgTime = totalTime / totalCount;
 
+            // Correct/wrong is unknown when the server hides it (show_right_answer: false):
+            // then the table leaves out the "correct" column instead of a dash in every row
+            const hasCorrectness = testResults.some(r => r.isCorrect !== null);
+
             // Build results content
             let tableContent = `
                 <p><strong>${T.result_label}</strong> ${correctCount}/${totalCount} (${percentage}%)</p>
@@ -2186,7 +2196,7 @@
                             <tr>
                                 <th>${T.question_header}</th>
                                 <th>${T.your_answer_header}</th>
-                                <th style="text-align: center;">${T.correct_header}</th>
+                                ${hasCorrectness ? `<th style="text-align: center;">${T.correct_header}</th>` : ''}
                             </tr>
                         </thead>
                         <tbody>
@@ -2204,9 +2214,9 @@
                                 </span>`}
                                 ${result.isCorrect === false && correctAnswer && showRightAnswer ? `<div class="correct-answer-hint">${T.result_correct_header}${formatAnswerForDisplay(correctAnswer)}</div>` : ''}
                             </td>
-                            <td data-label="${T.correct_header_alt}" style="text-align: center;">
+                            ${hasCorrectness ? `<td data-label="${T.correct_header_alt}" style="text-align: center;">
                                 ${result.isCorrect !== null ? `<span class="${result.isCorrect ? 'correct' : 'incorrect'}" style="font-size: 18px;">${result.isCorrect ? '✓' : '✗'}</span>` : '<span style="color: #666;">—</span>'}
-                            </td>
+                            </td>` : ''}
                         </tr>
                     `;
                 });
@@ -2274,7 +2284,7 @@
                             <tr>
                                 <th>${T.question_header}</th>
                                 <th>${T.your_answer_header}</th>
-                                <th style="text-align: center;">${T.correct_header_alt}</th>
+                                ${hasCorrectAnswers ? `<th style="text-align: center;">${T.correct_header_alt}</th>` : ''}
                                 ${hasCustomPoints ? `<th style="text-align: center;">${T.points_header}</th>` : ''}
                             </tr>
                         </thead>
@@ -2288,9 +2298,9 @@
                                         </span>`}
                                         ${result.is_correct === false && result.correct_answer && (showRightAnswer || hasCorrectAnswers) ? `<div class="correct-answer-hint">${T.result_correct_header}${formatAnswerForDisplay(result.correct_answer)}</div>` : ''}
                                     </td>
-                                    <td data-label="${T.correct_header_alt}" style="text-align: center;">
+                                    ${hasCorrectAnswers ? `<td data-label="${T.correct_header_alt}" style="text-align: center;">
                                         ${result.is_correct !== undefined ? `<span class="${result.is_correct ? 'correct' : 'incorrect'}" style="font-size: 18px;">${result.is_correct ? '✓' : '✗'}</span>` : `<span style="color: #666;">${T.unknown}</span>`}
-                                    </td>
+                                    </td>` : ''}
                                     ${hasCustomPoints ? `<td data-label="${T.points_header}" style="text-align: center;">${formatPoints(result.earned_points !== undefined ? result.earned_points : (result.is_correct ? (result.points || 1) : 0))}/${formatPoints(result.points || 1)}</td>` : ''}
                                 </tr>
                             `).join('')}
