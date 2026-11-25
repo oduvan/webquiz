@@ -1,0 +1,551 @@
+<!DOCTYPE html>
+<html lang="{{LANGUAGE}}">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{T_REVIEW_TITLE}}</title>
+    <style>
+        :root {
+            --bg-color: #f5f5f5;
+            --container-bg: white;
+            --text-color: #333;
+            --muted-color: #666;
+            --border-color: #ddd;
+            --answer-bg: #fff8e1;
+            --answer-border: #ffc107;
+            --sample-bg: #eef5ff;
+            --ok-color: #28a745;
+            --fail-color: #dc3545;
+            --notice-bg: #fff3cd;
+            --notice-color: #856404;
+            --error-bg: #f8d7da;
+            --error-color: #721c24;
+        }
+
+        [data-theme="dark"] {
+            --bg-color: #1a1a1a;
+            --container-bg: #2d2d2d;
+            --text-color: #e0e0e0;
+            --muted-color: #aaa;
+            --border-color: #555;
+            --answer-bg: #3d3a1a;
+            --answer-border: #c99a06;
+            --sample-bg: #1e2a3a;
+            --notice-bg: #3d3a1a;
+            --notice-color: #f0d68a;
+            --error-bg: #3a1a1a;
+            --error-color: #f5b5bb;
+        }
+
+        html, body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            transition: background-color 0.3s ease, color 0.3s ease;
+        }
+
+        body {
+            padding: 16px;
+            box-sizing: border-box;
+            position: relative;
+        }
+
+        .page {
+            width: 100%;
+            max-width: 640px;
+            margin: 0 auto;
+        }
+
+        h1 {
+            font-size: 22px;
+            margin: 4px 48px 12px 0;
+        }
+
+        .theme-toggle {
+            position: absolute;
+            top: 12px;
+            right: 12px;
+            background: var(--container-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            font-size: 18px;
+            cursor: pointer;
+        }
+
+        .status-bar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 12px;
+            font-weight: bold;
+        }
+
+        .connection-banner, .notice, .login-error {
+            padding: 10px;
+            border-radius: 6px;
+            margin-bottom: 12px;
+        }
+
+        .connection-banner {
+            background: var(--error-bg);
+            color: var(--error-color);
+        }
+
+        .notice {
+            background: var(--notice-bg);
+            color: var(--notice-color);
+        }
+
+        .login-error {
+            background: var(--error-bg);
+            color: var(--error-color);
+        }
+
+        .card {
+            background: var(--container-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 10px;
+            padding: 16px;
+            box-sizing: border-box;
+            width: 100%;
+        }
+
+        .label {
+            font-size: 13px;
+            color: var(--muted-color);
+            text-transform: uppercase;
+            letter-spacing: 0.03em;
+            margin: 12px 0 4px 0;
+        }
+
+        #question-label {
+            margin-top: 0;
+        }
+
+        .question-text, .answer-text, .sample-text {
+            white-space: pre-wrap;
+            word-wrap: break-word;
+            font-size: 17px;
+            line-height: 1.4;
+        }
+
+        .question-image {
+            display: block;
+            max-width: 100%;
+            max-height: 240px;
+            margin-top: 8px;
+            border-radius: 6px;
+        }
+
+        .answer-text {
+            background: var(--answer-bg);
+            border-left: 4px solid var(--answer-border);
+            padding: 10px;
+            border-radius: 6px;
+            font-size: 19px;
+        }
+
+        .sample-text {
+            background: var(--sample-bg);
+            padding: 8px 10px;
+            border-radius: 6px;
+            font-size: 15px;
+        }
+
+        .points {
+            margin-top: 10px;
+            color: var(--muted-color);
+        }
+
+        .verdict-buttons {
+            display: flex;
+            gap: 12px;
+            margin-top: 16px;
+        }
+
+        .verdict-buttons button {
+            flex: 1;
+            min-height: 64px;
+            font-size: 20px;
+            font-weight: bold;
+            color: white;
+            border: none;
+            border-radius: 10px;
+            cursor: pointer;
+        }
+
+        .verdict-buttons button:disabled {
+            opacity: 0.5;
+            cursor: default;
+        }
+
+        #verdict-correct {
+            background: var(--ok-color);
+        }
+
+        #verdict-incorrect {
+            background: var(--fail-color);
+        }
+
+        .idle {
+            text-align: center;
+            padding: 40px 16px;
+            font-size: 17px;
+            color: var(--muted-color);
+        }
+
+        .help-button {
+            min-height: 48px;
+            padding: 0 20px;
+            font-size: 16px;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            background: var(--container-bg);
+            color: var(--text-color);
+            cursor: pointer;
+        }
+
+        .login-form input {
+            width: 100%;
+            max-width: 100%;
+            box-sizing: border-box;
+            padding: 12px;
+            font-size: 17px;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            background: var(--container-bg);
+            color: var(--text-color);
+            margin: 8px 0 12px 0;
+        }
+
+        .login-form button {
+            width: 100%;
+            min-height: 48px;
+            font-size: 17px;
+            border: none;
+            border-radius: 6px;
+            background: #007bff;
+            color: white;
+            cursor: pointer;
+        }
+
+        .hidden {
+            display: none !important;
+        }
+
+        @media (max-width: 768px) {
+            body {
+                padding: 12px;
+            }
+
+            .verdict-buttons {
+                flex-direction: column;
+            }
+        }
+    </style>
+</head>
+<body>
+    <button class="theme-toggle" onclick="toggleTheme()" title="Theme">🌙</button>
+    <div class="page">
+        <h1 id="review-title"></h1>
+
+        <div id="login-section" class="card login-form hidden">
+            <div id="login-title" style="font-weight: bold;"></div>
+            <div id="login-error" class="login-error hidden"></div>
+            <label for="master-key-input" id="master-key-label" class="label"></label>
+            <input type="password" id="master-key-input" autocomplete="current-password">
+            <button id="login-button" onclick="login()"></button>
+        </div>
+
+        <div id="review-section" class="hidden">
+            <div id="connection-banner" class="connection-banner hidden"></div>
+            <div class="status-bar">
+                <span id="pending-count"></span>
+            </div>
+            <div id="notice" class="notice hidden"></div>
+
+            <div id="idle" class="card idle hidden">
+                <div id="idle-text"></div>
+                <div id="help-block" class="hidden">
+                    <p id="help-text"></p>
+                    <button id="help-button" class="help-button" onclick="takeShared()"></button>
+                </div>
+            </div>
+
+            <div id="item-card" class="card hidden">
+                <div class="label" id="question-label"></div>
+                <div class="question-text" id="item-question"></div>
+                <img id="item-image" class="question-image hidden" alt="">
+                <div class="label" id="answer-label"></div>
+                <div class="answer-text" id="item-answer"></div>
+                <div id="sample-block">
+                    <div class="label" id="sample-label"></div>
+                    <div class="sample-text" id="item-sample"></div>
+                </div>
+                <div class="points" id="item-points"></div>
+                <div class="verdict-buttons">
+                    <button id="verdict-correct" onclick="sendVerdict(true)"></button>
+                    <button id="verdict-incorrect" onclick="sendVerdict(false)"></button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const IS_TRUSTED_IP = {{IS_TRUSTED_IP}};
+        const T = {{TRANSLATIONS_JSON}};
+
+        let socket = null;
+        let currentItem = null;
+        let reconnectTimer = null;
+        let noticeTimer = null;
+
+        function initializeTheme() {
+            if (localStorage.getItem('theme') === 'dark') {
+                document.body.setAttribute('data-theme', 'dark');
+                document.querySelector('.theme-toggle').textContent = '☀️';
+            }
+        }
+
+        function toggleTheme() {
+            const toggleButton = document.querySelector('.theme-toggle');
+            if (document.body.getAttribute('data-theme') === 'dark') {
+                document.body.removeAttribute('data-theme');
+                toggleButton.textContent = '🌙';
+                localStorage.setItem('theme', 'light');
+            } else {
+                document.body.setAttribute('data-theme', 'dark');
+                toggleButton.textContent = '☀️';
+                localStorage.setItem('theme', 'dark');
+            }
+        }
+
+        // The theme follows the other WebQuiz pages open in this browser
+        window.addEventListener('storage', (event) => {
+            if (event.key === 'theme') {
+                if (event.newValue === 'dark') {
+                    document.body.setAttribute('data-theme', 'dark');
+                } else {
+                    document.body.removeAttribute('data-theme');
+                }
+                document.querySelector('.theme-toggle').textContent = event.newValue === 'dark' ? '☀️' : '🌙';
+            }
+        });
+
+        function setText(id, text) {
+            document.getElementById(id).textContent = text;
+        }
+
+        function show(id, visible) {
+            document.getElementById(id).classList.toggle('hidden', !visible);
+        }
+
+        function fillStaticTexts() {
+            setText('review-title', T.review_title);
+            setText('login-title', T.review_login_title);
+            setText('master-key-label', T.review_master_key);
+            setText('login-button', T.review_login_button);
+            setText('question-label', T.review_question);
+            setText('answer-label', T.review_student_answer);
+            setText('sample-label', T.review_sample_answer);
+            setText('verdict-correct', T.review_correct);
+            setText('verdict-incorrect', T.review_incorrect);
+            setText('connection-banner', T.connection_lost);
+            setText('help-button', T.review_help_button);
+        }
+
+        async function start() {
+            fillStaticTexts();
+            initializeTheme();
+            if (IS_TRUSTED_IP) {
+                openReview();
+                return;
+            }
+            try {
+                const response = await fetch('/api/admin/check-session', { credentials: 'same-origin' });
+                if (response.ok) {
+                    openReview();
+                    return;
+                }
+            } catch (error) {
+                console.log('Session check failed:', error);
+            }
+            showLogin();
+        }
+
+        function showLogin() {
+            show('review-section', false);
+            show('login-section', true);
+            document.getElementById('master-key-input').focus();
+        }
+
+        async function login() {
+            const masterKey = document.getElementById('master-key-input').value;
+            show('login-error', false);
+            try {
+                const response = await fetch('/api/admin/auth', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ master_key: masterKey }),
+                    credentials: 'same-origin'
+                });
+                if (response.ok) {
+                    openReview();
+                    return;
+                }
+            } catch (error) {
+                console.log('Login failed:', error);
+            }
+            setText('login-error', T.review_login_error);
+            show('login-error', true);
+        }
+
+        document.getElementById('master-key-input').addEventListener('keydown', (event) => {
+            if (event.key === 'Enter') {
+                login();
+            }
+        });
+
+        function openReview() {
+            show('login-section', false);
+            show('review-section', true);
+            connect();
+        }
+
+        function connect() {
+            const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+            socket = new WebSocket(`${protocol}//${window.location.host}/ws/review`);
+            let opened = false;
+
+            socket.onopen = () => {
+                opened = true;
+                show('connection-banner', false);
+            };
+
+            socket.onmessage = (event) => {
+                let data;
+                try {
+                    data = JSON.parse(event.data);
+                } catch (error) {
+                    return;
+                }
+                if (data.type === 'review_state') {
+                    renderState(data);
+                }
+            };
+
+            socket.onclose = () => {
+                socket = null;
+                setButtonsEnabled(false);
+                if (!opened) {
+                    // Refused before it opened: the session may have ended (server restart)
+                    fetch('/api/admin/check-session', { credentials: 'same-origin' })
+                        .then(response => {
+                            if (!response.ok && !IS_TRUSTED_IP) {
+                                showLogin();
+                            } else {
+                                scheduleReconnect();
+                            }
+                        })
+                        .catch(() => scheduleReconnect());
+                    return;
+                }
+                scheduleReconnect();
+            };
+        }
+
+        function scheduleReconnect() {
+            show('connection-banner', true);
+            clearTimeout(reconnectTimer);
+            reconnectTimer = setTimeout(connect, 3000);
+        }
+
+        function setButtonsEnabled(enabled) {
+            document.getElementById('verdict-correct').disabled = !enabled;
+            document.getElementById('verdict-incorrect').disabled = !enabled;
+        }
+
+        function showNotice(text) {
+            setText('notice', text);
+            show('notice', true);
+            clearTimeout(noticeTimer);
+            noticeTimer = setTimeout(() => show('notice', false), 4000);
+        }
+
+        function renderState(state) {
+            setText('pending-count', T.review_waiting_count.replace('{n}', state.pending_count));
+            if (state.already_decided) {
+                showNotice(T.review_already_decided);
+            }
+
+            const item = state.item;
+            const sameItem = item && currentItem && item.review_id === currentItem.review_id;
+            currentItem = item;
+
+            if (!item) {
+                show('item-card', false);
+                // Every waiting answer is open on another teacher's page: offer to help with one
+                const othersHaveAnswers = state.pending_count > 0;
+                setText('idle-text', othersHaveAnswers ? '' : (state.has_manual ? T.review_idle : T.review_no_manual));
+                show('idle-text', !othersHaveAnswers);
+                setText('help-text', T.review_help_text.replace('{n}', state.pending_count));
+                show('help-block', othersHaveAnswers);
+                document.getElementById('help-button').disabled = false;
+                show('idle', true);
+                return;
+            }
+
+            show('idle', false);
+            show('item-card', true);
+            if (sameItem && document.getElementById('verdict-correct').disabled === false) {
+                return;  // Only the count changed: keep the screen as it is
+            }
+            setText('item-question', item.question || '');
+            const image = document.getElementById('item-image');
+            if (item.image) {
+                image.src = item.image;
+                show('item-image', true);
+            } else {
+                image.removeAttribute('src');
+                show('item-image', false);
+            }
+            setText('item-answer', item.answer);
+            setText('item-sample', item.correct_value || '');
+            show('sample-block', Boolean(item.correct_value));
+            setText('item-points', T.review_points.replace('{n}', item.points));
+            setButtonsEnabled(true);
+        }
+
+        function sendVerdict(isCorrect) {
+            if (!currentItem || !socket || socket.readyState !== WebSocket.OPEN) {
+                return;
+            }
+            // Until the next state arrives, a second tap does nothing
+            setButtonsEnabled(false);
+            socket.send(JSON.stringify({ type: 'verdict', review_id: currentItem.review_id, is_correct: isCorrect }));
+        }
+
+        function takeShared() {
+            if (!socket || socket.readyState !== WebSocket.OPEN) {
+                return;
+            }
+            document.getElementById('help-button').disabled = true;
+            socket.send(JSON.stringify({ type: 'take_shared' }));
+        }
+
+        // Keep the connection alive through phone sleep and proxies
+        setInterval(() => {
+            if (socket && socket.readyState === WebSocket.OPEN) {
+                socket.send(JSON.stringify({ type: 'ping' }));
+            }
+        }, 30000);
+
+        start();
+    </script>
+</body>
+</html>

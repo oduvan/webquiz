@@ -43,6 +43,7 @@ START_SETTING_KEYS = (
 
 from webquiz import __version__ as package_version
 from webquiz import checker as checker_module
+from webquiz.manual_review import ReviewQueue
 
 # Logger will be configured in create_app() with custom log file
 logger = logging.getLogger(__name__)
@@ -171,6 +172,16 @@ def sum_points(values) -> float:
         Normalized sum (int when whole, otherwise float rounded to 2 decimals)
     """
     return normalize_points(sum(values))
+
+
+def is_manual_question(question) -> bool:
+    """Tell whether the teacher checks this question by hand (``manual_check: true``)."""
+    return isinstance(question, dict) and question.get("manual_check") is True
+
+
+def is_text_question(question) -> bool:
+    """Tell whether the student types the answer: the question has ``checker`` or ``manual_check: true``."""
+    return isinstance(question, dict) and ("checker" in question or is_manual_question(question))
 
 
 def get_default_config_path() -> Optional[str]:
@@ -654,6 +665,12 @@ class TestingServer:
         self.answer_results: Dict[str, Dict[int, Dict[str, Any]]] = {}
         self.registration_tokens: Dict[str, str] = {}  # registration_token -> user_id, for retried registrations
         self.force_all_completed: bool = False  # Admin-triggered flag to force show answers
+        # Answers to manual_check questions that wait for a teacher, and the open review pages
+        self.review_queue = ReviewQueue()
+        # Every answers CSV row of this quiz run, in order. A verdict changes a row that may be
+        # in the file already, so the whole file is written again at the next flush.
+        self.all_responses: List[Dict[str, Any]] = []
+        self.csv_rewrite_needed = False
 
         # Live stats WebSocket infrastructure
         self.websocket_clients: List[web.WebSocketResponse] = []  # Connected WebSocket clients (live stats)
@@ -705,6 +722,7 @@ class TestingServer:
             "files.html",
             "csv_table.html",
             "live_stats.html",
+            "review.html",
             "quiz_selection_required.html",
             "template_error.html",
         ]
@@ -799,6 +817,9 @@ class TestingServer:
         self.registration_tokens.clear()
         self.live_stats.clear()
         self.force_all_completed = False
+        self.review_queue.clear()
+        self.all_responses.clear()
+        self.csv_rewrite_needed = False
         logger.info("Server state reset for new quiz")
 
     def reload_config_from_file(self) -> Optional[WebQuizConfig]:
@@ -1042,6 +1063,8 @@ class TestingServer:
                 "message": f"Quiz switched to: {quiz_filename}",
             }
         )
+        # Review pages drop the answers of the old run and learn whether this quiz has manual questions
+        await self.review_changed()
 
         logger.info(f"Switched to quiz: {quiz_filename}, CSV: {self.csv_file}")
 
@@ -1254,10 +1277,8 @@ class TestingServer:
         # Prepare questions data for client (without correct answers)
         questions_for_client = []
         for q in self.questions:
-            # Check if this is a text input question (has checker)
-            is_text_question = "checker" in q
-
-            if is_text_question:
+            # Text input question: has checker, or the teacher checks it by hand
+            if is_text_question(q):
                 # Text input question - no options, no correct_answer
                 client_question = {
                     "id": q["id"],
@@ -1374,7 +1395,13 @@ class TestingServer:
         When ``extra_answers_with_users_csv`` is enabled, the same rows are also
         appended to a third CSV that prepends user info (user_id, username,
         registration fields) to each per-answer row.
+
+        After a teacher's verdict on a manual_check answer, a row that may be in the
+        file already has changed, so both files are written again in full.
         """
+        if self.csv_rewrite_needed and self.csv_file:
+            await self._rewrite_answer_csv_files()
+            return
         if not self.user_responses:
             return
 
@@ -1426,6 +1453,49 @@ class TestingServer:
         if self.answers_with_users_csv_file and responses_snapshot:
             await self._append_answers_with_users_csv(responses_snapshot)
 
+    async def _rewrite_answer_csv_files(self):
+        """Write the answers CSV (and the answers_with_users CSV) again from all rows of this quiz run.
+
+        The new content goes to a temporary file that replaces the old one, so a power cut
+        leaves either the old file or the new one.
+        """
+        self.csv_rewrite_needed = False
+        self.user_responses.clear()
+        responses = list(self.all_responses)
+
+        csv_buffer = StringIO()
+        csv_writer = csv.writer(csv_buffer)
+        csv_writer.writerow(
+            ["user_id", "question", "selected_answer", "correct_answer", "is_correct", "time_taken_seconds"]
+        )
+        for response in responses:
+            csv_writer.writerow(
+                [
+                    response["user_id"],
+                    response["question"],
+                    response["selected_answer"],
+                    response["correct_answer"],
+                    response["is_correct"],
+                    response["time_taken_seconds"],
+                ]
+            )
+        await self._replace_file(self.csv_file, csv_buffer.getvalue())
+        logger.info(f"Rewrote CSV file with {len(responses)} responses after a teacher's verdict: {self.csv_file}")
+
+        if self.answers_with_users_csv_file:
+            await self._replace_file(
+                self.answers_with_users_csv_file, self._answers_with_users_csv_text(responses, with_headers=True)
+            )
+
+    async def _replace_file(self, path: str, content: str):
+        """Write content to path through a temporary file (flush, fsync, rename)."""
+        temp_path = f"{path}.tmp"
+        async with aiofiles.open(temp_path, "w", encoding="utf-8") as f:
+            await f.write(content)
+            await f.flush()
+            os.fsync(f.fileno())
+        os.replace(temp_path, path)
+
     async def _append_answers_with_users_csv(self, responses):
         """Append per-answer rows enriched with user info to the answers_with_users CSV.
 
@@ -1439,16 +1509,31 @@ class TestingServer:
         if not responses:
             return
 
+        file_exists = os.path.exists(self.answers_with_users_csv_file)
+        csv_content = self._answers_with_users_csv_text(responses, with_headers=not file_exists)
+
+        mode = "w" if not file_exists else "a"
+        async with aiofiles.open(self.answers_with_users_csv_file, mode, encoding="utf-8") as f:
+            await f.write(csv_content)
+            await f.flush()
+            os.fsync(f.fileno())
+
+        action = "Created" if not file_exists else "Updated"
+        logger.info(
+            f"{action} answers_with_users CSV file with {len(responses)} rows: "
+            f"{self.answers_with_users_csv_file}"
+        )
+
+    def _answers_with_users_csv_text(self, responses, with_headers: bool) -> str:
+        """CSV text for the answers_with_users file: optional headers, then one row per answer."""
         registration_fields = []
         if hasattr(self.config, "registration") and self.config.registration.fields:
             registration_fields = list(self.config.registration.fields)
 
-        file_exists = os.path.exists(self.answers_with_users_csv_file)
-
         csv_buffer = StringIO()
         csv_writer = csv.writer(csv_buffer)
 
-        if not file_exists:
+        if with_headers:
             headers = ["user_id", "username"]
             for field_label in registration_fields:
                 headers.append(field_label.lower().replace(" ", "_"))
@@ -1477,18 +1562,7 @@ class TestingServer:
 
         csv_content = csv_buffer.getvalue()
         csv_buffer.close()
-
-        mode = "w" if not file_exists else "a"
-        async with aiofiles.open(self.answers_with_users_csv_file, mode, encoding="utf-8") as f:
-            await f.write(csv_content)
-            await f.flush()
-            os.fsync(f.fileno())
-
-        action = "Created" if not file_exists else "Updated"
-        logger.info(
-            f"{action} answers_with_users CSV file with {len(responses)} rows: "
-            f"{self.answers_with_users_csv_file}"
-        )
+        return csv_content
 
     async def flush_users_to_csv(self):
         """Flush user registration data to separate CSV file.
@@ -1531,7 +1605,8 @@ class TestingServer:
             # Calculate and add user statistics
             user_answer_list = self.user_answers.get(user_id, [])
             total_questions_asked = len(user_answer_list)
-            correct_answers = sum(answer["is_correct"] for answer in user_answer_list)
+            # An answer that waits for the teacher (is_correct None) is not counted yet
+            correct_answers = sum(1 for answer in user_answer_list if answer["is_correct"] is True)
             earned_points = sum_points(
                 answer.get("earned_points", 1 if answer["is_correct"] else 0) for answer in user_answer_list
             )
@@ -1694,7 +1769,7 @@ class TestingServer:
             For text questions: tuple (is_correct: bool, error_message: str or None)
         """
         # Handle text input questions (has checker)
-        if "checker" in question:
+        if is_text_question(question):
             return self._execute_checker(selected_answer, question)
 
         correct_answer = question["correct_answer"]
@@ -2107,6 +2182,105 @@ class TestingServer:
             {"success": True, "message": "Registration data updated successfully", "user_data": user_data}
         )
 
+    # ------------------------------------------------------------------
+    # Manual check: answers that the teacher marks right or wrong
+    # ------------------------------------------------------------------
+
+    def has_manual_questions(self) -> bool:
+        """Tell whether the running quiz has questions with ``manual_check: true``."""
+        return any(is_manual_question(q) for q in self.questions)
+
+    def review_status(self) -> dict:
+        """Summary for the admin panel: manual questions, waiting answers, open review pages."""
+        return {
+            "has_manual": self.has_manual_questions(),
+            "pending_count": self.review_queue.pending_count,
+            "reviewers": self.review_queue.reviewers,
+        }
+
+    def review_state(self, ws, already_decided: bool = False) -> dict:
+        """The message for one review page: its answer (or None) and the number of waiting answers."""
+        item = self.review_queue.item_for(ws)
+        return {
+            "type": "review_state",
+            "item": dict(item.public) if item else None,
+            "pending_count": self.review_queue.pending_count,
+            "has_manual": self.has_manual_questions(),
+            "already_decided": already_decided,
+        }
+
+    async def _send_review_state(self, ws, already_decided: bool = False):
+        if ws.closed or ws not in self.review_queue.clients:
+            return
+        try:
+            await ws.send_str(json.dumps(self.review_state(ws, already_decided)))
+        except Exception as e:
+            logger.warning(f"Failed to send to review WebSocket client: {e}")
+
+    async def review_changed(self, already_decided_for=None):
+        """Hand answers to review pages that have none, then tell every page and the admin panel.
+
+        Args:
+            already_decided_for: The page that sent a verdict for an answer decided elsewhere
+                (it gets ``already_decided: true`` once)
+        """
+        self.review_queue.assign_idle()
+        for ws in list(self.review_queue.clients):
+            await self._send_review_state(ws, already_decided=ws is already_decided_for)
+        await self.broadcast_to_admin_websockets({"type": "review_status", **self.review_status()})
+
+    async def apply_review_verdict(self, review_id: str, is_correct: bool) -> bool:
+        """Store the teacher's verdict for a waiting answer.
+
+        Updates the stored answer, the CSV row (the file is written again at the next flush),
+        the final stats of a student who has finished, and live stats.
+
+        Returns:
+            True when the answer was waiting, False when it was decided already (or the quiz restarted)
+        """
+        item = self.review_queue.decide(review_id)
+        if item is None:
+            return False
+
+        answer = item.refs["answer"]
+        answer["is_correct"] = is_correct
+        answer["earned_points"] = answer["points"] if is_correct else 0
+        answer.pop("pending_review", None)
+        item.refs["csv_row"]["is_correct"] = is_correct
+        self.csv_rewrite_needed = True
+
+        user_id = item.user_id
+        if user_id in self.user_stats:
+            completed_at = self.user_stats[user_id].get("completed_at")
+            self.calculate_and_store_user_stats(user_id)
+            self.user_stats[user_id]["completed_at"] = completed_at
+
+        state = "ok" if is_correct else "fail"
+        time_taken = answer.get("time_taken")
+        self.update_live_stats(user_id, item.question_id, state, time_taken)
+        user_data = self.users.get(user_id, {})
+        logger.info(
+            f"Teacher marked the answer of user {user_id} for question {item.question_id} as "
+            f"{'correct' if is_correct else 'incorrect'}"
+        )
+        await self.broadcast_to_websockets(
+            {
+                "type": "state_update",
+                "user_id": user_id,
+                "username": user_data.get("username", ""),
+                "question_id": item.question_id,
+                "state": state,
+                "time_taken": time_taken,
+                "total_questions": len(self.questions),
+                "total_points": sum_points(q.get("points", 1) for q in self.questions),
+                "earned_points": answer["earned_points"],
+                "question_points": answer["points"],
+                "completed": len(self.user_answers.get(user_id, [])) == len(self.questions),
+                "completed_at": self.user_stats.get(user_id, {}).get("completed_at"),
+            }
+        )
+        return True
+
     async def submit_answer(self, request):
         """Submit test answer.
 
@@ -2262,30 +2436,33 @@ class TestingServer:
             self.current_question_ids.pop(user_id, None)
         self.question_ready_times[user_id] = datetime.now()
 
-        # Check if this is a text input question (has checker)
-        is_text_question = "checker" in question
+        is_text = is_text_question(question)
         checker_error = None
+        # An answer to a manual_check question waits for the teacher: correctness is unknown (None)
+        pending_review = is_manual_question(question) and not timed_out
 
         if timed_out:
             is_correct = False
+        elif pending_review:
+            is_correct = None
         else:
             # Check if answer is correct (handle single, multiple, and text answers)
             validation_result = self._validate_answer(selected_answer, question)
 
             # Handle text question result (returns tuple)
-            if is_text_question:
+            if is_text:
                 is_correct, checker_error = validation_result
             else:
                 is_correct = validation_result
 
         # Determine the correct answer text for storage
-        if is_text_question:
+        if is_text:
             correct_answer_text = question.get("correct_value", "")
         else:
             correct_answer_text = self._format_answer_text(question["correct_answer"], question.get("options"))
         if timed_out:
             selected_answer_text = ""  # An empty answer marks "time ran out"
-        elif is_text_question:
+        elif is_text:
             selected_answer_text = str(selected_answer)
         else:
             selected_answer_text = self._format_answer_text(selected_answer, question.get("options"))
@@ -2298,16 +2475,19 @@ class TestingServer:
             "question": question.get("question", ""),  # Handle image-only questions
             "selected_answer": selected_answer_text,
             "correct_answer": correct_answer_text,
-            "is_correct": is_correct,
+            # Empty in the CSV until the teacher decides
+            "is_correct": "" if pending_review else is_correct,
             "time_taken_seconds": time_taken,
             "timestamp": datetime.now().isoformat(),
         }
 
         # Add checker error for text questions if present
-        if is_text_question and checker_error:
+        if is_text and checker_error:
             response_data["checker_error"] = checker_error
 
         self.user_responses.append(response_data)
+        self.all_responses.append(response_data)
+        csv_row = response_data
 
         # Track answer separately for stats calculation (independent of CSV flushing)
         if user_id not in self.user_answers:
@@ -2335,12 +2515,28 @@ class TestingServer:
         }
 
         # Add checker error for text questions if present
-        if is_text_question and checker_error:
+        if is_text and checker_error:
             answer_data["checker_error"] = checker_error
         if timed_out:
             answer_data["timed_out"] = True  # Used by the results screen, not written to CSV
+        if pending_review:
+            answer_data["pending_review"] = True  # Removed when the teacher decides
 
         self.user_answers[user_id].append(answer_data)
+
+        if pending_review:
+            self.review_queue.add(
+                user_id,
+                question_id,
+                {
+                    "question": question.get("question", ""),
+                    "image": question.get("image") or None,
+                    "answer": selected_answer_text,
+                    "correct_value": question.get("correct_value", ""),
+                    "points": question_points,
+                },
+                {"answer": answer_data, "csv_row": csv_row},
+            )
 
         # Update user progress
         self.user_progress[user_id] = question_id
@@ -2348,6 +2544,8 @@ class TestingServer:
         # Update live stats: set current question state based on correctness
         if timed_out:
             state = "timeout"
+        elif pending_review:
+            state = "pending"
         else:
             state = "ok" if is_correct else "fail"
         self.update_live_stats(user_id, question_id, state, time_taken)
@@ -2372,12 +2570,20 @@ class TestingServer:
         if timed_out:
             # Always sent, so the page can show "Time is up" even when correct answers are hidden
             response_data["timed_out"] = True
+        if pending_review:
+            # Always sent: the page says the teacher will check the answer
+            response_data["pending_review"] = True
 
         # Only include correctness feedback and correct answer if show_right_answer is enabled
-        if self.show_right_answer:
+        if self.show_right_answer and pending_review:
+            # Nothing to show yet: no correctness, no sample answer
+            response_data["is_text_question"] = True
+            if with_explanation and self.show_explanation and question_id in self.explanations_html:
+                response_data["explanation_html"] = self.explanations_html[question_id]
+        elif self.show_right_answer:
             response_data["is_correct"] = is_correct
 
-            if is_text_question:
+            if is_text:
                 # Text input question response
                 response_data["is_text_question"] = True
                 response_data["correct_value"] = question.get("correct_value", "")
@@ -2417,9 +2623,18 @@ class TestingServer:
             }
         )
 
+        if pending_review:
+            await self.review_changed()
+
+        if timed_out:
+            outcome = "Time ran out"
+        elif pending_review:
+            outcome = "Waits for the teacher"
+        else:
+            outcome = "Correct" if is_correct else "Incorrect"
         logger.info(
             f"Answer submitted by {username} (ID: {user_id}) for question {question_id}: "
-            f"{'Time ran out' if timed_out else ('Correct' if is_correct else 'Incorrect')} (took {time_taken}s)"
+            f"{outcome} (took {time_taken}s)"
         )
         logger.info(f"Updated progress for user {user_id}: last answered question = {question_id}")
 
@@ -2637,6 +2852,8 @@ class TestingServer:
             "total_points": total_points,
             "points_percentage": points_percentage,
             "total_time": total_time,
+            # Answers to manual_check questions the teacher has not decided yet
+            "pending_count": sum(1 for answer in user_answer_list if answer.get("pending_review")),
             "completed_at": datetime.now().isoformat(),
         }
 
@@ -2734,6 +2951,7 @@ class TestingServer:
             "total_points": 0,
             "points_percentage": 0,
             "total_time": 0,
+            "pending_count": 0,
             "all_completed": False,
             "show_answers_on_completion": False,
         }
@@ -3528,8 +3746,8 @@ class TestingServer:
                 errors.append(f"Question {i+1} must be a dictionary")
                 continue
 
-            # Check if this is a text input question (has checker)
-            is_text_question = "checker" in question
+            # Text input question: has checker, or the teacher checks it by hand
+            is_text = is_text_question(question)
 
             # Either question text OR image must be provided (for all question types)
             has_question = "question" in question and question["question"]
@@ -3537,7 +3755,20 @@ class TestingServer:
             if not has_question and not has_image:
                 errors.append(f"Question {i+1} must have either question text or image")
 
-            if is_text_question:
+            # manual_check: true = the teacher checks the typed answer, so no checker code and no options
+            if "manual_check" in question:
+                if not isinstance(question["manual_check"], bool):
+                    errors.append(f"Question {i+1} 'manual_check' must be a boolean (true or false)")
+                elif question["manual_check"]:
+                    checker_value = question.get("checker")
+                    if isinstance(checker_value, str) and checker_value.strip():
+                        errors.append(f"Question {i+1} cannot have both 'manual_check: true' and checker code")
+                    if "options" in question or "correct_answer" in question:
+                        errors.append(
+                            f"Question {i+1} with 'manual_check: true' cannot have options or correct_answer"
+                        )
+
+            if is_text:
                 # Text input question validation
                 # Optional fields: default_value, correct_value, checker
                 if "default_value" in question and not isinstance(question["default_value"], str):
@@ -3575,7 +3806,7 @@ class TestingServer:
 
             # Validate correct_answer (can be integer for single answer or list for multiple answers)
             # Only for choice questions
-            if not is_text_question and "correct_answer" in question and "options" in question:
+            if not is_text and "correct_answer" in question and "options" in question:
                 correct_answer = question["correct_answer"]
                 options_count = len(question["options"])
 
@@ -3597,7 +3828,7 @@ class TestingServer:
                     errors.append(f"Question {i+1} correct_answer must be an integer or array of integers")
 
             # Validate min_correct (only valid for multiple choice questions)
-            if not is_text_question and "min_correct" in question:
+            if not is_text and "min_correct" in question:
                 min_correct = question["min_correct"]
                 if "correct_answer" not in question:
                     errors.append(f"Question {i+1} has min_correct but no correct_answer")
@@ -4834,10 +5065,76 @@ class TestingServer:
             "requires_approval": hasattr(self.config, "registration") and self.config.registration.approve,
             "tunnel": tunnel_info,
             "transfer_requests": self.transfer.list_incoming(),
+            "review": self.review_status(),
         }
         return await self._handle_websocket_connection(
             request, self.admin_websocket_clients, initial_data, "admin WebSocket"
         )
+
+    @local_network_only
+    async def serve_review_page(self, request):
+        """Serve the review page, where teachers mark manual_check answers right or wrong.
+
+        The page holds no data: it logs in like the admin panel and gets the answers over WS /ws/review.
+        """
+        template_content = self.templates.get("review.html", "")
+        client_ip = get_client_ip(request)
+        is_trusted_ip = client_ip in self.admin_config.trusted_ips if hasattr(self, "admin_config") else False
+        t = self.translations
+        page = template_content.replace("{{IS_TRUSTED_IP}}", "true" if is_trusted_ip else "false")
+        page = page.replace("{{TRANSLATIONS_JSON}}", json_for_script(t))
+        page = page.replace("{{LANGUAGE}}", html.escape(self.config.language))
+        page = page.replace("{{T_REVIEW_TITLE}}", html.escape(t["review_title"], quote=False))
+        page = page.replace("{{WEBQUIZ_VERSION}}", get_package_version())
+        return web.Response(text=page, content_type="text/html")
+
+    @admin_auth_required
+    async def websocket_review(self, request):
+        """WebSocket for review pages (admin session or trusted IP, local network only).
+
+        The server sends ``review_state`` messages; the page sends ``verdict`` and ``ping``.
+        """
+        # The heartbeat drops a phone that went to sleep, so its answer goes to another teacher
+        ws = web.WebSocketResponse(heartbeat=30)
+        await ws.prepare(request)
+        self.review_queue.connect(ws)
+        logger.info(f"Review page connected. Open review pages: {self.review_queue.reviewers}")
+        await self.review_changed()
+
+        try:
+            async for msg in ws:
+                if msg.type == WSMsgType.ERROR:
+                    logger.error(f"Review WebSocket error: {ws.exception()}")
+                    break
+                if msg.type != WSMsgType.TEXT:
+                    continue
+                try:
+                    data = json.loads(msg.data)
+                except ValueError:
+                    continue
+                if not isinstance(data, dict):
+                    continue
+                if data.get("type") == "ping":
+                    await ws.send_str(json.dumps({"type": "pong"}))
+                elif data.get("type") == "verdict":
+                    is_correct = data.get("is_correct")
+                    if not isinstance(is_correct, bool):
+                        await self._send_review_state(ws)
+                        continue
+                    applied = await self.apply_review_verdict(str(data.get("review_id")), is_correct)
+                    await self.review_changed(already_decided_for=None if applied else ws)
+                elif data.get("type") == "take_shared":
+                    # The teacher helps with an answer that is open on another teacher's page
+                    if self.review_queue.take_shared(ws):
+                        await self.review_changed()
+                    else:
+                        await self._send_review_state(ws)
+        finally:
+            self.review_queue.disconnect(ws)
+            logger.info(f"Review page disconnected. Open review pages: {self.review_queue.reviewers}")
+            await self.review_changed()
+
+        return ws
 
 
 async def create_app(config: WebQuizConfig):
@@ -4930,6 +5227,10 @@ async def create_app(config: WebQuizConfig):
     # Live stats routes (public access)
     app.router.add_get("/live-stats/", server.serve_live_stats_page)
     app.router.add_get("/ws/live-stats", server.websocket_live_stats)
+
+    # Manual check of answers by teachers
+    app.router.add_get("/review/", server.serve_review_page)
+    app.router.add_get("/ws/review", server.websocket_review)
 
     # Serve index.html at root path
     app.router.add_get("/", server.serve_index_page)

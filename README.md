@@ -259,7 +259,7 @@ pytest tests/test_registration_approval.py
 
 ### Test Coverage
 
-The project has **911 tests** across **72 test files**. The main areas:
+The project has **954 tests** across **75 test files**. The main areas:
 
 - **CLI and Directory Creation** (7 tests): Directory and file creation
 - **Admin API** (14 tests): Admin interface and authentication
@@ -280,10 +280,11 @@ The project has **911 tests** across **72 test files**. The main areas:
 - **Time Limits** (57 tests): Per-question and whole-quiz time limits, timeouts, background check, countdowns, editor fields (`test_time_limits_*.py`, `test_selenium_time_limits.py`, `test_selenium_admin_time_limits.py`)
 - **Start Settings** (11 tests): Settings pop-up when starting a quiz; values apply to the running quiz only (`test_quiz_start_settings.py`, `test_selenium_admin_start_settings.py`)
 - **Question Explanations** (53 tests): Markdown rendering, the answer reply, the explanation step, editor field and preview, start pop-up (`test_explanations*.py`, `test_selenium_explanations.py`, `test_selenium_admin_explanations.py`)
+- **Manual Check** (43 tests): Answers the teacher checks by hand, review queue shared by several teachers, review page, results that update by themselves, CSV rewrite (`test_manual_check.py`, `test_manual_review_unit.py`, `test_selenium_manual_check.py`)
 - **Hidden Correctness** (2 tests): The results table leaves out the "correct" column while correct answers are hidden (`test_selenium_hidden_correctness.py`)
 - **Harness Checks** (14 tests): The classroom harness's data and agent-report checks, on small fake records (`test_harness_checks.py`)
 - **Integration Tests** (6 tests): Multiple choice, multiple answers
-- **Selenium Tests** (87 tests): End-to-end browser testing
+- **Selenium Tests** (94 tests): End-to-end browser testing
 - **Auto-Advance** (6 tests): Automatic progression behavior
 
 The test suite uses GitHub Actions CI/CD for automated testing on every commit.
@@ -476,6 +477,26 @@ checker_templates:
 ```
 
 Templates appear in the admin quiz editor for easy insertion.
+
+**Answers the Teacher Checks by Hand:**
+
+For answers that code cannot check (an explanation, an opinion), write `manual_check: true`. No `checker` is needed:
+
+```yaml
+questions:
+  - question: "Why is the sky blue?"
+    manual_check: true
+    correct_value: "Because of Rayleigh scattering"  # optional, a sample answer only the teacher sees
+    points: 2
+```
+
+- The student types the answer and sees "the teacher will check it; you will see the result at the end".
+- Teachers open `/review/` on a phone (same network, log in with the master key). The page shows one answer at a time, without the student's name, with **✓ Right** and **✗ Wrong** buttons.
+- Several teachers can review at once: each page gets a different answer. When all waiting answers are open on other pages, a page can **help**: it then shows the same answer, and the first verdict counts.
+- The start pop-up and the admin panel tell the teacher about the review page and show its addresses.
+- The student's results screen marks waiting answers in yellow and updates by itself every 5 seconds.
+- In the answers CSV, `is_correct` stays empty until the teacher decides; then the file is written again with `True` / `False`.
+- A question with `manual_check: true` cannot have checker code, `options` or `correct_answer`.
 
 ### Server Configuration
 

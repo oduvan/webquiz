@@ -773,6 +773,52 @@
             border-color: #28a745;
             color: #a5d6a7;
         }
+        /* Manual check by the teacher: the answer waits for a verdict */
+        .pending-review-message, .pending-review-notice {
+            background: #fff3cd;
+            border: 1px solid #ffc107;
+            border-left: 4px solid #ffc107;
+            color: #856404;
+            padding: 10px 12px;
+            border-radius: 5px;
+            margin: 10px 0;
+        }
+        .pending-review-done {
+            background: #d4edda;
+            border: 1px solid #28a745;
+            border-left: 4px solid #28a745;
+            color: #155724;
+            padding: 10px 12px;
+            border-radius: 5px;
+            margin: 10px 0;
+        }
+        [data-theme="dark"] .pending-review-message, [data-theme="dark"] .pending-review-notice {
+            background: #3d3a1a;
+            border-color: #ffc107;
+            color: #f0d68a;
+        }
+        [data-theme="dark"] .pending-review-done {
+            background: #1a3a1a;
+            color: #a5d6a7;
+        }
+        .results-table tr.pending-review-row,
+        .results-table tr.pending-review-row:nth-child(even) {
+            background-color: #fff8e1;
+            box-shadow: inset 4px 0 0 #ffc107;
+        }
+        [data-theme="dark"] .results-table tr.pending-review-row,
+        [data-theme="dark"] .results-table tr.pending-review-row:nth-child(even) {
+            background-color: #3d3a1a;
+        }
+        .pending-review-label {
+            display: inline-block;
+            margin-top: 4px;
+            font-weight: bold;
+            color: #856404;
+        }
+        [data-theme="dark"] .pending-review-label {
+            color: #f0d68a;
+        }
         /* Time limit countdowns */
         .timer-box {
             display: inline-block;
@@ -2031,13 +2077,20 @@
                     isTextQuestion: isTextQuestion,
                     checkerError: data.checker_error,
                     correctValue: data.correct_value,
-                    timedOut: timedOut
+                    timedOut: timedOut,
+                    pendingReview: data.pending_review === true
                 });
 
                 // Whole-quiz time is over: the server closed the quiz, show the results
                 if (timedOut && quizTimeLimit > 0 && data.test_completed) {
                     answerLocked = false;
                     await finishQuizAfterTimeUp();
+                    return;
+                }
+
+                // The teacher checks this answer later: say so instead of right/wrong
+                if (data.pending_review === true) {
+                    showPendingReviewFeedback();
                     return;
                 }
 
@@ -2054,6 +2107,31 @@
             } finally {
                 answerLocked = false;
             }
+        }
+
+        // An answer to a question that the teacher checks by hand (manual_check): no right/wrong yet
+        function showPendingReviewFeedback() {
+            const textInput = document.getElementById('text-answer-input');
+            if (textInput) {
+                textInput.disabled = true;
+            }
+            const feedbackContainer = document.getElementById('checker-feedback');
+            if (feedbackContainer) {
+                feedbackContainer.innerHTML = `<div class="pending-review-message">${escapeHtml(T.pending_review_saved)}</div>`;
+            }
+            const submitBtn = document.getElementById('submit-answer-btn');
+            submitBtn.classList.add('hidden');
+
+            if (!showRightAnswer) {
+                // No continue button in this mode: leave time to read the message, then move on
+                setTimeout(() => {
+                    continueToNextQuestion(true);
+                }, 1500);
+                return;
+            }
+            const continueBtn = document.getElementById('continue-btn');
+            continueBtn.classList.remove('hidden');
+            continueBtn.disabled = false;
         }
 
         function showAnswerFeedback(isCorrect, correctAnswer, isTextQuestion, checkerError, correctValue, timedOut = false) {
@@ -2337,7 +2415,7 @@
                     // Note: testResults uses different property names than server data
                     const correctAnswer = (questions[index] && questions[index].correct_answer !== undefined) ? questions[index].options[questions[index].correct_answer] : null;
                     tableContent += `
-                        <tr>
+                        <tr class="${result.pendingReview ? 'pending-review-row' : ''}">
                             <td data-label="${T.question_header}">${formatQuestionForDisplay(result.question, result.image, result.file)}</td>
                             <td data-label="${T.your_answer_header}">
                                 ${result.timedOut ? `<span class="time-up-message">⏱ ${T.time_is_up}</span>` : `<span class="${result.isCorrect === true ? 'answer-correct' : (result.isCorrect === false ? 'answer-incorrect' : '')}">
@@ -2364,8 +2442,51 @@
             document.getElementById('results').classList.remove('hidden');
         }
 
+        // Results screen while the teacher still checks answers (manual_check): ask again every 5 s
+        let pendingReviewTimer = null;
+        let sawPendingReview = false;
+        let lastFinalResultsJson = null;
+
+        function schedulePendingReviewRefresh(pendingCount) {
+            clearTimeout(pendingReviewTimer);
+            pendingReviewTimer = null;
+            if (pendingCount > 0) {
+                pendingReviewTimer = setTimeout(refreshPendingReview, 5000);
+            }
+        }
+
+        async function refreshPendingReview() {
+            pendingReviewTimer = null;
+            try {
+                const response = await fetchWithRetry(`api/verify-user/${currentUserId}`);
+                const data = await response.json();
+                if (response.ok && data.valid && data.test_completed && data.final_results) {
+                    showCompletedTestResults(data.final_results);
+                    return;
+                }
+            } catch (error) {
+                console.error('Error refreshing results:', error);
+            }
+            pendingReviewTimer = setTimeout(refreshPendingReview, 5000);
+        }
+
         function showCompletedTestResults(finalResults) {
             stopAllCountdowns();
+            const pendingCount = finalResults.pending_count || 0;
+            schedulePendingReviewRefresh(pendingCount);
+            // Redraw only when something changed, so the page does not blink every 5 s
+            const resultsJson = JSON.stringify(finalResults);
+            if (resultsJson === lastFinalResultsJson && !document.getElementById('results').classList.contains('hidden')) {
+                return;
+            }
+            lastFinalResultsJson = resultsJson;
+            let pendingReviewHtml = '';
+            if (pendingCount > 0) {
+                sawPendingReview = true;
+                pendingReviewHtml = `<div class="pending-review-notice" id="pending-review-notice">${escapeHtml(T.pending_review_notice.replace('{n}', pendingCount))}</div>`;
+            } else if (sawPendingReview) {
+                pendingReviewHtml = `<div class="pending-review-done" id="pending-review-done">${escapeHtml(T.pending_review_done)}</div>`;
+            }
             document.getElementById('loading').classList.add('hidden');
             document.getElementById('test-section').classList.add('hidden');
 
@@ -2397,6 +2518,7 @@
             let resultsHtml = `
                 <p><strong>${T.result_label}</strong> ${correctCount}/${totalCount} (${percentage}%)</p>
                 ${pointsDisplay}
+                ${pendingReviewHtml}
                 ${shouldShowWaitingMessage ? `
                     <div style="background: var(--stats-bg); padding: 15px; border-radius: 5px; margin: 15px 0; border-left: 4px solid #2196f3;">
                         <p style="margin: 0 0 10px 0;"><strong>${T.answers_available_later}</strong></p>
@@ -2421,18 +2543,19 @@
                         </thead>
                         <tbody>
                             ${finalResults.test_results.map((result, index) => `
-                                <tr>
+                                <tr class="${result.pending_review ? 'pending-review-row' : ''}">
                                     <td data-label="${T.question_header}">${formatQuestionForDisplay(result.question, result.image, result.file)}</td>
                                     <td data-label="${T.your_answer_header}">
                                         ${result.timed_out ? `<span class="time-up-message">⏱ ${T.time_is_up}</span>` : `<span class="${result.is_correct === true ? 'answer-correct' : (result.is_correct === false ? 'answer-incorrect' : '')}">
                                             ${formatAnswerForDisplay(result.selected_answer)}
                                         </span>`}
+                                        ${result.pending_review ? `<div class="pending-review-label">${escapeHtml(T.pending_review_row)}</div>` : ''}
                                         ${result.is_correct === false && result.correct_answer && (showRightAnswer || hasCorrectAnswers) ? `<div class="correct-answer-hint">${T.result_correct_header}${formatAnswerForDisplay(result.correct_answer)}</div>` : ''}
                                     </td>
                                     ${hasCorrectAnswers ? `<td data-label="${T.correct_header_alt}" style="text-align: center;">
-                                        ${result.is_correct !== undefined ? `<span class="${result.is_correct ? 'correct' : 'incorrect'}" style="font-size: 18px;">${result.is_correct ? '✓' : '✗'}</span>` : `<span style="color: #666;">${T.unknown}</span>`}
+                                        ${result.pending_review ? '<span style="font-size: 18px;">⏳</span>' : (result.is_correct !== undefined ? `<span class="${result.is_correct ? 'correct' : 'incorrect'}" style="font-size: 18px;">${result.is_correct ? '✓' : '✗'}</span>` : `<span style="color: #666;">${T.unknown}</span>`)}
                                     </td>` : ''}
-                                    ${hasCustomPoints ? `<td data-label="${T.points_header}" style="text-align: center;">${formatPoints(result.earned_points !== undefined ? result.earned_points : (result.is_correct ? (result.points || 1) : 0))}/${formatPoints(result.points || 1)}</td>` : ''}
+                                    ${hasCustomPoints ? `<td data-label="${T.points_header}" style="text-align: center;">${result.pending_review ? '?' : formatPoints(result.earned_points !== undefined ? result.earned_points : (result.is_correct ? (result.points || 1) : 0))}/${formatPoints(result.points || 1)}</td>` : ''}
                                 </tr>
                             `).join('')}
                         </tbody>

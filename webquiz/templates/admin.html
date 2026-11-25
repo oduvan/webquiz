@@ -927,6 +927,29 @@
             padding: 20px;
         }
 
+        /* Manual check by the teacher: start pop-up note and the panel block */
+        .manual-check-note, .manual-review-status {
+            background: var(--warning-bg);
+            border: 2px solid var(--warning-border);
+            border-radius: 8px;
+            padding: 12px 15px;
+            margin: 10px 0 15px 0;
+            word-wrap: break-word;
+        }
+
+        .manual-review-status {
+            margin-top: 30px;
+        }
+
+        .manual-check-note ul, .manual-review-status ul {
+            margin: 6px 0 0 0;
+            padding-left: 20px;
+        }
+
+        .manual-check-note a, .manual-review-status a {
+            word-break: break-all;
+        }
+
         .pending-user-item {
             background: var(--white);
             border: 1px solid var(--border-color);
@@ -1278,6 +1301,14 @@
                 </div>
             </div>
 
+            <!-- Manual check: shown while the running quiz has questions the teacher checks by hand -->
+            <div id="manual-review-section" class="manual-review-status hidden">
+                <h3 style="margin-top: 0;">✍️ Ручна перевірка</h3>
+                <div>Чекають перевірки: <strong id="manual-review-pending">0</strong> · Сторінок перевірки відкрито: <strong id="manual-review-reviewers">0</strong></div>
+                <div id="manual-review-no-reviewers" style="margin-top: 6px;">⚠️ Ніхто не перевіряє відповіді. Відкрийте сторінку перевірки:</div>
+                <ul id="manual-review-links"></ul>
+            </div>
+
             <!-- Incoming File Transfer Requests (from other servers on the same tunnel server) -->
             <div id="transfer-requests-section" class="transfer-requests hidden">
                 <h3 style="margin-top: 0;">📥 Запити на отримання файлів</h3>
@@ -1351,6 +1382,8 @@
                 <a href="/files/">📁 File Manager</a>
                 <span style="margin: 0 10px;">|</span>
                 <a href="/live-stats/">📊 Live Stats</a>
+                <span style="margin: 0 10px;">|</span>
+                <a href="/review/">✍️ Перевірка відповідей</a>
             </div>
 
             <!-- Footer -->
@@ -1499,6 +1532,11 @@
             </div>
             <p id="start-quiz-name" style="font-weight: 600; margin-top: 0;"></p>
             <p class="start-quiz-hint">Значення взято з файлу тесту. Зміни діють лише для цього запуску і не зберігаються у файлі.</p>
+            <div id="start-manual-check-note" class="manual-check-note" style="display: none;">
+                <strong>✍️ <span id="start-manual-check-count"></span></strong>
+                <div>Відкрийте сторінку перевірки на телефоні (у тій самій мережі, вхід з головним ключем):</div>
+                <ul id="start-manual-check-links"></ul>
+            </div>
             <div class="form-group">
                 <label style="display: flex; align-items: center;">
                     <input type="checkbox" id="start-show-right-answer" style="margin-right: 10px;" onchange="toggleStartShowAnswersOnCompletion()">
@@ -1832,6 +1870,18 @@
             );
             document.getElementById('start-show-explanation-group').style.display = quizHasExplanations ? 'block' : 'none';
             document.getElementById('start-show-explanation').checked = quizData.show_explanation === true;
+
+            // Questions the teacher checks by hand: tell where to check them before the quiz starts
+            const manualCount = quizQuestions.filter(q => q && q.manual_check === true).length;
+            const manualNote = document.getElementById('start-manual-check-note');
+            if (manualCount > 0) {
+                document.getElementById('start-manual-check-count').textContent =
+                    `Питань, які перевіряєте ви вручну: ${manualCount}.`;
+                fillReviewLinks(document.getElementById('start-manual-check-links'));
+                manualNote.style.display = 'block';
+            } else {
+                manualNote.style.display = 'none';
+            }
 
             const timeLimit = (quizData.time_limit && typeof quizData.time_limit === 'object') ? quizData.time_limit : {};
             let mode = 'none';
@@ -2295,6 +2345,13 @@
                             <textarea class="correct-value-input" placeholder="Введіть правильну відповідь..." style="width: 100%; min-height: 60px; font-family: monospace;">1000</textarea>
                         </div>
                         <div class="form-group">
+                            <label style="display: flex; align-items: center;">
+                                <input type="checkbox" class="manual-check-input" style="margin-right: 10px;" onchange="toggleManualCheck(this)" >
+                                ✍️ Перевіряє вчитель вручну
+                            </label>
+                            <small>Учень вводить відповідь, а вчитель позначає її правильною чи ні на сторінці перевірки (/review/). Правильна відповідь вище показується вчителю як зразок.</small>
+                        </div>
+                        <div class="form-group checker-group" style="">
                             <label>Перевірка (Python код):</label>
                             <div style="display: flex; gap: 10px; margin-bottom: 5px;">
                                 <select class="checker-template-select" onchange="insertCheckerTemplate(${questionCounter}, this)" style="flex: 1;">
@@ -2688,6 +2745,15 @@
             });
         }
 
+        // "Checked by the teacher by hand": the checker code is not used, so hide it
+        function toggleManualCheck(checkbox) {
+            const textFields = checkbox.closest('.text-question-fields');
+            const checkerGroup = textFields ? textFields.querySelector('.checker-group') : null;
+            if (checkerGroup) {
+                checkerGroup.style.display = checkbox.checked ? 'none' : '';
+            }
+        }
+
         function insertCheckerTemplate(questionId, selectElement) {
             if (!selectElement.value) return;
 
@@ -2784,7 +2850,7 @@
                     questionDiv.dataset.questionId = questionCounter;
 
                     // Check if this is a text question (has checker)
-                    const isTextQuestion = 'checker' in question;
+                    const isTextQuestion = 'checker' in question || question.manual_check === true;
                     const isMultipleChoice = !isTextQuestion && Array.isArray(question.correct_answer);
                     const correctAnswers = isMultipleChoice ? question.correct_answer : [question.correct_answer || 0];
                     const inputType = isMultipleChoice ? 'checkbox' : 'radio';
@@ -2914,6 +2980,13 @@
                                     <textarea class="correct-value-input" placeholder="Введіть правильну відповідь..." style="width: 100%; min-height: 60px; font-family: monospace;">${escapeHtml(question.correct_value || '')}</textarea>
                                 </div>
                                 <div class="form-group">
+                                    <label style="display: flex; align-items: center;">
+                                        <input type="checkbox" class="manual-check-input" style="margin-right: 10px;" onchange="toggleManualCheck(this)" ${question.manual_check === true ? 'checked' : ''}>
+                                        ✍️ Перевіряє вчитель вручну
+                                    </label>
+                                    <small>Учень вводить відповідь, а вчитель позначає її правильною чи ні на сторінці перевірки (/review/). Правильна відповідь вище показується вчителю як зразок.</small>
+                                </div>
+                                <div class="form-group checker-group" style="${question.manual_check === true ? 'display: none;' : ''}">
                                     <label>Перевірка (Python код):</label>
                                     <div style="display: flex; gap: 10px; margin-bottom: 5px;">
                                         <select class="checker-template-select" onchange="insertCheckerTemplate(${questionCounter}, this)" style="flex: 1;">
@@ -3134,7 +3207,11 @@
                     if (correctValueInput && correctValueInput.value) {
                         questionData.correct_value = correctValueInput.value;
                     }
-                    if (checkerInput && checkerInput.value.trim()) {
+                    const manualCheckInput = div.querySelector('.manual-check-input');
+                    if (manualCheckInput && manualCheckInput.checked) {
+                        // The teacher checks the answer by hand: no checker code
+                        questionData.manual_check = true;
+                    } else if (checkerInput && checkerInput.value.trim()) {
                         questionData.checker = checkerInput.value;
                     }
                 } else {
@@ -3794,6 +3871,43 @@
             })();
         }
 
+        // Addresses of the review page: one per network address (for a phone), else this computer
+        function reviewPageUrls() {
+            const urls = [];
+            if (typeof NETWORK_INFO !== 'undefined' && NETWORK_INFO.urls) {
+                NETWORK_INFO.urls.forEach(entry => {
+                    const base = entry.quiz_url.endsWith('/') ? entry.quiz_url : entry.quiz_url + '/';
+                    urls.push(base + 'review/');
+                });
+            }
+            if (urls.length === 0) {
+                urls.push(`${window.location.origin}/review/`);
+            }
+            return urls;
+        }
+
+        function fillReviewLinks(list) {
+            list.innerHTML = reviewPageUrls()
+                .map(url => `<li><a href="${escapeHtml(url)}" target="_blank" rel="noopener">${escapeHtml(url)}</a></li>`)
+                .join('');
+        }
+
+        function updateManualReviewStatus(review) {
+            const section = document.getElementById('manual-review-section');
+            if (!review || !review.has_manual) {
+                section.classList.add('hidden');
+                return;
+            }
+            document.getElementById('manual-review-pending').textContent = review.pending_count;
+            document.getElementById('manual-review-reviewers').textContent = review.reviewers;
+            const nobody = review.reviewers === 0;
+            document.getElementById('manual-review-no-reviewers').textContent = nobody
+                ? '⚠️ Ніхто не перевіряє відповіді. Відкрийте сторінку перевірки:'
+                : 'Сторінка перевірки:';
+            fillReviewLinks(document.getElementById('manual-review-links'));
+            section.classList.remove('hidden');
+        }
+
         // Admin WebSocket for Pending Approvals
         let adminWebSocket = null;
         let pendingUsers = {};
@@ -3843,6 +3957,9 @@
                 transferRequests = {};
                 (data.transfer_requests || []).forEach(request => { transferRequests[request.id] = request; });
                 displayTransferRequests();
+                updateManualReviewStatus(data.review);
+            } else if (data.type === 'review_status') {
+                updateManualReviewStatus(data);
             } else if (data.type === 'transfer_request') {
                 transferRequests[data.request.id] = data.request;
                 displayTransferRequests();

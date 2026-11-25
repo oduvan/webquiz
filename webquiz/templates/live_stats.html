@@ -234,6 +234,13 @@
             color: #6c757d;
         }
 
+        /* Answered, waiting for the teacher's check (manual_check) */
+        .state-pending {
+            background: var(--think-color);
+            color: #856404;
+            box-shadow: inset 0 0 0 2px #ffc107;
+        }
+
         .no-data {
             text-align: center;
             padding: 40px;
@@ -502,9 +509,10 @@
         // Initialize theme on page load
         initializeTheme();
 
-        // A question is answered when it is right, wrong, or its time limit ran out ("timeout" counts as wrong)
+        // A question is answered when it is right, wrong, its time limit ran out ("timeout" counts as wrong),
+        // or the answer waits for the teacher's check ("pending", not right until the teacher says so)
         function isAnsweredState(state) {
-            return state === 'ok' || state === 'fail' || state === 'timeout';
+            return state === 'ok' || state === 'fail' || state === 'timeout' || state === 'pending';
         }
 
         // Points may be decimals with at most 2 places. Round to kill binary
@@ -1108,6 +1116,7 @@
                     case 'ok': return '🟢';
                     case 'fail': return '🔴';
                     case 'timeout': return '⏱';
+                    case 'pending': return '✍️';
                     default: return '⚪';
                 }
             }

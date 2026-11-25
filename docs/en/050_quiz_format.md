@@ -520,6 +520,33 @@ Example with math validation:
   points: 2
 ```
 
+#### Answers the Teacher Checks by Hand
+
+Some answers cannot be checked by code: a short explanation, an opinion, an answer that can be written in many ways. For such a question write `manual_check: true`. The student types the answer, and you (or other teachers) mark it right or wrong on the review page.
+
+```
+- question: "Why is the sky blue?"
+  manual_check: true
+  correct_value: "Because of Rayleigh scattering"   # optional: a sample answer for the teacher
+  points: 2
+```
+
+**Fields:**
+- **manual_check: true** — the teacher checks the answer. The question is a text question by itself, so no `checker` is needed
+- **correct_value** — a sample answer. Only the teacher sees it, on the review page (optional)
+- **default_value** and **points** — as for other text questions
+
+**Rules:**
+- A question with `manual_check: true` cannot have checker code, `options` or `correct_answer`
+- `manual_check` must be `true` or `false`
+
+**What the student sees:**
+- After the answer: "Your answer is saved. The teacher will check it; you will see the result at the end of the quiz"
+- On the results screen, answers that are not checked yet are highlighted in yellow and marked "⏳ Waiting for the teacher". A note above says how many are waiting. The screen updates by itself every few seconds, so the student does not need to reload the page
+- The score counts only checked answers. A right answer gets the question's points, a wrong one gets 0
+
+How to check the answers is described in the admin chapter, section "Answer Review".
+
 ---
 
 #### Checker Templates
