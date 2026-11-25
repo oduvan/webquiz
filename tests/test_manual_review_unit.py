@@ -122,3 +122,35 @@ def test_clear_keeps_clients_and_drops_answers():
     assert queue.reviewers == 1
     assert shown(queue, "p1") is None
     assert add(queue, "b").review_id == "2"
+
+
+def test_failed_csv_rewrite_is_tried_again_at_next_flush(tmp_path):
+    import asyncio
+
+    from webquiz.config import WebQuizConfig
+    from webquiz.server import TestingServer
+
+    server = TestingServer(WebQuizConfig())
+    server.all_responses = [
+        {
+            "user_id": "100001",
+            "question": "Q",
+            "selected_answer": "a",
+            "correct_answer": "",
+            "is_correct": True,
+            "time_taken_seconds": 1,
+        }
+    ]
+    server.csv_rewrite_needed = True
+    # The folder does not exist, so the write fails
+    server.csv_file = str(tmp_path / "missing" / "quiz_0001.csv")
+    try:
+        asyncio.run(server.flush_responses_to_csv())
+    except OSError:
+        pass
+    assert server.csv_rewrite_needed is True
+
+    server.csv_file = str(tmp_path / "quiz_0001.csv")
+    asyncio.run(server.flush_responses_to_csv())
+    assert server.csv_rewrite_needed is False
+    assert (tmp_path / "quiz_0001.csv").read_text(encoding="utf-8").splitlines()[1] == "100001,Q,a,,True,1"

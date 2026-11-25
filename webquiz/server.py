@@ -1462,7 +1462,15 @@ class TestingServer:
         self.csv_rewrite_needed = False
         self.user_responses.clear()
         responses = list(self.all_responses)
+        try:
+            await self._write_answer_csv_files(responses)
+        except Exception:
+            # All rows are still in all_responses, so the next flush tries the whole rewrite again
+            self.csv_rewrite_needed = True
+            raise
 
+    async def _write_answer_csv_files(self, responses):
+        """Write the answers CSV (and the answers_with_users CSV) in full from the given rows."""
         csv_buffer = StringIO()
         csv_writer = csv.writer(csv_buffer)
         csv_writer.writerow(
