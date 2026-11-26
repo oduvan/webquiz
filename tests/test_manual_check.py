@@ -543,3 +543,17 @@ async def test_csv_row_is_rewritten_after_verdict():
             assert users[0]["correct_answers"] == "2"
             assert users[0]["earned_points"] == "3"
             assert os.path.exists(csv_dir)
+
+
+def test_texts_never_say_teacher():
+    """Students and review pages see "manual verification", never a "teacher"."""
+    from webquiz.translations import TRANSLATIONS
+
+    for language, texts in TRANSLATIONS.items():
+        for key, text in texts.items():
+            if key.startswith(("pending_review", "review_")):
+                lowered = text.lower()
+                assert "teacher" not in lowered and "вчител" not in lowered and "учител" not in lowered, (
+                    language,
+                    key,
+                )

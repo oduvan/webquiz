@@ -58,7 +58,7 @@ def answer_manual_then_choice(browser):
     message = WebDriverWait(browser, 5).until(
         EC.visibility_of_element_located((By.CSS_SELECTOR, "#checker-feedback .pending-review-message"))
     )
-    assert "teacher will check it" in message.text
+    assert "checked manually" in message.text
     wait_for_clickable(browser, By.ID, "continue-btn").click()
     wait_for_question_containing_text(browser, "2 + 2?")
     find_option_by_index(browser, 1).click()
@@ -75,15 +75,15 @@ def test_results_wait_for_teacher_and_update_by_themselves(temp_dir, browser):
         notice = WebDriverWait(browser, 10).until(
             EC.visibility_of_element_located((By.ID, "pending-review-notice"))
         )
-        assert "not checked yet: 1" in notice.text
+        assert "waiting for manual verification: 1" in notice.text
         row = browser.find_element(By.CSS_SELECTOR, ".results-table tr.pending-review-row")
-        assert "Waiting for the teacher" in row.text
+        assert "Waiting for manual verification" in row.text
         assert len(browser.find_elements(By.CSS_SELECTOR, ".results-table tr.pending-review-row")) == 1
 
         decide_first_waiting_answer(port, True)
 
         done = WebDriverWait(browser, 12).until(EC.visibility_of_element_located((By.ID, "pending-review-done")))
-        assert "checked all your answers" in done.text
+        assert "All your answers have been verified" in done.text
         assert browser.find_elements(By.CSS_SELECTOR, ".results-table tr.pending-review-row") == []
         assert "2/2" in browser.find_element(By.ID, "results-content").text
 
@@ -143,6 +143,8 @@ def test_start_popup_tells_about_manual_check(temp_dir, browser):
         assert "1" in browser.find_element(By.ID, "start-manual-check-count").text
         links = note.find_elements(By.CSS_SELECTOR, "a")
         assert links and all(link.get_attribute("href").endswith("/review/") for link in links)
+        # Same master key and session as the other admin pages: nothing to explain in the note
+        assert "ключ" not in note.text
 
 
 @skip_if_selenium_disabled
@@ -204,3 +206,44 @@ def test_editor_saves_manual_check(temp_dir, browser):
         assert "checker" not in saved["questions"][0]
         assert saved["questions"][0]["correct_value"] == "x"
         assert saved["questions"][1]["manual_check"] is True
+
+
+@skip_if_selenium_disabled
+def test_editor_marks_manual_questions_in_the_list(temp_dir, browser):
+    from test_selenium_quiz_editor import admin_login, select_and_edit_quiz
+
+    quizzes = {
+        "q.yaml": {
+            "title": "Editor",
+            "questions": [
+                {"question": "Type it", "correct_value": "x", "checker": "assert user_answer == 'x'"},
+                {"question": "By hand", "manual_check": True},
+                {"question": "Pick", "options": ["a", "b"], "correct_answer": 0},
+            ],
+        }
+    }
+    with custom_webquiz_server(quizzes=quizzes) as (proc, port):
+        admin_login(browser, port)
+        select_and_edit_quiz(browser)
+        items = browser.find_elements(By.CSS_SELECTOR, ".question-item")
+        markers = [len(item.find_elements(By.CSS_SELECTOR, ".manual-check-indicator")) for item in items]
+        assert markers == [0, 1, 0]
+        assert "вручну" in items[1].find_element(By.CSS_SELECTOR, ".manual-check-indicator").text
+
+        # Turning manual check on adds the marker at once, turning it off removes it
+        box = items[0].find_element(By.CSS_SELECTOR, ".manual-check-input")
+        browser.execute_script("arguments[0].click()", box)
+        assert len(items[0].find_elements(By.CSS_SELECTOR, ".manual-check-indicator")) == 1
+        browser.execute_script("arguments[0].click()", box)
+        assert len(items[0].find_elements(By.CSS_SELECTOR, ".manual-check-indicator")) == 0
+
+
+@skip_if_selenium_disabled
+def test_live_stats_marks_manual_questions(temp_dir, browser):
+    with custom_webquiz_server(quizzes=quiz()) as (proc, port):
+        browser.get(f"http://localhost:{port}/live-stats/")
+        WebDriverWait(browser, 10).until(EC.presence_of_element_located((By.CSS_SELECTOR, "th")))
+        submit(port, register_student(port), 1, "Light scatters")
+        WebDriverWait(browser, 10).until(
+            lambda b: len(b.find_elements(By.CSS_SELECTOR, "th .manual-check-indicator")) == 1
+        )

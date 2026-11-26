@@ -412,6 +412,18 @@
             opacity: 0.8;
         }
 
+        .question-indicator.manual-check-indicator {
+            font-size: 12px;
+            font-weight: bold;
+            color: #856404;
+            background: var(--warning-bg);
+            border: 1px solid var(--warning-border);
+            border-radius: 10px;
+            padding: 0 6px;
+            opacity: 1;
+            white-space: nowrap;
+        }
+
         .question-indicator.points-indicator {
             color: darkgoldenrod;
             font-weight: bold;
@@ -1534,7 +1546,7 @@
             <p class="start-quiz-hint">Значення взято з файлу тесту. Зміни діють лише для цього запуску і не зберігаються у файлі.</p>
             <div id="start-manual-check-note" class="manual-check-note" style="display: none;">
                 <strong>✍️ <span id="start-manual-check-count"></span></strong>
-                <div>Відкрийте сторінку перевірки на телефоні (у тій самій мережі, вхід з головним ключем):</div>
+                <div>Сторінка перевірки:</div>
                 <ul id="start-manual-check-links"></ul>
             </div>
             <div class="form-group">
@@ -1876,7 +1888,7 @@
             const manualNote = document.getElementById('start-manual-check-note');
             if (manualCount > 0) {
                 document.getElementById('start-manual-check-count').textContent =
-                    `Питань, які перевіряєте ви вручну: ${manualCount}.`;
+                    `Питань з ручною перевіркою: ${manualCount}.`;
                 fillReviewLinks(document.getElementById('start-manual-check-links'));
                 manualNote.style.display = 'block';
             } else {
@@ -2347,9 +2359,9 @@
                         <div class="form-group">
                             <label style="display: flex; align-items: center;">
                                 <input type="checkbox" class="manual-check-input" style="margin-right: 10px;" onchange="toggleManualCheck(this)" >
-                                ✍️ Перевіряє вчитель вручну
+                                ✍️ Ручна перевірка
                             </label>
-                            <small>Учень вводить відповідь, а вчитель позначає її правильною чи ні на сторінці перевірки (/review/). Правильна відповідь вище показується вчителю як зразок.</small>
+                            <small>Відповідь перевіряють вручну на сторінці перевірки (/review/). Правильна відповідь вище показується там як зразок.</small>
                         </div>
                         <div class="form-group checker-group" style="">
                             <label>Перевірка (Python код):</label>
@@ -2505,6 +2517,9 @@
             const points = pointsInput ? roundPoints(parseFloat(pointsInput.value) || 1) : 1;
             const stickCheckbox = questionDiv.querySelector('.stick-to-previous-checkbox');
             const stickToPrevious = stickCheckbox ? stickCheckbox.checked : false;
+            const manualCheckbox = questionDiv.querySelector('.manual-check-input');
+            const textToggle = questionDiv.querySelector('.question-type-toggle[data-type="text"]');
+            const isManual = Boolean(manualCheckbox && manualCheckbox.checked && textToggle && textToggle.classList.contains('active'));
 
             // Set preview text (full text, no truncation)
             previewSpan.textContent = questionText || '';
@@ -2514,6 +2529,9 @@
                 let indicators = '';
                 if (stickToPrevious) {
                     indicators += '<span class="question-indicator" title="Прив\'язано до попереднього">🔗</span>';
+                }
+                if (isManual) {
+                    indicators += MANUAL_CHECK_INDICATOR;
                 }
                 if (questionImage) {
                     indicators += '<span class="question-indicator" title="Має зображення">🖼️</span>';
@@ -2670,6 +2688,12 @@
                 }
             });
 
+            // The manual check marker depends on the type
+            const anyInput = questionDiv.querySelector('.question-text');
+            if (anyInput) {
+                setTimeout(() => updateQuestionPreview(anyInput), 0);
+            }
+
             // Show/hide appropriate fields
             if (type === 'text') {
                 // Text input question
@@ -2745,13 +2769,17 @@
             });
         }
 
-        // "Checked by the teacher by hand": the checker code is not used, so hide it
+        // Marker on a folded question that is checked manually
+        const MANUAL_CHECK_INDICATOR = '<span class="question-indicator manual-check-indicator" title="Ручна перевірка">✍️ вручну</span>';
+
+        // Manual check: the checker code is not used, so hide it; the folded question gets its marker
         function toggleManualCheck(checkbox) {
             const textFields = checkbox.closest('.text-question-fields');
             const checkerGroup = textFields ? textFields.querySelector('.checker-group') : null;
             if (checkerGroup) {
                 checkerGroup.style.display = checkbox.checked ? 'none' : '';
             }
+            updateQuestionPreview(checkbox);
         }
 
         function insertCheckerTemplate(questionId, selectElement) {
@@ -2902,6 +2930,9 @@
                     if (question.stick_to_the_previous) {
                         indicatorsHtml += '<span class="question-indicator" title="Прив\'язано до попереднього">🔗</span>';
                     }
+                    if (question.manual_check === true) {
+                        indicatorsHtml += MANUAL_CHECK_INDICATOR;
+                    }
                     if (question.image) {
                         indicatorsHtml += '<span class="question-indicator" title="Має зображення">🖼️</span>';
                     }
@@ -2982,9 +3013,9 @@
                                 <div class="form-group">
                                     <label style="display: flex; align-items: center;">
                                         <input type="checkbox" class="manual-check-input" style="margin-right: 10px;" onchange="toggleManualCheck(this)" ${question.manual_check === true ? 'checked' : ''}>
-                                        ✍️ Перевіряє вчитель вручну
+                                        ✍️ Ручна перевірка
                                     </label>
-                                    <small>Учень вводить відповідь, а вчитель позначає її правильною чи ні на сторінці перевірки (/review/). Правильна відповідь вище показується вчителю як зразок.</small>
+                                    <small>Відповідь перевіряють вручну на сторінці перевірки (/review/). Правильна відповідь вище показується там як зразок.</small>
                                 </div>
                                 <div class="form-group checker-group" style="${question.manual_check === true ? 'display: none;' : ''}">
                                     <label>Перевірка (Python код):</label>

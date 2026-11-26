@@ -275,7 +275,7 @@ The main area displays a grid with:
 Each cell shows the participant's answer status:
 - **Red circle** — incorrect answer
 - **Stopwatch ⏱** — the time limit ran out, so there is no answer (counts as incorrect)
-- **Hand ✍️** — the answer waits for the teacher's check (see "Answer Review")
+- **Hand ✍️** — the answer waits for manual verification (see "Answer Review")
 - **Green background** — correct answer
 - **Yellow background** — currently answering this question
 - **Empty/white** — not yet answered
@@ -290,10 +290,12 @@ This view allows you to monitor quiz progress in real-time and identify particip
 
 Answers to questions with `manual_check: true` are checked by the teacher on the review page, `/review/`. The page is made for a phone. The phone must be on the same network as the server.
 
-**When you start such a quiz**, the start pop-up says how many questions you check by hand and shows the review page addresses. While the quiz runs, the admin panel shows the **✍️ Manual check** block: how many answers wait and how many review pages are open. If nobody is checking, it warns you and shows the addresses again. The **✍️ Review** link at the bottom of the admin panel opens the page too.
+In the quiz editor such questions carry the **✍️ вручну** mark in the question list, and live statistics mark their columns with ✍️.
+
+**When you start such a quiz**, the start pop-up says how many questions are checked manually and shows the review page addresses. While the quiz runs, the admin panel shows the **✍️ Manual check** block: how many answers wait and how many review pages are open. If nobody is checking, it warns you and shows the addresses again. The **✍️ Review** link at the bottom of the admin panel opens the page too.
 
 **How to check:**
-1. Open the review page on the phone and log in with the master key (once; the phone remembers the session).
+1. Open the review page on the phone. It uses the same master key and login as the admin panel and the file manager: a browser that is already logged in opens it at once, and a new device such as a phone asks for the key once and then remembers the session.
 2. The page shows one answer: the question, the student's answer and the sample answer (`correct_value`), if the question has one. The student's name is never shown.
 3. Tap **✓ Right** or **✗ Wrong**. The page shows the next answer at once, or waits until a new one arrives.
 

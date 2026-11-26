@@ -234,7 +234,11 @@
             color: #6c757d;
         }
 
-        /* Answered, waiting for the teacher's check (manual_check) */
+        .manual-check-indicator {
+            margin-left: 4px;
+        }
+
+        /* Answered, waiting for manual verification (manual_check) */
         .state-pending {
             background: var(--think-color);
             color: #856404;
@@ -986,6 +990,9 @@
                     // Build points indicator if question has more than 1 point
                     const pointsIndicator = questionPoints !== 1 ? `<span class="points-indicator" title="${formatPoints(questionPoints)} points">🏆 ${formatPoints(questionPoints)}</span>` : '';
 
+                    // Marker for a question that is checked manually (manual_check)
+                    const manualIndicator = question.manual_check === true ? '<span class="manual-check-indicator" title="Manual verification">✍️</span>' : '';
+
                     if (question.image && !question.question) {
                         // Image-only question: show filename and small image
                         const imagePath = question.image;
@@ -993,7 +1000,7 @@
                         headerHtml += `<th title="${escapeHtml(filename)} - Correct: ${statsText}${questionPoints !== 1 ? ` - ${formatPoints(questionPoints)} points` : ''}">
                             <div class="image-header">
                                 <img src="${escapeHtml(imagePath)}" alt="${escapeHtml(filename)}" class="header-image">
-                                <div class="image-filename">${escapeHtml(filename)}${fileIndicator}${pointsIndicator}</div>
+                                <div class="image-filename">${escapeHtml(filename)}${fileIndicator}${pointsIndicator}${manualIndicator}</div>
                                 <div class="question-stats">${statsText}</div>
                             </div>
                         </th>`;
@@ -1002,7 +1009,7 @@
                         const questionText = question.question || `Q${i + 1}`;
                         headerHtml += `<th title="${escapeHtml(questionText)} - Correct: ${statsText}${questionPoints > 1 ? ` - ${questionPoints} points` : ''}">
                             <div class="question-header">
-                                <div class="question-text">${escapeHtml(questionText)}${fileIndicator}${pointsIndicator}</div>
+                                <div class="question-text">${escapeHtml(questionText)}${fileIndicator}${pointsIndicator}${manualIndicator}</div>
                                 <div class="question-stats">${statsText}</div>
                             </div>
                         </th>`;
