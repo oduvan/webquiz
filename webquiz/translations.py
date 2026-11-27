@@ -78,6 +78,31 @@ TRANSLATIONS = {
         "reload_later": "Перезавантажте сторінку пізніше, щоб побачити правильні відповіді.",
         "reload_page": "🔄 Перезавантажити сторінку",
 
+        # Manual check by the teacher (student page)
+        "pending_review_saved": "✍️ Вашу відповідь збережено. Її перевірять вручну — результат ви побачите в кінці тесту.",
+        "pending_review_notice": "⏳ Відповідей чекає ручної перевірки: {n}. Сторінка оновиться сама.",
+        "pending_review_done": "✓ Усі ваші відповіді перевірено.",
+        "pending_review_row": "⏳ Чекає ручної перевірки",
+
+        # Review page (teacher)
+        "review_title": "✍️ Перевірка відповідей",
+        "review_waiting_count": "Чекають перевірки: {n}",
+        "review_question": "Питання",
+        "review_student_answer": "Відповідь учня",
+        "review_sample_answer": "Зразок відповіді",
+        "review_points": "Бали: {n}",
+        "review_correct": "✓ Правильно",
+        "review_incorrect": "✗ Неправильно",
+        "review_idle": "Немає відповідей для перевірки. Нові з'являться тут самі.",
+        "review_no_manual": "У поточному тесті немає питань з ручною перевіркою.",
+        "review_already_decided": "Цю відповідь уже перевірили на іншій сторінці перевірки.",
+        "review_help_text": "Відповіді, відкриті на інших сторінках перевірки: {n}. Можна допомогти: тоді ви бачите ту саму відповідь, і зараховується перше рішення.",
+        "review_help_button": "🤝 Допомогти з перевіркою",
+        "review_login_title": "Увійдіть, щоб перевіряти відповіді",
+        "review_master_key": "Головний ключ",
+        "review_login_button": "Увійти",
+        "review_login_error": "Невірний ключ",
+
         # Server-side error messages (user-facing)
         "server_username_empty": "Ім'я користувача не може бути порожнім",
         "server_username_exists": "Ім'я користувача вже існує",
@@ -172,6 +197,31 @@ TRANSLATIONS = {
         "answers_available_later": "ℹ️ Correct answers will be available after all students complete the quiz.",
         "reload_later": "Reload the page later to see the correct answers.",
         "reload_page": "🔄 Reload page",
+
+        # Manual check by the teacher (student page)
+        "pending_review_saved": "✍️ Your answer is saved. It will be checked manually; you will see the result at the end of the quiz.",
+        "pending_review_notice": "⏳ Answers waiting for manual verification: {n}. This page will update by itself.",
+        "pending_review_done": "✓ All your answers have been verified.",
+        "pending_review_row": "⏳ Waiting for manual verification",
+
+        # Review page (teacher)
+        "review_title": "✍️ Answer review",
+        "review_waiting_count": "Waiting for a check: {n}",
+        "review_question": "Question",
+        "review_student_answer": "Student's answer",
+        "review_sample_answer": "Sample answer",
+        "review_points": "Points: {n}",
+        "review_correct": "✓ Right",
+        "review_incorrect": "✗ Wrong",
+        "review_idle": "No answers to check. New ones will appear here by themselves.",
+        "review_no_manual": "The current quiz has no questions with manual verification.",
+        "review_already_decided": "This answer has already been checked on another review page.",
+        "review_help_text": "Answers open on other review pages: {n}. You can help: you then see the same answer, and the first verdict counts.",
+        "review_help_button": "🤝 Help check",
+        "review_login_title": "Log in to check answers",
+        "review_master_key": "Master key",
+        "review_login_button": "Log in",
+        "review_login_error": "Wrong key",
 
         # Server-side error messages (user-facing)
         "server_username_empty": "Username cannot be empty",
