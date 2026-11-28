@@ -290,7 +290,7 @@ This view allows you to monitor quiz progress in real-time and identify particip
 
 Answers to questions with `manual_check: true` are checked by the teacher on the review page, `/review/`. The page is made for a phone. The phone must be on the same network as the server.
 
-In the quiz editor such questions carry the **✍️ вручну** mark in the question list, and live statistics mark their columns with ✍️.
+In the quiz editor such questions carry the **✍️** mark in the question list (the tooltip says "Ручна перевірка"), and live statistics mark their columns with ✍️.
 
 **When you start such a quiz**, the start pop-up says how many questions are checked manually and shows the review page addresses. While the quiz runs, the admin panel shows the **✍️ Manual check** block: how many answers wait and how many review pages are open. If nobody is checking, it warns you and shows the addresses again. The **✍️ Review** link at the bottom of the admin panel opens the page too.
 

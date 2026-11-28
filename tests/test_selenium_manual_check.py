@@ -228,7 +228,10 @@ def test_editor_marks_manual_questions_in_the_list(temp_dir, browser):
         items = browser.find_elements(By.CSS_SELECTOR, ".question-item")
         markers = [len(item.find_elements(By.CSS_SELECTOR, ".manual-check-indicator")) for item in items]
         assert markers == [0, 1, 0]
-        assert "вручну" in items[1].find_element(By.CSS_SELECTOR, ".manual-check-indicator").text
+        # Only the icon, like the other markers; the words are in the tooltip
+        marker = items[1].find_element(By.CSS_SELECTOR, ".manual-check-indicator")
+        assert marker.text.strip() == "✍️"
+        assert marker.get_attribute("title") == "Ручна перевірка"
 
         # Turning manual check on adds the marker at once, turning it off removes it
         box = items[0].find_element(By.CSS_SELECTOR, ".manual-check-input")

@@ -493,7 +493,7 @@ questions:
 - The student types the answer and sees "it will be checked manually; you will see the result at the end". The student page never mentions a teacher.
 - Teachers open `/review/` on a phone (same network; same master key and session as the other admin pages, asked once per device). The page shows one answer at a time, without the student's name, with **✓ Right** and **✗ Wrong** buttons.
 - Several teachers can review at once: each page gets a different answer. When all waiting answers are open on other pages, a page can **help**: it then shows the same answer, and the first verdict counts.
-- The start pop-up and the admin panel tell the teacher about the review page and show its addresses. The editor marks such questions with **✍️ вручну** in the question list; live stats mark their columns with ✍️.
+- The start pop-up and the admin panel tell the teacher about the review page and show its addresses. The editor marks such questions with a **✍️** icon in the question list; live stats mark their columns with ✍️.
 - The student's results screen marks waiting answers in yellow and updates by itself every 5 seconds.
 - In the answers CSV, `is_correct` stays empty until the teacher decides; then the file is written again with `True` / `False`.
 - A question with `manual_check: true` cannot have checker code, `options` or `correct_answer`.
